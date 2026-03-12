@@ -168,6 +168,101 @@ Ingest single-patient FHIR exports from one or multiple health systems. Normaliz
 
 ---
 
+---
+
+## Agent 7 — Autonomous Web Data Collector 🌐
+
+**The most exciting and most differentiated feature — and the hardest engineering problem.**
+
+**The problem:** Before any agent can help a patient, someone has to get their data. Today, a patient's health records are scattered across 3–8 different portals (their PCP, cardiologist, hospital system, urgent care, pharmacy, insurer). Asking the patient to manually download and upload each one is a non-starter for real adoption. The agent needs to go get it.
+
+**Why it's challenging:** This sits at the intersection of HIPAA, authentication, and live web automation. But it's actually legally supported — the 21st Century Cures Act created the infrastructure for exactly this. The challenge is engineering, not regulatory.
+
+---
+
+### Three-Tier Data Acquisition Architecture
+
+#### Tier 1 — SMART on FHIR API (Clean, scalable, works today)
+**Coverage: ~60% of U.S. hospital records (Epic = 35%, Cerner = 25%+)**
+
+Every certified EHR with a patient-facing portal must support SMART on FHIR OAuth since December 2023. This means:
+- Patient clicks "Connect [Hospital Name]" → OAuth redirect → patient logs in and authorizes → agent receives access token
+- Agent can then pull Patient, Condition, Observation, MedicationRequest, Coverage, etc. via standard FHIR R4 API calls
+- Token stored encrypted in patient's own environment
+- Refreshable access — can sync automatically on a schedule
+
+**HIPAA framing:** Patient-authorized API access. Identical to Apple Health or CommonHealth. No PHI leaves the patient's environment after retrieval.
+
+**For EHIgnite:** Directly satisfies the "multi-EHR integration" scenario and interoperability bonus.
+
+**Implementation:** HL7 Argonaut SMART on FHIR client library. Register app with each major EHR vendor (Epic App Orchard, Cerner Code, etc.). One OAuth flow per health system.
+
+---
+
+#### Tier 2 — Patient-Authorized Browser Agent (The hard one)
+**Coverage: ~40% of providers — smaller hospitals, specialty clinics, urgent cares, labs**
+
+The ONC mandate requires EVERY certified EHR to have an EHI export button in the patient portal — even ones with no FHIR API. So the data is accessible, just not via API.
+
+**Architecture:**
+1. Patient provides portal credentials (stored encrypted in their own Azure Key Vault — never on our servers)
+2. Agent launches a headless browser (Playwright) inside the patient's environment
+3. Navigates to each portal, authenticates, downloads the EHI export ZIP
+4. Ingests into the patient workspace
+
+**HIPAA framing:** The patient is authorizing an agent to act on their behalf on their own data — exactly like giving your accountant access to your bank portal. Processing happens inside the patient's own infrastructure. No PHI transits any third-party system.
+
+**Real engineering challenges (not regulatory):**
+- MFA / SMS codes — requires human-in-the-loop step (agent pauses, asks patient to enter code)
+- Portal UI changes breaking selectors — needs resilient automation + fallback to patient-assisted upload
+- Session timeouts — agent needs to re-authenticate on schedule
+- Each portal has different UX — requires per-portal automation scripts or LLM-driven browser navigation
+
+**LLM-driven browser navigation angle:** Instead of brittle CSS selectors, use a vision model to identify the "Download My Records" button on any portal UI. More resilient to layout changes. This is the novel research angle for the competition — "zero-shot portal automation using multimodal LLM navigation."
+
+---
+
+#### Tier 3 — Government APIs (Easiest, often overlooked, massive coverage)
+**Coverage: 65M+ Medicare patients, 9M+ VA patients, Medicaid varies by state**
+
+These are fully standardized, well-documented, and patient-authorized today:
+
+| Source | API | What You Get | Auth |
+|---|---|---|---|
+| Medicare (CMS) | Blue Button 2.0 | Full claims history, EOBs, Part D prescriptions | OAuth 2.0 |
+| VA | VA FHIR API | Full clinical records for veterans | OAuth 2.0 |
+| Medicaid | Varies by state | Claims data | State-specific |
+| Epic MyChart | SMART on FHIR | Clinical records | OAuth 2.0 |
+
+Blue Button 2.0 is particularly powerful — it's structured FHIR data covering every Medicare claim, which means every hospital visit, every procedure, every prescription for anyone 65+. For our target patient population (complex chronic patients), this is gold.
+
+---
+
+### The EHIgnite Proposal Framing
+
+> *"Our platform uses a tiered data acquisition strategy: SMART on FHIR OAuth for compliant EHRs (covering 60%+ of hospital records today), patient-authorized browser automation for the long tail of EHI-compliant portals, and direct government API integration for CMS Blue Button and VA data. All retrieval and processing happens inside the patient's own cloud environment — our infrastructure never touches PHI. The patient authorizes once; the agent maintains access and syncs on schedule."*
+
+This directly answers:
+- ✅ Privacy/security criterion — no PHI on our servers, patient controls everything
+- ✅ Multi-EHR integration bonus — tiered approach covers the full market
+- ✅ AI Innovation bonus — LLM-driven browser navigation is novel
+- ✅ Scalability criterion — SMART on FHIR scales automatically; browser agent handles the long tail
+
+---
+
+### The Privacy Paradox (And Why It's Actually Solved)
+
+The 21st Century Cures Act created a legal framework that most people haven't internalized yet:
+
+1. **Patients have an absolute right to their data** — information blocking is now illegal
+2. **They can share it with any app they choose** — SMART on FHIR is the mechanism
+3. **The EHI export button must exist** — even for non-API portals
+4. **Processing in the patient's own environment = no BAA needed** — data never leaves their control
+
+The architecture that threads this needle: **the agent is a tool running in the patient's own Azure tenant, operating on the patient's own data, on the patient's own behalf.** That's not a healthcare vendor handling PHI. That's a patient using a tool to manage their own records.
+
+---
+
 ## Phase 1 Submission Strategy
 
 Given the May 13 deadline for concept + wireframes, the strongest competition submission would be:

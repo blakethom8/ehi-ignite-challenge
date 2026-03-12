@@ -1,0 +1,15 @@
+# Large ZIP files - don't commit
+data/synthea-samples/*.zip
+data/synthea-samples/synthea-r4-individual/
+data/synthea-samples/sample-bulk-fhir-datasets-10-patients/*.ndjson
+data/synthea-samples/sample-bulk-fhir-datasets-10-patients/log.ndjson
+
+# Keep the folder structure
+!data/synthea-samples/.gitkeep
+
+# Python
+__pycache__/
+*.pyc
+.env
+venv/
+.venv/

@@ -13,3 +13,8 @@ __pycache__/
 .env
 venv/
 .venv/
+.DS_Store
+fhir_explorer/.venv/
+fhir_explorer/catalog/.corpus_cache.json
+__pycache__/
+*.pyc

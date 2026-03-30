@@ -5,7 +5,7 @@ grouping, episode detection, and per-drug detail cards.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 import pandas as pd
 import streamlit as st
@@ -134,7 +134,7 @@ def render(record: PatientRecord, stats: PatientStats) -> None:
                         dur_str = f"{duration / 365:.1f} years"
                     st.metric("Duration", dur_str)
                 elif ep.is_active and ep.start_date:
-                    days = (datetime.now() - ep.start_date).days
+                    days = (datetime.now(timezone.utc) - ep.start_date).days
                     if days < 30:
                         dur_str = f"{days} days"
                     elif days < 365:
@@ -151,7 +151,7 @@ def render(record: PatientRecord, stats: PatientStats) -> None:
                 req_rows = []
                 for req in sorted(
                     ep.requests,
-                    key=lambda r: r.authored_on or datetime.min,
+                    key=lambda r: r.authored_on or datetime.min.replace(tzinfo=timezone.utc),
                     reverse=True,
                 ):
                     req_rows.append({

@@ -9,11 +9,19 @@ on the timeline.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pandas as pd
+import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
+
+
+def _naive(dt: datetime | None) -> datetime | None:
+    """Strip timezone info for Plotly compatibility."""
+    if dt is None:
+        return None
+    return dt.replace(tzinfo=None)
 
 from fhir_explorer.parser.models import PatientRecord
 from fhir_explorer.catalog.single_patient import PatientStats
@@ -90,8 +98,8 @@ def render(record: PatientRecord, stats: PatientStats) -> None:
     all_ends = [e.end_date for e in dated_episodes if e.end_date]
     global_min = min(all_starts).year if all_starts else 2000
     global_max = max(
-        max(e.year for e in all_ends) if all_ends else datetime.now().year,
-        datetime.now().year,
+        max(e.year for e in all_ends) if all_ends else datetime.now(timezone.utc).year,
+        datetime.now(timezone.utc).year,
     )
 
     with col_range:
@@ -112,11 +120,9 @@ def render(record: PatientRecord, stats: PatientStats) -> None:
     show_active_only = st.checkbox("Show only active medications", value=False)
 
     # --- Build Gantt figure ---
-    fig = go.Figure()
-
-    range_start = datetime(year_range[0], 1, 1)
-    range_end = datetime(year_range[1], 12, 31)
-    now = datetime.now()
+    range_start = datetime(year_range[0], 1, 1, tzinfo=timezone.utc)
+    range_end = datetime(year_range[1], 12, 31, tzinfo=timezone.utc)
+    now = datetime.now(timezone.utc)
 
     filtered_episodes = []
     for ep in dated_episodes:
@@ -131,10 +137,11 @@ def render(record: PatientRecord, stats: PatientStats) -> None:
         return
 
     # Sort by start date for a clean layout
-    filtered_episodes.sort(key=lambda e: e.start_date or datetime.min)
+    filtered_episodes.sort(key=lambda e: e.start_date or datetime.min.replace(tzinfo=timezone.utc))
 
-    # Add medication bars
-    for i, ep in enumerate(filtered_episodes):
+    # Build medication bars as a DataFrame for px.timeline
+    med_rows = []
+    for ep in filtered_episodes:
         start = ep.start_date or range_start
         end = ep.end_date or now
         # Ensure minimum visible width (7 days)
@@ -143,26 +150,33 @@ def render(record: PatientRecord, stats: PatientStats) -> None:
 
         color = _get_bar_color(ep, classifier)
         active_label = " (active)" if ep.is_active else ""
-        hover = (
-            f"<b>{ep.display}</b>{active_label}<br>"
-            f"Start: {start.strftime('%b %d, %Y')}<br>"
-            f"End: {end.strftime('%b %d, %Y') if ep.end_date else 'ongoing'}<br>"
-            f"Status: {ep.status}<br>"
-            f"Dosage: {ep.dosage_text or '—'}<br>"
-            f"Reason: {ep.reason or '—'}"
-        )
 
-        fig.add_trace(go.Bar(
-            x=[end - start],
-            y=[ep.display],
-            base=[start],
-            orientation="h",
-            marker=dict(color=color, opacity=0.85 if ep.is_active else 0.5),
-            hovertext=hover,
-            hoverinfo="text",
-            name=ep.display,
-            showlegend=False,
-        ))
+        med_rows.append({
+            "Medication": ep.display,
+            "Start": _naive(start),
+            "End": _naive(end),
+            "Status": "Active" if ep.is_active else ep.status,
+            "Color": color,
+            "Hover": (
+                f"<b>{ep.display}</b>{active_label}<br>"
+                f"Start: {start.strftime('%b %d, %Y')}<br>"
+                f"End: {end.strftime('%b %d, %Y') if ep.end_date else 'ongoing'}<br>"
+                f"Status: {ep.status}<br>"
+                f"Dosage: {ep.dosage_text or '—'}<br>"
+                f"Reason: {ep.reason or '—'}"
+            ),
+        })
+
+    med_df = pd.DataFrame(med_rows)
+    fig = px.timeline(
+        med_df,
+        x_start="Start",
+        x_end="End",
+        y="Medication",
+        color="Status",
+        custom_data=["Hover"],
+    )
+    fig.update_traces(hovertemplate="%{customdata[0]}<extra></extra>")
 
     # --- Overlay encounter markers ---
     if "Encounters" in show_options and record.encounters:
@@ -175,7 +189,7 @@ def render(record: PatientRecord, stats: PatientStats) -> None:
             ]
             if encs:
                 fig.add_trace(go.Scatter(
-                    x=[e.period.start for e in encs],
+                    x=[_naive(e.period.start) for e in encs],
                     y=[filtered_episodes[0].display] * len(encs),  # pin to top row
                     mode="markers",
                     marker=dict(
@@ -205,7 +219,7 @@ def render(record: PatientRecord, stats: PatientStats) -> None:
         ]
         if procs_dated:
             fig.add_trace(go.Scatter(
-                x=[p.performed_period.start for p in procs_dated],
+                x=[_naive(p.performed_period.start) for p in procs_dated],
                 y=[filtered_episodes[0].display] * len(procs_dated),
                 mode="markers",
                 marker=dict(
@@ -232,7 +246,7 @@ def render(record: PatientRecord, stats: PatientStats) -> None:
         ]
         if conds_dated:
             fig.add_trace(go.Scatter(
-                x=[c.onset_dt for c in conds_dated],
+                x=[_naive(c.onset_dt) for c in conds_dated],
                 y=[filtered_episodes[0].display] * len(conds_dated),
                 mode="markers",
                 marker=dict(
@@ -260,7 +274,7 @@ def render(record: PatientRecord, stats: PatientStats) -> None:
         xaxis=dict(
             title="",
             type="date",
-            range=[range_start, range_end],
+            range=[_naive(range_start), _naive(range_end)],
         ),
         yaxis=dict(
             title="",

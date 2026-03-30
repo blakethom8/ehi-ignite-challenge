@@ -10,7 +10,7 @@ and the condition tracker.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fhir_explorer.parser.models import (
     ConditionRecord,
@@ -106,7 +106,7 @@ def detect_medication_episodes(
         episodes.append(episode)
 
     # Sort by start date (earliest first), then by name
-    episodes.sort(key=lambda e: (e.start_date or datetime.min, e.display.lower()))
+    episodes.sort(key=lambda e: (e.start_date or datetime.min.replace(tzinfo=timezone.utc), e.display.lower()))
     return episodes
 
 
@@ -155,7 +155,7 @@ def detect_condition_episodes(record: PatientRecord) -> list[ConditionEpisode]:
     # Sort: active first, then by onset date descending
     episodes.sort(key=lambda e: (
         0 if e.condition.is_active else 1,
-        -(e.condition.onset_dt or datetime.min).timestamp(),
+        -(e.condition.onset_dt or datetime.min.replace(tzinfo=timezone.utc)).timestamp(),
     ))
 
     return episodes

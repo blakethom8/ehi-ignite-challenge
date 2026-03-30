@@ -5,11 +5,18 @@ timeline of diagnoses, and linked medications per condition.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 import pandas as pd
 import plotly.express as px
 import streamlit as st
+
+
+def _naive(dt: datetime | None) -> datetime | None:
+    """Strip timezone info for Plotly compatibility."""
+    if dt is None:
+        return None
+    return dt.replace(tzinfo=None)
 
 from fhir_explorer.parser.models import PatientRecord
 from fhir_explorer.catalog.single_patient import PatientStats
@@ -57,8 +64,8 @@ def render(record: PatientRecord, stats: PatientStats) -> None:
         if cond.onset_dt:
             timeline_data.append({
                 "Condition": cond.code.label(),
-                "Onset": cond.onset_dt,
-                "End": cond.abatement_dt or datetime.now(),
+                "Onset": _naive(cond.onset_dt),
+                "End": _naive(cond.abatement_dt) or datetime.now().replace(tzinfo=None),
                 "Status": "Active" if cond.is_active else cond.clinical_status.capitalize(),
             })
 
@@ -135,7 +142,7 @@ def render(record: PatientRecord, stats: PatientStats) -> None:
             with col_meta:
                 # Duration
                 if cond.onset_dt:
-                    end = cond.abatement_dt or datetime.now()
+                    end = cond.abatement_dt or datetime.now(timezone.utc)
                     days = (end - cond.onset_dt).days
                     if days < 30:
                         dur_str = f"{days} days"

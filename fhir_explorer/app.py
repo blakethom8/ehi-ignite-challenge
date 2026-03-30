@@ -33,10 +33,13 @@ st.set_page_config(
 DATA_DIR = Path(__file__).parent.parent / "data" / "synthea-samples" / "synthea-r4-individual" / "fhir"
 
 # ---------------------------------------------------------------------------
-# Sidebar — file picker + navigation
+# Page definitions
 # ---------------------------------------------------------------------------
 
 PAGES = [
+    "FHIR Reference",
+    "Data Profile",
+    "───────────────",  # visual separator (not selectable)
     "Overview",
     "Timeline",
     "Encounter Hub",
@@ -44,7 +47,11 @@ PAGES = [
     "Field Profiler",
     "Corpus Explorer",
     "Signal vs. Noise",
+    "Raw Resources",
 ]
+
+# Pages that don't require a patient to be loaded
+REFERENCE_PAGES = {"FHIR Reference", "Data Profile"}
 
 TIER_COLORS = {
     "simple": "🟢",
@@ -73,21 +80,30 @@ def sidebar():
     st.sidebar.title("🏥 FHIR Explorer")
     st.sidebar.markdown("---")
 
+    # Single navigation radio — separator line is disabled via format_func
+    page = st.sidebar.radio(
+        "Navigate",
+        PAGES,
+        format_func=lambda p: f"--- Patient Explorer ---" if p.startswith("──") else p,
+        label_visibility="collapsed",
+    )
+
+    # If user somehow selects the separator, default to Overview
+    if page.startswith("──"):
+        page = "Overview"
+
+    # For reference pages, skip patient loading
+    if page in REFERENCE_PAGES:
+        return None, None, page
+
+    st.sidebar.markdown("---")
+
+    # --- Patient selector (only needed for patient pages) ---
     files = get_patient_files()
     if not files:
         st.sidebar.error(f"No patient files found in:\n{DATA_DIR}")
         return None, None, None
 
-    # Build display labels: "Name (tier icon) — N resources"
-    @st.cache_data(show_spinner=False)
-    def build_labels(_files_hash: str, file_paths: list[str]) -> list[str]:
-        labels = []
-        for fp in file_paths:
-            name = Path(fp).stem.split("_")[0] + " " + Path(fp).stem.split("_")[1]
-            labels.append(name)
-        return labels
-
-    file_paths = [str(f) for f in files]
     labels = [f.stem.rsplit("_", 1)[0].replace("_", " ") for f in files]
 
     selected_idx = st.sidebar.selectbox(
@@ -112,9 +128,6 @@ def sidebar():
         f"Age {stats.age_years:.1f} · {'Deceased' if stats.is_deceased else 'Living'}"
     )
 
-    st.sidebar.markdown("---")
-    page = st.sidebar.radio("Navigate", PAGES)
-
     return record, stats, page
 
 
@@ -125,12 +138,27 @@ def sidebar():
 def main():
     record, stats, page = sidebar()
 
+    # Reference pages (no patient needed)
+    if page == "FHIR Reference":
+        from fhir_explorer.views.fhir_reference import render
+        render()
+        return
+
+    if page == "Data Profile":
+        from fhir_explorer.views.data_profile import render
+        render()
+        return
+
+    if page is None:
+        st.info("Select a page from the sidebar to get started.")
+        return
+
     if record is None:
         st.error("No patient data found. Check your data directory.")
         st.code(str(DATA_DIR))
         return
 
-    # Lazy import pages to keep startup fast
+    # Patient-specific pages
     if page == "Overview":
         from fhir_explorer.views.overview import render
     elif page == "Timeline":
@@ -145,6 +173,8 @@ def main():
         from fhir_explorer.views.corpus_view import render
     elif page == "Signal vs. Noise":
         from fhir_explorer.views.signal_filter import render
+    elif page == "Raw Resources":
+        from fhir_explorer.views.raw_resources import render
     else:
         st.error(f"Unknown page: {page}")
         return

@@ -44,7 +44,9 @@ PAGES = [
     "Journey Timeline",
     "Pre-Op Safety Panel",
     "Medication History",
+    "Drug Interactions",
     "Conditions",
+    "Clinical Search",
 ]
 
 # ---------------------------------------------------------------------------
@@ -133,8 +135,12 @@ def main():
         from views.safety_panel import render
     elif page == "Medication History":
         from views.medication_history import render
+    elif page == "Drug Interactions":
+        from views.interaction_view import render
     elif page == "Conditions":
         from views.condition_tracker import render
+    elif page == "Clinical Search":
+        from views.nl_search import render
     else:
         st.error(f"Unknown page: {page}")
         return

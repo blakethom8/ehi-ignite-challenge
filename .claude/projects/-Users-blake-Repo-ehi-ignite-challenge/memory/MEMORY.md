@@ -1,0 +1,2 @@
+- [Blake — project lead](user_blake.md) — EHI Ignite lead, works with neurosurgeon Max, works from phone sometimes
+- [Patient Journey app scaffolded](project_patient_journey.md) — patient-journey/ has 4 views, drug classifier, episode detector, all working as of 2026-03-29

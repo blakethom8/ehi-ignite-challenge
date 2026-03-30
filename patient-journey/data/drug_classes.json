@@ -1,0 +1,253 @@
+{
+  "anticoagulants": {
+    "label": "Anticoagulants / Blood Thinners",
+    "severity": "critical",
+    "surgical_note": "Bleeding risk — must hold before surgery. Check INR/PT if on warfarin.",
+    "keywords": [
+      "warfarin", "coumadin",
+      "heparin", "enoxaparin", "lovenox",
+      "apixaban", "eliquis",
+      "rivaroxaban", "xarelto",
+      "dabigatran", "pradaxa",
+      "edoxaban", "savaysa",
+      "fondaparinux", "arixtra"
+    ],
+    "rxnorm_codes": [
+      "11289", "67108", "69528", "114934", "1364430",
+      "1037045", "1114195", "1232082"
+    ]
+  },
+  "antiplatelets": {
+    "label": "Antiplatelet Agents",
+    "severity": "critical",
+    "surgical_note": "Increased bleeding risk. Typically held 5-7 days pre-op.",
+    "keywords": [
+      "clopidogrel", "plavix",
+      "aspirin", "asa",
+      "prasugrel", "effient",
+      "ticagrelor", "brilinta",
+      "dipyridamole", "aggrenox",
+      "ticlopidine", "ticlid",
+      "cilostazol", "pletal"
+    ],
+    "rxnorm_codes": [
+      "32968", "1116632", "1116635"
+    ]
+  },
+  "ace_inhibitors": {
+    "label": "ACE Inhibitors",
+    "severity": "warning",
+    "surgical_note": "May cause hypotension under anesthesia. Often held morning of surgery.",
+    "keywords": [
+      "lisinopril", "prinivil", "zestril",
+      "enalapril", "vasotec",
+      "ramipril", "altace",
+      "benazepril", "lotensin",
+      "captopril", "capoten",
+      "fosinopril", "monopril",
+      "quinapril", "accupril",
+      "perindopril", "aceon",
+      "trandolapril", "mavik",
+      "moexipril"
+    ],
+    "rxnorm_codes": [
+      "29046", "3827", "35296", "18867", "1998"
+    ]
+  },
+  "arbs": {
+    "label": "Angiotensin Receptor Blockers (ARBs)",
+    "severity": "warning",
+    "surgical_note": "Same hemodynamic concerns as ACE inhibitors under anesthesia.",
+    "keywords": [
+      "losartan", "cozaar",
+      "valsartan", "diovan",
+      "irbesartan", "avapro",
+      "candesartan", "atacand",
+      "telmisartan", "micardis",
+      "olmesartan", "benicar",
+      "azilsartan", "edarbi",
+      "eprosartan", "teveten"
+    ],
+    "rxnorm_codes": [
+      "52175", "69749", "83818", "83515", "73494", "321064"
+    ]
+  },
+  "jak_inhibitors": {
+    "label": "JAK Inhibitors",
+    "severity": "critical",
+    "surgical_note": "Immunosuppressive — increased infection risk. Hold 1+ week pre-op.",
+    "keywords": [
+      "tofacitinib", "xeljanz",
+      "baricitinib", "olumiant",
+      "upadacitinib", "rinvoq",
+      "ruxolitinib", "jakafi",
+      "abrocitinib", "cibinqo",
+      "deucravacitinib", "sotyktu"
+    ],
+    "rxnorm_codes": [
+      "1372736", "2047232"
+    ]
+  },
+  "immunosuppressants": {
+    "label": "Immunosuppressants",
+    "severity": "critical",
+    "surgical_note": "Infection and wound healing risk. Do NOT discontinue without transplant team.",
+    "keywords": [
+      "tacrolimus", "prograf",
+      "cyclosporine", "neoral", "sandimmune",
+      "mycophenolate", "cellcept", "myfortic",
+      "azathioprine", "imuran",
+      "sirolimus", "rapamune",
+      "everolimus", "zortress",
+      "methotrexate", "trexall",
+      "leflunomide", "arava",
+      "prednisone", "prednisolone", "methylprednisolone",
+      "dexamethasone", "hydrocortisone",
+      "rituximab", "cyclophosphamide"
+    ],
+    "rxnorm_codes": [
+      "42316", "3008", "68149", "1256", "35302",
+      "6851", "202462", "6691"
+    ]
+  },
+  "nsaids": {
+    "label": "NSAIDs",
+    "severity": "warning",
+    "surgical_note": "Increased bleeding risk + renal concerns. Typically held 3-5 days pre-op.",
+    "keywords": [
+      "ibuprofen", "advil", "motrin",
+      "naproxen", "aleve", "naprosyn",
+      "ketorolac", "toradol",
+      "diclofenac", "voltaren",
+      "meloxicam", "mobic",
+      "celecoxib", "celebrex",
+      "indomethacin", "indocin",
+      "piroxicam", "feldene",
+      "nabumetone", "relafen",
+      "etodolac"
+    ],
+    "rxnorm_codes": [
+      "5640", "7258", "6662", "3355", "36429", "2393", "5691"
+    ]
+  },
+  "opioids": {
+    "label": "Opioid History",
+    "severity": "warning",
+    "surgical_note": "Tolerance affects post-op pain management. Review for OUD history.",
+    "keywords": [
+      "oxycodone", "oxycontin", "percocet", "roxicodone",
+      "hydrocodone", "vicodin", "norco", "lortab",
+      "morphine", "ms contin", "kadian",
+      "fentanyl", "duragesic", "sublimaze",
+      "codeine", "tylenol with codeine",
+      "tramadol", "ultram",
+      "methadone", "dolophine",
+      "hydromorphone", "dilaudid",
+      "buprenorphine", "suboxone", "subutex",
+      "tapentadol", "nucynta",
+      "meperidine", "demerol",
+      "oxymorphone", "opana"
+    ],
+    "rxnorm_codes": [
+      "7804", "5489", "7052", "4337", "2670",
+      "10689", "6813", "3423", "1819", "73032", "6754"
+    ]
+  },
+  "anticonvulsants": {
+    "label": "Anticonvulsants",
+    "severity": "warning",
+    "surgical_note": "Enzyme inducers affect anesthetic drug metabolism. Check levels pre-op.",
+    "keywords": [
+      "phenytoin", "dilantin",
+      "valproate", "valproic acid", "depakote", "depakene",
+      "carbamazepine", "tegretol",
+      "levetiracetam", "keppra",
+      "lamotrigine", "lamictal",
+      "topiramate", "topamax",
+      "gabapentin", "neurontin",
+      "pregabalin", "lyrica",
+      "oxcarbazepine", "trileptal",
+      "zonisamide", "zonegran",
+      "lacosamide", "vimpat"
+    ],
+    "rxnorm_codes": [
+      "8183", "11170", "2002", "28439", "114953",
+      "38404", "25480", "77492"
+    ]
+  },
+  "psych_medications": {
+    "label": "Psychiatric Medications",
+    "severity": "info",
+    "surgical_note": "MAOIs require 2-week washout. SSRIs may increase bleeding. Lithium requires monitoring.",
+    "keywords": [
+      "sertraline", "zoloft",
+      "fluoxetine", "prozac",
+      "paroxetine", "paxil",
+      "citalopram", "celexa",
+      "escitalopram", "lexapro",
+      "venlafaxine", "effexor",
+      "duloxetine", "cymbalta",
+      "bupropion", "wellbutrin",
+      "mirtazapine", "remeron",
+      "trazodone", "desyrel",
+      "amitriptyline", "elavil",
+      "nortriptyline", "pamelor",
+      "lithium", "lithobid",
+      "quetiapine", "seroquel",
+      "olanzapine", "zyprexa",
+      "risperidone", "risperdal",
+      "aripiprazole", "abilify",
+      "clozapine", "clozaril",
+      "phenelzine", "nardil",
+      "tranylcypromine", "parnate"
+    ],
+    "rxnorm_codes": [
+      "36437", "4493", "32937", "2556", "321988",
+      "39786", "72625", "42347", "15996", "10737",
+      "704", "7531", "6448", "51272", "7019",
+      "35636", "89013", "2626", "8123"
+    ]
+  },
+  "stimulants": {
+    "label": "Stimulants",
+    "severity": "info",
+    "surgical_note": "Cardiovascular effects — arrhythmia risk under anesthesia. Hold day of surgery.",
+    "keywords": [
+      "amphetamine", "adderall",
+      "methylphenidate", "ritalin", "concerta",
+      "lisdexamfetamine", "vyvanse",
+      "dextroamphetamine", "dexedrine",
+      "modafinil", "provigil",
+      "armodafinil", "nuvigil"
+    ],
+    "rxnorm_codes": [
+      "725", "6901", "608139", "3289", "30125"
+    ]
+  },
+  "diabetes_medications": {
+    "label": "Diabetes Medications",
+    "severity": "info",
+    "surgical_note": "Hold metformin 48h pre-op (contrast/renal risk). Adjust insulin dosing.",
+    "keywords": [
+      "metformin", "glucophage",
+      "insulin", "lantus", "humalog", "novolog", "levemir", "tresiba",
+      "glipizide", "glucotrol",
+      "glyburide", "diabeta", "micronase",
+      "glimepiride", "amaryl",
+      "pioglitazone", "actos",
+      "sitagliptin", "januvia",
+      "empagliflozin", "jardiance",
+      "dapagliflozin", "farxiga",
+      "canagliflozin", "invokana",
+      "liraglutide", "victoza",
+      "semaglutide", "ozempic", "wegovy", "rybelsus",
+      "dulaglutide", "trulicity",
+      "exenatide", "byetta", "bydureon"
+    ],
+    "rxnorm_codes": [
+      "6809", "5856", "4815", "4821", "25789",
+      "33738", "593411", "1488564", "1373458",
+      "475968", "1598392", "1551291", "60548"
+    ]
+  }
+}

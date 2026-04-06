@@ -22,6 +22,7 @@ type ChatMessage =
       role: "assistant";
       content: string;
       confidence: ProviderAssistantResponse["confidence"];
+      engine: ProviderAssistantResponse["engine"];
       citations: ProviderAssistantCitation[];
       followUps: string[];
     };
@@ -84,6 +85,7 @@ export function ExplorerAssistant() {
           role: "assistant",
           content: data.answer,
           confidence: data.confidence,
+          engine: data.engine,
           citations: data.citations,
           followUps: data.follow_ups,
         },
@@ -226,6 +228,9 @@ export function ExplorerAssistant() {
                     <div className="ml-9 flex items-center gap-2">
                       <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${confidenceStyle(message.confidence)}`}>
                         confidence: {message.confidence}
+                      </span>
+                      <span className="rounded-full bg-[#e2e8f0] px-2 py-0.5 text-[10px] font-semibold uppercase text-[#334155]">
+                        engine: {message.engine}
                       </span>
                       {message.citations.length > 0 && (
                         <span className="text-xs text-[#64748b]">{message.citations.length} citation(s)</span>

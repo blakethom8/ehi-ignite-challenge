@@ -394,6 +394,7 @@ export interface ProviderAssistantResponse {
   answer: string;
   confidence: "high" | "medium" | "low";
   stance: "opinionated" | "balanced";
+  engine: "deterministic" | "anthropic-agent-sdk" | "deterministic-fallback" | string;
   citations: ProviderAssistantCitation[];
   follow_ups: string[];
 }

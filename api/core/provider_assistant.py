@@ -15,6 +15,7 @@ import sys as _sys
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from api.core.condition_ranker import ConditionRanker
 from api.core.interaction_checker import check_interactions
@@ -79,6 +80,7 @@ class AssistantResult:
     confidence: str
     citations: list[AssistantCitationPayload]
     follow_ups: list[str]
+    engine: str = "deterministic"
 
 
 def _tokenize(text: str) -> set[str]:
@@ -322,6 +324,76 @@ def _collect_citations(facts: list[_Fact], max_items: int = 6) -> list[Assistant
     return citations
 
 
+def _rank_relevant_facts(
+    patient_id: str,
+    question: str,
+    history: list[dict[str, str]] | None = None,
+    max_items: int = 8,
+) -> tuple[str, list[_Fact], dict]:
+    facts, summary = _build_facts(patient_id)
+
+    query = f"{question} {_history_context(history)}".strip()
+    tokens = _expand_tokens(_tokenize(query))
+    intent = _detect_intent(tokens)
+
+    scored = sorted(
+        ((fact, _score_fact(fact, tokens, intent)) for fact in facts),
+        key=lambda item: item[1],
+        reverse=True,
+    )
+
+    # Keep only meaningfully relevant facts; always allow some fallback context.
+    top_facts = [fact for fact, score in scored if score >= 10][:max_items]
+    if not top_facts:
+        top_facts = [fact for fact, _score in scored[:max_items]]
+
+    return intent, top_facts, summary
+
+
+def _serialize_citation(citation: AssistantCitationPayload) -> dict[str, Any]:
+    return {
+        "source_type": citation.source_type,
+        "resource_id": citation.resource_id,
+        "label": citation.label,
+        "detail": citation.detail,
+        "event_date": citation.event_date.isoformat() if citation.event_date else None,
+    }
+
+
+def get_relevant_provider_evidence(
+    patient_id: str,
+    query: str,
+    history: list[dict[str, str]] | None = None,
+    max_facts: int = 8,
+    max_citations: int = 6,
+) -> dict[str, Any]:
+    """
+    Return top chart-grounded evidence for a query in a JSON-serializable shape.
+
+    This helper is used by the Anthropic Agent SDK tool layer so both assistant
+    modes use the same retrieval/ranking logic.
+    """
+    intent, top_facts, summary = _rank_relevant_facts(
+        patient_id=patient_id,
+        question=query,
+        history=history,
+        max_items=max_facts,
+    )
+
+    citations = _collect_citations(top_facts, max_items=max_citations)
+    return {
+        "intent": intent,
+        "patient_name": summary["patient_name"],
+        "parse_warning_count": summary["parse_warning_count"],
+        "active_flag_count": len(summary["active_flags"]),
+        "interaction_count": len(summary["interactions"]),
+        "high_risk_active_condition_count": summary["active_high_risk_condition_count"],
+        "evidence_lines": [fact.text for fact in top_facts],
+        "citations": [_serialize_citation(citation) for citation in citations],
+        "follow_ups": _follow_ups(intent),
+    }
+
+
 def _direct_answer(intent: str, summary: dict, question: str) -> tuple[str, str, str | None]:
     active_flags = summary["active_flags"]
     interactions = summary["interactions"]
@@ -499,22 +571,12 @@ def answer_provider_question(
     history: list[dict[str, str]] | None = None,
     stance: str = "opinionated",
 ) -> AssistantResult:
-    facts, summary = _build_facts(patient_id)
-
-    query = f"{question} {_history_context(history)}".strip()
-    tokens = _expand_tokens(_tokenize(query))
-    intent = _detect_intent(tokens)
-
-    scored = sorted(
-        ((fact, _score_fact(fact, tokens, intent)) for fact in facts),
-        key=lambda item: item[1],
-        reverse=True,
+    intent, top_facts, summary = _rank_relevant_facts(
+        patient_id=patient_id,
+        question=question,
+        history=history,
+        max_items=8,
     )
-
-    # Keep only meaningfully relevant facts; always allow some fallback context.
-    top_facts = [fact for fact, score in scored if score >= 10][:8]
-    if not top_facts:
-        top_facts = [fact for fact, _score in scored[:5]]
 
     short_answer, confidence, recommendation = _direct_answer(intent, summary, question)
 
@@ -547,4 +609,5 @@ def answer_provider_question(
         confidence=confidence,
         citations=citations,
         follow_ups=_follow_ups(intent),
+        engine="deterministic",
     )

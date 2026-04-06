@@ -532,5 +532,6 @@ class ProviderAssistantResponse(BaseModel):
     answer: str
     confidence: str                # "high" | "medium" | "low"
     stance: str
+    engine: str = "deterministic"  # "deterministic" | "anthropic-agent-sdk" | "deterministic-fallback"
     citations: list[ProviderAssistantCitation]
     follow_ups: list[str]

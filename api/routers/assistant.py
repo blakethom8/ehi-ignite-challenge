@@ -4,7 +4,7 @@
 
 from fastapi import APIRouter, HTTPException
 
-from api.core.provider_assistant import answer_provider_question
+from api.core.provider_assistant_service import answer_provider_question
 from api.models import (
     ProviderAssistantRequest,
     ProviderAssistantResponse,
@@ -36,12 +36,15 @@ def provider_chat(payload: ProviderAssistantRequest) -> ProviderAssistantRespons
         )
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     return ProviderAssistantResponse(
         patient_id=payload.patient_id,
         answer=result.answer,
         confidence=result.confidence,
         stance=payload.stance,
+        engine=result.engine,
         citations=[
             ProviderAssistantCitation(
                 source_type=c.source_type,

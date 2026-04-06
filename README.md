@@ -58,3 +58,10 @@ ehi-ignite-challenge/
 - [Synthea patient generator](https://github.com/synthetichealth/synthea)
 - [EHI Export API reference implementation](https://github.com/smart-on-fhir/ehi-server)
 - [Argonaut EHI Export draft spec](https://build.fhir.org/ig/argonautproject/ehi-api/ehi-export.html)
+
+## Provider Assistant Runtimes
+
+The provider assistant now supports deterministic and Anthropic Agent SDK modes behind the same API endpoint.
+
+- Integration guide: `architecture/ANTHROPIC-AGENT-SDK.md`
+- Agent profile files: `api/agents/provider-assistant/`

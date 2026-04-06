@@ -255,28 +255,6 @@ async def _run_agent(
         tools=[get_patient_snapshot, query_chart_evidence],
     )
 
-    web_search_calls = 0
-    web_fetch_calls = 0
-
-    async def can_use_tool(tool_name: str, _input: dict[str, Any], _context: Any) -> dict[str, str]:
-        nonlocal web_search_calls, web_fetch_calls
-
-        if tool_name == "WebSearch":
-            if not config.enable_web_search:
-                return {"behavior": "deny", "message": "WebSearch is disabled for this assistant."}
-            web_search_calls += 1
-            if web_search_calls > config.web_search_max_uses:
-                return {"behavior": "deny", "message": "WebSearch max uses exceeded for this turn."}
-
-        if tool_name == "WebFetch":
-            if not config.enable_web_fetch:
-                return {"behavior": "deny", "message": "WebFetch is disabled for this assistant."}
-            web_fetch_calls += 1
-            if web_fetch_calls > config.web_fetch_max_uses:
-                return {"behavior": "deny", "message": "WebFetch max uses exceeded for this turn."}
-
-        return {"behavior": "allow"}
-
     built_in_tools: list[str] = []
     if config.enable_web_search:
         built_in_tools.append("WebSearch")
@@ -300,7 +278,6 @@ async def _run_agent(
         mcp_servers={"fhir_chart": mcp_server},
         max_turns=config.max_turns,
         max_budget_usd=config.max_budget_usd,
-        can_use_tool=can_use_tool,
     )
 
     prompt = (

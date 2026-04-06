@@ -14,59 +14,97 @@ This is the codebase for **Blake's submission to the EHI Ignite Challenge** — 
 
 **The core problem:** Patient health records are siloed, unstructured, and nearly impossible for clinicians to rapidly parse under time pressure. We're building tools to fix that.
 
+**North star:** *"Clinicians don't need more records. They need the right 5 facts in 30 seconds."*
+
+---
+
+## Product Strategy
+
+- **Primary user:** Surgeon / specialist doing high-speed chart review (Max Gibber, neurosurgeon, is the prototype user)
+- **Product wedge:** Medication-centered clinical intelligence — longitudinal, safety-critical, directly relevant to surgical decisions
+- **Do not build:** A generic FHIR browser, patient portal, or vague "AI-powered EHR" product
+- **Should feel like:** A clinical briefing. A risk dashboard. Evidence-backed Q&A.
+- Full strategic context: `ideas/PODCAST-INSIGHTS-FHIR-POSITIONING.md` (on `feature/patient-journey-app` branch)
+
 ---
 
 ## Repository Structure
 
 ```
 ehi-ignite-challenge/
-├── CLAUDE.md                          ← you are here
-├── README.md                          ← project overview + contest details
 │
-├── ideas/                             ← product specs (read before building)
-│   ├── FEATURE-IDEAS.md               ← full agent platform brainstorm
-│   ├── PATIENT-JOURNEY-APP.md         ← spec for the Patient Journey application ⭐
-│   └── FORMAT-AGNOSTIC-INGESTION.md   ← spec for the upstream ingestion service ⭐
+├── CLAUDE.md                              ← you are here
+├── README.md
 │
-├── fhir_explorer/                     ← EXISTING internal data exploration tool (Streamlit)
-│   ├── app.py                         ← entry point: `streamlit run fhir_explorer/app.py`
-│   ├── requirements.txt
-│   ├── data-review-plan.md
-│   ├── parser/                        ← FHIR parsing layer (reuse this in new apps)
-│   │   ├── bundle_parser.py           ← parses a FHIR R4 JSON bundle → PatientRecord
-│   │   ├── extractors.py              ← resource-type extractors (Condition, Med, etc.)
-│   │   └── models.py                  ← PatientRecord + all data models (source of truth)
+├── api/                                   ← FastAPI backend (PRIMARY — build here)
+│   ├── main.py
+│   ├── routers/                           ← patients, safety, timeline, search, corpus
+│   └── core/                             ← clinical intelligence modules (migrated from patient-journey/core/)
+│       ├── loader.py
+│       ├── drug_classifier.py
+│       ├── episode_detector.py
+│       ├── temporal.py                    ← TODO
+│       ├── batch_enrichment.py            ← TODO (LLM pipeline)
+│       ├── context_builder.py             ← TODO (5-layer pipeline)
+│       └── rag_tools.py                   ← TODO
+│
+├── app/                                   ← React + Vite + TypeScript frontend (PRIMARY)
+│   ├── src/
+│   │   ├── pages/
+│   │   │   ├── Explorer/                  ← FHIR data exploration (build first)
+│   │   │   └── PatientJourney/            ← clinician-facing app (build second)
+│   │   ├── components/
+│   │   ├── hooks/
+│   │   └── api/client.ts
+│   └── vite.config.ts
+│
+├── deploy/                                ← Docker Compose + nginx configs
+│   ├── docker-compose.prod.yml
+│   ├── nginx.conf
+│   ├── Dockerfile.api
+│   └── Dockerfile.app
+│
+├── design/                                ← design system reference
+│   ├── README.md
+│   └── DESIGN.md                          ← Miro-inspired tokens, components, color roles
+│
+├── architecture/                          ← architecture docs
+│   ├── ECOSYSTEM-OVERVIEW.md              ← platform framing, full directory layout, build sequence
+│   ├── DEPLOYMENT.md                      ← Hetzner + Docker Compose deployment guide
+│   └── CONTEXT-PIPELINE.md               ← LLM context engineering (TODO)
+│
+├── ideas/                                ← product specs (read before building)
+│   ├── FEATURE-IDEAS.md
+│   ├── PATIENT-JOURNEY-APP.md             ← patient journey spec ⭐
+│   ├── FORMAT-AGNOSTIC-INGESTION.md       ← ingestion service spec ⭐
+│   └── PODCAST-INSIGHTS-FHIR-POSITIONING.md ← strategic positioning (on feature branch)
+│
+├── fhir_explorer/                         ← LEGACY Streamlit (internal reference tool — DO NOT EXTEND)
+│   ├── app.py                             ← run: streamlit run fhir_explorer/app.py
+│   ├── parser/                            ← SHARED PARSER — always import from here
+│   │   ├── bundle_parser.py
+│   │   ├── extractors.py
+│   │   └── models.py                      ← PatientRecord + all data models (source of truth)
 │   ├── catalog/
-│   │   ├── corpus.py                  ← multi-patient corpus analysis
-│   │   ├── field_profiler.py          ← FHIR field coverage profiling
-│   │   └── single_patient.py          ← PatientStats + complexity scoring
-│   └── views/                         ← Streamlit pages
-│       ├── overview.py                ← patient summary
-│       ├── timeline.py                ← encounter timeline (chronological)
-│       ├── encounter_hub.py           ← encounter detail browser
-│       ├── signal_filter.py           ← LLM signal tiering + token budget
-│       ├── catalog_view.py            ← code catalog (SNOMED, RxNorm, LOINC)
-│       ├── corpus_view.py             ← multi-patient corpus view
-│       └── field_profiler_view.py     ← field coverage analysis
+│   │   ├── corpus.py
+│   │   ├── field_profiler.py
+│   │   └── single_patient.py
+│   └── views/                             ← reference implementations for React ports
+│
+├── patient-journey/                       ← LEGACY Streamlit (reference only — DO NOT EXTEND)
+│   ├── app.py
+│   ├── core/                              ← drug_classifier, episode_detector (migrate to api/core/)
+│   ├── views/                             ← reference implementations for React ports
+│   ├── CONTEXT-ENGINEERING.md             ← READ THIS — LLM context pipeline design ⭐
+│   └── DATA-DEFINITIONS.md               ← READ THIS — data model reference ⭐
 │
 ├── data/
-│   ├── synthea-samples/
-│   │   ├── synthea-r4-individual/fhir/   ← 1,180 individual patient FHIR bundles (JSON)
-│   │   │                                    ← PRIMARY TEST DATA — use these for development
-│   │   ├── sample-bulk-fhir-datasets-10-patients/  ← bulk NDJSON format (10 patients)
-│   │   │   ├── Patient.000.ndjson
-│   │   │   ├── Condition.000.ndjson
-│   │   │   ├── MedicationRequest.000.ndjson
-│   │   │   ├── Encounter.000.ndjson
-│   │   │   ├── Observation.000.ndjson
-│   │   │   └── ... (all FHIR resource types)
-│   │   └── synthea-r4-samples.zip
-│   └── real-world-examples/              ← placeholder for real de-identified data
+│   └── synthea-samples/
+│       ├── synthea-r4-individual/fhir/    ← 1,180 individual FHIR bundles (PRIMARY TEST DATA)
+│       └── sample-bulk-fhir-datasets-10-patients/
 │
-├── architecture/                         ← architecture docs
-├── docs/
-│   └── DATA-OVERVIEW.md
-└── __init__.py
+├── pyproject.toml                         ← UV root environment
+└── uv.lock
 ```
 
 ---
@@ -77,30 +115,15 @@ ehi-ignite-challenge/
 
 **Path:** `data/synthea-samples/synthea-r4-individual/fhir/`  
 **Count:** 1,180 JSON files  
-**Format:** FHIR R4 Bundle (each file = one patient's complete record)  
-**Content:** Each bundle contains all FHIR resource types for that patient: Patient, Condition, Encounter, MedicationRequest, Observation, Procedure, DiagnosticReport, Immunization, AllergyIntolerance, CarePlan, etc.
+**Format:** FHIR R4 Bundle (each file = one patient's complete record)
 
-These are the primary test files. The existing `fhir_explorer` parser is built to read these directly.
-
-**Notable patients for testing (complex histories):**
-- `Robert854_Botsford977_*.json` — check for complex medication history
-- Any file can be loaded — use the fhir_explorer app to browse them visually first
-
-### Secondary: Bulk NDJSON Dataset (10 patients)
-
-**Path:** `data/synthea-samples/sample-bulk-fhir-datasets-10-patients/`  
-**Format:** NDJSON (one resource per line), split by resource type  
-**Use case:** Useful for corpus-level analysis or if you need to work with the bulk FHIR export format
-
-### Real-World Examples
-
-`data/real-world-examples/` — currently empty placeholder. If Blake adds real de-identified records, they'll appear here.
+These are the primary test files. The existing `fhir_explorer` parser reads these directly.
 
 ---
 
 ## The Existing Parser (Always Reuse This)
 
-The `fhir_explorer/parser/` module is stable and well-tested. **Do not rewrite it.** Import from it.
+The `fhir_explorer/parser/` module is stable and well-tested. **Do not rewrite it.** Always import from it — even in the new `api/` backend.
 
 ### Loading a patient
 
@@ -118,7 +141,7 @@ stats = compute_patient_stats(record)
 |---|---|
 | `PatientRecord` | Top-level object — contains everything about a patient |
 | `PatientDemographics` | Name, DOB, gender, address |
-| `Condition` | A diagnosis — code, display, onset, status (active/resolved) |
+| `Condition` | A diagnosis — code, display, onset, status |
 | `Medication` | A medication — display, RxNorm code, status, dates |
 | `EncounterRecord` | A clinical visit — type, date, linked resources |
 | `Observation` | A lab result or vital — LOINC code, value, unit |
@@ -126,91 +149,70 @@ stats = compute_patient_stats(record)
 | `Immunization` | A vaccine — display, date |
 | `AllergyRecord` | An allergy — substance, reaction, severity |
 
-### PatientRecord key attributes
+---
 
-```python
-record.patient          # PatientDemographics
-record.conditions       # list[Condition]
-record.medications      # list[Medication]
-record.encounters       # list[EncounterRecord]
-record.observations     # list[Observation]
-record.procedures       # list[Procedure]
-record.immunizations    # list[Immunization]
-record.allergies        # list[AllergyRecord]
-record.obs_index        # dict[id, Observation] — fast lookup
-```
+## Tech Stack
+
+### Backend (`api/`)
+- **Python 3.13**, FastAPI, uvicorn
+- Imports from `fhir_explorer.parser` for all FHIR parsing
+- Anthropic SDK (Claude Haiku for batch enrichment, Sonnet for NL search)
+- Run: `uv run uvicorn api.main:app --reload --port 8000`
+
+### Frontend (`app/`)
+- **React 18 + Vite + TypeScript**
+- Tailwind CSS + shadcn/ui for components
+- Plotly.js (react-plotly) for charts (Gantt, timeline, density)
+- React Query for API state management
+- Run: `cd app && npm run dev` (runs on :5173)
+
+### Deployment
+- Hetzner CX21 VPS (~€4.85/mo)
+- Docker Compose + nginx + Let's Encrypt SSL
+- See `architecture/DEPLOYMENT.md` for full setup
+
+### Design System
+- Miro-inspired (see `design/DESIGN.md`)
+- Primary color: Blue 450 (`#5b76fe`)
+- Display font: Roobert PRO Medium
+- Body font: Noto Sans
 
 ---
 
-## What's Been Built (fhir_explorer)
+## Build Order
 
-The `fhir_explorer` is an **internal data exploration tool** — it's for understanding the data, not for the competition submission. Think of it as our data lab.
+1. **FastAPI backend** — stand up `api/`, wire in existing parser, expose patient list + data endpoints
+2. **React shell** — routing, patient selector sidebar, layout
+3. **Explorer views** (React ports of fhir_explorer): Overview → Timeline → Encounter Hub → Field Profiler → Corpus
+4. **Patient Journey views**: Safety Panel → Medication Timeline → Conditions
+5. **Context engineering pipeline**: `temporal.py` → `batch_enrichment.py` → `context_builder.py`
+6. **NL Search**: streaming Claude Q&A with citations
+7. **Deployment**: Docker Compose → Hetzner
 
-### Running it
+**Current focus: Steps 1–3 (Explorer)**
 
-```bash
-cd ehi-ignite-challenge
-pip install -r fhir_explorer/requirements.txt
-streamlit run fhir_explorer/app.py
-```
+---
 
-### Pages available
+## Key Reference Docs
 
-| Page | What It Does |
+| Doc | What It Is |
 |---|---|
-| Overview | Patient summary — demographics, conditions, complexity score |
-| Timeline | Chronological encounter timeline with density chart and filters |
-| Encounter Hub | Expandable encounter cards with linked medications, labs, procedures |
-| Code Catalogs | All SNOMED, RxNorm, LOINC codes found in the record |
-| Field Profiler | Which FHIR fields are populated vs. missing |
-| Corpus Explorer | Multi-patient analysis across all 1,180 patients |
-| Signal vs. Noise | LLM signal tiering — which resources belong in the LLM context window |
-
----
-
-## What to Build Next (New Applications)
-
-Two new standalone applications are planned. **Each goes in its own top-level directory.** Read the full spec before starting.
-
-### 1. Patient Journey Application (`patient-journey/`)
-
-**Spec:** `ideas/PATIENT-JOURNEY-APP.md`  
-**Purpose:** Clinician-facing patient history visualization tool. A surgeon reviewing a patient before a case needs to rapidly answer: is this patient on blood thinners? anticoagulants? opioid history?  
-**Key features:**
-- Medication Gantt timeline (each drug as a horizontal bar over time)
-- Pre-op surgical safety panel (auto-flagging drug classes: anticoagulants, JAK inhibitors, ACE inhibitors, opioids, immunosuppressants)
-- Natural language search ("Has this patient been on opioids in the last 5 years?")
-- Condition/episode tracker
-
-**Build in:** `patient-journey/`  
-**Reuse:** `fhir_explorer/parser/` for all data loading
-
----
-
-### 2. Format-Agnostic Ingestion Service (`fhir-ingestion/`)
-
-**Spec:** `ideas/FORMAT-AGNOSTIC-INGESTION.md`  
-**Purpose:** Upstream ETL service that accepts patient records in any format (PDF, CDA/CCD, HL7 v2, free text, FHIR) and outputs a standardized FHIR R4 bundle. Sits upstream of the Patient Journey App.  
-**Key features:**
-- Format detection
-- PDF text extraction + LLM-based entity extraction
-- CDA/CCD XML parsing
-- Entity normalization (RxNorm, ICD-10, LOINC codes)
-- FHIR R4 bundle builder
-
-**Build in:** `fhir-ingestion/`
+| `patient-journey/CONTEXT-ENGINEERING.md` | 5-layer LLM context pipeline design — read before building batch_enrichment or NL search |
+| `patient-journey/DATA-DEFINITIONS.md` | Full data model reference — encounter types, medication records, observation fields |
+| `ideas/PATIENT-JOURNEY-APP.md` | Full product spec for the clinical journey app |
+| `architecture/ECOSYSTEM-OVERVIEW.md` | Platform framing and complete directory layout |
+| `architecture/DEPLOYMENT.md` | Hetzner + Docker Compose deployment guide |
+| `design/DESIGN.md` | Miro-inspired design tokens + component guide |
 
 ---
 
 ## Coding Conventions
 
-- **Python 3.11+**, fully typed with type hints
-- **Streamlit** for UI (consistent with fhir_explorer)
-- **Plotly** for charts
-- **Imports:** always import from `fhir_explorer.parser` — don't copy/paste parser code
-- **Style:** match the existing code style in `fhir_explorer/` — clean, typed, docstrings on public functions
-- **Tests:** put in `tests/` subdirectory within each app folder
-- **No hardcoded paths** — use `Path(__file__).parent` for relative paths
+- **Python 3.13+**, fully typed with type hints
+- **FastAPI** for backend — follow `provider-search` repo patterns (routers, service layer, Pydantic models)
+- **React + TypeScript** — functional components, hooks, React Query for data fetching
+- **Imports:** always import from `fhir_explorer.parser` — never copy parser code
+- **No hardcoded paths** — use `Path(__file__).parent` for relative paths in Python; `import.meta.env.VITE_API_URL` for API URL in React
 
 ---
 
@@ -223,4 +225,4 @@ Two new standalone applications are planned. **Each goes in its own top-level di
 
 ---
 
-*Last updated: March 29, 2026*
+*Last updated: April 5, 2026*

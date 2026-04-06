@@ -1,0 +1,17 @@
+[project]
+name = "ehi-ignite-challenge"
+version = "0.1.0"
+description = "EHI Ignite Challenge — FHIR clinical intelligence tools"
+requires-python = ">=3.11"
+dependencies = [
+    "streamlit>=1.35.0",
+    "pandas>=2.2.0",
+    "plotly>=5.20.0",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "pydantic>=2.7.0",
+    "python-multipart>=0.0.9",
+]
+
+[dependency-groups]
+dev = []

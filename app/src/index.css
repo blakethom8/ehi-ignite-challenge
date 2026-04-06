@@ -1,0 +1,38 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #5b76fe;
+  --color-primary-pressed: #2a41b6;
+  --color-near-black: #1c1c1e;
+  --color-slate: #555a6a;
+  --color-placeholder: #a5a8b5;
+  --color-border: #c7cad5;
+  --color-ring: rgb(224 226 232);
+  --color-success: #00b473;
+
+  /* Clinical risk */
+  --color-risk-critical-bg: #ffc6c6;
+  --color-risk-critical-text: #600000;
+  --color-risk-warning-bg: #ffe6cd;
+  --color-risk-warning-text: #744000;
+  --color-risk-clear-bg: #c3faf5;
+  --color-risk-clear-text: #187574;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Noto Sans", system-ui, sans-serif;
+  color: #1c1c1e;
+  background-color: #f5f6f8;
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}

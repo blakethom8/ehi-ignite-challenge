@@ -1,0 +1,666 @@
+"""
+/api/patients — patient listing and detail endpoints.
+"""
+
+from __future__ import annotations
+
+import json
+import sys as _sys
+from collections import defaultdict
+from datetime import datetime
+from pathlib import Path
+
+from fastapi import APIRouter, HTTPException
+
+from api.core.loader import (
+    list_patient_files,
+    patient_display_name,
+    patient_id_from_path,
+    path_from_patient_id,
+    load_patient,
+)
+from api.models import (
+    PatientListItem,
+    PatientOverview,
+    ConditionRow,
+    MedRow,
+    ResourceTypeCount,
+    EncounterTypeSummary,
+    TimelineResponse,
+    EncounterEvent,
+    EncounterDetail,
+    ObservationDetail,
+    ConditionDetail,
+    ProcedureDetail,
+    MedicationDetail,
+    LabHistoryPoint,
+    LabValue,
+    KeyLabsResponse,
+    SafetyMedication,
+    SafetyFlag,
+    SafetyResponse,
+    ImmunizationItem,
+    ImmunizationResponse,
+    RankedConditionItem,
+    ConditionAcuityResponse,
+    ProcedureItem,
+    ProceduresResponse,
+)
+
+# ---------------------------------------------------------------------------
+# Condition ranker
+# ---------------------------------------------------------------------------
+
+from api.core.condition_ranker import ConditionRanker
+
+_condition_ranker = ConditionRanker()
+
+# ---------------------------------------------------------------------------
+# Drug classifier — imported from patient-journey module
+# ---------------------------------------------------------------------------
+
+_PATIENT_JOURNEY = Path(__file__).parent.parent.parent / "patient-journey"
+if str(_PATIENT_JOURNEY) not in _sys.path:
+    _sys.path.insert(0, str(_PATIENT_JOURNEY))
+from core.drug_classifier import DrugClassifier, SafetyFlag as _SafetyFlag  # noqa: E402
+
+_DRUG_MAPPING = _PATIENT_JOURNEY / "data" / "drug_classes.json"
+_classifier = DrugClassifier(mapping_path=_DRUG_MAPPING)
+
+router = APIRouter(prefix="/patients", tags=["patients"])
+
+BILLING_TYPES = {"Claim", "ExplanationOfBenefit"}
+ADMIN_TYPES = {"Organization", "Practitioner", "PractitionerRole", "Location"}
+
+
+@router.get("", response_model=list[PatientListItem])
+def list_patients() -> list[PatientListItem]:
+    """
+    Return a lightweight list of all patients — names and key stats only.
+    Reads file names without loading bundles, so this is fast regardless
+    of corpus size.
+    """
+    files = list_patient_files()
+    items: list[PatientListItem] = []
+
+    for path in files:
+        patient_id = patient_id_from_path(path)
+        name = patient_display_name(path)
+        items.append(PatientListItem(
+            id=patient_id,
+            name=name,
+            age_years=0.0,
+            gender="",
+            complexity_tier="",
+            complexity_score=0.0,
+            total_resources=0,
+            encounter_count=0,
+            active_condition_count=0,
+            active_med_count=0,
+        ))
+
+    return items
+
+
+@router.get("/loaded", response_model=list[PatientListItem])
+def list_patients_with_stats() -> list[PatientListItem]:
+    """
+    Return patient list WITH stats computed. Loads all bundles — slow for
+    large corpora. Use sparingly (corpus view, sorting/filtering).
+    """
+    files = list_patient_files()
+    items: list[PatientListItem] = []
+    for path in files:
+        result = load_patient(patient_id_from_path(path))
+        if result is None:
+            continue
+        _, stats = result
+        items.append(PatientListItem(
+            id=patient_id_from_path(path),
+            name=stats.name,
+            age_years=stats.age_years,
+            gender=stats.gender,
+            complexity_tier=stats.complexity_tier,
+            complexity_score=stats.complexity_score,
+            total_resources=stats.total_resources,
+            encounter_count=stats.encounter_count,
+            active_condition_count=stats.active_condition_count,
+            active_med_count=stats.active_med_count,
+        ))
+    return items
+
+
+@router.get("/{patient_id}/overview", response_model=PatientOverview)
+def patient_overview(patient_id: str) -> PatientOverview:
+    """Full patient overview — demographics, resource counts, conditions, meds."""
+    result = load_patient(patient_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"Patient not found: {patient_id}")
+
+    record, stats = result
+    s = record.summary
+
+    # Resource type breakdown with categories
+    resource_type_counts: list[ResourceTypeCount] = []
+    for rtype, count in sorted(record.resource_type_counts.items(), key=lambda x: -x[1]):
+        if rtype in BILLING_TYPES:
+            category = "Billing"
+        elif rtype in ADMIN_TYPES:
+            category = "Administrative"
+        else:
+            category = "Clinical"
+        resource_type_counts.append(ResourceTypeCount(
+            resource_type=rtype,
+            count=count,
+            category=category,
+        ))
+
+    conditions = [
+        ConditionRow(
+            condition_id=c.condition_id,
+            display=c.display,
+            clinical_status=c.clinical_status,
+            is_active=c.is_active,
+            onset_dt=c.onset_dt,
+            abatement_dt=c.abatement_dt,
+        )
+        for c in stats.condition_catalog
+    ]
+
+    medications = [
+        MedRow(
+            med_id=m.med_id,
+            display=m.display,
+            status=m.status,
+            authored_on=m.authored_on,
+            is_active=m.is_active,
+        )
+        for m in stats.med_catalog
+    ]
+
+    enc_type_breakdown = [
+        EncounterTypeSummary(encounter_type=e.encounter_type, count=e.count)
+        for e in stats.encounter_type_breakdown
+    ]
+
+    return PatientOverview(
+        id=patient_id,
+        name=stats.name,
+        age_years=stats.age_years,
+        gender=stats.gender,
+        birth_date=str(s.birth_date) if s.birth_date else None,
+        is_deceased=stats.is_deceased,
+        race=stats.race or "",
+        ethnicity=s.ethnicity or "",
+        city=stats.city or "",
+        state=stats.state or "",
+        language=s.language or "",
+        marital_status=s.marital_status or "",
+        daly=s.daly,
+        qaly=s.qaly,
+        earliest_encounter_dt=stats.earliest_encounter_dt,
+        latest_encounter_dt=stats.latest_encounter_dt,
+        years_of_history=stats.years_of_history,
+        total_resources=stats.total_resources,
+        clinical_resource_count=stats.clinical_resource_count,
+        billing_resource_count=stats.billing_resource_count,
+        billing_pct=stats.billing_pct,
+        resource_type_counts=resource_type_counts,
+        complexity_score=stats.complexity_score,
+        complexity_tier=stats.complexity_tier,
+        active_condition_count=stats.active_condition_count,
+        resolved_condition_count=stats.resolved_condition_count,
+        conditions=conditions,
+        active_med_count=stats.active_med_count,
+        total_med_count=stats.total_med_count,
+        medications=medications,
+        unique_loinc_count=stats.unique_loinc_count,
+        obs_category_breakdown=stats.obs_category_breakdown,
+        encounter_count=stats.encounter_count,
+        encounter_class_breakdown=stats.encounter_class_breakdown,
+        encounter_type_breakdown=enc_type_breakdown,
+        avg_resources_per_encounter=stats.avg_resources_per_encounter,
+        allergy_count=stats.allergy_count,
+        allergy_labels=stats.allergy_labels,
+        immunization_count=stats.immunization_count,
+        unique_vaccines=stats.unique_vaccines,
+        parse_warning_count=stats.parse_warning_count,
+    )
+
+
+@router.get("/{patient_id}/timeline", response_model=TimelineResponse)
+def patient_timeline(patient_id: str) -> TimelineResponse:
+    """Encounter timeline — chronological list with linked resource counts."""
+    result = load_patient(patient_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"Patient not found: {patient_id}")
+
+    record, stats = result
+
+    encounters_sorted = sorted(
+        record.encounters,
+        key=lambda e: e.period.start or datetime.min,
+    )
+
+    year_counts: dict[str, int] = defaultdict(int)
+    events: list[EncounterEvent] = []
+
+    for enc in encounters_sorted:
+        if enc.period.start:
+            year_counts[str(enc.period.start.year)] += 1
+
+        events.append(EncounterEvent(
+            encounter_id=enc.encounter_id,
+            class_code=enc.class_code or "",
+            encounter_type=enc.encounter_type or "",
+            reason_display=enc.reason_display or "",
+            start=enc.period.start,
+            end=enc.period.end,
+            provider_org=enc.provider_org or "",
+            practitioner_name=enc.practitioner_name or "",
+            linked_observation_count=len(enc.linked_observations),
+            linked_condition_count=len(enc.linked_conditions),
+            linked_procedure_count=len(enc.linked_procedures),
+            linked_medication_count=len(enc.linked_medications),
+        ))
+
+    return TimelineResponse(
+        patient_id=patient_id,
+        name=stats.name,
+        encounters=events,
+        year_counts=dict(year_counts),
+    )
+
+
+@router.get("/{patient_id}/encounters/{encounter_id}", response_model=EncounterDetail)
+def encounter_detail(patient_id: str, encounter_id: str) -> EncounterDetail:
+    """Full detail for a single encounter — all linked resources."""
+    result = load_patient(patient_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"Patient not found: {patient_id}")
+
+    record, _ = result
+    enc = record.encounter_index.get(encounter_id)
+    if enc is None:
+        raise HTTPException(status_code=404, detail=f"Encounter not found: {encounter_id}")
+
+    # Duration
+    duration_hours: float | None = None
+    if enc.period.start and enc.period.end:
+        duration_hours = (enc.period.end - enc.period.start).total_seconds() / 3600
+
+    # Linked observations
+    observations = [
+        ObservationDetail(
+            obs_id=obs.obs_id,
+            category=obs.category or "",
+            display=obs.display or "",
+            loinc_code=obs.loinc_code or "",
+            effective_dt=obs.effective_dt,
+            value_type=obs.value_type or "",
+            value_quantity=obs.value_quantity,
+            value_unit=obs.value_unit or "",
+            value_concept_display=obs.value_concept_display,
+        )
+        for obs_id in enc.linked_observations
+        if (obs := record.obs_index.get(obs_id)) is not None
+    ]
+
+    # Linked conditions
+    cond_index = {c.condition_id: c for c in record.conditions}
+    conditions = [
+        ConditionDetail(
+            condition_id=c.condition_id,
+            display=c.code.label(),
+            clinical_status=c.clinical_status,
+            is_active=c.is_active,
+            onset_dt=c.onset_dt,
+        )
+        for cid in enc.linked_conditions
+        if (c := cond_index.get(cid)) is not None
+    ]
+
+    # Linked procedures
+    proc_index = {p.procedure_id: p for p in record.procedures}
+    procedures = [
+        ProcedureDetail(
+            procedure_id=p.procedure_id,
+            display=p.code.label(),
+            status=p.status,
+            performed_start=p.performed_period.start if p.performed_period else None,
+            reason_display=p.reason_display or "",
+        )
+        for pid in enc.linked_procedures
+        if (p := proc_index.get(pid)) is not None
+    ]
+
+    # Linked medications
+    med_index = {m.med_id: m for m in record.medications}
+    medications = [
+        MedicationDetail(
+            med_id=m.med_id,
+            display=m.display,
+            status=m.status,
+            authored_on=m.authored_on,
+            dosage_text=m.dosage_text or "",
+            reason_display=m.reason_display or "",
+        )
+        for mid in enc.linked_medications
+        if (m := med_index.get(mid)) is not None
+    ]
+
+    return EncounterDetail(
+        encounter_id=enc.encounter_id,
+        class_code=enc.class_code or "",
+        encounter_type=enc.encounter_type or "",
+        reason_display=enc.reason_display or "",
+        start=enc.period.start,
+        end=enc.period.end,
+        duration_hours=duration_hours,
+        provider_org=enc.provider_org or "",
+        practitioner_name=enc.practitioner_name or "",
+        observations=observations,
+        conditions=conditions,
+        procedures=procedures,
+        medications=medications,
+        diagnostic_report_count=len(enc.linked_diagnostic_reports),
+        imaging_study_count=len(enc.linked_imaging_studies),
+    )
+
+
+@router.get("/{patient_id}/key-labs", response_model=KeyLabsResponse)
+def patient_key_labs(patient_id: str) -> KeyLabsResponse:
+    """
+    Return the most recent value + trend for clinically important lab panels.
+
+    Panels covered:
+    - Hematology: CBC labs (Hemoglobin, Hematocrit, Platelets, WBC)
+    - Metabolic: BMP/CMP (Sodium, Potassium, Creatinine, BUN, Glucose)
+    - Coagulation: INR, PT, PTT
+    - Cardiac: Troponin, BNP, proBNP
+    """
+    result = load_patient(patient_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"Patient not found: {patient_id}")
+
+    record, _ = result
+
+    # LOINC code → (panel name, display label)
+    PANEL_LOINC: dict[str, tuple[str, str]] = {
+        # Hematology
+        "718-7":   ("Hematology", "Hemoglobin"),
+        "20570-8": ("Hematology", "Hematocrit"),
+        "777-3":   ("Hematology", "Platelets"),
+        "6690-2":  ("Hematology", "WBC"),
+        # Metabolic
+        "2951-2":  ("Metabolic", "Sodium"),
+        "2823-3":  ("Metabolic", "Potassium"),
+        "2160-0":  ("Metabolic", "Creatinine"),
+        "3094-0":  ("Metabolic", "BUN"),
+        "2345-7":  ("Metabolic", "Glucose"),
+        # Coagulation
+        "34714-6": ("Coagulation", "INR"),
+        "5902-2":  ("Coagulation", "PT"),
+        "3173-2":  ("Coagulation", "PTT"),
+        # Cardiac
+        "10839-9": ("Cardiac", "Troponin"),
+        "42637-9": ("Cardiac", "BNP"),
+        "33762-6": ("Cardiac", "proBNP"),
+    }
+
+    # Group observations by LOINC code, keeping only quantity observations
+    obs_by_loinc: dict[str, list] = defaultdict(list)
+    for obs in record.observations:
+        if obs.loinc_code in PANEL_LOINC and obs.value_type == "quantity" and obs.value_quantity is not None:
+            obs_by_loinc[obs.loinc_code].append(obs)
+
+    # Build panels dict: panel_name → list[LabValue]
+    panels: dict[str, list[LabValue]] = {}
+
+    for loinc_code, (panel_name, default_display) in PANEL_LOINC.items():
+        observations = obs_by_loinc.get(loinc_code)
+        if not observations:
+            continue
+
+        # Sort by effective_dt descending (most recent first); None dates go last
+        observations_sorted = sorted(
+            observations,
+            key=lambda o: o.effective_dt or datetime.min,
+            reverse=True,
+        )
+
+        most_recent = observations_sorted[0]
+
+        # Compute trend by comparing the two most recent readings
+        trend: str | None = None
+        if len(observations_sorted) >= 2:
+            v0 = most_recent.value_quantity          # most recent
+            v1 = observations_sorted[1].value_quantity  # previous
+            if v0 is not None and v1 is not None and v1 != 0:
+                pct_change = (v0 - v1) / abs(v1)
+                if pct_change > 0.05:
+                    trend = "up"
+                elif pct_change < -0.05:
+                    trend = "down"
+                else:
+                    trend = "stable"
+
+        # Build history: take up to 10 readings, oldest first
+        history_obs = observations_sorted[:10]
+        history_obs.reverse()  # oldest first for sparkline
+        history = [
+            LabHistoryPoint(
+                effective_dt=obs.effective_dt,
+                value=obs.value_quantity,
+            )
+            for obs in history_obs
+            if obs.value_quantity is not None
+        ]
+
+        lab = LabValue(
+            loinc_code=loinc_code,
+            display=most_recent.display or default_display,
+            value=most_recent.value_quantity,
+            unit=most_recent.value_unit or "",
+            effective_dt=most_recent.effective_dt,
+            trend=trend,
+            is_abnormal=None,  # No reference range data available in Synthea
+            history=history,
+        )
+
+        if panel_name not in panels:
+            panels[panel_name] = []
+        panels[panel_name].append(lab)
+
+    return KeyLabsResponse(patient_id=patient_id, panels=panels)
+
+
+@router.get("/{patient_id}/safety", response_model=SafetyResponse)
+def patient_safety(patient_id: str) -> SafetyResponse:
+    """Pre-op safety flags — drug class risk classification."""
+    result = load_patient(patient_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"Patient not found: {patient_id}")
+
+    record, stats = result
+
+    raw_flags = _classifier.generate_safety_flags(record.medications)
+
+    flags: list[SafetyFlag] = []
+    for rf in raw_flags:
+        medications = [
+            SafetyMedication(
+                med_id=cm.medication.med_id,
+                display=cm.medication.display,
+                status=cm.medication.status,
+                authored_on=cm.medication.authored_on,
+                is_active=cm.is_active,
+            )
+            for cm in rf.medications
+        ]
+        flags.append(SafetyFlag(
+            class_key=rf.class_key,
+            label=rf.label,
+            severity=rf.severity,
+            surgical_note=rf.surgical_note,
+            status=rf.status,
+            medications=medications,
+        ))
+
+    active_flag_count = sum(1 for f in flags if f.status == "ACTIVE")
+    historical_flag_count = sum(1 for f in flags if f.status == "HISTORICAL")
+
+    return SafetyResponse(
+        patient_id=patient_id,
+        name=stats.name,
+        flags=flags,
+        active_flag_count=active_flag_count,
+        historical_flag_count=historical_flag_count,
+    )
+
+
+@router.get("/{patient_id}/immunizations", response_model=ImmunizationResponse)
+def patient_immunizations(patient_id: str) -> ImmunizationResponse:
+    """Immunization history — all vaccines with dates."""
+    result = load_patient(patient_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"Patient not found: {patient_id}")
+
+    record, stats = result
+
+    # Sort by occurrence_dt descending, nulls last
+    immunizations_sorted = sorted(
+        record.immunizations,
+        key=lambda imm: imm.occurrence_dt or datetime.min,
+        reverse=True,
+    )
+
+    items: list[ImmunizationItem] = [
+        ImmunizationItem(
+            imm_id=imm.imm_id,
+            display=imm.display or "",
+            cvx_code=imm.cvx_code or "",
+            status=imm.status or "",
+            occurrence_dt=imm.occurrence_dt,
+        )
+        for imm in immunizations_sorted
+    ]
+
+    # Unique vaccines — dedup by display name, sorted alphabetically
+    seen: set[str] = set()
+    unique_vaccines: list[str] = []
+    for imm in immunizations_sorted:
+        name = imm.display or ""
+        if name and name not in seen:
+            seen.add(name)
+            unique_vaccines.append(name)
+    unique_vaccines.sort()
+
+    return ImmunizationResponse(
+        patient_id=patient_id,
+        name=stats.name,
+        total_count=len(items),
+        immunizations=items,
+        unique_vaccines=unique_vaccines,
+    )
+
+
+@router.get("/{patient_id}/condition-acuity", response_model=ConditionAcuityResponse)
+def condition_acuity(patient_id: str) -> ConditionAcuityResponse:
+    """Active conditions ranked by surgical risk category."""
+    result = load_patient(patient_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"Patient not found: {patient_id}")
+
+    record, stats = result
+
+    all_ranked = _condition_ranker.rank_all(stats.condition_catalog)
+
+    ranked_active = [r for r in all_ranked if r.is_active]
+    ranked_resolved = [r for r in all_ranked if not r.is_active]
+
+    def to_item(r: "RankedCondition") -> RankedConditionItem:  # noqa: F821
+        from datetime import datetime
+        onset_dt: datetime | None = None
+        if r.onset_dt is not None:
+            try:
+                onset_dt = datetime.fromisoformat(r.onset_dt)
+            except ValueError:
+                onset_dt = None
+        return RankedConditionItem(
+            condition_id=r.condition_id,
+            display=r.display,
+            clinical_status=r.clinical_status,
+            onset_dt=onset_dt,
+            risk_category=r.risk_category,
+            risk_rank=r.risk_rank,
+            risk_label=r.risk_label,
+            is_active=r.is_active,
+        )
+
+    return ConditionAcuityResponse(
+        patient_id=patient_id,
+        name=stats.name,
+        active_count=len(ranked_active),
+        resolved_count=len(ranked_resolved),
+        ranked_active=[to_item(r) for r in ranked_active],
+        ranked_resolved=[to_item(r) for r in ranked_resolved],
+    )
+
+
+@router.get("/{patient_id}/procedures", response_model=ProceduresResponse)
+def patient_procedures(patient_id: str) -> ProceduresResponse:
+    """Full procedure history sorted by date descending."""
+    result = load_patient(patient_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"Patient not found: {patient_id}")
+
+    record, stats = result
+
+    # Sort by performed_start descending; procedures with no date go last
+    procedures_sorted = sorted(
+        record.procedures,
+        key=lambda p: p.performed_period.start if (p.performed_period and p.performed_period.start) else datetime.min,
+        reverse=True,
+    )
+
+    items: list[ProcedureItem] = [
+        ProcedureItem(
+            procedure_id=p.procedure_id,
+            display=p.code.label(),
+            status=p.status or "",
+            performed_start=p.performed_period.start if p.performed_period else None,
+            performed_end=p.performed_period.end if p.performed_period else None,
+            reason_display=p.reason_display or "",
+            body_site="",
+        )
+        for p in procedures_sorted
+    ]
+
+    return ProceduresResponse(
+        patient_id=patient_id,
+        name=stats.name,
+        total_count=len(items),
+        procedures=items,
+    )
+
+
+@router.get("/{patient_id}/encounters/{encounter_id}/raw")
+def encounter_raw(patient_id: str, encounter_id: str) -> dict:
+    """Return the raw FHIR Encounter resource JSON from the bundle file."""
+    path = path_from_patient_id(patient_id)
+    if path is None:
+        raise HTTPException(status_code=404, detail=f"Patient not found: {patient_id}")
+
+    with open(path) as f:
+        bundle = json.load(f)
+
+    for entry in bundle.get("entry", []):
+        resource = entry.get("resource", {})
+        if resource.get("resourceType") == "Encounter":
+            resource_id = resource.get("id", "")
+            full_url = entry.get("fullUrl", "")
+            if resource_id == encounter_id or full_url.endswith(encounter_id):
+                return resource
+
+    raise HTTPException(status_code=404, detail=f"Encounter not found: {encounter_id}")

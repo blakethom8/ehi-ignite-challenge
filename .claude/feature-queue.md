@@ -12,14 +12,8 @@ _none_
 
 ## 📋 Queued (priority order — genuine remaining work)
 
-### LOW complexity
-1. **(U) Pre-Op Decision Card** — A unified readiness card on the Overview page that synthesizes Clearance domain statuses + ASA level + top-3 flagged conditions in a single glanceable block. Red/amber/green with 1-click drill-down buttons to the relevant page. Frontend-only — composes from existing `/safety`, `/condition-acuity`, `/key-labs`, `/overview`.
-2. **(U) Risk-Filtered Patient Sidebar** — Segmented toggle above the patient list: All | High Risk | Needs Review. "High Risk" filters to complex/highly-complex patients; "Needs Review" surfaces patients with any ACTIVE critical safety flag. Status dot per row (green/amber/red). Lightweight `/api/patients/risk-summary` endpoint returning id+name+tier+has_critical_flag.
 
-### MEDIUM complexity
-3. **(D) Observation Distributions** — Corpus-level histogram + percentile stats for quantitative labs (LOINC). New `/corpus/observation-distributions` endpoint.
-4. **(D) Structured Data Export (CSV/JSON)** — Download patient cohort data as normalized CSVs (one per resource type). New `/corpus/export` endpoint.
-5. **(U) Lab Critical-Change Timeline** — Collapsible mini-timeline below Key Labs showing last 6 months of observations with alert dots. Clicking a dot reveals which labs changed and direction. Extends `/key-labs` history window, surfaces multi-month trends without leaving Overview.
+
 
 ### HIGH complexity
 7. **(D) Resource Linkage Graph** — Interactive viz of encounter ↔ observation ↔ condition ↔ med cross-references.
@@ -29,6 +23,11 @@ _none_
 ---
 
 ## ✅ Completed
+- [x] Lab Critical-Change Timeline — TimelineEvent/Month models, 6-month bucketing with change_direction, CSS dot timeline in Overview with click-to-open popovers [BUILD-022]
+- [x] Observation Distributions — /corpus/observation-distributions, top 30 LOINC codes, percentile bar + histogram per card, Distributions page [BUILD-020]
+- [x] Structured Data Export — /corpus/export ZIP (6 CSVs), Export CSV button on Corpus page [BUILD-021]
+- [x] Risk-Filtered Patient Sidebar — All/High Risk/Needs Review toggle, risk dots, /patients/risk-summary endpoint (109 critical, 168 high-risk tier) [BUILD-019]
+- [x] Pre-Op Decision Card — 3-query composite readiness card on Overview (Meds/Conditions/Labs domains, overall FLAGGED/REVIEW/CLEARED status bar, drill-down nav buttons) [BUILD-018]
 - [x] Recent Lab Alert Flags — LabAlertFlag model, ALERT_THRESHOLDS for 10 LOINC codes, LabAlertBanner in Overview [BUILD-016]
 - [x] Medication Hold/Bridge Protocol Guidance — PROTOCOL_NOTES lookup, collapsible Pre-Op Protocol on Safety cards [BUILD-017]
 - [x] Pre-Op Clearance Checklist — 3-domain readiness card (Meds/Conditions/Labs), CLEARED/FLAGGED/REVIEW per domain, overall status bar [BUILD-015]

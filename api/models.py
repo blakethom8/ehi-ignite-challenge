@@ -249,10 +249,26 @@ class LabAlertFlag(BaseModel):
     days_ago: int          # how many days since this observation
 
 
+class TimelineEvent(BaseModel):
+    loinc_code: str
+    display_name: str
+    value: float
+    unit: str
+    date: str           # ISO date string "YYYY-MM-DD"
+    change_direction: str  # "up" | "down" | "stable"
+
+
+class TimelineMonth(BaseModel):
+    month: str          # "2026-03"
+    label: str          # "Mar 2026"
+    events: list[TimelineEvent]
+
+
 class KeyLabsResponse(BaseModel):
     patient_id: str
     panels: dict[str, list[LabValue]]  # panel name → list of labs
     alert_flags: list[LabAlertFlag] = []
+    timeline_events: list[TimelineMonth] = []
 
 
 # ---------------------------------------------------------------------------
@@ -364,6 +380,50 @@ class CorpusStats(BaseModel):
     avg_active_med_count: float
     total_encounters: int
     total_resources: int
+
+
+# ---------------------------------------------------------------------------
+# Patient Risk Summary (sidebar filter)
+# ---------------------------------------------------------------------------
+
+class PatientRiskSummary(BaseModel):
+    id: str
+    name: str
+    complexity_tier: str          # "simple" | "moderate" | "complex" | "highly_complex"
+    has_critical_flag: bool       # True if any ACTIVE critical-severity drug class
+    active_critical_classes: list[str]  # e.g. ["anticoagulants", "antiplatelets"]
+
+
+class PatientRiskSummaryResponse(BaseModel):
+    patients: list[PatientRiskSummary]
+
+
+# ---------------------------------------------------------------------------
+# Observation Distributions (corpus-level lab value distributions)
+# ---------------------------------------------------------------------------
+
+class ObservationDistribution(BaseModel):
+    loinc_code: str
+    display_name: str
+    unit: str
+    count: int
+    patient_count: int
+    min: float
+    max: float
+    mean: float
+    median: float
+    p10: float
+    p25: float
+    p75: float
+    p90: float
+    histogram: list[int]
+    bucket_labels: list[str]
+
+
+class ObservationDistributionsResponse(BaseModel):
+    distributions: list[ObservationDistribution]
+    total_loinc_codes_found: int
+    loinc_codes_shown: int
 
 
 # ---------------------------------------------------------------------------

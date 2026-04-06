@@ -1,5 +1,5 @@
 import axios from "axios";
-import type { PatientListItem, PatientOverview, TimelineResponse, EncounterDetail, KeyLabsResponse, CorpusStats, SafetyResponse, ImmunizationResponse, ConditionAcuityResponse } from "../types";
+import type { PatientListItem, PatientOverview, TimelineResponse, EncounterDetail, KeyLabsResponse, CorpusStats, SafetyResponse, ImmunizationResponse, ConditionAcuityResponse, PatientRiskSummary, ObservationDistributionsResponse } from "../types";
 
 const http = axios.create({
   baseURL: "/api",
@@ -46,4 +46,12 @@ export const api = {
   /** Condition acuity — active conditions ranked by surgical risk */
   getConditionAcuity: (patientId: string): Promise<ConditionAcuityResponse> =>
     http.get<ConditionAcuityResponse>(`/patients/${patientId}/condition-acuity`).then((r) => r.data),
+
+  /** Risk summary for all patients — complexity tier + critical safety flags */
+  getRiskSummary: (): Promise<PatientRiskSummary[]> =>
+    http.get<{ patients: PatientRiskSummary[] }>("/patients/risk-summary").then((r) => r.data.patients),
+
+  /** Population-level LOINC observation distributions across all 1,180 patients */
+  getObservationDistributions: (): Promise<ObservationDistributionsResponse> =>
+    http.get<ObservationDistributionsResponse>("/corpus/observation-distributions").then((r) => r.data),
 };

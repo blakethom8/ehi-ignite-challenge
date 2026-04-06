@@ -99,7 +99,7 @@ function groupByYear(
 // Component
 // ---------------------------------------------------------------------------
 
-export default function ExplorerProcedures() {
+export function ExplorerProcedures() {
   const [searchParams] = useSearchParams();
   const patientId = searchParams.get("patient") ?? undefined;
 

@@ -37,6 +37,8 @@ from api.models import (
     LabValue,
     LabAlertFlag,
     KeyLabsResponse,
+    TimelineEvent,
+    TimelineMonth,
     SafetyMedication,
     SafetyFlag,
     SafetyResponse,
@@ -46,6 +48,8 @@ from api.models import (
     ConditionAcuityResponse,
     ProcedureItem,
     ProceduresResponse,
+    PatientRiskSummary,
+    PatientRiskSummaryResponse,
 )
 
 # ---------------------------------------------------------------------------
@@ -165,6 +169,45 @@ def list_patients() -> list[PatientListItem]:
         ))
 
     return items
+
+
+@router.get("/risk-summary", response_model=PatientRiskSummaryResponse)
+def patient_risk_summary() -> PatientRiskSummaryResponse:
+    """
+    Return all patients enriched with risk tier and critical safety flags.
+
+    NOTE: This iterates all 1,180 patient files and calls the drug classifier
+    for each. First call is slow (~30-60s). Subsequent calls per patient are
+    instant because load_patient() is LRU-cached.
+    """
+    files = list_patient_files()
+    results: list[PatientRiskSummary] = []
+
+    for path in files:
+        patient_id = patient_id_from_path(path)
+        result = load_patient(patient_id)
+        if result is None:
+            continue
+
+        record, stats = result
+
+        # Classify medications to find active critical-severity drug classes
+        raw_flags = _classifier.generate_safety_flags(record.medications)
+        active_critical_classes: list[str] = [
+            flag.class_key
+            for flag in raw_flags
+            if flag.status == "ACTIVE" and flag.severity == "critical"
+        ]
+
+        results.append(PatientRiskSummary(
+            id=patient_id,
+            name=stats.name,
+            complexity_tier=stats.complexity_tier,
+            has_critical_flag=len(active_critical_classes) > 0,
+            active_critical_classes=active_critical_classes,
+        ))
+
+    return PatientRiskSummaryResponse(patients=results)
 
 
 @router.get("/loaded", response_model=list[PatientListItem])
@@ -571,6 +614,96 @@ def _compute_alert_flags(record, today_dt: date) -> list[LabAlertFlag]:
     return flags
 
 
+def _compute_timeline_events(record, today_dt: date) -> list[TimelineMonth]:
+    """
+    Build 6-month monthly buckets of LOINC observations for ALERT_THRESHOLDS codes.
+
+    For each calendar month in the last 6 months (oldest → newest):
+    - Find all observations matching any tracked LOINC code
+    - For each code with a value in that month, record change_direction vs prior month
+    - Only include months with at least one event
+    """
+    # Build a list of (year, month) tuples covering the last 6 months, oldest first
+    months: list[tuple[int, int]] = []
+    y, m = today_dt.year, today_dt.month
+    for _ in range(6):
+        months.append((y, m))
+        m -= 1
+        if m == 0:
+            m = 12
+            y -= 1
+    months.reverse()  # oldest first
+
+    # Collect all observations for tracked LOINC codes with quantity values
+    # Keyed by (loinc_code, year, month) → list of (date, value, display, unit)
+    obs_by_code_month: dict[tuple[str, int, int], list[tuple[date, float, str, str]]] = defaultdict(list)
+
+    for obs in record.observations:
+        if obs.loinc_code not in ALERT_THRESHOLDS:
+            continue
+        if obs.value_type != "quantity" or obs.value_quantity is None:
+            continue
+        obs_date = _obs_date_to_date(obs.effective_dt)
+        if obs_date is None:
+            continue
+        obs_by_code_month[(obs.loinc_code, obs_date.year, obs_date.month)].append(
+            (obs_date, obs.value_quantity, obs.display or ALERT_THRESHOLDS[obs.loinc_code][0], obs.value_unit or ALERT_THRESHOLDS[obs.loinc_code][5])
+        )
+
+    result_months: list[TimelineMonth] = []
+
+    # Track prior month value per loinc_code for change_direction
+    prior_month_values: dict[str, float] = {}
+
+    for yr, mo in months:
+        events: list[TimelineEvent] = []
+
+        for loinc_code, (display_name, _lc, _lw, _hw, _hc, unit) in ALERT_THRESHOLDS.items():
+            bucket = obs_by_code_month.get((loinc_code, yr, mo))
+            if not bucket:
+                continue
+
+            # Use the most recent observation in that month
+            bucket.sort(key=lambda t: t[0], reverse=True)
+            obs_date, value, obs_display, obs_unit = bucket[0]
+
+            # Compute change_direction vs prior month
+            prior = prior_month_values.get(loinc_code)
+            if prior is None:
+                change_direction = "stable"
+            else:
+                pct = (value - prior) / abs(prior) if prior != 0 else 0.0
+                if pct > 0.05:
+                    change_direction = "up"
+                elif pct < -0.05:
+                    change_direction = "down"
+                else:
+                    change_direction = "stable"
+
+            events.append(TimelineEvent(
+                loinc_code=loinc_code,
+                display_name=obs_display if obs_display else display_name,
+                value=value,
+                unit=obs_unit if obs_unit else unit,
+                date=obs_date.isoformat(),
+                change_direction=change_direction,
+            ))
+
+            # Update prior for next month's comparison
+            prior_month_values[loinc_code] = value
+
+        if events:
+            import calendar as _cal
+            label = f"{_cal.month_abbr[mo]} {yr}"
+            result_months.append(TimelineMonth(
+                month=f"{yr:04d}-{mo:02d}",
+                label=label,
+                events=events,
+            ))
+
+    return result_months
+
+
 @router.get("/{patient_id}/key-labs", response_model=KeyLabsResponse)
 def patient_key_labs(patient_id: str) -> KeyLabsResponse:
     """
@@ -679,7 +812,15 @@ def patient_key_labs(patient_id: str) -> KeyLabsResponse:
     today = datetime.now().date()
     alert_flags = _compute_alert_flags(record, today)
 
-    return KeyLabsResponse(patient_id=patient_id, panels=panels, alert_flags=alert_flags)
+    # Compute 6-month timeline events
+    timeline_events = _compute_timeline_events(record, today)
+
+    return KeyLabsResponse(
+        patient_id=patient_id,
+        panels=panels,
+        alert_flags=alert_flags,
+        timeline_events=timeline_events,
+    )
 
 
 @router.get("/{patient_id}/safety", response_model=SafetyResponse)

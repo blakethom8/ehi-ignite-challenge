@@ -1,11 +1,11 @@
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { AlertCircle, AlertTriangle, User, ChevronDown, ChevronRight } from "lucide-react";
+import { AlertCircle, AlertTriangle, AlertOctagon, CheckCircle, User, ChevronDown, ChevronRight, Pill, Heart, FlaskConical, Clock } from "lucide-react";
 import type { ReactNode } from "react";
 import { api } from "../../api/client";
 import { EmptyState } from "../../components/EmptyState";
-import type { PatientOverview, ResourceTypeCount, KeyLabsResponse, LabValue, LabHistoryPoint, LabAlertFlag } from "../../types";
+import type { PatientOverview, ResourceTypeCount, KeyLabsResponse, LabValue, LabHistoryPoint, LabAlertFlag, SafetyFlag, TimelineMonth } from "../../types";
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -345,6 +345,346 @@ function LabPanel({ name, labs }: { name: string; labs: LabValue[] }) {
   );
 }
 
+// ── Lab History Timeline ───────────────────────────────────────────────────
+
+// LOINC codes that are "critical-direction" codes for dot coloring
+const CRITICAL_LOINC_CODES = new Set(["718-7", "4544-3", "6301-6", "2160-0"]);
+
+function dotColor(month: TimelineMonth): string {
+  for (const ev of month.events) {
+    if (CRITICAL_LOINC_CODES.has(ev.loinc_code)) {
+      if (ev.change_direction === "down") return "#ef4444"; // red
+      if (ev.change_direction === "up") return "#f59e0b";  // amber
+    }
+  }
+  return "#5b76fe"; // blue (default)
+}
+
+function ChangeArrow({ dir }: { dir: "up" | "down" | "stable" }) {
+  if (dir === "up") return <span className="text-[#f59e0b] font-bold">↑</span>;
+  if (dir === "down") return <span className="text-[#ef4444] font-bold">↓</span>;
+  return <span className="text-[#9ca3af]">→</span>;
+}
+
+function LabHistoryTimeline({ keyLabs }: { keyLabs: KeyLabsResponse }) {
+  const [openMonth, setOpenMonth] = useState<string | null>(null);
+
+  const events = keyLabs.timeline_events ?? [];
+
+  return (
+    <div className="mt-3 border-t border-[#f0f1f5] pt-3">
+      <div className="flex items-center gap-2 mb-3">
+        <Clock size={13} className="text-[#a5a8b5]" />
+        <span className="text-xs font-semibold text-[#555a6a] uppercase tracking-wide">
+          Lab History Timeline
+        </span>
+        <span className="text-[10px] text-[#a5a8b5] ml-1">(last 6 months)</span>
+      </div>
+
+      {events.length === 0 ? (
+        <p className="text-xs text-[#a5a8b5] italic">No lab observations in the last 6 months.</p>
+      ) : (
+        <div className="overflow-x-auto">
+          {/* Timeline row */}
+          <div className="relative flex items-start gap-0 min-w-0">
+            {/* Connecting line — positioned at dot center */}
+            <div
+              className="absolute left-0 right-0 border-t border-[#e9eaef]"
+              style={{ top: "calc(0.75rem + 10px)" }}  /* text-[10px] ~12px + gap ~10px = label height before dot */
+            />
+
+            {events.map((month) => {
+              const color = dotColor(month);
+              const isOpen = openMonth === month.month;
+
+              return (
+                <div
+                  key={month.month}
+                  className="relative flex flex-col items-center"
+                  style={{ minWidth: "80px", flex: "0 0 80px" }}
+                >
+                  {/* Month label */}
+                  <span className="text-[10px] text-[#a5a8b5] mb-1.5 whitespace-nowrap">
+                    {month.label}
+                  </span>
+
+                  {/* Dot */}
+                  <button
+                    onClick={() => setOpenMonth(isOpen ? null : month.month)}
+                    title={`${month.label} — ${month.events.length} lab${month.events.length !== 1 ? "s" : ""}`}
+                    className="relative z-10 w-3 h-3 rounded-full border-2 border-white shadow-sm transition-transform hover:scale-125 focus:outline-none focus:ring-2 focus:ring-offset-1"
+                    style={{ backgroundColor: color }}
+                    aria-expanded={isOpen}
+                    aria-label={`${month.label}: ${month.events.length} observations`}
+                  />
+
+                  {/* Count badge below dot */}
+                  <span className="mt-1 text-[9px] text-[#a5a8b5]">{month.events.length}</span>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Popover panel — shown below timeline for whichever month is open */}
+          {openMonth && (() => {
+            const month = events.find((m) => m.month === openMonth);
+            if (!month) return null;
+            return (
+              <div className="mt-3 border border-[#e9eaef] rounded-lg overflow-hidden bg-white">
+                <div className="px-3 py-2 bg-[#f9fafb] border-b border-[#e9eaef]">
+                  <span className="text-xs font-semibold text-[#1c1c1e]">{month.label}</span>
+                  <span className="text-[10px] text-[#a5a8b5] ml-2">{month.events.length} observation{month.events.length !== 1 ? "s" : ""}</span>
+                </div>
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-left text-[10px] text-[#a5a8b5] border-b border-[#f0f1f5]">
+                      <th className="px-3 py-1.5 font-medium">Lab</th>
+                      <th className="px-2 py-1.5 font-medium text-right">Value</th>
+                      <th className="px-2 py-1.5 font-medium text-center">Change</th>
+                      <th className="px-3 py-1.5 font-medium text-right">Date</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {month.events.map((ev) => (
+                      <tr key={ev.loinc_code} className="border-b border-[#f5f6f8] hover:bg-[#f9fafb]">
+                        <td className="px-3 py-1.5 text-[#1c1c1e]">{ev.display_name}</td>
+                        <td className="px-2 py-1.5 text-right text-[#1c1c1e]">
+                          {ev.value} <span className="text-[#a5a8b5]">{ev.unit}</span>
+                        </td>
+                        <td className="px-2 py-1.5 text-center">
+                          <ChangeArrow dir={ev.change_direction} />
+                        </td>
+                        <td className="px-3 py-1.5 text-right text-[#a5a8b5]">
+                          {new Date(ev.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            );
+          })()}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Pre-Op Decision Card ────────────────────────────────────────────────────
+
+type DomainStatus = "CLEARED" | "FLAGGED" | "REVIEW";
+
+// Inline domain logic (same rules as Clearance.tsx — do not import from there)
+
+function preOpMedStatus(flags: SafetyFlag[]): { status: DomainStatus; topConcern: string | null } {
+  const activeFlags = flags.filter((f) => f.status === "ACTIVE");
+  const criticalActive = activeFlags.filter((f) => f.severity === "critical");
+  const reviewActive = activeFlags.filter((f) => f.severity !== "critical");
+
+  if (criticalActive.length > 0) {
+    return { status: "FLAGGED", topConcern: criticalActive[0].label };
+  }
+  if (reviewActive.length > 0) {
+    return { status: "REVIEW", topConcern: reviewActive[0].label };
+  }
+  return { status: "CLEARED", topConcern: null };
+}
+
+function preOpConditionStatus(
+  ranked_active: { display: string; risk_category: string }[]
+): { status: DomainStatus; topConcern: string | null } {
+  const cardiac = ranked_active.filter((c) => c.risk_category === "CARDIAC");
+  const pulmonary = ranked_active.filter((c) => c.risk_category === "PULMONARY");
+  const metabolic = ranked_active.filter((c) => c.risk_category === "METABOLIC");
+
+  if (cardiac.length > 0 || pulmonary.length > 0) {
+    const first = [...cardiac, ...pulmonary][0];
+    return { status: "FLAGGED", topConcern: first.display };
+  }
+  if (metabolic.length > 0) {
+    return { status: "REVIEW", topConcern: metabolic[0].display };
+  }
+  return { status: "CLEARED", topConcern: null };
+}
+
+function preOpLabStatus(panels: Record<string, LabValue[]>): { status: DomainStatus; topConcern: string | null } {
+  const entries = Object.entries(panels);
+  if (entries.length === 0 || entries.every(([, vals]) => vals.length === 0)) {
+    return { status: "REVIEW", topConcern: "No lab panel data available" };
+  }
+  return { status: "CLEARED", topConcern: null };
+}
+
+function overallPreOpStatus(statuses: DomainStatus[]): DomainStatus {
+  if (statuses.includes("FLAGGED")) return "FLAGGED";
+  if (statuses.includes("REVIEW")) return "REVIEW";
+  return "CLEARED";
+}
+
+const STATUS_CONFIG = {
+  FLAGGED: {
+    bg: "#fef2f2",
+    border: "#ef4444",
+    text: "#991b1b",
+    badgeBg: "#ef4444",
+    label: "FLAGGED",
+    Icon: AlertOctagon,
+    overallLabel: "Surgery Hold — Review Required",
+  },
+  REVIEW: {
+    bg: "#fffbeb",
+    border: "#f59e0b",
+    text: "#92400e",
+    badgeBg: "#f59e0b",
+    label: "REVIEW",
+    Icon: AlertTriangle,
+    overallLabel: "Pre-Op Review Incomplete",
+  },
+  CLEARED: {
+    bg: "#f0fdf4",
+    border: "#22c55e",
+    text: "#166534",
+    badgeBg: "#22c55e",
+    label: "CLEARED",
+    Icon: CheckCircle,
+    overallLabel: "Pre-Op Clearance Complete",
+  },
+} as const;
+
+function DomainChip({
+  icon: Icon,
+  label,
+  status,
+}: {
+  icon: React.ComponentType<{ size?: number; className?: string }>;
+  label: string;
+  status: DomainStatus;
+}) {
+  const cfg = STATUS_CONFIG[status];
+  return (
+    <div
+      className="flex items-center gap-2 px-3 py-2 rounded-lg border text-sm"
+      style={{ backgroundColor: cfg.bg, borderColor: cfg.border }}
+    >
+      <Icon size={14} style={{ color: cfg.text }} className="shrink-0" />
+      <span className="font-medium" style={{ color: cfg.text }}>{label}</span>
+      <span
+        className="ml-1 text-[10px] font-bold uppercase text-white px-1.5 py-0.5 rounded-full"
+        style={{ backgroundColor: cfg.badgeBg }}
+      >
+        {cfg.label}
+      </span>
+    </div>
+  );
+}
+
+function PreOpDecisionCard({ patientId }: { patientId: string }) {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  const safetyQ = useQuery({
+    queryKey: ["safety", patientId],
+    queryFn: () => api.getSafety(patientId),
+    enabled: !!patientId,
+  });
+
+  const conditionsQ = useQuery({
+    queryKey: ["conditionAcuity", patientId],
+    queryFn: () => api.getConditionAcuity(patientId),
+    enabled: !!patientId,
+  });
+
+  const labsQ = useQuery({
+    queryKey: ["keyLabs", patientId],
+    queryFn: () => api.getKeyLabs(patientId),
+    enabled: !!patientId,
+  });
+
+  const isLoading = safetyQ.isLoading || conditionsQ.isLoading || labsQ.isLoading;
+
+  if (isLoading) {
+    return (
+      <div className="animate-pulse space-y-2 mb-2">
+        <div className="h-12 bg-[#f0f1f5] rounded-xl" />
+        <div className="h-10 bg-[#f0f1f5] rounded-xl" />
+      </div>
+    );
+  }
+
+  if (!safetyQ.data || !conditionsQ.data || !labsQ.data) {
+    return null;
+  }
+
+  const patientParam = searchParams.get("patient") ?? patientId;
+
+  const medResult = preOpMedStatus(safetyQ.data.flags);
+  const condResult = preOpConditionStatus(conditionsQ.data.ranked_active);
+  const labResult = preOpLabStatus(labsQ.data.panels);
+
+  const overall = overallPreOpStatus([medResult.status, condResult.status, labResult.status]);
+  const overallCfg = STATUS_CONFIG[overall];
+  const OverallIcon = overallCfg.Icon;
+
+  // Pick the top concern to surface
+  const topConcern =
+    medResult.status === "FLAGGED"
+      ? `${medResult.topConcern} — active medication hold required`
+      : condResult.status === "FLAGGED"
+      ? condResult.topConcern
+      : medResult.status === "REVIEW"
+      ? `${medResult.topConcern} — requires pre-op review`
+      : condResult.status === "REVIEW"
+      ? condResult.topConcern
+      : labResult.status === "REVIEW"
+      ? labResult.topConcern
+      : "No surgical risk flags identified";
+
+  return (
+    <div
+      className="rounded-xl border-l-4 overflow-hidden"
+      style={{ backgroundColor: overallCfg.bg, borderLeftColor: overallCfg.border, borderTopColor: overallCfg.border, borderRightColor: overallCfg.border, borderBottomColor: overallCfg.border, borderWidth: 1, borderLeftWidth: 4 }}
+    >
+      {/* Overall status bar */}
+      <div className="flex items-center gap-3 px-5 py-3 border-b" style={{ borderBottomColor: overallCfg.border + "33" }}>
+        <OverallIcon size={18} style={{ color: overallCfg.text }} className="shrink-0" />
+        <span className="font-semibold text-sm" style={{ color: overallCfg.text }}>
+          {overallCfg.overallLabel}
+        </span>
+      </div>
+
+      {/* Domain chips + actions row */}
+      <div className="px-5 py-3 flex flex-wrap items-center gap-2">
+        <DomainChip icon={Pill} label="Medications" status={medResult.status} />
+        <DomainChip icon={Heart} label="Conditions" status={condResult.status} />
+        <DomainChip icon={FlaskConical} label="Labs" status={labResult.status} />
+
+        {/* Spacer + action buttons */}
+        <div className="ml-auto flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => navigate(`/explorer/clearance?patient=${patientParam}`)}
+            className="text-xs font-medium px-3 py-1.5 rounded-lg border border-[#e9eaef] bg-white text-[#555a6a] hover:bg-[#f5f6f8] transition-colors"
+          >
+            → Clearance
+          </button>
+          <button
+            onClick={() => navigate(`/explorer/safety?patient=${patientParam}`)}
+            className="text-xs font-medium px-3 py-1.5 rounded-lg border border-[#e9eaef] bg-white text-[#555a6a] hover:bg-[#f5f6f8] transition-colors"
+          >
+            → Safety
+          </button>
+        </div>
+      </div>
+
+      {/* Top concern line */}
+      <div className="px-5 pb-3">
+        <p className="text-xs" style={{ color: overallCfg.text, opacity: 0.85 }}>
+          <span className="font-medium">Top concern:</span> {topConcern}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 // ── Skeleton ───────────────────────────────────────────────────────────────
 
 function SkeletonRect({ className }: { className?: string }) {
@@ -453,7 +793,7 @@ function OverviewSkeleton() {
 
 // ── main component ─────────────────────────────────────────────────────────
 
-function OverviewContent({ overview, keyLabs }: { overview: PatientOverview; keyLabs: KeyLabsResponse | undefined }) {
+function OverviewContent({ overview, keyLabs, patientId }: { overview: PatientOverview; keyLabs: KeyLabsResponse | undefined; patientId: string }) {
   const tierLabel = overview.complexity_tier.replace("_", " ");
 
   const { prefs, toggle } = useSectionPrefs({
@@ -469,6 +809,9 @@ function OverviewContent({ overview, keyLabs }: { overview: PatientOverview; key
 
   return (
     <div className="p-6 space-y-6">
+      {/* Pre-Op Decision Card — first thing a surgeon sees */}
+      <PreOpDecisionCard patientId={patientId} />
+
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
@@ -745,15 +1088,16 @@ function OverviewContent({ overview, keyLabs }: { overview: PatientOverview; key
             {keyLabs.alert_flags && keyLabs.alert_flags.length > 0 && (
               <LabAlertBanner flags={keyLabs.alert_flags} />
             )}
+            <LabHistoryTimeline keyLabs={keyLabs} />
             {(() => {
               const populatedPanels = Object.entries(keyLabs.panels).filter(([, labs]) => labs.length > 0);
               if (populatedPanels.length === 0) {
                 return (
-                  <p className="text-sm text-[#a5a8b5]">No quantitative lab values found.</p>
+                  <p className="text-sm text-[#a5a8b5] mt-3">No quantitative lab values found.</p>
                 );
               }
               return (
-                <div className="space-y-3">
+                <div className="space-y-3 mt-3">
                   {populatedPanels.map(([panelName, labs]) => (
                     <LabPanel key={panelName} name={panelName} labs={labs} />
                   ))}
@@ -820,5 +1164,5 @@ export function ExplorerOverview() {
     );
   }
 
-  return <OverviewContent overview={data} keyLabs={keyLabs} />;
+  return <OverviewContent overview={data} keyLabs={keyLabs} patientId={patientId} />;
 }

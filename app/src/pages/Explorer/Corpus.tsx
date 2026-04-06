@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { BarChart3, Users, Activity, Layers, User } from "lucide-react";
+import { BarChart3, Users, Activity, Layers, User, Download } from "lucide-react";
 import { api } from "../../api/client";
 import type { CorpusStats } from "../../types";
 
@@ -220,11 +220,21 @@ function CorpusContent({ stats }: { stats: CorpusStats }) {
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-semibold text-[#1c1c1e]">Patient Corpus</h1>
-        <p className="text-sm text-[#555a6a] mt-1">
-          1,180 Synthea R4 FHIR bundles · EHI Ignite dataset
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold text-[#1c1c1e]">Patient Corpus</h1>
+          <p className="text-sm text-[#555a6a] mt-1">
+            1,180 Synthea R4 FHIR bundles · EHI Ignite dataset
+          </p>
+        </div>
+        <a
+          href="/api/corpus/export?format=csv"
+          download="ehi-export.zip"
+          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#5b76fe] text-white text-sm font-medium hover:bg-[#4a63e0] transition-colors shrink-0"
+        >
+          <Download size={15} />
+          Export CSV
+        </a>
       </div>
 
       {/* KPI bar */}

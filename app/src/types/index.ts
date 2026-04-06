@@ -189,10 +189,26 @@ export interface LabAlertFlag {
   days_ago: number;
 }
 
+export interface TimelineEvent {
+  loinc_code: string;
+  display_name: string;
+  value: number;
+  unit: string;
+  date: string;                  // "YYYY-MM-DD"
+  change_direction: "up" | "down" | "stable";
+}
+
+export interface TimelineMonth {
+  month: string;                 // "2026-03"
+  label: string;                 // "Mar 2026"
+  events: TimelineEvent[];
+}
+
 export interface KeyLabsResponse {
   patient_id: string;
   panels: Record<string, LabValue[]>;
   alert_flags: LabAlertFlag[];
+  timeline_events: TimelineMonth[];
 }
 
 export interface SafetyMedication {
@@ -267,4 +283,36 @@ export interface ConditionAcuityResponse {
   resolved_count: number;
   ranked_active: RankedConditionItem[];
   ranked_resolved: RankedConditionItem[];
+}
+
+export interface PatientRiskSummary {
+  id: string;
+  name: string;
+  complexity_tier: string;
+  has_critical_flag: boolean;
+  active_critical_classes: string[];
+}
+
+export interface ObservationDistribution {
+  loinc_code: string;
+  display_name: string;
+  unit: string;
+  count: number;
+  patient_count: number;
+  min: number;
+  max: number;
+  mean: number;
+  median: number;
+  p10: number;
+  p25: number;
+  p75: number;
+  p90: number;
+  histogram: number[];
+  bucket_labels: string[];
+}
+
+export interface ObservationDistributionsResponse {
+  distributions: ObservationDistribution[];
+  total_loinc_codes_found: number;
+  loinc_codes_shown: number;
 }

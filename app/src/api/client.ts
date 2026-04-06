@@ -1,5 +1,5 @@
 import axios from "axios";
-import type { PatientListItem, PatientOverview, TimelineResponse, EncounterDetail, KeyLabsResponse, CorpusStats, SafetyResponse, ImmunizationResponse, ConditionAcuityResponse, PatientRiskSummary, ObservationDistributionsResponse } from "../types";
+import type { PatientListItem, PatientOverview, TimelineResponse, EncounterDetail, KeyLabsResponse, CorpusStats, SafetyResponse, ImmunizationResponse, ConditionAcuityResponse, PatientRiskSummary, ObservationDistributionsResponse, InteractionResponse } from "../types";
 
 const http = axios.create({
   baseURL: "/api",
@@ -54,4 +54,8 @@ export const api = {
   /** Population-level LOINC observation distributions across all 1,180 patients */
   getObservationDistributions: (): Promise<ObservationDistributionsResponse> =>
     http.get<ObservationDistributionsResponse>("/corpus/observation-distributions").then((r) => r.data),
+
+  /** Drug-drug interaction checker — flags known interactions between active medications */
+  getInteractions: (patientId: string): Promise<InteractionResponse> =>
+    http.get<InteractionResponse>(`/patients/${patientId}/interactions`).then((r) => r.data),
 };

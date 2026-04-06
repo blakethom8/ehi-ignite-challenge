@@ -316,3 +316,26 @@ export interface ObservationDistributionsResponse {
   total_loinc_codes_found: number;
   loinc_codes_shown: number;
 }
+
+export interface InteractionResult {
+  drug_a: string;
+  drug_a_label: string;
+  drug_b: string;
+  drug_b_label: string;
+  severity: "contraindicated" | "major" | "moderate";
+  mechanism: string;
+  clinical_effect: string;
+  management: string;
+  drug_a_meds: string[];
+  drug_b_meds: string[];
+}
+
+export interface InteractionResponse {
+  patient_id: string;
+  active_class_keys: string[];
+  interactions: InteractionResult[];
+  contraindicated_count: number;
+  major_count: number;
+  moderate_count: number;
+  has_interactions: boolean;
+}

@@ -11,6 +11,7 @@ import { ExplorerProcedures } from "./pages/Explorer/Procedures";
 import { ExplorerClearance } from "./pages/Explorer/Clearance";
 import { ExplorerAnesthesia } from "./pages/Explorer/Anesthesia";
 import { ExplorerDistributions } from "./pages/Explorer/Distributions";
+import { ExplorerInteractions } from "./pages/Explorer/Interactions";
 import { JourneyPlaceholder } from "./pages/Journey/Placeholder";
 
 const queryClient = new QueryClient({
@@ -39,6 +40,7 @@ export default function App() {
             <Route path="/explorer/clearance" element={<ExplorerClearance />} />
             <Route path="/explorer/anesthesia" element={<ExplorerAnesthesia />} />
             <Route path="/explorer/distributions" element={<ExplorerDistributions />} />
+            <Route path="/explorer/interactions" element={<ExplorerInteractions />} />
             <Route path="/journey" element={<JourneyPlaceholder />} />
           </Routes>
         </Layout>

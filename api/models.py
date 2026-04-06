@@ -120,6 +120,7 @@ class PatientOverview(BaseModel):
     # Allergies
     allergy_count: int
     allergy_labels: list[str]
+    allergies: list["AllergyRow"] = []
 
     # Immunizations
     immunization_count: int
@@ -424,6 +425,64 @@ class ObservationDistributionsResponse(BaseModel):
     distributions: list[ObservationDistribution]
     total_loinc_codes_found: int
     loinc_codes_shown: int
+
+
+# ---------------------------------------------------------------------------
+# Drug-Drug Interactions
+# ---------------------------------------------------------------------------
+
+class InteractionResult(BaseModel):
+    drug_a: str
+    drug_a_label: str       # human-readable label e.g. "Anticoagulants"
+    drug_b: str
+    drug_b_label: str
+    severity: str           # "contraindicated" | "major" | "moderate"
+    mechanism: str
+    clinical_effect: str
+    management: str
+    drug_a_meds: list[str]  # actual med names from patient's record
+    drug_b_meds: list[str]
+
+
+class InteractionResponse(BaseModel):
+    patient_id: str
+    active_class_keys: list[str]
+    interactions: list[InteractionResult]
+    contraindicated_count: int
+    major_count: int
+    moderate_count: int
+    has_interactions: bool
+
+
+# ---------------------------------------------------------------------------
+# Allergy Criticality Breakdown (corpus-level)
+# ---------------------------------------------------------------------------
+
+class AllergySubstanceEntry(BaseModel):
+    substance: str
+    count: int
+    criticality: str  # most severe criticality seen for this substance
+
+
+class AllergyCriticalityBreakdown(BaseModel):
+    criticality_counts: dict[str, int]    # {"high": 45, "low": 120, ...}
+    category_counts: dict[str, int]       # {"medication": 234, "food": 45, ...}
+    total_allergy_records: int
+    patients_with_allergies: int
+    patients_with_high_criticality: int   # at least one "high" allergy
+    top_substances: list[AllergySubstanceEntry]  # top 10 by count
+
+
+# ---------------------------------------------------------------------------
+# Allergy detail (per-patient overview enhancement)
+# ---------------------------------------------------------------------------
+
+class AllergyRow(BaseModel):
+    substance: str
+    criticality: str | None   # "high" | "low" | "unable-to-assess" | None
+    category: list[str]       # ["medication"] | ["food"] | [] etc.
+    reactions: list[str]      # empty — AllergyRecord has no reaction field
+    severity: str | None      # not available in AllergyRecord — always None
 
 
 # ---------------------------------------------------------------------------

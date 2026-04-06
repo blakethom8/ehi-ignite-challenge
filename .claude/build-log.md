@@ -130,3 +130,25 @@
 **Note:** Synthea data predates the 6-month window so timeline_events is always [] on this corpus — logic verified with offset test date.
 
 **TSC:** zero errors.
+
+---
+
+## 2026-04-05 — BUILD-023: Drug-Drug Interaction Checker
+
+**Feature:** Static drug-drug interaction checker flagging known dangerous interactions between a patient's active medication classes.
+
+**New file — `api/core/interaction_checker.py`:** `Interaction` dataclass + `INTERACTIONS` list of 10 clinically significant pairs (anticoagulants↔antiplatelets, anticoagulants↔NSAIDs, MAOIs↔opioids [contraindicated], MAOIs↔antidepressants [contraindicated], JAK inhibitors↔immunosuppressants, etc.). `check_interactions(active_class_keys)` returns sorted results (contraindicated → major → moderate).
+
+**Backend (`api/models.py`):** Added `InteractionResult` (drug_a/b, labels, severity, mechanism, clinical_effect, management, actual med names) and `InteractionResponse`.
+
+**Backend (`api/routers/patients.py`):** Added `GET /api/patients/{id}/interactions` — pulls active safety flags, extracts class keys and med names, runs `check_interactions()`, returns structured response.
+
+**New file — `app/src/pages/Explorer/Interactions.tsx`:** KPI strip (contraindicated/major/moderate counts), per-interaction cards with severity badge, drug pair header, actual med name chips, collapsible Mechanism/Clinical Effect/Management rows. All-clear green state. Empty state for no patient selected.
+
+**Modified (`app/src/pages/Explorer/Safety.tsx`):** Interaction alert banner at top — fetches `/interactions`, shows amber "X interactions detected → View Interactions" link when `has_interactions` is true.
+
+**Other:** `App.tsx` route, `Layout.tsx` Zap icon nav entry (between Safety and Conditions), `client.ts` + `types/index.ts` additions.
+
+**Smoke test:** Patient with warfarin + naproxen → 1 MAJOR interaction (Anticoagulants ↔ NSAIDs). Correct.
+
+**TSC:** zero errors.

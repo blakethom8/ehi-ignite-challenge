@@ -6,7 +6,8 @@
 ---
 
 ## 🔨 In Progress
-_none_
+- **(D) Allergy Criticality & Reaction Audit** — BUILD-024
+- **(D) Device & Implant Timeline** — BUILD-025
 
 ---
 
@@ -15,14 +16,17 @@ _none_
 
 
 
+### MEDIUM complexity
+3. **(D) Care Coordination Risk Dashboard** — Surface CarePlan goals and CareTeam assignments from `care_plans_raw`/`care_teams_raw`. Identify patients with fragmented care (many distinct providers, incomplete goals). New `/{patient_id}/care-coordination` endpoint + page.
+
 ### HIGH complexity
 7. **(D) Resource Linkage Graph** — Interactive viz of encounter ↔ observation ↔ condition ↔ med cross-references.
 8. **(U) Patient Comparison Mode** — Side-by-side patient cards with multi-select in sidebar.
-9. **(C) Drug-Drug Interaction Checker** — Flag interactions between current meds and common surgical drugs.
 
 ---
 
 ## ✅ Completed
+- [x] Drug-Drug Interaction Checker — interaction_checker.py (10 interactions), /interactions endpoint, Interactions page, Safety page alert banner [BUILD-023]
 - [x] Lab Critical-Change Timeline — TimelineEvent/Month models, 6-month bucketing with change_direction, CSS dot timeline in Overview with click-to-open popovers [BUILD-022]
 - [x] Observation Distributions — /corpus/observation-distributions, top 30 LOINC codes, percentile bar + histogram per card, Distributions page [BUILD-020]
 - [x] Structured Data Export — /corpus/export ZIP (6 CSVs), Export CSV button on Corpus page [BUILD-021]
@@ -76,6 +80,14 @@ _none_
 **2026-04-05 — Build orchestrator cron (37-min cycle)**
 - BUILD-009 in progress (Conditions page) — not stuck, let it run.
 - Parallel backend-safe build: picked Surgical Procedure History (BUILD-010, non-overlapping files).
+
+**2026-04-05 — Research orchestrator cron (23-min cycle, pass 5)**
+- Queue had 3 HIGH-only items — below threshold of 6. Spawned Data perspective agent (all 3 perspectives had 1 item each; rotating from UX→Clinician→Data).
+- Agent explored `devices_raw`, `care_plans_raw`, `care_teams_raw`, and AllergyRecord fields that are parsed but never surfaced. Returned 4 ideas; 3 selected:
+  1. Allergy Criticality Audit (Low, D) — AllergyRecord.criticality field already parsed, just not displayed
+  2. Device & Implant Timeline (Medium, D) — devices_raw has UDI codes, expiration dates, SNOMED types
+  3. Care Coordination Risk Dashboard (Medium, D) — care_plans_raw + care_teams_raw never surfaced
+- Queue now at 5 items (1 LOW + 2 MEDIUM + 2 HIGH). BUILD-023 (Drug-Drug Interaction) also completed this cycle.
 
 **2026-04-05 — Research orchestrator cron (23-min cycle, pass 4)**
 - Queue had 5 genuine unbuilt items — below threshold of 6. Spawned UX research agent (UX perspective had fewest queued items, last pass was Clinician).

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
   ShieldAlert,
@@ -10,6 +10,7 @@ import {
   ChevronDown,
   ChevronUp,
   BookOpen,
+  Zap,
 } from "lucide-react";
 import { api } from "../../api/client";
 import { EmptyState } from "../../components/EmptyState";
@@ -188,6 +189,12 @@ export function ExplorerSafety() {
     enabled: !!patientId,
   });
 
+  const { data: interactionData } = useQuery({
+    queryKey: ["interactions", patientId],
+    queryFn: () => api.getInteractions(patientId!),
+    enabled: !!patientId,
+  });
+
   // ── Empty state ────────────────────────────────────────────────────────
   if (!patientId) {
     return (
@@ -227,6 +234,30 @@ export function ExplorerSafety() {
 
   return (
     <div className="p-8 max-w-3xl mx-auto space-y-6">
+      {/* Drug-drug interaction alert banner */}
+      {interactionData?.has_interactions && (
+        <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl border bg-[#fffbeb] border-[#fcd34d]">
+          <div className="flex items-center gap-2">
+            <Zap size={16} className="text-[#d97706] shrink-0" />
+            <span className="text-sm font-semibold text-[#92400e]">
+              {interactionData.contraindicated_count + interactionData.major_count + interactionData.moderate_count} drug interaction
+              {interactionData.contraindicated_count + interactionData.major_count + interactionData.moderate_count !== 1 ? "s" : ""} detected
+              {interactionData.contraindicated_count > 0 && (
+                <span className="ml-1 text-[#991b1b]">
+                  ({interactionData.contraindicated_count} contraindicated)
+                </span>
+              )}
+            </span>
+          </div>
+          <Link
+            to={`/explorer/interactions${patientId ? `?patient=${patientId}` : ""}`}
+            className="shrink-0 text-xs font-semibold text-[#5b76fe] hover:text-[#3b56de] transition-colors whitespace-nowrap"
+          >
+            View Interactions →
+          </Link>
+        </div>
+      )}
+
       {/* Summary bar */}
       <div>
         <h1 className="text-xl font-semibold text-[#1c1c1e] mb-3">

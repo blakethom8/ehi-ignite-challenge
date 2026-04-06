@@ -15,6 +15,8 @@ from fastapi.responses import StreamingResponse
 
 from api.core.loader import list_patient_files, load_patient, patient_id_from_path
 from api.models import (
+    AllergyCriticalityBreakdown,
+    AllergySubstanceEntry,
     CorpusStats,
     FieldCoverageItem,
     FieldCoverageResponse,
@@ -419,6 +421,107 @@ def observation_distributions() -> ObservationDistributionsResponse:
         distributions=distributions,
         total_loinc_codes_found=total_loinc_codes_found,
         loinc_codes_shown=len(distributions),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Allergy Criticality Breakdown
+# ---------------------------------------------------------------------------
+
+# Criticality severity order for "most severe wins" logic
+_CRITICALITY_ORDER = {"high": 0, "low": 1, "unable-to-assess": 2, "unknown": 3}
+
+
+@router.get("/allergies/criticality-breakdown", response_model=AllergyCriticalityBreakdown)
+def allergy_criticality_breakdown() -> AllergyCriticalityBreakdown:
+    """
+    Population-level allergy criticality and category breakdown across all patients.
+
+    Iterates all patient bundles, collecting AllergyRecord data to produce:
+    - criticality_counts: tally of high / low / unable-to-assess / unknown
+    - category_counts: tally of medication / food / environment / biologic
+    - patients_with_high_criticality: patients with at least one "high" allergy
+    - top_substances: top 10 substances by occurrence count
+
+    NOTE: First call loads all bundles (~30–60 s). Subsequent calls are fast
+    due to the LRU cache in loader.py.
+    """
+    files = list_patient_files()
+
+    criticality_counts: dict[str, int] = defaultdict(int)
+    category_counts: dict[str, int] = defaultdict(int)
+    total_records = 0
+    patients_with_allergies = 0
+    patients_with_high = 0
+
+    # substance -> {count, worst_criticality_order, worst_criticality_label}
+    substance_data: dict[str, dict] = {}
+
+    for path in files:
+        patient_id = patient_id_from_path(path)
+        result = load_patient(patient_id)
+        if result is None:
+            continue
+
+        record, _ = result
+        allergies = record.allergies
+        if not allergies:
+            continue
+
+        patients_with_allergies += 1
+        has_high = False
+
+        for a in allergies:
+            total_records += 1
+
+            # Criticality
+            crit = a.criticality.strip() if a.criticality else ""
+            if crit not in ("high", "low", "unable-to-assess"):
+                crit = "unknown"
+            criticality_counts[crit] += 1
+            if crit == "high":
+                has_high = True
+
+            # Categories — raw list of strings from the FHIR bundle
+            for cat in a.categories:
+                cat_clean = cat.strip().lower() if cat else "unknown"
+                category_counts[cat_clean] += 1
+
+            # Substance tracking
+            substance = a.code.label()
+            if not substance or substance == "Unknown":
+                substance = "Unspecified"
+
+            if substance not in substance_data:
+                substance_data[substance] = {"count": 0, "worst_order": 99, "worst_label": "unknown"}
+
+            substance_data[substance]["count"] += 1
+            order = _CRITICALITY_ORDER.get(crit, 3)
+            if order < substance_data[substance]["worst_order"]:
+                substance_data[substance]["worst_order"] = order
+                substance_data[substance]["worst_label"] = crit
+
+        if has_high:
+            patients_with_high += 1
+
+    # Top 10 substances by count
+    top_sorted = sorted(substance_data.items(), key=lambda x: -x[1]["count"])[:10]
+    top_substances = [
+        AllergySubstanceEntry(
+            substance=name,
+            count=data["count"],
+            criticality=data["worst_label"],
+        )
+        for name, data in top_sorted
+    ]
+
+    return AllergyCriticalityBreakdown(
+        criticality_counts=dict(criticality_counts),
+        category_counts=dict(category_counts),
+        total_allergy_records=total_records,
+        patients_with_allergies=patients_with_allergies,
+        patients_with_high_criticality=patients_with_high,
+        top_substances=top_substances,
     )
 
 

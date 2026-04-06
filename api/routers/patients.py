@@ -50,7 +50,10 @@ from api.models import (
     ProceduresResponse,
     PatientRiskSummary,
     PatientRiskSummaryResponse,
+    InteractionResult,
+    InteractionResponse,
 )
+from api.core.interaction_checker import check_interactions
 
 # ---------------------------------------------------------------------------
 # Condition ranker
@@ -865,6 +868,56 @@ def patient_safety(patient_id: str) -> SafetyResponse:
         flags=flags,
         active_flag_count=active_flag_count,
         historical_flag_count=historical_flag_count,
+    )
+
+
+@router.get("/{patient_id}/interactions", response_model=InteractionResponse)
+def patient_interactions(patient_id: str) -> InteractionResponse:
+    """Drug-drug interaction checker — flags known dangerous interactions between active medications."""
+    result = load_patient(patient_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"Patient not found: {patient_id}")
+
+    record, stats = result
+
+    # Get safety flags to find active classes and their med names
+    flags = _classifier.generate_safety_flags(record.medications)
+    active_flags = [f for f in flags if f.status == "ACTIVE"]
+    active_keys = [f.class_key for f in active_flags]
+
+    # Build label map and med name map from flags
+    label_map = {f.class_key: f.label for f in flags}
+    med_map = {
+        f.class_key: [cm.medication.display for cm in f.medications if cm.is_active]
+        for f in active_flags
+    }
+
+    interactions = check_interactions(active_keys)
+
+    results = [
+        InteractionResult(
+            drug_a=i.drug_a,
+            drug_a_label=label_map.get(i.drug_a, i.drug_a),
+            drug_b=i.drug_b,
+            drug_b_label=label_map.get(i.drug_b, i.drug_b),
+            severity=i.severity,
+            mechanism=i.mechanism,
+            clinical_effect=i.clinical_effect,
+            management=i.management,
+            drug_a_meds=med_map.get(i.drug_a, []),
+            drug_b_meds=med_map.get(i.drug_b, []),
+        )
+        for i in interactions
+    ]
+
+    return InteractionResponse(
+        patient_id=patient_id,
+        active_class_keys=active_keys,
+        interactions=results,
+        contraindicated_count=sum(1 for r in results if r.severity == "contraindicated"),
+        major_count=sum(1 for r in results if r.severity == "major"),
+        moderate_count=sum(1 for r in results if r.severity == "moderate"),
+        has_interactions=len(results) > 0,
     )
 
 

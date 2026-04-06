@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { NavLink, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Activity, Star, Database, Heart, CalendarDays, BarChart3, ShieldAlert, Syringe, Scissors } from "lucide-react";
+import { Activity, Star, Database, Heart, CalendarDays, BarChart3, ShieldAlert, Syringe, Scissors, ClipboardCheck, Stethoscope } from "lucide-react";
 import { api } from "../api/client";
 import { useFavorites } from "../hooks/useFavorites";
 import { CommandPalette } from "./CommandPalette";
@@ -119,6 +119,8 @@ const NAV_LINKS = [
   { to: "/explorer/conditions", label: "Conditions", icon: Activity, description: "Surgical risk ranking" },
   { to: "/explorer/procedures", label: "Procedures", icon: Scissors, description: "Procedure history" },
   { to: "/explorer/immunizations", label: "Immunizations", icon: Syringe, description: "Vaccination history" },
+  { to: "/explorer/clearance", label: "Clearance", icon: ClipboardCheck, description: "Pre-op readiness check" },
+  { to: "/explorer/anesthesia", label: "Anesthesia", icon: Stethoscope, description: "Anesthesia handoff card" },
   { to: "/explorer/corpus", label: "Corpus", icon: BarChart3, description: "Population statistics" },
   { to: "/journey", label: "Patient Journey", icon: Heart, description: "Clinical briefing" },
 ];

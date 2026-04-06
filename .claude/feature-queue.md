@@ -6,31 +6,28 @@
 ---
 
 ## 🔨 In Progress
-- **Collapsible sections in Overview** (U) — [BUILD-012] ← running
+_none_
 
 ---
 
 ## 📋 Queued (priority order — genuine remaining work)
 
-### LOW complexity
-1. **(C) Surgical Procedure History Page** — Dedicated page listing all procedures by date, grouped by year, with status badges. New `/patients/{id}/procedures` endpoint + `Procedures.tsx` page.
-
 ### MEDIUM complexity
-2. **(U) Lab Trend Sparklines** — Mini time-series charts for key labs in Overview (creatinine, glucose, Hgb trend over time). Uses existing key-labs data + observation history.
-3. **(U) Progressive Disclosure / Collapsible Sections** — Overview cards collapsible with preference saved in localStorage.
-4. **(U) Encounter Context Preservation** — Scroll position restore when closing preview pane + breadcrumb trail.
-5. **(D) Field Coverage Profiler** — Which FHIR fields are always/sometimes/rarely populated across corpus. New `/corpus/field-coverage` endpoint.
-6. **(D) Observation Distributions** — Corpus-level histogram + percentile stats for quantitative labs (LOINC). New `/corpus/observation-distributions` endpoint.
-7. **(D) Structured Data Export (CSV/JSON)** — Download patient cohort data as normalized CSVs (one per resource type). New `/corpus/export` endpoint.
+3. **(D) Observation Distributions** — Corpus-level histogram + percentile stats for quantitative labs (LOINC). New `/corpus/observation-distributions` endpoint.
+4. **(D) Structured Data Export (CSV/JSON)** — Download patient cohort data as normalized CSVs (one per resource type). New `/corpus/export` endpoint.
+5. **(C) Recent Lab Alert Flags** — Flag labs from the last 30 days that are abnormal or trending toward critical (e.g. rising creatinine, falling Hgb). Adds `alert_flags` array to `/key-labs` response; renders amber/red badges in Overview.
+6. **(C) Medication Hold/Bridge Protocol Guidance** — Per-drug-class protocol lookup (e.g. "Hold warfarin 5 days pre-op, bridge with LMWH if high-risk"). Static lookup table. Adds protocol_note field to Safety page drug class cards.
 
 ### HIGH complexity
-8. **(D) Resource Linkage Graph** — Interactive viz of encounter ↔ observation ↔ condition ↔ med cross-references.
-9. **(U) Patient Comparison Mode** — Side-by-side patient cards with multi-select in sidebar.
-10. **(C) Drug-Drug Interaction Checker** — Flag interactions between current meds and common surgical drugs.
+7. **(D) Resource Linkage Graph** — Interactive viz of encounter ↔ observation ↔ condition ↔ med cross-references.
+8. **(U) Patient Comparison Mode** — Side-by-side patient cards with multi-select in sidebar.
+9. **(C) Drug-Drug Interaction Checker** — Flag interactions between current meds and common surgical drugs.
 
 ---
 
 ## ✅ Completed
+- [x] Pre-Op Clearance Checklist — 3-domain readiness card (Meds/Conditions/Labs), CLEARED/FLAGGED/REVIEW per domain, overall status bar [BUILD-015]
+- [x] Anesthesia Risk Summary Card — ASA I-IV derivation, anticoag/opioid panels, airway notes, printable layout [BUILD-015]
 - [x] Scroll restore + encounter breadcrumb in Timeline (prevSelectedId ref, 50ms reflow delay) [BUILD-013]
 - [x] Surgical Procedure History Page + `/procedures` endpoint (year-grouped, status badges) [BUILD-010]
 - [x] Lab Sparklines (inline SVG + LabHistoryPoint history field in API, up to 10 readings) [BUILD-011]
@@ -75,3 +72,12 @@
 **2026-04-05 — Build orchestrator cron (37-min cycle)**
 - BUILD-009 in progress (Conditions page) — not stuck, let it run.
 - Parallel backend-safe build: picked Surgical Procedure History (BUILD-010, non-overlapping files).
+
+**2026-04-05 — Research orchestrator cron (23-min cycle, pass 3)**
+- Queue had 5 genuine unbuilt items — below threshold of 6. Spawned Clinician research agent.
+- Agent returned 4 new (C) features focused on Patient Journey MVP and Phase 1 demo needs:
+  1. Pre-Op Clearance Checklist (Low) — no new API needed, composes from existing endpoints
+  2. Anesthesia Risk Summary Card (Low) — composites Safety + Conditions data
+  3. Recent Lab Alert Flags (Medium) — `alert_flags` array on `/key-labs` response
+  4. Medication Hold/Bridge Protocol Guidance (Medium) — static protocol lookup table
+- All 4 items appended to queue. Queue now at 9 items. Dispatching BUILD-015 (low-complexity pair).

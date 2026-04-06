@@ -123,6 +123,42 @@ Shows: vaccine chip summary at top (deduped names), then year-grouped timeline r
 
 ---
 
+### Pre-Op Clearance Checklist (`/explorer/clearance`)
+**What it does:** Per-domain pre-operative readiness assessment. Runs three parallel queries and derives a CLEARED / FLAGGED / REVIEW signal for each domain.
+
+**Domains:**
+- **Medications** — FLAGGED if any ACTIVE critical drug class (anticoagulants, antiplatelets, JAK inhibitors, immunosuppressants); REVIEW if only warning-level classes active; CLEARED otherwise
+- **Conditions** — FLAGGED if any active CARDIAC or PULMONARY condition; REVIEW if only METABOLIC; CLEARED otherwise
+- **Labs** — REVIEW if any LOINC panel has no data; CLEARED if all panels populated
+
+**Overall status bar:** Any FLAGGED → red "Hold — Review Required"; any REVIEW only → amber "Incomplete — Pending Review"; all CLEARED → green "Pre-Op Clearance: Complete".
+
+Each domain card shows a colored left border, status chip, and bullet list of flagged items (or a "No concerns identified" note).
+
+**API:** Composes `GET /api/patients/{id}/safety` + `GET /api/patients/{id}/condition-acuity` + `GET /api/patients/{id}/key-labs` — no new endpoint.
+
+---
+
+### Anesthesia Risk Summary Card (`/explorer/anesthesia`)
+**What it does:** Printable-style consolidated card for anesthesiologist handoff. Derives an ASA-like physical status classification (I–IV) and surfaces the key drug and condition considerations.
+
+**ASA derivation:**
+- **I** — No active conditions, no critical medications
+- **II** — Mild systemic disease (1–2 non-critical conditions, no critical meds)
+- **III** — Severe systemic disease (CARDIAC or PULMONARY condition, OR any active critical medication)
+- **IV** — Life-threatening (CARDIAC/PULMONARY condition AND active anticoagulant/antiplatelet)
+
+**Panels:**
+- Patient header (name, age, DOB, gender, date stamp)
+- Anesthesia risk factors — amber: active CARDIAC/PULMONARY/METABOLIC conditions
+- Anticoagulant/antiplatelet considerations — red panel with individual med names
+- Opioid considerations — amber panel
+- Airway notes — placeholder unless PULMONARY conditions exist
+
+**API:** Composes `GET /api/patients/{id}/safety` + `GET /api/patients/{id}/condition-acuity` + `GET /api/patients/{id}/overview` — no new endpoint.
+
+---
+
 ### Corpus (`/explorer/corpus`)
 **What it does:** Population-level statistics across all 1,180 patients in the dataset.
 

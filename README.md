@@ -64,4 +64,6 @@ ehi-ignite-challenge/
 The provider assistant now supports deterministic and Anthropic Agent SDK modes behind the same API endpoint.
 
 - Integration guide: `architecture/ANTHROPIC-AGENT-SDK.md`
+- Operating report: `architecture/ANTHROPIC-SDK-OPERATING-REPORT.md`
+- Context engineering report: `architecture/FHIR-AGENT-CONTEXT-ENGINEERING-REPORT.md`
 - Agent profile files: `api/agents/provider-assistant/`

@@ -1,5 +1,11 @@
 # Anthropic Agent SDK Integration
 
+For full operating guidance, use:
+- `architecture/ANTHROPIC-SDK-OPERATING-REPORT.md`
+- `architecture/FHIR-AGENT-CONTEXT-ENGINEERING-REPORT.md`
+
+This file is the quick-start reference.
+
 This project now supports two provider-assistant runtimes behind the same API endpoint:
 
 - `deterministic` (existing rules-based chart assistant)

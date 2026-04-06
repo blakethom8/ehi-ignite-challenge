@@ -24,7 +24,8 @@ ehi-ignite-challenge/
 │   └── FHIR-PRIMER.md            ← quick reference for FHIR R4 concepts
 ├── ideas/
 │   └── FEATURE-IDEAS.md          ← use cases, agent concepts, product strategy
-├── architecture/                 ← system design docs
+├── docs/
+│   └── architecture/             ← system design docs
 └── src/                          ← code experiments
 ```
 
@@ -63,7 +64,7 @@ ehi-ignite-challenge/
 
 The provider assistant now supports deterministic and Anthropic Agent SDK modes behind the same API endpoint.
 
-- Integration guide: `architecture/ANTHROPIC-AGENT-SDK.md`
-- Operating report: `architecture/ANTHROPIC-SDK-OPERATING-REPORT.md`
-- Context engineering report: `architecture/FHIR-AGENT-CONTEXT-ENGINEERING-REPORT.md`
+- Integration guide: `docs/architecture/ANTHROPIC-AGENT-SDK.md`
+- Operating report: `docs/architecture/ANTHROPIC-SDK-OPERATING-REPORT.md`
+- Context engineering report: `docs/architecture/FHIR-AGENT-CONTEXT-ENGINEERING-REPORT.md`
 - Agent profile files: `api/agents/provider-assistant/`

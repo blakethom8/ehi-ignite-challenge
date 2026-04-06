@@ -1,8 +1,8 @@
 # Anthropic Agent SDK Integration
 
 For full operating guidance, use:
-- `architecture/ANTHROPIC-SDK-OPERATING-REPORT.md`
-- `architecture/FHIR-AGENT-CONTEXT-ENGINEERING-REPORT.md`
+- `docs/architecture/ANTHROPIC-SDK-OPERATING-REPORT.md`
+- `docs/architecture/FHIR-AGENT-CONTEXT-ENGINEERING-REPORT.md`
 
 This file is the quick-start reference.
 

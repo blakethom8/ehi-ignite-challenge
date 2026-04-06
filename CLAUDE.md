@@ -68,7 +68,7 @@ ehi-ignite-challenge/
 │   ├── README.md
 │   └── DESIGN.md                          ← Miro-inspired tokens, components, color roles
 │
-├── architecture/                          ← architecture docs
+├── docs/architecture/                     ← architecture docs
 │   ├── ECOSYSTEM-OVERVIEW.md              ← platform framing, full directory layout, build sequence
 │   ├── DEPLOYMENT.md                      ← Hetzner + Docker Compose deployment guide
 │   └── CONTEXT-PIPELINE.md               ← LLM context engineering (TODO)
@@ -169,7 +169,7 @@ stats = compute_patient_stats(record)
 ### Deployment
 - Hetzner CX21 VPS (~€4.85/mo)
 - Docker Compose + nginx + Let's Encrypt SSL
-- See `architecture/DEPLOYMENT.md` for full setup
+- See `docs/architecture/DEPLOYMENT.md` for full setup
 
 ### Design System
 - Miro-inspired (see `design/DESIGN.md`)
@@ -200,8 +200,8 @@ stats = compute_patient_stats(record)
 | `patient-journey/CONTEXT-ENGINEERING.md` | 5-layer LLM context pipeline design — read before building batch_enrichment or NL search |
 | `patient-journey/DATA-DEFINITIONS.md` | Full data model reference — encounter types, medication records, observation fields |
 | `ideas/PATIENT-JOURNEY-APP.md` | Full product spec for the clinical journey app |
-| `architecture/ECOSYSTEM-OVERVIEW.md` | Platform framing and complete directory layout |
-| `architecture/DEPLOYMENT.md` | Hetzner + Docker Compose deployment guide |
+| `docs/architecture/ECOSYSTEM-OVERVIEW.md` | Platform framing and complete directory layout |
+| `docs/architecture/DEPLOYMENT.md` | Hetzner + Docker Compose deployment guide |
 | `design/DESIGN.md` | Miro-inspired design tokens + component guide |
 
 ---

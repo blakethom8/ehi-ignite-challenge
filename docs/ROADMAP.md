@@ -126,7 +126,7 @@ The pipeline lives in `api/core/context_builder.py` (TODO) and is called by `api
 
 ## Deployment Plan
 
-The app is designed to deploy on a Hetzner CX21 VPS (~€4.85/mo) using Docker Compose + nginx + Let's Encrypt SSL. See `architecture/DEPLOYMENT.md` for full setup.
+The app is designed to deploy on a Hetzner CX21 VPS (~€4.85/mo) using Docker Compose + nginx + Let's Encrypt SSL. See `docs/architecture/DEPLOYMENT.md` for full setup.
 
 For the Phase 1 demo (May 13, 2026), we should have a live URL rather than a local demo. This gives judges the ability to explore the app themselves.
 

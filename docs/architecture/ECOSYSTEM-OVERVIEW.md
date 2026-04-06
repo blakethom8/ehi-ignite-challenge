@@ -132,7 +132,7 @@ ehi-ignite-challenge/
 │   ├── README.md
 │   └── DESIGN.md                   ← Miro-inspired tokens + component guide
 │
-├── architecture/                   ← you are here
+├── docs/architecture/              ← you are here
 │   ├── ECOSYSTEM-OVERVIEW.md
 │   ├── DEPLOYMENT.md
 │   └── CONTEXT-PIPELINE.md         ← LLM context engineering (simplified)

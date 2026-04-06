@@ -7,7 +7,7 @@ from __future__ import annotations
 import json
 import sys as _sys
 from collections import defaultdict
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
@@ -35,6 +35,7 @@ from api.models import (
     MedicationDetail,
     LabHistoryPoint,
     LabValue,
+    LabAlertFlag,
     KeyLabsResponse,
     SafetyMedication,
     SafetyFlag,
@@ -71,6 +72,70 @@ router = APIRouter(prefix="/patients", tags=["patients"])
 
 BILLING_TYPES = {"Claim", "ExplanationOfBenefit"}
 ADMIN_TYPES = {"Organization", "Practitioner", "PractitionerRole", "Location"}
+
+# ---------------------------------------------------------------------------
+# Pre-operative hold/bridge protocol notes — keyed by drug class
+# ---------------------------------------------------------------------------
+
+PROTOCOL_NOTES: dict[str, str] = {
+    "anticoagulants": (
+        "Hold warfarin 5 days pre-op; check INR day of surgery (target <1.5). "
+        "Bridge with LMWH (enoxaparin 1 mg/kg SQ BID) for high-thromboembolic-risk patients "
+        "(mechanical heart valve, AF with CHA\u2082DS\u2082-VASc \u22654, recent VTE <3 months). "
+        "Last LMWH dose 24h pre-op. Resume warfarin evening of surgery if hemostasis adequate."
+    ),
+    "antiplatelets": (
+        "Hold aspirin 7 days pre-op (or continue low-dose 81mg if cardiac stent within 12 months \u2014 "
+        "discuss with cardiologist). Hold clopidogrel/ticagrelor 5\u20137 days pre-op. "
+        "Do NOT hold if drug-eluting stent placed within 12 months without cardiology sign-off."
+    ),
+    "jak_inhibitors": (
+        "Hold 1\u20132 weeks pre-op per ACR guidelines (tofacitinib: 3 days minimum; "
+        "baricitinib/upadacitinib: 3 days minimum). Restart after wound healing confirmed, "
+        "typically 2 weeks post-op. Increased infection risk; ensure prophylactic antibiotics given."
+    ),
+    "immunosuppressants": (
+        "Do NOT abruptly discontinue. Consult with prescribing specialist (transplant/rheumatology). "
+        "Tacrolimus/cyclosporine: continue at reduced dose, monitor levels day of surgery. "
+        "Mycophenolate: typically held 1 week pre-op for elective cases. "
+        "Perioperative stress-dose steroids may be needed."
+    ),
+    "nsaids": (
+        "Hold NSAIDs (ibuprofen, naproxen, indomethacin) 3\u20135 days pre-op due to platelet "
+        "dysfunction and renal effects. COX-2 inhibitors (celecoxib) may be continued if needed "
+        "for pain control \u2014 consult surgeon. Post-op: restart only after renal function confirmed stable."
+    ),
+    "opioids": (
+        "Continue chronic opioids up to day of surgery to avoid withdrawal. "
+        "Inform anesthesia team \u2014 increased intraoperative and post-op opioid requirements expected. "
+        "Consider multimodal analgesia plan. Buprenorphine: consult pain management \u2014 "
+        "may need dose adjustment or conversion."
+    ),
+    "anticonvulsants": (
+        "Continue anticonvulsants without interruption. Do not hold pre-op. "
+        "Ensure IV formulation available if patient unable to take PO post-op. "
+        "Phenytoin/carbamazepine: CYP450 inducers \u2014 may alter anesthetic metabolism. "
+        "Inform anesthesia team."
+    ),
+    "corticosteroids": (
+        "Do NOT abruptly discontinue. Patients on chronic steroids (>5mg prednisone/day for >3 weeks) "
+        "may have HPA axis suppression. Administer stress-dose steroids: hydrocortisone 50mg IV "
+        "at induction + 25mg q8h x24h for major surgery. Taper back to baseline dose post-op."
+    ),
+    "maois": (
+        "Ideally hold MAOIs 14 days pre-op due to risk of hypertensive crisis and serotonin syndrome "
+        "with anesthetic agents. Discuss with psychiatry before stopping. "
+        "If surgery cannot be delayed: avoid meperidine, indirect sympathomimetics, and serotonergic agents. "
+        "Use direct-acting vasopressors only."
+    ),
+    "antidiabetics": (
+        "Hold metformin 24\u201348h pre-op (lactic acidosis risk with contrast/renal changes). "
+        "Sulfonylureas: hold morning of surgery (hypoglycemia risk). "
+        "Insulin: give 50\u201380% of basal dose morning of surgery; hold mealtime insulin. "
+        "Monitor glucose q1\u20132h intraoperatively; target 140\u2013180 mg/dL. "
+        "GLP-1 agonists (semaglutide): hold 1 week pre-op due to gastroparesis risk."
+    ),
+}
 
 
 @router.get("", response_model=list[PatientListItem])
@@ -368,6 +433,144 @@ def encounter_detail(patient_id: str, encounter_id: str) -> EncounterDetail:
     )
 
 
+# ---------------------------------------------------------------------------
+# Lab alert thresholds
+# (loinc_code): (display_name, low_critical, low_warning, high_warning, high_critical, unit)
+# None = threshold not applicable for that direction
+# ---------------------------------------------------------------------------
+
+ALERT_THRESHOLDS: dict[str, tuple[str, float | None, float | None, float | None, float | None, str]] = {
+    "718-7":  ("Hemoglobin",  6.0,  8.0,   17.5, 20.0,  "g/dL"),
+    "4544-3": ("Hematocrit",  18.0, 24.0,  52.0, 60.0,  "%"),
+    "777-3":  ("Platelets",   50.0, 100.0, 400.0, 1000.0, "K/uL"),
+    "6301-6": ("INR",         None, None,  3.0,  5.0,   ""),
+    "2160-0": ("Creatinine",  None, None,  1.5,  3.0,   "mg/dL"),
+    "2823-3": ("Potassium",   3.0,  3.5,   5.5,  6.5,   "mEq/L"),
+    "2951-2": ("Sodium",      125.0, 130.0, 148.0, 155.0, "mEq/L"),
+    "2345-7": ("Glucose",     50.0, 70.0,  200.0, 400.0, "mg/dL"),
+    "1751-7": ("Albumin",     None, 2.5,   None, None,  "g/dL"),
+    "6768-6": ("Alk Phos",    None, None,  120.0, 300.0, "U/L"),
+}
+
+
+def _obs_date_to_date(obs_dt: datetime | None) -> date | None:
+    """Extract a date from an observation's effective_dt (datetime or date)."""
+    if obs_dt is None:
+        return None
+    if isinstance(obs_dt, datetime):
+        return obs_dt.date()
+    return obs_dt  # already a date
+
+
+def _compute_alert_flags(record, today_dt: date) -> list[LabAlertFlag]:
+    """
+    Scan all observations within the last 30 days against ALERT_THRESHOLDS.
+    Returns deduplicated (most recent per LOINC), sorted critical-first then by days_ago.
+    """
+    cutoff = today_dt.toordinal() - 30
+
+    # Collect all recent, matchable observations grouped by loinc_code
+    # Structure: loinc_code → list of (obs, value_float, days_ago)
+    candidates: dict[str, list[tuple]] = defaultdict(list)
+
+    for obs in record.observations:
+        if obs.loinc_code not in ALERT_THRESHOLDS:
+            continue
+        if obs.value_type != "quantity" or obs.value_quantity is None:
+            continue
+        obs_date = _obs_date_to_date(obs.effective_dt)
+        if obs_date is None:
+            continue
+        days_ago = today_dt.toordinal() - obs_date.toordinal()
+        if days_ago > 30 or days_ago < 0:
+            continue
+        candidates[obs.loinc_code].append((obs, obs.value_quantity, days_ago))
+
+    # For trend detection, also gather all historical readings per LOINC (sorted newest-first)
+    all_by_loinc: dict[str, list] = defaultdict(list)
+    for obs in record.observations:
+        if obs.loinc_code in ALERT_THRESHOLDS and obs.value_type == "quantity" and obs.value_quantity is not None:
+            all_by_loinc[obs.loinc_code].append(obs)
+
+    for loinc_code in all_by_loinc:
+        all_by_loinc[loinc_code].sort(
+            key=lambda o: o.effective_dt or datetime.min, reverse=True
+        )
+
+    flags: list[LabAlertFlag] = []
+
+    for loinc_code, obs_list in candidates.items():
+        # Take the most recent observation for this LOINC (smallest days_ago)
+        obs_list.sort(key=lambda t: t[2])  # sort by days_ago ascending
+        most_recent_obs, value, days_ago = obs_list[0]
+
+        display_name, low_crit, low_warn, high_warn, high_crit, unit = ALERT_THRESHOLDS[loinc_code]
+
+        severity: str | None = None
+        direction: str | None = None
+
+        # Check critical first (harder threshold)
+        if low_crit is not None and value < low_crit:
+            severity = "critical"
+            direction = "low"
+        elif high_crit is not None and value > high_crit:
+            severity = "critical"
+            direction = "high"
+        elif low_warn is not None and value < low_warn:
+            severity = "warning"
+            direction = "low"
+        elif high_warn is not None and value > high_warn:
+            severity = "warning"
+            direction = "high"
+
+        # Check trend (only if no harder flag already set, or to augment a warning)
+        if severity is None or severity == "warning":
+            history = all_by_loinc.get(loinc_code, [])
+            if len(history) >= 3:
+                last3_vals = [h.value_quantity for h in history[:3] if h.value_quantity is not None]
+                if len(last3_vals) == 3:
+                    v0, v1, v2 = last3_vals[0], last3_vals[1], last3_vals[2]
+                    # Trending up: each successive reading increases by >5%
+                    if v2 != 0 and v1 != 0:
+                        r1 = (v1 - v2) / abs(v2)  # v1 vs v2 (older)
+                        r2 = (v0 - v1) / abs(v1)  # v0 vs v1 (newer)
+                        if r1 > 0.05 and r2 > 0.05 and severity is None:
+                            severity = "warning"
+                            direction = "trending_up"
+                        elif r1 < -0.05 and r2 < -0.05 and severity is None:
+                            severity = "warning"
+                            direction = "trending_down"
+
+        if severity is None or direction is None:
+            continue
+
+        # Build message
+        unit_str = f" {unit}" if unit else ""
+        if direction == "low":
+            msg = f"{display_name} {value}{unit_str} — critically low" if severity == "critical" else f"{display_name} {value}{unit_str} — below normal"
+        elif direction == "high":
+            msg = f"{display_name} {value}{unit_str} — critically high" if severity == "critical" else f"{display_name} {value}{unit_str} — above normal"
+        elif direction == "trending_up":
+            msg = f"{display_name} {value}{unit_str} — trending upward over last 3 readings"
+        else:
+            msg = f"{display_name} {value}{unit_str} — trending downward over last 3 readings"
+
+        flags.append(LabAlertFlag(
+            lab_name=display_name,
+            loinc_code=loinc_code,
+            value=value,
+            unit=unit,
+            severity=severity,
+            direction=direction,
+            message=msg,
+            days_ago=days_ago,
+        ))
+
+    # Sort: critical first, then warning; within severity, sort by days_ago ascending
+    flags.sort(key=lambda f: (0 if f.severity == "critical" else 1, f.days_ago))
+    return flags
+
+
 @router.get("/{patient_id}/key-labs", response_model=KeyLabsResponse)
 def patient_key_labs(patient_id: str) -> KeyLabsResponse:
     """
@@ -472,7 +675,11 @@ def patient_key_labs(patient_id: str) -> KeyLabsResponse:
             panels[panel_name] = []
         panels[panel_name].append(lab)
 
-    return KeyLabsResponse(patient_id=patient_id, panels=panels)
+    # Compute alert flags for recent labs (last 30 days)
+    today = datetime.now().date()
+    alert_flags = _compute_alert_flags(record, today)
+
+    return KeyLabsResponse(patient_id=patient_id, panels=panels, alert_flags=alert_flags)
 
 
 @router.get("/{patient_id}/safety", response_model=SafetyResponse)
@@ -505,6 +712,7 @@ def patient_safety(patient_id: str) -> SafetyResponse:
             surgical_note=rf.surgical_note,
             status=rf.status,
             medications=medications,
+            protocol_note=PROTOCOL_NOTES.get(rf.class_key),
         ))
 
     active_flag_count = sum(1 for f in flags if f.status == "ACTIVE")

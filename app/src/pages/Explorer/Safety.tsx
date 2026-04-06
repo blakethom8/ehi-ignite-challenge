@@ -9,6 +9,7 @@ import {
   CheckCircle,
   ChevronDown,
   ChevronUp,
+  BookOpen,
 } from "lucide-react";
 import { api } from "../../api/client";
 import { EmptyState } from "../../components/EmptyState";
@@ -55,6 +56,7 @@ const SEVERITY_CONFIG = {
 
 function FlagCard({ flag }: { flag: SafetyFlag }) {
   const [expanded, setExpanded] = useState(false);
+  const [protocolOpen, setProtocolOpen] = useState(false);
   const config = SEVERITY_CONFIG[flag.severity] ?? SEVERITY_CONFIG.info;
   const SeverityIcon = config.icon;
 
@@ -141,6 +143,33 @@ function FlagCard({ flag }: { flag: SafetyFlag }) {
               </span>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Protocol note */}
+      {flag.protocol_note && flag.status !== "NONE" && (
+        <div className="border-t border-[#e9eaef]">
+          <button
+            onClick={() => setProtocolOpen((o) => !o)}
+            className="w-full flex items-center justify-between px-5 py-2.5 hover:bg-[#fafafa] transition-colors"
+          >
+            <span className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-semibold text-[#a5a8b5]">
+              <BookOpen size={12} />
+              Pre-Op Protocol
+            </span>
+            {protocolOpen ? (
+              <ChevronUp size={13} className="text-[#a5a8b5]" />
+            ) : (
+              <ChevronDown size={13} className="text-[#a5a8b5]" />
+            )}
+          </button>
+          {protocolOpen && (
+            <div className="px-5 pb-4">
+              <p className="bg-[#f5f6f8] rounded-lg p-3 text-sm text-[#555a6a] leading-relaxed">
+                {flag.protocol_note}
+              </p>
+            </div>
+          )}
         </div>
       )}
     </div>

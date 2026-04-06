@@ -5,7 +5,7 @@ import { AlertCircle, AlertTriangle, User, ChevronDown, ChevronRight } from "luc
 import type { ReactNode } from "react";
 import { api } from "../../api/client";
 import { EmptyState } from "../../components/EmptyState";
-import type { PatientOverview, ResourceTypeCount, KeyLabsResponse, LabValue, LabHistoryPoint } from "../../types";
+import type { PatientOverview, ResourceTypeCount, KeyLabsResponse, LabValue, LabHistoryPoint, LabAlertFlag } from "../../types";
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -219,6 +219,72 @@ function Sparkline({ history }: { history: LabHistoryPoint[] }) {
       />
       <circle cx={dotX} cy={dotY} r="2.5" fill={color} />
     </svg>
+  );
+}
+
+// ── lab alert banner ───────────────────────────────────────────────────────
+
+function LabAlertBanner({ flags }: { flags: LabAlertFlag[] }) {
+  const [expanded, setExpanded] = useState(false);
+  if (flags.length === 0) return null;
+
+  const criticalCount = flags.filter((f) => f.severity === "critical").length;
+  const warningCount = flags.filter((f) => f.severity === "warning").length;
+
+  const summaryParts: string[] = [];
+  if (criticalCount > 0) summaryParts.push(`${criticalCount} critical`);
+  if (warningCount > 0) summaryParts.push(`${warningCount} warning${warningCount !== 1 ? "s" : ""}`);
+  const summaryText = summaryParts.join(", ");
+
+  return (
+    <div className="mb-3">
+      <button
+        onClick={() => setExpanded((e) => !e)}
+        className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-[#f59e0b] bg-[#fffbeb] hover:bg-[#fef3c7] transition-colors text-left"
+      >
+        <AlertTriangle size={14} className="text-[#f59e0b] shrink-0" />
+        <span className="text-sm font-semibold text-[#744000]">
+          {flags.length} recent lab alert{flags.length !== 1 ? "s" : ""} — {summaryText}
+        </span>
+        <ChevronDown
+          size={13}
+          className={`ml-auto text-[#a5a8b5] transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      {expanded && (
+        <div className="mt-1 space-y-1.5">
+          {flags.map((flag) => {
+            const isCritical = flag.severity === "critical";
+            return (
+              <div
+                key={`${flag.loinc_code}-${flag.days_ago}`}
+                className={`flex items-center gap-3 px-3 py-2 rounded-lg border text-sm ${
+                  isCritical
+                    ? "bg-[#fef2f2] border-[#ef4444]"
+                    : "bg-[#fffbeb] border-[#f59e0b]"
+                }`}
+              >
+                <span
+                  className={`shrink-0 text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${
+                    isCritical
+                      ? "bg-[#ef4444] text-white"
+                      : "bg-[#f59e0b] text-white"
+                  }`}
+                >
+                  {isCritical ? "CRITICAL" : "WARNING"}
+                </span>
+                <span className="font-medium text-[#1c1c1e] shrink-0">{flag.lab_name}</span>
+                <span className="text-[#555a6a] flex-1">{flag.message}</span>
+                <span className="text-[#a5a8b5] text-xs shrink-0">
+                  {flag.days_ago === 0 ? "today" : `${flag.days_ago}d ago`}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -676,6 +742,9 @@ function OverviewContent({ overview, keyLabs }: { overview: PatientOverview; key
           onToggle={() => toggle("keyLabs")}
         >
           <div className="px-5 py-4">
+            {keyLabs.alert_flags && keyLabs.alert_flags.length > 0 && (
+              <LabAlertBanner flags={keyLabs.alert_flags} />
+            )}
             {(() => {
               const populatedPanels = Object.entries(keyLabs.panels).filter(([, labs]) => labs.length > 0);
               if (populatedPanels.length === 0) {

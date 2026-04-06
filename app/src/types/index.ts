@@ -178,9 +178,21 @@ export interface LabValue {
   history: LabHistoryPoint[];
 }
 
+export interface LabAlertFlag {
+  lab_name: string;
+  loinc_code: string;
+  value: number;
+  unit: string;
+  severity: "critical" | "warning";
+  direction: "high" | "low" | "trending_up" | "trending_down";
+  message: string;
+  days_ago: number;
+}
+
 export interface KeyLabsResponse {
   patient_id: string;
   panels: Record<string, LabValue[]>;
+  alert_flags: LabAlertFlag[];
 }
 
 export interface SafetyMedication {
@@ -198,6 +210,7 @@ export interface SafetyFlag {
   surgical_note: string;
   status: "ACTIVE" | "HISTORICAL" | "NONE";
   medications: SafetyMedication[];
+  protocol_note?: string | null;
 }
 
 export interface SafetyResponse {

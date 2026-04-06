@@ -238,9 +238,21 @@ class LabValue(BaseModel):
     history: list[LabHistoryPoint]
 
 
+class LabAlertFlag(BaseModel):
+    lab_name: str          # e.g. "Hemoglobin"
+    loinc_code: str        # e.g. "718-7"
+    value: float
+    unit: str
+    severity: str          # "critical" | "warning"
+    direction: str         # "high" | "low" | "trending_up" | "trending_down"
+    message: str           # e.g. "Hemoglobin 7.2 g/dL — critically low"
+    days_ago: int          # how many days since this observation
+
+
 class KeyLabsResponse(BaseModel):
     patient_id: str
     panels: dict[str, list[LabValue]]  # panel name → list of labs
+    alert_flags: list[LabAlertFlag] = []
 
 
 # ---------------------------------------------------------------------------
@@ -262,6 +274,7 @@ class SafetyFlag(BaseModel):
     surgical_note: str
     status: str        # "ACTIVE" | "HISTORICAL" | "NONE"
     medications: list[SafetyMedication]
+    protocol_note: str | None = None
 
 
 class SafetyResponse(BaseModel):

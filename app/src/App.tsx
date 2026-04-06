@@ -12,7 +12,13 @@ import { ExplorerClearance } from "./pages/Explorer/Clearance";
 import { ExplorerAnesthesia } from "./pages/Explorer/Anesthesia";
 import { ExplorerDistributions } from "./pages/Explorer/Distributions";
 import { ExplorerInteractions } from "./pages/Explorer/Interactions";
+import { ExplorerAssistant } from "./pages/Explorer/Assistant";
 import { JourneyPlaceholder } from "./pages/Journey/Placeholder";
+import { AnalysisOverview } from "./pages/Analysis/Overview";
+import { AnalysisMethodology } from "./pages/Analysis/Methodology";
+import { AnalysisDefinitions } from "./pages/Analysis/Definitions";
+import { AnalysisCoverage } from "./pages/Analysis/Coverage";
+import { AnalysisFlightSchool } from "./pages/Analysis/FlightSchool";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -24,24 +30,36 @@ const queryClient = new QueryClient({
 });
 
 export default function App() {
+  const routes = [
+    { path: "/explorer", element: <ExplorerOverview /> },
+    { path: "/explorer/timeline", element: <ExplorerTimeline /> },
+    { path: "/explorer/corpus", element: <ExplorerCorpus /> },
+    { path: "/explorer/safety", element: <ExplorerSafety /> },
+    { path: "/explorer/immunizations", element: <ExplorerImmunizations /> },
+    { path: "/explorer/conditions", element: <ExplorerConditions /> },
+    { path: "/explorer/procedures", element: <ExplorerProcedures /> },
+    { path: "/explorer/clearance", element: <ExplorerClearance /> },
+    { path: "/explorer/anesthesia", element: <ExplorerAnesthesia /> },
+    { path: "/explorer/distributions", element: <ExplorerDistributions /> },
+    { path: "/explorer/interactions", element: <ExplorerInteractions /> },
+    { path: "/explorer/assistant", element: <ExplorerAssistant /> },
+    { path: "/journey", element: <JourneyPlaceholder /> },
+    { path: "/analysis", element: <AnalysisOverview /> },
+    { path: "/analysis/methodology", element: <AnalysisMethodology /> },
+    { path: "/analysis/definitions", element: <AnalysisDefinitions /> },
+    { path: "/analysis/coverage", element: <AnalysisCoverage /> },
+    { path: "/analysis/flight-school", element: <AnalysisFlightSchool /> },
+  ];
+
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <Layout>
           <Routes>
             <Route path="/" element={<Navigate to="/explorer" replace />} />
-            <Route path="/explorer" element={<ExplorerOverview />} />
-            <Route path="/explorer/timeline" element={<ExplorerTimeline />} />
-            <Route path="/explorer/corpus" element={<ExplorerCorpus />} />
-            <Route path="/explorer/safety" element={<ExplorerSafety />} />
-            <Route path="/explorer/immunizations" element={<ExplorerImmunizations />} />
-            <Route path="/explorer/conditions" element={<ExplorerConditions />} />
-            <Route path="/explorer/procedures" element={<ExplorerProcedures />} />
-            <Route path="/explorer/clearance" element={<ExplorerClearance />} />
-            <Route path="/explorer/anesthesia" element={<ExplorerAnesthesia />} />
-            <Route path="/explorer/distributions" element={<ExplorerDistributions />} />
-            <Route path="/explorer/interactions" element={<ExplorerInteractions />} />
-            <Route path="/journey" element={<JourneyPlaceholder />} />
+            {routes.map((route) => (
+              <Route key={route.path} path={route.path} element={route.element} />
+            ))}
           </Routes>
         </Layout>
       </BrowserRouter>

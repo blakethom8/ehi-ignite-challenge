@@ -10,7 +10,7 @@ contract stable independent of internal parsing model changes.
 from __future__ import annotations
 
 from datetime import datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 # ---------------------------------------------------------------------------
@@ -501,3 +501,36 @@ class FieldCoverageItem(BaseModel):
 class FieldCoverageResponse(BaseModel):
     total_patients: int
     fields: list[FieldCoverageItem]  # sorted by resource_type, then coverage_pct descending
+
+
+# ---------------------------------------------------------------------------
+# Provider Assistant (chat)
+# ---------------------------------------------------------------------------
+
+class ProviderAssistantTurn(BaseModel):
+    role: str    # "user" | "assistant"
+    content: str
+
+
+class ProviderAssistantCitation(BaseModel):
+    source_type: str      # "MedicationRequest" | "Condition" | ...
+    resource_id: str
+    label: str
+    detail: str
+    event_date: datetime | None = None
+
+
+class ProviderAssistantRequest(BaseModel):
+    patient_id: str
+    question: str
+    history: list[ProviderAssistantTurn] = Field(default_factory=list)
+    stance: str = "opinionated"    # "opinionated" | "balanced"
+
+
+class ProviderAssistantResponse(BaseModel):
+    patient_id: str
+    answer: str
+    confidence: str                # "high" | "medium" | "low"
+    stance: str
+    citations: list[ProviderAssistantCitation]
+    follow_ups: list[str]

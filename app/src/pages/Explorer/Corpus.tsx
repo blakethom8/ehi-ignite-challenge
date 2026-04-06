@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { BarChart3, Users, Activity, Layers, User, Download } from "lucide-react";
+import { Users, Activity, Layers, User, Download } from "lucide-react";
 import { api } from "../../api/client";
 import type { CorpusStats } from "../../types";
 

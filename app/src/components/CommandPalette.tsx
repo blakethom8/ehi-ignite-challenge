@@ -45,26 +45,25 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
         .slice(0, 8)
     : patients.slice(0, 8);
 
-  // Reset state when opening
+  const closePalette = useCallback(() => {
+    setQuery("");
+    setActiveIndex(0);
+    onClose();
+  }, [onClose]);
+
+  // Focus input when opening
   useEffect(() => {
     if (open) {
-      setQuery("");
-      setActiveIndex(0);
       setTimeout(() => inputRef.current?.focus(), 0);
     }
   }, [open]);
 
-  // Keep activeIndex in bounds when filtered list changes
-  useEffect(() => {
-    setActiveIndex(0);
-  }, [query]);
-
   const selectPatient = useCallback(
     (patient: PatientListItem) => {
       navigate(`/explorer?patient=${patient.id}`);
-      onClose();
+      closePalette();
     },
-    [navigate, onClose]
+    [closePalette, navigate]
   );
 
   // Scroll active item into view
@@ -88,7 +87,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
       const patient = filtered[activeIndex];
       if (patient) selectPatient(patient);
     } else if (e.key === "Escape") {
-      onClose();
+      closePalette();
     }
   }
 
@@ -99,7 +98,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
       className="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh]"
       style={{ backgroundColor: "rgba(0,0,0,0.45)" }}
       onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (e.target === e.currentTarget) closePalette();
       }}
     >
       <div
@@ -112,14 +111,20 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
           <input
             ref={inputRef}
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setActiveIndex(0);
+            }}
             onKeyDown={handleKeyDown}
             placeholder="Search patients by name…"
             className="flex-1 text-sm text-[#1c1c1e] outline-none placeholder:text-[#a5a8b5] bg-transparent"
           />
           {query && (
             <button
-              onClick={() => setQuery("")}
+              onClick={() => {
+                setQuery("");
+                setActiveIndex(0);
+              }}
               className="text-[#a5a8b5] hover:text-[#555a6a] transition-colors"
             >
               <X size={14} />

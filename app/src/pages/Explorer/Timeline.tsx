@@ -767,8 +767,35 @@ function CompositionPanel({ encounters }: { encounters: EncounterEvent[] }) {
 export function ExplorerTimeline() {
   const [searchParams] = useSearchParams();
   const patientId = searchParams.get("patient");
-  const [selectedEncounterId, setSelectedEncounterId] = useState<string | null>(null);
-  const [yearFilter, setYearFilter] = useState<string | null>(null);
+  const [uiState, setUiState] = useState<{
+    patientId: string | null;
+    selectedEncounterId: string | null;
+    yearFilter: string | null;
+  }>({
+    patientId,
+    selectedEncounterId: null,
+    yearFilter: null,
+  });
+
+  const setUiStateForActivePatient = useCallback(
+    (
+      updater: (prev: { selectedEncounterId: string | null; yearFilter: string | null }) => {
+        selectedEncounterId: string | null;
+        yearFilter: string | null;
+      }
+    ) => {
+      setUiState((prev) => {
+        const activeState =
+          prev.patientId === patientId
+            ? { selectedEncounterId: prev.selectedEncounterId, yearFilter: prev.yearFilter }
+            : { selectedEncounterId: null, yearFilter: null };
+
+        const next = updater(activeState);
+        return { patientId, ...next };
+      });
+    },
+    [patientId]
+  );
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["timeline", patientId],
@@ -776,15 +803,30 @@ export function ExplorerTimeline() {
     enabled: !!patientId,
   });
 
-  // Reset filters when patient changes
-  useEffect(() => {
-    setSelectedEncounterId(null);
-    setYearFilter(null);
-  }, [patientId]);
+  const selectedEncounterId =
+    uiState.patientId === patientId ? uiState.selectedEncounterId : null;
+  const yearFilter = uiState.patientId === patientId ? uiState.yearFilter : null;
 
   const handleSelect = useCallback((id: string) => {
-    setSelectedEncounterId(prev => prev === id ? null : id);
-  }, []);
+    setUiStateForActivePatient((prev) => ({
+      ...prev,
+      selectedEncounterId: prev.selectedEncounterId === id ? null : id,
+    }));
+  }, [setUiStateForActivePatient]);
+
+  const handleYearFilterChange = useCallback((year: string | null) => {
+    setUiStateForActivePatient((prev) => ({
+      ...prev,
+      yearFilter: year,
+    }));
+  }, [setUiStateForActivePatient]);
+
+  const closePreview = useCallback(() => {
+    setUiStateForActivePatient((prev) => ({
+      ...prev,
+      selectedEncounterId: null,
+    }));
+  }, [setUiStateForActivePatient]);
 
   if (!patientId) {
     return (
@@ -834,7 +876,7 @@ export function ExplorerTimeline() {
         <YearFilter
           yearCounts={data.year_counts}
           active={yearFilter}
-          onChange={setYearFilter}
+          onChange={handleYearFilterChange}
         />
         <CompositionPanel encounters={data.encounters} />
       </div>
@@ -858,7 +900,7 @@ export function ExplorerTimeline() {
             <span className="text-xs text-[#c7cad5] mx-1.5">›</span>
             <span className="text-xs text-[#a5a8b5]">Encounter preview</span>
             <button
-              onClick={() => setSelectedEncounterId(null)}
+              onClick={closePreview}
               className="ml-auto flex items-center gap-1 text-xs text-[#a5a8b5] hover:text-[#1c1c1e] transition-colors"
               aria-label="Close preview"
             >
@@ -889,7 +931,7 @@ export function ExplorerTimeline() {
             <PreviewPane
               patientId={patientId}
               encounterId={selectedEncounterId!}
-              onClose={() => setSelectedEncounterId(null)}
+              onClose={closePreview}
             />
           </div>
         )}

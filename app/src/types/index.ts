@@ -339,3 +339,61 @@ export interface InteractionResponse {
   moderate_count: number;
   has_interactions: boolean;
 }
+
+export interface FieldCoverageItem {
+  field_path: string;
+  resource_type: string;
+  present_count: number;
+  total_count: number;
+  coverage_pct: number;
+  coverage_label: "Always" | "Usually" | "Sometimes" | "Rarely";
+}
+
+export interface FieldCoverageResponse {
+  total_patients: number;
+  fields: FieldCoverageItem[];
+}
+
+export interface AllergySubstanceEntry {
+  substance: string;
+  count: number;
+  criticality: string;
+}
+
+export interface AllergyCriticalityBreakdown {
+  criticality_counts: Record<string, number>;
+  category_counts: Record<string, number>;
+  total_allergy_records: number;
+  patients_with_allergies: number;
+  patients_with_high_criticality: number;
+  top_substances: AllergySubstanceEntry[];
+}
+
+export interface ProviderAssistantTurn {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface ProviderAssistantCitation {
+  source_type: string;
+  resource_id: string;
+  label: string;
+  detail: string;
+  event_date: string | null;
+}
+
+export interface ProviderAssistantRequest {
+  patient_id: string;
+  question: string;
+  history?: ProviderAssistantTurn[];
+  stance?: "opinionated" | "balanced";
+}
+
+export interface ProviderAssistantResponse {
+  patient_id: string;
+  answer: string;
+  confidence: "high" | "medium" | "low";
+  stance: "opinionated" | "balanced";
+  citations: ProviderAssistantCitation[];
+  follow_ups: string[];
+}

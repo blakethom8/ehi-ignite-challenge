@@ -1,5 +1,22 @@
 import axios from "axios";
-import type { PatientListItem, PatientOverview, TimelineResponse, EncounterDetail, KeyLabsResponse, CorpusStats, SafetyResponse, ImmunizationResponse, ConditionAcuityResponse, PatientRiskSummary, ObservationDistributionsResponse, InteractionResponse } from "../types";
+import type {
+  PatientListItem,
+  PatientOverview,
+  TimelineResponse,
+  EncounterDetail,
+  KeyLabsResponse,
+  CorpusStats,
+  SafetyResponse,
+  ImmunizationResponse,
+  ConditionAcuityResponse,
+  PatientRiskSummary,
+  ObservationDistributionsResponse,
+  InteractionResponse,
+  FieldCoverageResponse,
+  AllergyCriticalityBreakdown,
+  ProviderAssistantRequest,
+  ProviderAssistantResponse,
+} from "../types";
 
 const http = axios.create({
   baseURL: "/api",
@@ -58,4 +75,16 @@ export const api = {
   /** Drug-drug interaction checker — flags known interactions between active medications */
   getInteractions: (patientId: string): Promise<InteractionResponse> =>
     http.get<InteractionResponse>(`/patients/${patientId}/interactions`).then((r) => r.data),
+
+  /** Field coverage profiler across the full corpus */
+  getFieldCoverage: (): Promise<FieldCoverageResponse> =>
+    http.get<FieldCoverageResponse>("/corpus/field-coverage").then((r) => r.data),
+
+  /** Allergy criticality + category breakdown across the full corpus */
+  getAllergyCriticalityBreakdown: (): Promise<AllergyCriticalityBreakdown> =>
+    http.get<AllergyCriticalityBreakdown>("/corpus/allergies/criticality-breakdown").then((r) => r.data),
+
+  /** Provider-facing chart Q&A */
+  chatProviderAssistant: (payload: ProviderAssistantRequest): Promise<ProviderAssistantResponse> =>
+    http.post<ProviderAssistantResponse>("/assistant/chat", payload).then((r) => r.data),
 };

@@ -52,7 +52,6 @@ function PercentileBar({ d }: { d: ObservationDistribution }) {
   const p10Left = pct(d.p10);
   const p25Left = pct(d.p25);
   const iqrWidth = pct(d.p75) - pct(d.p25);
-  const p75Left = pct(d.p75);
   const p90Left = pct(d.p90);
 
   return (

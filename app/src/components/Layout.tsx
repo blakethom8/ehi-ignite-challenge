@@ -1,7 +1,27 @@
-import { useEffect, useState } from "react";
-import { NavLink, useSearchParams } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, NavLink, useLocation, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Activity, Star, Database, Heart, CalendarDays, BarChart3, BarChart2, ShieldAlert, Syringe, Scissors, ClipboardCheck, Stethoscope, Zap } from "lucide-react";
+import {
+  Activity,
+  BarChart2,
+  BarChart3,
+  BookMarked,
+  CalendarDays,
+  ClipboardCheck,
+  Database,
+  GraduationCap,
+  Heart,
+  Layers3,
+  MessageSquareText,
+  Scissors,
+  ShieldAlert,
+  Star,
+  Stethoscope,
+  Syringe,
+  TestTubeDiagonal,
+  Zap,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { api } from "../api/client";
 import { useFavorites } from "../hooks/useFavorites";
 import { CommandPalette } from "./CommandPalette";
@@ -11,17 +31,72 @@ interface LayoutProps {
   children: React.ReactNode;
 }
 
-// ── Patient list with favorites ─────────────────────────────────────────────
-
 type FilterMode = "all" | "high_risk" | "needs_review";
+type AppEnvironment = "clinical" | "analysis";
+
+interface NavItem {
+  to: string;
+  label: string;
+  icon: LucideIcon;
+  description: string;
+}
+
+const CLINICAL_NAV_LINKS: NavItem[] = [
+  { to: "/explorer", label: "Overview", icon: Database, description: "Patient summary" },
+  { to: "/explorer/timeline", label: "Timeline", icon: CalendarDays, description: "Encounter history" },
+  { to: "/explorer/safety", label: "Safety", icon: ShieldAlert, description: "Pre-op risk flags" },
+  { to: "/explorer/interactions", label: "Interactions", icon: Zap, description: "Drug-drug interactions" },
+  { to: "/explorer/conditions", label: "Conditions", icon: Activity, description: "Surgical risk ranking" },
+  { to: "/explorer/procedures", label: "Procedures", icon: Scissors, description: "Procedure history" },
+  { to: "/explorer/immunizations", label: "Immunizations", icon: Syringe, description: "Vaccination history" },
+  { to: "/explorer/clearance", label: "Clearance", icon: ClipboardCheck, description: "Pre-op readiness check" },
+  { to: "/explorer/anesthesia", label: "Anesthesia", icon: Stethoscope, description: "Anesthesia handoff card" },
+  { to: "/explorer/assistant", label: "Assistant", icon: MessageSquareText, description: "Provider chart Q&A" },
+  { to: "/explorer/corpus", label: "Corpus", icon: BarChart3, description: "Population statistics" },
+  { to: "/explorer/distributions", label: "Distributions", icon: BarChart2, description: "Lab value distributions" },
+  { to: "/journey", label: "Patient Journey", icon: Heart, description: "Clinical briefing" },
+];
+
+const ANALYSIS_NAV_LINKS: NavItem[] = [
+  { to: "/analysis", label: "Overview", icon: BookMarked, description: "Orientation and goals" },
+  {
+    to: "/analysis/flight-school",
+    label: "Flight School",
+    icon: GraduationCap,
+    description: "Guided learning missions",
+  },
+  {
+    to: "/analysis/methodology",
+    label: "Methodology",
+    icon: Layers3,
+    description: "Interpretability strategy",
+  },
+  {
+    to: "/analysis/definitions",
+    label: "Definitions",
+    icon: Database,
+    description: "Canonical data contracts",
+  },
+  {
+    to: "/analysis/coverage",
+    label: "Coverage",
+    icon: TestTubeDiagonal,
+    description: "Field quality and reliability",
+  },
+];
+
+function withPatientQuery(path: string, patientId: string | null): string {
+  if (!patientId) return path;
+  return `${path}?patient=${patientId}`;
+}
 
 function StatusDot({ risk }: { risk: PatientRiskSummary | undefined }) {
   if (!risk) return null;
   if (risk.has_critical_flag) {
-    return <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-[#ef4444]" />;
+    return <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#ef4444]" />;
   }
   if (risk.complexity_tier === "complex" || risk.complexity_tier === "highly_complex") {
-    return <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-[#f59e0b]" />;
+    return <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#f59e0b]" />;
   }
   return null;
 }
@@ -35,89 +110,77 @@ function PatientList({
 }) {
   const [filter, setFilter] = useState<FilterMode>("all");
 
-  const { data: patients = [], isLoading } = useQuery({
+  const { data: patients = [], isLoading: patientsLoading } = useQuery({
     queryKey: ["patients"],
     queryFn: api.listPatients,
     staleTime: Infinity,
   });
 
-  const { data: riskSummary = [], isLoading: riskLoading } = useQuery({
-    queryKey: ["risk-summary"],
-    queryFn: api.getRiskSummary,
-    enabled: filter !== "all",
-    staleTime: 5 * 60 * 1000,
-  });
-
-  // Also fetch risk summary eagerly for dot rendering even in "all" mode
-  const { data: riskSummaryAll = [] } = useQuery({
+  const { data: riskSummary = [], isLoading: riskQueryLoading } = useQuery({
     queryKey: ["risk-summary"],
     queryFn: api.getRiskSummary,
     staleTime: 5 * 60 * 1000,
-    enabled: true,
   });
 
-  const riskMap = new Map<string, PatientRiskSummary>(
-    riskSummaryAll.map((r) => [r.id, r])
+  const riskMap = useMemo(
+    () => new Map<string, PatientRiskSummary>(riskSummary.map((item) => [item.id, item])),
+    [riskSummary]
   );
 
   const { isFavorite, toggleFavorite } = useFavorites();
 
-  // Apply filter
+  const riskLoading = filter !== "all" && riskQueryLoading;
+
   let visiblePatients = patients;
-  if (filter !== "all") {
-    if (riskLoading) {
-      // Show skeleton while loading risk data
-      visiblePatients = [];
-    } else if (filter === "high_risk") {
-      visiblePatients = patients.filter((p) => {
-        const r = riskMap.get(p.id);
-        return r?.complexity_tier === "complex" || r?.complexity_tier === "highly_complex";
-      });
-    } else if (filter === "needs_review") {
-      visiblePatients = patients.filter((p) => riskMap.get(p.id)?.has_critical_flag === true);
-    }
+  if (!riskLoading && filter === "high_risk") {
+    visiblePatients = patients.filter((patient) => {
+      const risk = riskMap.get(patient.id);
+      return risk?.complexity_tier === "complex" || risk?.complexity_tier === "highly_complex";
+    });
   }
 
-  const favorites = visiblePatients.filter((p) => isFavorite(p.id));
-  const others = visiblePatients.filter((p) => !isFavorite(p.id));
+  if (!riskLoading && filter === "needs_review") {
+    visiblePatients = patients.filter((patient) => riskMap.get(patient.id)?.has_critical_flag === true);
+  }
 
-  function renderRow(p: PatientListItem) {
-    const active = p.id === selectedId;
-    const faved = isFavorite(p.id);
-    const risk = riskMap.get(p.id);
+  const favorites = visiblePatients.filter((patient) => isFavorite(patient.id));
+  const others = visiblePatients.filter((patient) => !isFavorite(patient.id));
+
+  function renderRow(patient: PatientListItem) {
+    const active = patient.id === selectedId;
+    const favorited = isFavorite(patient.id);
+    const risk = riskMap.get(patient.id);
+
     return (
       <div
-        key={p.id}
-        className={`group flex items-center gap-1 pr-1 rounded-lg transition-colors ${
+        key={patient.id}
+        className={`group flex items-center gap-1 rounded-lg pr-1 transition-colors ${
           active ? "bg-[#eef1ff]" : "hover:bg-[#f5f6f8]"
         }`}
       >
         <button
-          onClick={() => onSelect(p.id)}
-          className={`flex-1 flex items-center gap-2 text-left px-3 py-2 text-sm truncate ${
-            active ? "text-[#5b76fe] font-medium" : "text-[#1c1c1e]"
+          onClick={() => onSelect(patient.id)}
+          className={`flex flex-1 items-center gap-2 truncate px-3 py-2 text-left text-sm ${
+            active ? "font-medium text-[#5b76fe]" : "text-[#1c1c1e]"
           }`}
         >
-          <StatusDot risk={riskSummaryAll.length > 0 ? risk : undefined} />
-          <span className="truncate">{p.name}</span>
+          <StatusDot risk={risk} />
+          <span className="truncate">{patient.name}</span>
         </button>
+
         <button
-          onClick={(e) => {
-            e.stopPropagation();
-            toggleFavorite(p.id);
+          onClick={(event) => {
+            event.stopPropagation();
+            toggleFavorite(patient.id);
           }}
-          title={faved ? "Remove from favorites" : "Add to favorites"}
-          className={`shrink-0 p-1 rounded transition-colors ${
-            faved
+          title={favorited ? "Remove from favorites" : "Add to favorites"}
+          className={`shrink-0 rounded p-1 transition-colors ${
+            favorited
               ? "text-[#5b76fe]"
               : "text-transparent group-hover:text-[#c7cad5] hover:!text-[#5b76fe]"
           }`}
         >
-          <Star
-            size={13}
-            fill={faved ? "currentColor" : "none"}
-            strokeWidth={faved ? 0 : 1.5}
-          />
+          <Star size={13} fill={favorited ? "currentColor" : "none"} strokeWidth={favorited ? 0 : 1.5} />
         </button>
       </div>
     );
@@ -129,29 +192,26 @@ function PatientList({
     { key: "needs_review", label: "Needs Review" },
   ];
 
-  if (isLoading) {
+  if (patientsLoading) {
     return (
       <div className="space-y-1 px-1">
-        {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="h-8 bg-[#f5f6f8] rounded-lg animate-pulse" />
+        {[1, 2, 3, 4].map((item) => (
+          <div key={item} className="h-8 animate-pulse rounded-lg bg-[#f5f6f8]" />
         ))}
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col flex-1 overflow-hidden">
-      {/* Filter toggle */}
-      <div className="px-3 pt-2 pb-1 shrink-0">
+    <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="shrink-0 px-3 pb-1 pt-2">
         <div className="flex gap-1">
           {FILTER_OPTIONS.map(({ key, label }) => (
             <button
               key={key}
               onClick={() => setFilter(key)}
-              className={`flex-1 text-xs px-2 py-1 rounded-full transition-colors ${
-                filter === key
-                  ? "bg-[#eef1ff] text-[#5b76fe] font-medium"
-                  : "text-[#a5a8b5] hover:text-[#555a6a]"
+              className={`flex-1 rounded-full px-2 py-1 text-xs transition-colors ${
+                filter === key ? "bg-[#eef1ff] font-medium text-[#5b76fe]" : "text-[#a5a8b5] hover:text-[#555a6a]"
               }`}
             >
               {label}
@@ -161,37 +221,33 @@ function PatientList({
       </div>
 
       <div className="flex-1 overflow-y-auto px-2 py-2">
-        {/* Loading skeleton for filtered views */}
-        {filter !== "all" && riskLoading && (
+        {riskLoading && (
           <div className="space-y-1">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-8 bg-[#f5f6f8] rounded-lg animate-pulse" />
+            {[1, 2, 3].map((item) => (
+              <div key={item} className="h-8 animate-pulse rounded-lg bg-[#f5f6f8]" />
             ))}
           </div>
         )}
 
-        {!(filter !== "all" && riskLoading) && (
+        {!riskLoading && (
           <>
             {favorites.length > 0 && (
               <>
-                <p className="px-2 mb-1 text-[10px] font-semibold text-[#a5a8b5] uppercase tracking-wider">
+                <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wider text-[#a5a8b5]">
                   Favorites
                 </p>
-                <div className="space-y-0.5 mb-3">{favorites.map(renderRow)}</div>
-                <div className="border-t border-[#e9eaef] mb-3" />
-                <p className="px-2 mb-1 text-[10px] font-semibold text-[#a5a8b5] uppercase tracking-wider">
-                  {filter === "all" ? "All Patients" : filter === "high_risk" ? "High Risk" : "Needs Review"}
-                </p>
+                <div className="mb-3 space-y-0.5">{favorites.map(renderRow)}</div>
+                <div className="mb-3 border-t border-[#e9eaef]" />
               </>
             )}
-            {favorites.length === 0 && (
-              <p className="px-2 mb-1 text-[10px] font-semibold text-[#a5a8b5] uppercase tracking-wider">
-                {filter === "all" ? "All Patients" : filter === "high_risk" ? "High Risk" : "Needs Review"}
-              </p>
-            )}
+
+            <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wider text-[#a5a8b5]">
+              {filter === "all" ? "All Patients" : filter === "high_risk" ? "High Risk" : "Needs Review"}
+            </p>
             <div className="space-y-0.5">{others.map(renderRow)}</div>
+
             {visiblePatients.length === 0 && (
-              <p className="px-3 py-4 text-sm text-[#a5a8b5] text-center">
+              <p className="px-3 py-4 text-center text-sm text-[#a5a8b5]">
                 {filter === "all" ? "No patients available" : "No patients match this filter"}
               </p>
             )}
@@ -202,122 +258,202 @@ function PatientList({
   );
 }
 
-// ── Nav links ───────────────────────────────────────────────────────────────
-
-const NAV_LINKS = [
-  { to: "/explorer", label: "Overview", icon: Database, description: "Patient summary" },
-  { to: "/explorer/timeline", label: "Timeline", icon: CalendarDays, description: "Encounter history" },
-  { to: "/explorer/safety", label: "Safety", icon: ShieldAlert, description: "Pre-op risk flags" },
-  { to: "/explorer/interactions", label: "Interactions", icon: Zap, description: "Drug-drug interactions" },
-  { to: "/explorer/conditions", label: "Conditions", icon: Activity, description: "Surgical risk ranking" },
-  { to: "/explorer/procedures", label: "Procedures", icon: Scissors, description: "Procedure history" },
-  { to: "/explorer/immunizations", label: "Immunizations", icon: Syringe, description: "Vaccination history" },
-  { to: "/explorer/clearance", label: "Clearance", icon: ClipboardCheck, description: "Pre-op readiness check" },
-  { to: "/explorer/anesthesia", label: "Anesthesia", icon: Stethoscope, description: "Anesthesia handoff card" },
-  { to: "/explorer/corpus", label: "Corpus", icon: BarChart3, description: "Population statistics" },
-  { to: "/explorer/distributions", label: "Distributions", icon: BarChart2, description: "Lab value distributions" },
-  { to: "/journey", label: "Patient Journey", icon: Heart, description: "Clinical briefing" },
-];
-
-// ── Layout ──────────────────────────────────────────────────────────────────
-
 export function Layout({ children }: LayoutProps) {
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const patientId = searchParams.get("patient");
+
   const [paletteOpen, setPaletteOpen] = useState(false);
 
+  const environment: AppEnvironment = location.pathname.startsWith("/analysis") ? "analysis" : "clinical";
+  const isAnalysis = environment === "analysis";
+
+  const { data: corpusStats } = useQuery({
+    queryKey: ["corpus-stats"],
+    queryFn: api.getCorpusStats,
+    staleTime: Infinity,
+    enabled: isAnalysis,
+  });
+
+  const clinicalLanding = withPatientQuery("/explorer", patientId);
+
   const handleSelectPatient = (id: string) => {
-    setSearchParams({ patient: id });
+    const next = new URLSearchParams(searchParams);
+    next.set("patient", id);
+    setSearchParams(next);
   };
 
-  // Cmd+K / Ctrl+K global shortcut
   useEffect(() => {
-    function onKeyDown(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
-        e.preventDefault();
-        setPaletteOpen((o) => !o);
+    function onKeyDown(event: KeyboardEvent) {
+      if ((event.metaKey || event.ctrlKey) && event.key === "k") {
+        event.preventDefault();
+        setPaletteOpen((open) => !open);
       }
     }
+
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
   return (
     <>
-      <CommandPalette
-        open={paletteOpen}
-        onClose={() => setPaletteOpen(false)}
-      />
+      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
 
-      <div className="flex h-screen overflow-hidden">
-        {/* Sidebar */}
-        <aside className="w-64 shrink-0 flex flex-col bg-white border-r border-[#e9eaef] overflow-hidden">
-          {/* Brand */}
-          <div className="px-4 pt-5 pb-4 border-b border-[#e9eaef] shrink-0">
-            <div className="flex items-center gap-2 mb-1">
-              <Activity size={18} className="text-[#5b76fe]" />
-              <span className="font-semibold text-[#1c1c1e] text-sm tracking-tight">
-                EHI Ignite
-              </span>
+      <div className={`h-screen overflow-hidden ${isAnalysis ? "bg-[#edf7f5]" : "bg-[#f5f6f8]"}`}>
+        <header
+          className={`border-b border-[#e9eaef] ${isAnalysis ? "bg-[#f7fffc]" : "bg-white"}`}
+          style={{ height: 72 }}
+        >
+          <div className="flex h-full flex-col justify-center gap-2 px-4 lg:px-6">
+            <div className="flex items-center justify-between gap-4">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-wider text-[#a5a8b5]">EHI Ignite</p>
+                <p className="truncate text-sm font-semibold text-[#1c1c1e]">
+                  {isAnalysis ? "Data Analysis & Methodology Environment" : "Clinical Intelligence Workspace"}
+                </p>
+              </div>
+
+              <nav className="flex min-w-0 items-center gap-1 rounded-xl border border-[#e9eaef] bg-white p-1">
+                <Link
+                  to={clinicalLanding}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors lg:text-sm ${
+                    !isAnalysis ? "bg-[#eef1ff] text-[#5b76fe]" : "text-[#667085] hover:text-[#1f2937]"
+                  }`}
+                >
+                  Clinical
+                </Link>
+                <Link
+                  to="/analysis"
+                  className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors lg:text-sm ${
+                    isAnalysis ? "bg-[#dff6ef] text-[#0f766e]" : "text-[#667085] hover:text-[#1f2937]"
+                  }`}
+                >
+                  Data Lab
+                </Link>
+              </nav>
             </div>
-            <p className="text-xs text-[#a5a8b5]">Clinical Intelligence Platform</p>
           </div>
+        </header>
 
-          {/* Cmd+K search trigger */}
-          <div className="px-4 py-3 border-b border-[#e9eaef] shrink-0">
-            <button
-              onClick={() => setPaletteOpen(true)}
-              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-[#e9eaef] bg-[#f5f6f8] text-sm text-[#a5a8b5] hover:border-[#5b76fe] hover:text-[#555a6a] transition-colors"
-            >
-              <span className="flex-1 text-left">Search patients…</span>
-              <kbd className="text-[10px] font-mono bg-white border border-[#e9eaef] rounded px-1 py-0.5 shrink-0">
-                ⌘K
-              </kbd>
-            </button>
-          </div>
-
-          {/* Patient list */}
-          <PatientList
-            selectedId={patientId}
-            onSelect={handleSelectPatient}
-          />
-
-          {/* Navigation */}
-          <nav className="shrink-0 px-3 py-4 border-t border-[#e9eaef] space-y-0.5">
-            <p className="px-2 mb-2 text-xs font-medium text-[#a5a8b5] uppercase tracking-wider">
-              Views
-            </p>
-            {NAV_LINKS.map(({ to, label, icon: Icon, description }) => (
-              <NavLink
-                key={to}
-                to={`${to}${patientId ? `?patient=${patientId}` : ""}`}
-                className={({ isActive }) =>
-                  `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
-                    isActive
-                      ? "bg-[#eef1ff] text-[#5b76fe] font-medium"
-                      : "text-[#555a6a] hover:bg-[#f5f6f8] hover:text-[#1c1c1e]"
-                  }`
-                }
-              >
-                <Icon size={16} />
-                <div>
-                  <div>{label}</div>
-                  <div className="text-xs opacity-60 font-normal">{description}</div>
+        <div className="flex h-[calc(100vh-72px)] flex-col overflow-hidden lg:flex-row">
+          <aside
+            className={`flex max-h-[50vh] w-full shrink-0 flex-col overflow-hidden border-b border-r border-[#e9eaef] lg:max-h-none lg:w-72 lg:border-b-0 ${
+              isAnalysis ? "bg-[#f7fffc]" : "bg-white"
+            }`}
+          >
+            {!isAnalysis && (
+              <>
+                <div className="shrink-0 border-b border-[#e9eaef] px-4 pb-4 pt-5">
+                  <div className="mb-1 flex items-center gap-2">
+                    <Activity size={18} className="text-[#5b76fe]" />
+                    <span className="text-sm font-semibold tracking-tight text-[#1c1c1e]">Clinical Workspace</span>
+                  </div>
+                  <p className="text-xs text-[#a5a8b5]">Patient-level safety and chart review</p>
                 </div>
-              </NavLink>
-            ))}
-          </nav>
 
-          {/* Footer */}
-          <div className="px-4 py-3 border-t border-[#e9eaef] shrink-0">
-            <p className="text-xs text-[#a5a8b5]">EHI Ignite Challenge · Phase 1</p>
-          </div>
-        </aside>
+                <div className="shrink-0 border-b border-[#e9eaef] px-4 py-3">
+                  <button
+                    onClick={() => setPaletteOpen(true)}
+                    className="flex w-full items-center gap-2 rounded-lg border border-[#e9eaef] bg-[#f5f6f8] px-3 py-2 text-sm text-[#a5a8b5] transition-colors hover:border-[#5b76fe] hover:text-[#555a6a]"
+                  >
+                    <span className="flex-1 text-left">Search patients…</span>
+                    <kbd className="shrink-0 rounded border border-[#e9eaef] bg-white px-1 py-0.5 font-mono text-[10px]">
+                      ⌘K
+                    </kbd>
+                  </button>
+                </div>
 
-        {/* Main content */}
-        <main className="flex-1 overflow-y-auto bg-[#f5f6f8]">
-          {children}
-        </main>
+                <PatientList selectedId={patientId} onSelect={handleSelectPatient} />
+
+                <nav className="space-y-0.5 border-t border-[#e9eaef] px-3 py-4">
+                  <p className="mb-2 px-2 text-xs font-medium uppercase tracking-wider text-[#a5a8b5]">Views</p>
+                  {CLINICAL_NAV_LINKS.map(({ to, label, icon: Icon, description }) => (
+                    <NavLink
+                      key={to}
+                      to={withPatientQuery(to, patientId)}
+                      className={({ isActive }) =>
+                        `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${
+                          isActive
+                            ? "bg-[#eef1ff] font-medium text-[#5b76fe]"
+                            : "text-[#555a6a] hover:bg-[#f5f6f8] hover:text-[#1c1c1e]"
+                        }`
+                      }
+                    >
+                      <Icon size={16} />
+                      <div>
+                        <div>{label}</div>
+                        <div className="text-xs font-normal opacity-60">{description}</div>
+                      </div>
+                    </NavLink>
+                  ))}
+                </nav>
+              </>
+            )}
+
+            {isAnalysis && (
+              <>
+                <div className="shrink-0 border-b border-[#d5ebe5] px-4 pb-4 pt-5">
+                  <div className="mb-1 flex items-center gap-2">
+                    <BookMarked size={18} className="text-[#0f766e]" />
+                    <span className="text-sm font-semibold tracking-tight text-[#0f172a]">Data Lab</span>
+                  </div>
+                  <p className="text-xs text-[#55706c]">Definitions, methodology, and reliability evidence</p>
+                </div>
+
+                <div className="shrink-0 border-b border-[#d5ebe5] px-4 py-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-[#55706c]">Corpus Snapshot</p>
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    <div className="rounded-lg bg-white px-2.5 py-2 shadow-[rgb(213_235_229)_0px_0px_0px_1px]">
+                      <p className="text-[10px] uppercase tracking-wider text-[#55706c]">Patients</p>
+                      <p className="text-sm font-semibold text-[#0f172a]">
+                        {corpusStats ? corpusStats.total_patients.toLocaleString() : "..."}
+                      </p>
+                    </div>
+                    <div className="rounded-lg bg-white px-2.5 py-2 shadow-[rgb(213_235_229)_0px_0px_0px_1px]">
+                      <p className="text-[10px] uppercase tracking-wider text-[#55706c]">Resources</p>
+                      <p className="text-sm font-semibold text-[#0f172a]">
+                        {corpusStats ? corpusStats.total_resources.toLocaleString() : "..."}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <nav className="space-y-0.5 border-t border-[#d5ebe5] px-3 py-4">
+                  <p className="mb-2 px-2 text-xs font-medium uppercase tracking-wider text-[#55706c]">Data Views</p>
+                  {ANALYSIS_NAV_LINKS.map(({ to, label, icon: Icon, description }) => (
+                    <NavLink
+                      key={to}
+                      to={to}
+                      className={({ isActive }) =>
+                        `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${
+                          isActive
+                            ? "bg-[#dff6ef] font-medium text-[#0f766e]"
+                            : "text-[#35524d] hover:bg-[#edf9f5] hover:text-[#0f172a]"
+                        }`
+                      }
+                    >
+                      <Icon size={16} />
+                      <div>
+                        <div>{label}</div>
+                        <div className="text-xs font-normal opacity-70">{description}</div>
+                      </div>
+                    </NavLink>
+                  ))}
+                </nav>
+              </>
+            )}
+
+            <div className={`shrink-0 border-t px-4 py-3 ${isAnalysis ? "border-[#d5ebe5]" : "border-[#e9eaef]"}`}>
+              <p className={`text-xs ${isAnalysis ? "text-[#55706c]" : "text-[#a5a8b5]"}`}>
+                EHI Ignite Challenge · Phase 1
+              </p>
+            </div>
+          </aside>
+
+          <main className={`flex-1 overflow-y-auto ${isAnalysis ? "bg-[#edf7f5]" : "bg-[#f5f6f8]"}`}>
+            {children}
+          </main>
+        </div>
       </div>
     </>
   );

@@ -55,7 +55,12 @@ export function ExplorerAssistant() {
 
   const [input, setInput] = useState("");
   const [stance, setStance] = useState<"opinionated" | "balanced">("opinionated");
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messagesByPatient, setMessagesByPatient] = useState<Record<string, ChatMessage[]>>({});
+
+  const messages = useMemo(() => {
+    if (!patientId) return [];
+    return messagesByPatient[patientId] ?? [];
+  }, [messagesByPatient, patientId]);
 
   const { data: overview } = useQuery({
     queryKey: ["overview", patientId],
@@ -64,32 +69,38 @@ export function ExplorerAssistant() {
   });
 
   const mutation = useMutation({
-    mutationFn: async (question: string) => {
-      const history: ProviderAssistantTurn[] = messages.map((message) => ({
-        role: message.role,
-        content: message.content,
-      }));
-
+    mutationFn: async (payload: {
+      patientId: string;
+      question: string;
+      history: ProviderAssistantTurn[];
+      stance: "opinionated" | "balanced";
+    }) => {
       return api.chatProviderAssistant({
-        patient_id: patientId!,
-        question,
-        history,
-        stance,
+        patient_id: payload.patientId,
+        question: payload.question,
+        history: payload.history,
+        stance: payload.stance,
       });
     },
-    onSuccess: (data) => {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: crypto.randomUUID(),
-          role: "assistant",
-          content: data.answer,
-          confidence: data.confidence,
-          engine: data.engine,
-          citations: data.citations,
-          followUps: data.follow_ups,
-        },
-      ]);
+    onSuccess: (data, variables) => {
+      setMessagesByPatient((prev) => {
+        const current = prev[variables.patientId] ?? [];
+        return {
+          ...prev,
+          [variables.patientId]: [
+            ...current,
+            {
+              id: crypto.randomUUID(),
+              role: "assistant",
+              content: data.answer,
+              confidence: data.confidence,
+              engine: data.engine,
+              citations: data.citations,
+              followUps: data.follow_ups,
+            },
+          ],
+        };
+      });
     },
   });
 
@@ -108,16 +119,27 @@ export function ExplorerAssistant() {
     const question = rawQuestion.trim();
     if (!question || mutation.isPending) return;
 
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: crypto.randomUUID(),
-        role: "user",
-        content: question,
-      },
-    ]);
+    const history: ProviderAssistantTurn[] = messages.map((message) => ({
+      role: message.role,
+      content: message.content,
+    }));
+
+    setMessagesByPatient((prev) => {
+      const current = prev[patientId] ?? [];
+      return {
+        ...prev,
+        [patientId]: [
+          ...current,
+          {
+            id: crypto.randomUUID(),
+            role: "user",
+            content: question,
+          },
+        ],
+      };
+    });
     setInput("");
-    mutation.mutate(question);
+    mutation.mutate({ patientId, question, history, stance });
   }
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {

@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import axios from "axios";
 import { AlertTriangle, Bot, MessageSquare, Send, Shield, User } from "lucide-react";
 import { api } from "../../api/client";
 import { EmptyState } from "../../components/EmptyState";
@@ -47,6 +48,22 @@ function confidenceStyle(level: ProviderAssistantResponse["confidence"]): string
   if (level === "high") return "bg-[#dcfce7] text-[#166534]";
   if (level === "medium") return "bg-[#fef3c7] text-[#92400e]";
   return "bg-[#fee2e2] text-[#991b1b]";
+}
+
+function errorMessage(error: unknown): string {
+  if (axios.isAxiosError(error)) {
+    const detail = error.response?.data?.detail;
+    if (typeof detail === "string" && detail.trim().length > 0) {
+      return detail;
+    }
+    if (typeof error.message === "string" && error.message.trim().length > 0) {
+      return error.message;
+    }
+  }
+  if (error instanceof Error && error.message.trim().length > 0) {
+    return error.message;
+  }
+  return "Assistant request failed. Try again.";
 }
 
 export function ExplorerAssistant() {
@@ -288,7 +305,7 @@ export function ExplorerAssistant() {
             {mutation.isError && (
               <div className="ml-9 inline-flex items-center gap-2 rounded-lg bg-[#fef2f2] px-3 py-2 text-sm text-[#991b1b]">
                 <AlertTriangle size={14} />
-                Assistant request failed. Try again.
+                {errorMessage(mutation.error)}
               </div>
             )}
           </div>

@@ -44,13 +44,13 @@ def answer_provider_question(
     fallback_enabled = _env_bool("PROVIDER_ASSISTANT_FALLBACK_TO_DETERMINISTIC", True)
 
     if mode in {"anthropic", "anthropic_agent", "agent_sdk", "anthropic_sdk"}:
-        from api.core.provider_assistant_agent_sdk import (
-            AgentConfigurationError,
-            AgentExecutionError,
-            answer_provider_question_with_agent_sdk,
-        )
-
         try:
+            from api.core.provider_assistant_agent_sdk import (
+                AgentConfigurationError,
+                AgentExecutionError,
+                answer_provider_question_with_agent_sdk,
+            )
+
             return answer_provider_question_with_agent_sdk(
                 patient_id=patient_id,
                 question=question,
@@ -63,6 +63,20 @@ def answer_provider_question(
             LOGGER.warning(
                 "Anthropic assistant mode failed (%s). Falling back to deterministic mode.",
                 str(exc),
+            )
+            fallback = answer_deterministic(
+                patient_id=patient_id,
+                question=question,
+                history=history,
+                stance=stance,
+            )
+            fallback.engine = "deterministic-fallback"
+            return fallback
+        except Exception as exc:  # pragma: no cover - defensive fallback path
+            if not fallback_enabled:
+                raise RuntimeError(f"Anthropic assistant mode failed: {exc}") from exc
+            LOGGER.exception(
+                "Unexpected Anthropic assistant failure. Falling back to deterministic mode."
             )
             fallback = answer_deterministic(
                 patient_id=patient_id,

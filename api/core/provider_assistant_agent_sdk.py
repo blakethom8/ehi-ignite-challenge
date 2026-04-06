@@ -433,7 +433,8 @@ def answer_provider_question_with_agent_sdk(
     stance: str,
 ) -> AssistantResult:
     """Entry point for Anthropic Agent SDK mode."""
-    if not os.getenv("ANTHROPIC_API_KEY"):
+    api_key = (os.getenv("ANTHROPIC_API_KEY") or "").strip()
+    if not api_key or "YOUR_KEY_HERE" in api_key:
         raise AgentConfigurationError("ANTHROPIC_API_KEY is required for anthropic assistant mode.")
 
     if not _AGENT_PROFILE_DIR.exists():

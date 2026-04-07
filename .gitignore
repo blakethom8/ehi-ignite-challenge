@@ -18,3 +18,5 @@ fhir_explorer/.venv/
 fhir_explorer/catalog/.corpus_cache.json
 __pycache__/
 *.pyc
+data/traces.db
+data/traces.db-*

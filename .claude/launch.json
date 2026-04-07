@@ -2,6 +2,18 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "name": "API",
+      "runtimeExecutable": ".venv/bin/uvicorn",
+      "runtimeArgs": ["api.main:app", "--reload", "--port", "8001"],
+      "port": 8001
+    },
+    {
+      "name": "Frontend",
+      "runtimeExecutable": "/usr/local/bin/npm",
+      "runtimeArgs": ["run", "dev", "--prefix", "app"],
+      "port": 5173
+    },
+    {
       "name": "Patient Journey App",
       "runtimeExecutable": ".venv/bin/streamlit",
       "runtimeArgs": ["run", "patient-journey/app.py"],

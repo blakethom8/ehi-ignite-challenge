@@ -37,9 +37,15 @@ ehi-ignite-challenge/
 ├── README.md
 │
 ├── api/                                   ← FastAPI backend (PRIMARY — build here)
-│   ├── main.py
-│   ├── routers/                           ← patients, safety, timeline, search, corpus
-│   └── core/                             ← clinical intelligence modules (migrated from patient-journey/core/)
+│   ├── main.py                            ← app entry, dotenv loading, middleware registration
+│   ├── routers/                           ← patients, safety, timeline, search, corpus, traces
+│   ├── middleware/
+│   │   └── tracing.py                     ← request-level trace lifecycle
+│   └── core/                             ← clinical intelligence modules
+│       ├── tracing.py                     ← LLM observability (traces, spans, SQLite, Langfuse)
+│       ├── provider_assistant_service.py  ← mode selector (agent-sdk / deterministic)
+│       ├── provider_assistant_agent_sdk.py ← Claude Agent SDK runtime (instrumented)
+│       ├── provider_assistant.py          ← deterministic fact ranking + evidence retrieval
 │       ├── loader.py
 │       ├── drug_classifier.py
 │       ├── episode_detector.py
@@ -71,6 +77,7 @@ ehi-ignite-challenge/
 ├── docs/architecture/                     ← architecture docs
 │   ├── ECOSYSTEM-OVERVIEW.md              ← platform framing, full directory layout, build sequence
 │   ├── DEPLOYMENT.md                      ← Hetzner + Docker Compose deployment guide
+│   ├── tracing.md                         ← LLM observability — traces, spans, costs, Langfuse
 │   └── CONTEXT-PIPELINE.md               ← LLM context engineering (TODO)
 │
 ├── ideas/                                ← product specs (read before building)
@@ -202,6 +209,7 @@ stats = compute_patient_stats(record)
 | `ideas/PATIENT-JOURNEY-APP.md` | Full product spec for the clinical journey app |
 | `docs/architecture/ECOSYSTEM-OVERVIEW.md` | Platform framing and complete directory layout |
 | `docs/architecture/DEPLOYMENT.md` | Hetzner + Docker Compose deployment guide |
+| `docs/architecture/tracing.md` | LLM observability — traces, spans, token/cost tracking, Langfuse |
 | `design/DESIGN.md` | Miro-inspired design tokens + component guide |
 
 ---

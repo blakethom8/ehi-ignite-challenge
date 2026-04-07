@@ -4,6 +4,7 @@ import os
 import unittest
 from contextlib import contextmanager
 from pathlib import Path
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
@@ -80,7 +81,8 @@ class ProviderAssistantApiTests(unittest.TestCase):
                 "ANTHROPIC_API_KEY": None,
             }
         ):
-            response = self.client.post("/api/assistant/chat", json=self._payload())
+            with patch("api.core.provider_assistant_agent_sdk._REPO_ENV_PATH", Path("/tmp/nonexistent.env")):
+                response = self.client.post("/api/assistant/chat", json=self._payload())
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["engine"], "deterministic-fallback")
@@ -93,7 +95,8 @@ class ProviderAssistantApiTests(unittest.TestCase):
                 "ANTHROPIC_API_KEY": None,
             }
         ):
-            response = self.client.post("/api/assistant/chat", json=self._payload())
+            with patch("api.core.provider_assistant_agent_sdk._REPO_ENV_PATH", Path("/tmp/nonexistent.env")):
+                response = self.client.post("/api/assistant/chat", json=self._payload())
 
         self.assertEqual(response.status_code, 503)
         self.assertIn("ANTHROPIC_API_KEY", response.json().get("detail", ""))
@@ -106,10 +109,66 @@ class ProviderAssistantApiTests(unittest.TestCase):
                 "ANTHROPIC_API_KEY": "sk-ant-YOUR_KEY_HERE",
             }
         ):
-            response = self.client.post("/api/assistant/chat", json=self._payload())
+            with patch("api.core.provider_assistant_agent_sdk._REPO_ENV_PATH", Path("/tmp/nonexistent.env")):
+                response = self.client.post("/api/assistant/chat", json=self._payload())
 
         self.assertEqual(response.status_code, 503)
         self.assertIn("ANTHROPIC_API_KEY", response.json().get("detail", ""))
+
+    def test_traces_list_and_detail_endpoints(self) -> None:
+        # Generate at least one assistant request so traces can exist when tracing is enabled.
+        with patched_env(
+            {
+                "PROVIDER_ASSISTANT_MODE": "deterministic",
+                "PROVIDER_ASSISTANT_FALLBACK_TO_DETERMINISTIC": "true",
+                "ANTHROPIC_API_KEY": None,
+            }
+        ):
+            self.client.post("/api/assistant/chat", json=self._payload("Trace smoke test question"))
+
+        response = self.client.get("/api/traces/")
+        if response.status_code == 503:
+            self.assertIn("Traces API is disabled", response.json().get("detail", ""))
+            return
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertIn("tracing_enabled", body)
+
+        if not body["tracing_enabled"]:
+            self.assertIn("message", body)
+            return
+
+        self.assertIn("traces", body)
+        self.assertIn("count", body)
+        traces = body["traces"]
+        self.assertIsInstance(traces, list)
+
+        if traces:
+            trace_id = traces[0]["trace_id"]
+            detail_response = self.client.get(f"/api/traces/{trace_id}")
+            self.assertEqual(detail_response.status_code, 200)
+            detail = detail_response.json()
+            self.assertEqual(detail.get("trace_id"), trace_id)
+            self.assertIn("spans", detail)
+
+    def test_traces_summary_endpoint(self) -> None:
+        response = self.client.get("/api/traces/summary")
+        if response.status_code == 503:
+            self.assertIn("Traces API is disabled", response.json().get("detail", ""))
+            return
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertIn("tracing_enabled", body)
+
+        if not body["tracing_enabled"]:
+            self.assertIn("message", body)
+            return
+
+        self.assertIn("total_traces", body)
+        self.assertIn("by_engine", body)
+        self.assertIn("by_status", body)
 
     def test_assistant_chat_anthropic_live_if_enabled(self) -> None:
         """

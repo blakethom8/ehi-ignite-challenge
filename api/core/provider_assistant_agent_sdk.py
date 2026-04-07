@@ -27,15 +27,18 @@ from claude_agent_sdk import (
     query,
     tool,
 )
+from dotenv import dotenv_values
 
 from api.core.provider_assistant import (
     AssistantCitationPayload,
     AssistantResult,
     get_relevant_provider_evidence,
 )
+from api.core.tracing import SpanKind, start_span
 
 
 _AGENT_PROFILE_DIR = Path(__file__).parent.parent / "agents" / "provider-assistant"
+_REPO_ENV_PATH = Path(__file__).resolve().parent.parent.parent / ".env"
 
 
 class AgentConfigurationError(RuntimeError):
@@ -52,9 +55,7 @@ class AgentSDKConfig:
     max_turns: int
     max_budget_usd: float | None
     enable_web_search: bool
-    web_search_max_uses: int
     enable_web_fetch: bool
-    web_fetch_max_uses: int
 
 
 def _env_bool(name: str, default: bool) -> bool:
@@ -62,6 +63,25 @@ def _env_bool(name: str, default: bool) -> bool:
     if raw is None:
         return default
     return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _resolve_anthropic_api_key() -> str:
+    """
+    Resolve Anthropic key with safe fallback to repo .env.
+
+    This prevents stale shell placeholders (e.g. sk-ant-YOUR_KEY_HERE) from
+    masking a valid key in .env when dotenv loading uses override=False.
+    """
+    env_key = (os.getenv("ANTHROPIC_API_KEY") or "").strip()
+    if env_key and "YOUR_KEY_HERE" not in env_key:
+        return env_key
+
+    if _REPO_ENV_PATH.exists():
+        file_key = (dotenv_values(_REPO_ENV_PATH).get("ANTHROPIC_API_KEY") or "").strip()
+        if file_key and "YOUR_KEY_HERE" not in file_key:
+            return file_key
+
+    return env_key
 
 
 def _load_config() -> AgentSDKConfig:
@@ -78,9 +98,7 @@ def _load_config() -> AgentSDKConfig:
         max_turns=max(2, int(os.getenv("PROVIDER_ASSISTANT_MAX_TURNS", "6"))),
         max_budget_usd=max_budget,
         enable_web_search=_env_bool("PROVIDER_ASSISTANT_ENABLE_WEB_SEARCH", False),
-        web_search_max_uses=max(1, int(os.getenv("PROVIDER_ASSISTANT_WEB_SEARCH_MAX_USES", "2"))),
         enable_web_fetch=_env_bool("PROVIDER_ASSISTANT_ENABLE_WEB_FETCH", False),
-        web_fetch_max_uses=max(1, int(os.getenv("PROVIDER_ASSISTANT_WEB_FETCH_MAX_USES", "2"))),
     )
 
 
@@ -166,13 +184,16 @@ async def _run_agent(
     stance: str,
     config: AgentSDKConfig,
 ) -> AssistantResult:
-    baseline = get_relevant_provider_evidence(
-        patient_id=patient_id,
-        query=question,
-        history=history,
-        max_facts=8,
-        max_citations=6,
-    )
+    with start_span(SpanKind.RETRIEVAL, "baseline_evidence", input_data={"patient_id": patient_id, "question": question}) as _baseline_span:
+        baseline = get_relevant_provider_evidence(
+            patient_id=patient_id,
+            query=question,
+            history=history,
+            max_facts=8,
+            max_citations=6,
+        )
+        if _baseline_span:
+            _baseline_span.output_data = json.dumps({"intent": baseline.get("intent"), "fact_count": len(baseline.get("evidence_lines", []))}, default=str)
 
     retrieved_citations: dict[tuple[str, str], AssistantCitationPayload] = {}
 
@@ -191,22 +212,26 @@ async def _run_agent(
         {},
     )
     async def get_patient_snapshot(_args: dict[str, Any]) -> dict[str, Any]:
-        snapshot = get_relevant_provider_evidence(
-            patient_id=patient_id,
-            query="Summarize the current peri-operative risk picture and major active safety signals.",
-            history=history,
-            max_facts=10,
-            max_citations=8,
-        )
-        remember_citations(snapshot.get("citations", []))
-        return {
-            "content": [
-                {
-                    "type": "text",
-                    "text": json.dumps(snapshot),
-                }
-            ]
-        }
+        with start_span(SpanKind.TOOL, "get_patient_snapshot") as _snap_span:
+            snapshot = get_relevant_provider_evidence(
+                patient_id=patient_id,
+                query="Summarize the current peri-operative risk picture and major active safety signals.",
+                history=history,
+                max_facts=10,
+                max_citations=8,
+            )
+            remember_citations(snapshot.get("citations", []))
+            result = {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": json.dumps(snapshot),
+                    }
+                ]
+            }
+            if _snap_span:
+                _snap_span.output_data = json.dumps({"fact_count": len(snapshot.get("evidence_lines", [])), "citation_count": len(snapshot.get("citations", []))}, default=str)
+            return result
 
     @tool(
         "query_chart_evidence",
@@ -231,14 +256,17 @@ async def _run_agent(
             max_facts_int = 8
         max_facts_int = max(3, min(max_facts_int, 12))
 
-        evidence = get_relevant_provider_evidence(
-            patient_id=patient_id,
-            query=query_text,
-            history=history,
-            max_facts=max_facts_int,
-            max_citations=8,
-        )
-        remember_citations(evidence.get("citations", []))
+        with start_span(SpanKind.TOOL, "query_chart_evidence", input_data={"query": query_text, "max_facts": max_facts_int}) as _ev_span:
+            evidence = get_relevant_provider_evidence(
+                patient_id=patient_id,
+                query=query_text,
+                history=history,
+                max_facts=max_facts_int,
+                max_citations=8,
+            )
+            remember_citations(evidence.get("citations", []))
+            if _ev_span:
+                _ev_span.output_data = json.dumps({"fact_count": len(evidence.get("evidence_lines", [])), "citation_count": len(evidence.get("citations", []))}, default=str)
 
         return {
             "content": [
@@ -320,29 +348,55 @@ async def _run_agent(
     result_text = ""
     last_assistant_text = ""
     structured_output: Any = None
+    result_stop_reason: str | None = None
+    result_num_turns: int | None = None
+    result_duration_api_ms: int | None = None
 
-    try:
-        async for message in query(prompt=prompt, options=options):
-            if isinstance(message, AssistantMessage):
-                text = _extract_assistant_text(message)
-                if text.strip():
-                    last_assistant_text = text
-                continue
+    # Trace the full SDK query/parse block so any downstream parse failures are captured.
+    with start_span(
+        SpanKind.LLM,
+        "agent_query",
+        input_data={"model": config.model, "stance": stance, "prompt": prompt},
+    ) as llm_span:
+        try:
+            async for message in query(prompt=prompt, options=options):
+                if isinstance(message, AssistantMessage):
+                    text = _extract_assistant_text(message)
+                    if text.strip():
+                        last_assistant_text = text
+                    continue
 
-            if isinstance(message, ResultMessage):
-                if message.is_error:
-                    details = "; ".join(message.errors or [])
-                    raise AgentExecutionError(details or "Agent SDK returned an error result.")
-                if message.structured_output is not None:
-                    structured_output = message.structured_output
-                if message.result and message.result.strip():
-                    result_text = message.result
-    except CLINotFoundError as exc:
-        raise AgentConfigurationError(
-            "Claude CLI runtime not found. Install/repair claude-agent-sdk runtime before enabling anthropic mode."
-        ) from exc
-    except ClaudeSDKError as exc:
-        raise AgentExecutionError(str(exc)) from exc
+                if isinstance(message, ResultMessage):
+                    if message.is_error:
+                        details = "; ".join(message.errors or [])
+                        raise AgentExecutionError(details or "Agent SDK returned an error result.")
+                    if message.structured_output is not None:
+                        structured_output = message.structured_output
+                    if message.result and message.result.strip():
+                        result_text = message.result
+
+                    result_stop_reason = getattr(message, "stop_reason", None)
+                    result_num_turns = getattr(message, "num_turns", None)
+                    result_duration_api_ms = getattr(message, "duration_api_ms", None)
+
+                    if llm_span:
+                        usage = getattr(message, "usage", None)
+                        if isinstance(usage, dict):
+                            llm_span.input_tokens = usage.get("input_tokens")
+                            llm_span.output_tokens = usage.get("output_tokens")
+                            llm_span.cache_read_tokens = usage.get("cache_read_input_tokens")
+                        llm_span.total_cost_usd = getattr(message, "total_cost_usd", None)
+                        llm_span.num_turns = result_num_turns
+        except CLINotFoundError as exc:
+            if llm_span:
+                llm_span.error = str(exc)
+            raise AgentConfigurationError(
+                "Claude CLI runtime not found. Install/repair claude-agent-sdk runtime before enabling anthropic mode."
+            ) from exc
+        except ClaudeSDKError as exc:
+            if llm_span:
+                llm_span.error = str(exc)
+            raise AgentExecutionError(str(exc)) from exc
 
     parsed: dict[str, Any]
     if isinstance(structured_output, dict):
@@ -393,6 +447,18 @@ async def _run_agent(
     if not citations:
         citations = list(retrieved_citations.values())[:6]
 
+    if llm_span:
+        llm_span.output_data = json.dumps(
+            {
+                "result_text": result_text or last_assistant_text,
+                "stop_reason": result_stop_reason,
+                "num_turns": result_num_turns,
+                "duration_api_ms": result_duration_api_ms,
+                "structured_output_present": isinstance(structured_output, dict),
+            },
+            default=str,
+        )
+
     return AssistantResult(
         answer=answer,
         confidence=confidence,
@@ -410,9 +476,10 @@ def answer_provider_question_with_agent_sdk(
     stance: str,
 ) -> AssistantResult:
     """Entry point for Anthropic Agent SDK mode."""
-    api_key = (os.getenv("ANTHROPIC_API_KEY") or "").strip()
+    api_key = _resolve_anthropic_api_key()
     if not api_key or "YOUR_KEY_HERE" in api_key:
         raise AgentConfigurationError("ANTHROPIC_API_KEY is required for anthropic assistant mode.")
+    os.environ["ANTHROPIC_API_KEY"] = api_key
 
     if not _AGENT_PROFILE_DIR.exists():
         raise AgentConfigurationError(f"Agent profile directory not found: {_AGENT_PROFILE_DIR}")

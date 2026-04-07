@@ -64,7 +64,18 @@ ehi-ignite-challenge/
 
 The provider assistant now supports deterministic and Anthropic Agent SDK modes behind the same API endpoint.
 
+- Env template: `.env.example`
 - Integration guide: `docs/architecture/ANTHROPIC-AGENT-SDK.md`
 - Operating report: `docs/architecture/ANTHROPIC-SDK-OPERATING-REPORT.md`
 - Context engineering report: `docs/architecture/FHIR-AGENT-CONTEXT-ENGINEERING-REPORT.md`
+- Harness playbook: `docs/architecture/CLAUDE-SDK-HARNESS-PLAYBOOK.md`
+- Tracing architecture: `docs/architecture/tracing.md`
 - Agent profile files: `api/agents/provider-assistant/`
+
+### Local Env Setup
+
+```bash
+cp .env.example .env
+# edit .env with your real ANTHROPIC_API_KEY
+set -a; source .env; set +a
+```

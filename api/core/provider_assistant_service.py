@@ -10,9 +10,25 @@ import logging
 import os
 
 from api.core.provider_assistant import AssistantResult, answer_provider_question as answer_deterministic
+from api.core.tracing import get_current_trace
 
 
 LOGGER = logging.getLogger(__name__)
+
+
+def _record_trace_metadata(result: AssistantResult) -> None:
+    """Populate the current trace with response metadata."""
+    trace = get_current_trace()
+    if trace is None:
+        return
+    trace.engine = result.engine
+    trace.confidence = result.confidence
+    trace.answer_preview = result.answer[:500] if result.answer else ""
+    trace.answer_length = len(result.answer) if result.answer else 0
+    trace.citation_count = len(result.citations) if result.citations else 0
+    trace.follow_up_count = len(result.follow_ups) if result.follow_ups else 0
+    if "fallback" in (result.engine or ""):
+        trace.status = "fallback"
 
 
 def _env_bool(name: str, default: bool) -> bool:
@@ -51,12 +67,14 @@ def answer_provider_question(
                 answer_provider_question_with_agent_sdk,
             )
 
-            return answer_provider_question_with_agent_sdk(
+            result = answer_provider_question_with_agent_sdk(
                 patient_id=patient_id,
                 question=question,
                 history=history,
                 stance=stance,
             )
+            _record_trace_metadata(result)
+            return result
         except (AgentConfigurationError, AgentExecutionError) as exc:
             if not fallback_enabled:
                 raise
@@ -71,6 +89,7 @@ def answer_provider_question(
                 stance=stance,
             )
             fallback.engine = "deterministic-fallback"
+            _record_trace_metadata(fallback)
             return fallback
         except Exception as exc:  # pragma: no cover - defensive fallback path
             if not fallback_enabled:
@@ -85,11 +104,14 @@ def answer_provider_question(
                 stance=stance,
             )
             fallback.engine = "deterministic-fallback"
+            _record_trace_metadata(fallback)
             return fallback
 
-    return answer_deterministic(
+    result = answer_deterministic(
         patient_id=patient_id,
         question=question,
         history=history,
         stance=stance,
     )
+    _record_trace_metadata(result)
+    return result

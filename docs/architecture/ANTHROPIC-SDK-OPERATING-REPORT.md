@@ -91,9 +91,7 @@ Optional runtime tuning:
 - `PROVIDER_ASSISTANT_MAX_TURNS` (default `6`)
 - `PROVIDER_ASSISTANT_MAX_BUDGET_USD` (optional)
 - `PROVIDER_ASSISTANT_ENABLE_WEB_SEARCH` (default `false`)
-- `PROVIDER_ASSISTANT_WEB_SEARCH_MAX_USES` (default `2`)
 - `PROVIDER_ASSISTANT_ENABLE_WEB_FETCH` (default `false`)
-- `PROVIDER_ASSISTANT_WEB_FETCH_MAX_USES` (default `2`)
 
 ## 5) Personality Profile Strategy
 

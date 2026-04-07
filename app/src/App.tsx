@@ -19,6 +19,7 @@ import { AnalysisMethodology } from "./pages/Analysis/Methodology";
 import { AnalysisDefinitions } from "./pages/Analysis/Definitions";
 import { AnalysisCoverage } from "./pages/Analysis/Coverage";
 import { AnalysisFlightSchool } from "./pages/Analysis/FlightSchool";
+import { AnalysisFhirPrimer } from "./pages/Analysis/FhirPrimer";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -45,6 +46,7 @@ export default function App() {
     { path: "/explorer/assistant", element: <ExplorerAssistant /> },
     { path: "/journey", element: <JourneyPlaceholder /> },
     { path: "/analysis", element: <AnalysisOverview /> },
+    { path: "/analysis/fhir-primer", element: <AnalysisFhirPrimer /> },
     { path: "/analysis/methodology", element: <AnalysisMethodology /> },
     { path: "/analysis/definitions", element: <AnalysisDefinitions /> },
     { path: "/analysis/coverage", element: <AnalysisCoverage /> },

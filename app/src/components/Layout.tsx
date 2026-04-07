@@ -9,6 +9,7 @@ import {
   CalendarDays,
   ClipboardCheck,
   Database,
+  FileJson2,
   GraduationCap,
   Heart,
   Layers3,
@@ -59,6 +60,12 @@ const CLINICAL_NAV_LINKS: NavItem[] = [
 
 const ANALYSIS_NAV_LINKS: NavItem[] = [
   { to: "/analysis", label: "Overview", icon: BookMarked, description: "Orientation and goals" },
+  {
+    to: "/analysis/fhir-primer",
+    label: "FHIR Primer",
+    icon: FileJson2,
+    description: "Data format deep dive",
+  },
   {
     to: "/analysis/flight-school",
     label: "Flight School",

@@ -251,7 +251,111 @@ return contract, `SqlRunResult` fields.
 
 ## Phase 1 — Clinically smart tables
 
-_(no entries yet)_
+### P1.1 — `drug_class` enrichment on `medication_request`
+
+**Shipped:** 2026-04-13
+**Commit:** captured in the same docs commit as this build-log entry
+**Files:**
+- `patient-journey/core/sql_on_fhir/enrich.py` — new (~180 lines). Defines `Enrichment` dataclass, `load_drug_classifier`, `medication_request_enrichment`, and `default_enrichments()` registry.
+- `patient-journey/core/sql_on_fhir/sqlite_sink.py` — edit. `_ensure_table`, `materialize`, and `materialize_all` all accept an optional `enrichments` kwarg; `None` means "use the default registry", `{}` means "pure unenriched build". Sentinel resolver: `_resolve_enrichments`.
+- `patient-journey/core/sql_on_fhir/__init__.py` — re-exports `Enrichment`, `default_enrichments`, `load_drug_classifier`, `medication_request_enrichment`, plus `materialize_all` and `open_db` which were missing from the public surface.
+- `patient-journey/tests/test_sql_on_fhir.py` — extended from 24 → 39 tests. New classes: `TestDrugClassifier` (7 tests), `TestMedicationEnrichment` (4 tests), `TestMaterializeWithEnrichment` (4 tests).
+- `api/core/sof_tools.py` — `get_schemas_for_prompt` now walks the default enrichment registry and tags injected columns with a `-- enriched` suffix in the CREATE TABLE output. Preamble lists every drug_class key inline so the agent never has to guess.
+- `research/ehi-ignite.db` — **rebuilt** with the new column (still 11.43 MB, still 200 patients).
+- `research/SQL-ON-FHIR-REVIEW.md` — "Known limitations" bullet updated to mark the drug_class gap as resolved; new "Row-level enrichment" section with the full pitch-snapshot distribution table.
+- `research/README.md` — medication_request row in the pitch-snapshot table now lists `drug_class` with a footnote explaining it's enriched and enumerating the twelve class keys.
+- `CLAUDE.md` — SQL-on-FHIR quick reference now lists the enrichment registry and the canonical `GROUP BY drug_class` query as the Phase 1 example.
+
+**What it does:** Closes the "we have SQL but it doesn't know what a
+medication *is*" gap from the Phase 0 review. Every
+`medication_request` row that hits the SQLite sink is now first
+passed through `Enrichment.apply`, which looks up the RxNorm code (or
+falls back to a case-insensitive keyword match against
+`medication_text` / `rxnorm_display`) and writes a canonical single
+drug class key into a new `drug_class` TEXT column. Values: one of
+`anticoagulants`, `antiplatelets`, `ace_inhibitors`, `arbs`,
+`jak_inhibitors`, `immunosuppressants`, `nsaids`, `opioids`,
+`anticonvulsants`, `psych_medications`, `stimulants`,
+`diabetes_medications`, or `NULL`.
+
+The classifier reuses the same `patient-journey/data/drug_classes.json`
+mapping file that the surgical safety panel (`core/drug_classifier.py`)
+reads — so the SQL warehouse and the safety panel cannot disagree
+about what counts as an anticoagulant. We did not import
+`DrugClassifier` directly because it depends on
+`fhir_explorer.parser.models.MedicationRecord`; the SQL-on-FHIR
+pipeline only has `(rxnorm_code, display)` strings, so `enrich.py`
+loads the JSON and exposes a lightweight
+`classify(rxnorm_code, display) -> class_key | None` function.
+
+**Architectural decision — enrichment is a sink-layer concern, not
+a ViewDefinition concern.** I deliberately did *not* add `drug_class`
+to `views/medication_request.json` because the SQL-on-FHIR v2 spec
+doesn't include a `classify()` function and shoehorning one into our
+FHIRPath-lite runtime would break portability — the whole point of
+the ViewDefinition layer is that it's standards-compatible by
+construction. Keeping enrichment in `enrich.py` means the JSON views
+stay pure and a future consumer running our views through a
+different engine (DuckDB, Databricks) would still get a valid
+warehouse, just without the drug_class column.
+
+**Smoke test A — unit suite:**
+```
+uv run pytest api/tests/test_sof_tools.py api/tests/test_sof_materialize.py \
+  patient-journey/tests/test_sql_on_fhir.py -q
+.....................................................................    [100%]
+69 passed in 0.24s
+```
+
+**Smoke test B — rendered system prompt:**
+The MCP tool description now contains the line
+`drug_class TEXT  -- enriched` right after `rxnorm_system TEXT` in
+the `medication_request` block, so the agent sees the column
+without us having to hand-write it into the system prompt.
+
+**Smoke test C — full cohort query against the pitch snapshot:**
+```
+SELECT drug_class, COUNT(*) FROM medication_request
+GROUP BY drug_class ORDER BY 2 DESC
+```
+Result:
+
+| `drug_class`           | Rows  |
+|------------------------|------:|
+| `NULL`                 | 1,746 |
+| `nsaids`               |    97 |
+| `opioids`              |    35 |
+| `diabetes_medications` |    16 |
+| `arbs`                 |    13 |
+| `antiplatelets`        |    13 |
+| `immunosuppressants`   |    13 |
+| `anticonvulsants`      |     4 |
+| `anticoagulants`       |     4 |
+| `ace_inhibitors`       |     4 |
+| `stimulants`           |     2 |
+| `psych_medications`    |     1 |
+
+Every shipped class has at least one row in the snapshot. The high
+`NULL` count (~90%) is Synthea-honest: vaccines, vitamins, antibiotics,
+contrast agents, routine meds. Risk-group cohort queries will return
+a non-empty result for every surgical-safety category we care about.
+
+**Follow-ups surfaced:**
+- The P0.1 follow-up ("schema description is CREATE TABLE only —
+  once P1.1 lands the drug_class column, the prompt should mention
+  it explicitly") is now resolved — the preamble lists every class
+  key inline.
+- The P0.3 follow-up ("when P1.1 adds a drug_class column to the
+  medication view, this snapshot will have to be rebuilt") is
+  resolved in this same commit. The snapshot was rebuilt with the
+  new column and the row count is unchanged (1,948).
+- `drug_classes.json` is currently keyword-first. A real production
+  feed would want a stronger RxNorm ingredient-level join (using
+  RxClass or ATC codes) before we trust this for anything
+  safety-critical. Fine for the prototype; flag it in the pitch deck.
+- The enrichment registry is hard-coded to one entry
+  (`medication_request`). P1.2 will add a second (`medication_episode`)
+  and the pattern scales cleanly; no sink changes needed.
 
 ---
 

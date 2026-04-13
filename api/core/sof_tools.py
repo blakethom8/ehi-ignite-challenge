@@ -256,12 +256,23 @@ def get_schemas_for_prompt() -> str:
 
     Types use the same mapping as ``sqlite_sink._sql_type`` so the prompt
     matches what the agent will actually see when it queries.
+
+    The renderer also picks up any enrichment columns registered in
+    ``enrich.default_enrichments`` — e.g. ``drug_class`` on
+    ``medication_request`` — so the agent's system prompt always
+    matches the column list the warehouse was actually built with.
     """
     try:
         from core.sql_on_fhir.sqlite_sink import _sql_type  # type: ignore
     except ImportError:  # pragma: no cover — module always present in-tree
         def _sql_type(col):  # type: ignore
             return "TEXT"
+
+    try:
+        from core.sql_on_fhir.enrich import default_enrichments  # type: ignore
+        enrichments = default_enrichments()
+    except Exception:  # pragma: no cover — enrich module is in-tree
+        enrichments = {}
 
     views = _load_view_definitions()
     if not views:
@@ -273,9 +284,19 @@ def get_schemas_for_prompt() -> str:
         for col in view.all_columns():
             if col.name not in seen:
                 seen[col.name] = col
+        enrichment = enrichments.get(view.name)
+        enrichment_names: set[str] = set()
+        if enrichment:
+            for extra in enrichment.columns:
+                if extra.name not in seen:
+                    seen[extra.name] = extra
+                    enrichment_names.add(extra.name)
         lines = [f"-- {view.name}: {view.description or view.resource}"]
         lines.append(f"CREATE TABLE {view.name} (")
-        col_lines = [f"  {c.name} {_sql_type(c)}" for c in seen.values()]
+        col_lines = []
+        for c in seen.values():
+            suffix = "  -- enriched" if c.name in enrichment_names else ""
+            col_lines.append(f"  {c.name} {_sql_type(c)}{suffix}")
         lines.append(",\n".join(col_lines))
         lines.append(");")
         chunks.append("\n".join(lines))
@@ -301,6 +322,13 @@ Rules:
 - Results are capped at 500 rows; use `limit` to request fewer.
 - Synthea patient references are stored as `urn:uuid:<id>`. To join back to
   `patient.id`, use `WHERE x.patient_ref = 'urn:uuid:' || p.id`.
+- Columns marked `-- enriched` below are derived at ingest time (not in the
+  raw FHIR). `medication_request.drug_class` is populated from the shared
+  drug-class mapping and takes one of: 'anticoagulants', 'antiplatelets',
+  'ace_inhibitors', 'arbs', 'jak_inhibitors', 'immunosuppressants', 'nsaids',
+  'opioids', 'anticonvulsants', 'psych_medications', 'stimulants',
+  'diabetes_medications' — or NULL if nothing matched. Use
+  `GROUP BY drug_class` for risk-class distributions.
 
 Schemas:
 

@@ -20,18 +20,27 @@ SOF_DB_PATH=research/ehi-ignite.db SOF_PATIENT_LIMIT=200 \
   uv run python -c "from api.core.sof_materialize import materialize_from_env; print(materialize_from_env())"
 ```
 
-| Table               | Rows    | Key columns                                                                  |
-|---------------------|---------|-------------------------------------------------------------------------------|
-| `patient`           |     200 | `id, gender, birth_date, family_name, given_name, deceased`                   |
-| `condition`         |   1,410 | `id, patient_ref, onset_date, display, code_system, code`                     |
-| `medication_request`|   1,948 | `id, patient_ref, authored_on, medication_text, rxnorm_code, rxnorm_display`  |
-| `observation`       |  40,476 | `id, patient_ref, loinc_code, display, effective_date, value_quantity, value_unit` |
-| `encounter`         |   6,714 | `id, patient_ref, class_code, type_text, period_start, period_end`            |
+| Table               | Rows    | Key columns                                                                                   |
+|---------------------|---------|-----------------------------------------------------------------------------------------------|
+| `patient`           |     200 | `id, gender, birth_date, family_name, given_name, deceased`                                   |
+| `condition`         |   1,410 | `id, patient_ref, onset_date, display, code_system, code`                                     |
+| `medication_request`|   1,948 | `id, patient_ref, authored_on, medication_text, rxnorm_code, rxnorm_display, drug_class` †    |
+| `observation`       |  40,476 | `id, patient_ref, loinc_code, display, effective_date, value_quantity, value_unit`            |
+| `encounter`         |   6,714 | `id, patient_ref, class_code, type_text, period_start, period_end`                            |
+
+† `drug_class` is an **enriched** column (P1.1) — not in the raw FHIR.
+Populated at ingest time by `patient-journey/core/sql_on_fhir/enrich.py`
+using the shared `patient-journey/data/drug_classes.json` mapping.
+Values: one of `anticoagulants`, `antiplatelets`, `ace_inhibitors`,
+`arbs`, `jak_inhibitors`, `immunosuppressants`, `nsaids`, `opioids`,
+`anticonvulsants`, `psych_medications`, `stimulants`,
+`diabetes_medications`, or `NULL` when nothing matched. Use
+`GROUP BY drug_class` for surgical-risk cohort queries.
 
 Schema matches the five ViewDefinitions under
-`patient-journey/core/sql_on_fhir/views/`. Use `run_sql` on the
-provider assistant agent — or plain `sqlite3 research/ehi-ignite.db` —
-to query it.
+`patient-journey/core/sql_on_fhir/views/` plus the enrichment columns
+declared in `enrich.py`. Use `run_sql` on the provider assistant agent
+— or plain `sqlite3 research/ehi-ignite.db` — to query it.
 
 Regenerate whenever a ViewDefinition changes. The snapshot is
 intentionally **not** materialized at API boot: production uses

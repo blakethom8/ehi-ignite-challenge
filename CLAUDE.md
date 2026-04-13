@@ -225,10 +225,13 @@ stats = compute_patient_stats(record)
 ### SQL-on-FHIR quick reference
 
 - **Engine:** `patient-journey/core/sql_on_fhir/` — ViewDefinition → SQLite (stable, reused everywhere)
+- **Enrichment registry:** `patient-journey/core/sql_on_fhir/enrich.py` — derived columns spliced in at ingest time
 - **LLM tool:** `api/core/sof_tools.run_sql(query, limit)` — SELECT-only gate, 500-row cap, read-only connection
 - **Warehouse:** `data/sof.db` (gitignored, materialized on FastAPI startup via `api/core/sof_materialize.py`)
 - **Pitch snapshot:** `research/ehi-ignite.db` (committed, 200 patients, 11 MB, reviewer-facing)
-- **Views shipped today:** `patient`, `condition`, `medication_request`, `observation`, `encounter`
+- **Views shipped today:** `patient`, `condition`, `medication_request` (+ `drug_class` enrichment), `observation`, `encounter`
+- **Drug-class cohort query** (canonical Phase 1 example):
+  `SELECT drug_class, COUNT(*) FROM medication_request GROUP BY drug_class ORDER BY 2 DESC`
 
 ---
 

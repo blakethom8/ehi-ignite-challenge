@@ -18,9 +18,14 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1] / "core" / "sql_on_fhir"
 sys.path.insert(0, str(ROOT))
 
+from enrich import (  # type: ignore  # noqa: E402
+    default_enrichments,
+    load_drug_classifier,
+    medication_request_enrichment,
+)
 from fhirpath import evaluate  # type: ignore  # noqa: E402
 from runner import run_view  # type: ignore  # noqa: E402
-from sqlite_sink import materialize, open_db  # type: ignore  # noqa: E402
+from sqlite_sink import materialize, materialize_all, open_db  # type: ignore  # noqa: E402
 from view_definition import ViewDefinition  # type: ignore  # noqa: E402
 
 
@@ -331,3 +336,204 @@ class TestBundledViews:
         patient_row = rows[0]
         assert patient_row["id"]
         assert patient_row["gender"] in ("male", "female", "other", "unknown")
+
+
+# ---------------------------------------------------------------------------
+# Enrichment — drug_class on medication_request (P1.1)
+# ---------------------------------------------------------------------------
+
+
+def _medication_view() -> ViewDefinition:
+    return ViewDefinition.from_json_file(ROOT / "views" / "medication_request.json")
+
+
+def _med_resource(
+    res_id: str,
+    *,
+    rxnorm_code: str | None = None,
+    rxnorm_display: str | None = None,
+    text: str | None = None,
+) -> dict:
+    coding = []
+    if rxnorm_code or rxnorm_display:
+        coding.append(
+            {
+                "system": "http://www.nlm.nih.gov/research/umls/rxnorm",
+                "code": rxnorm_code,
+                "display": rxnorm_display,
+            }
+        )
+    return {
+        "resourceType": "MedicationRequest",
+        "id": res_id,
+        "status": "active",
+        "intent": "order",
+        "subject": {"reference": "urn:uuid:pt-x"},
+        "authoredOn": "2023-01-01",
+        "medicationCodeableConcept": {
+            "text": text,
+            "coding": coding or None,
+        },
+    }
+
+
+class TestDrugClassifier:
+    def test_rxnorm_code_match_wins(self):
+        classify = load_drug_classifier()
+        # 11289 is warfarin in the shared mapping
+        assert classify("11289", None) == "anticoagulants"
+
+    def test_keyword_match_when_no_rxnorm(self):
+        classify = load_drug_classifier()
+        assert classify(None, "Warfarin sodium 5 MG") == "anticoagulants"
+
+    def test_keyword_match_is_case_insensitive(self):
+        classify = load_drug_classifier()
+        assert classify(None, "APIXABAN 5 mg oral tablet") == "anticoagulants"
+
+    def test_rxnorm_code_takes_precedence_over_unrelated_text(self):
+        classify = load_drug_classifier()
+        # Warfarin RxNorm + gibberish text still classifies as anticoag
+        assert classify("11289", "zzz unrelated zzz") == "anticoagulants"
+
+    def test_unknown_medication_returns_none(self):
+        classify = load_drug_classifier()
+        assert classify(None, "some random vitamin") is None
+
+    def test_empty_inputs(self):
+        classify = load_drug_classifier()
+        assert classify(None, None) is None
+        assert classify("", "") is None
+
+    def test_known_classes_exposed(self):
+        classify = load_drug_classifier()
+        # Touch each class key we document in the run_sql preamble so
+        # the preamble and the mapping file can't drift silently.
+        assert classify(None, "clopidogrel 75 mg") == "antiplatelets"
+        assert classify(None, "lisinopril 10 mg") == "ace_inhibitors"
+        assert classify(None, "losartan 50 mg") == "arbs"
+        assert classify(None, "ibuprofen 400 mg") == "nsaids"
+        assert classify(None, "oxycodone 5 mg") == "opioids"
+
+
+class TestMedicationEnrichment:
+    def test_enrichment_adds_drug_class_column(self):
+        enrichment = medication_request_enrichment()
+        assert enrichment.view_name == "medication_request"
+        names = [c.name for c in enrichment.columns]
+        assert "drug_class" in names
+
+    def test_apply_populates_drug_class(self):
+        enrichment = medication_request_enrichment()
+        row = {
+            "id": "m1",
+            "rxnorm_code": "11289",
+            "medication_text": "warfarin 5 mg",
+        }
+        enrichment.apply(row)
+        assert row["drug_class"] == "anticoagulants"
+
+    def test_apply_sets_none_for_unknown(self):
+        enrichment = medication_request_enrichment()
+        row = {"id": "m2", "rxnorm_code": None, "medication_text": "random vitamin"}
+        enrichment.apply(row)
+        assert "drug_class" in row
+        assert row["drug_class"] is None
+
+    def test_default_registry_has_medication_request(self):
+        reg = default_enrichments()
+        assert "medication_request" in reg
+
+
+class TestMaterializeWithEnrichment:
+    def test_drug_class_populated_end_to_end(self, tmp_path):
+        view = _medication_view()
+        resources = [
+            _med_resource(
+                "m1",
+                rxnorm_code="855332",
+                rxnorm_display="warfarin sodium 5 MG Oral Tablet",
+                text="warfarin 5 mg",
+            ),
+            _med_resource(
+                "m2",
+                rxnorm_code="99999",
+                rxnorm_display="clopidogrel 75 MG Oral Tablet",
+                text="clopidogrel 75 mg",
+            ),
+            _med_resource(
+                "m3",
+                rxnorm_code="0",
+                rxnorm_display="Vitamin D 1000 IU",
+                text="Vitamin D 1000 IU",
+            ),
+        ]
+        conn = sqlite3.connect(":memory:")
+        n = materialize(view, resources, conn)
+        assert n == 3
+        rows = conn.execute(
+            "SELECT id, drug_class FROM medication_request ORDER BY id"
+        ).fetchall()
+        assert rows == [
+            ("m1", "anticoagulants"),
+            ("m2", "antiplatelets"),
+            ("m3", None),
+        ]
+
+    def test_group_by_drug_class_smoke(self, tmp_path):
+        view = _medication_view()
+        resources = [
+            _med_resource(
+                f"a{i}",
+                rxnorm_code=None,
+                rxnorm_display=None,
+                text="warfarin 5 mg",
+            )
+            for i in range(4)
+        ] + [
+            _med_resource(
+                f"b{i}",
+                rxnorm_code=None,
+                rxnorm_display=None,
+                text="aspirin 81 mg",
+            )
+            for i in range(2)
+        ]
+        conn = sqlite3.connect(":memory:")
+        materialize(view, resources, conn)
+        groups = dict(
+            conn.execute(
+                "SELECT drug_class, COUNT(*) FROM medication_request "
+                "GROUP BY drug_class ORDER BY drug_class"
+            ).fetchall()
+        )
+        assert groups["anticoagulants"] == 4
+        assert groups["antiplatelets"] == 2
+
+    def test_empty_enrichments_opts_out(self, tmp_path):
+        view = _medication_view()
+        resources = [
+            _med_resource("m1", text="warfarin 5 mg"),
+        ]
+        conn = sqlite3.connect(":memory:")
+        materialize(view, resources, conn, enrichments={})
+        # Column must not exist when enrichment is opted out
+        cols = [
+            r[1]
+            for r in conn.execute("PRAGMA table_info(medication_request)").fetchall()
+        ]
+        assert "drug_class" not in cols
+
+    def test_materialize_all_applies_enrichment(self, tmp_path):
+        view = _medication_view()
+        resources = [
+            _med_resource("m1", text="warfarin 5 mg"),
+            _med_resource("m2", text="ibuprofen 400 mg"),
+        ]
+        conn = sqlite3.connect(":memory:")
+        counts = materialize_all([view], resources, conn)
+        assert counts["medication_request"] == 2
+        rows = conn.execute(
+            "SELECT id, drug_class FROM medication_request ORDER BY id"
+        ).fetchall()
+        assert rows == [("m1", "anticoagulants"), ("m2", "nsaids")]

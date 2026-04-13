@@ -462,11 +462,8 @@ prompt. Today this covers `patient`, `condition`, `medication_request`,
 convention (`urn:uuid:<id>`) is called out in the preamble so the
 agent knows to write `x.patient_ref = 'urn:uuid:' || p.id` joins.
 
-### Known limitations (Phase 0)
+### Known limitations (Phase 0 → early Phase 1)
 
-- **No `drug_class` column yet.** P1.1 will add it to the medication
-  view and this addendum must be updated the same day so the prompt,
-  the committed snapshot, and the docs all agree.
 - **No date arithmetic in the FHIRPath runtime**, so queries needing
   "within the last 90 days" have to do string comparison on ISO-8601
   text. Works for Synthea, could bite us on a real payer feed.
@@ -475,12 +472,69 @@ agent knows to write `x.patient_ref = 'urn:uuid:' || p.id` joins.
   `condition.clinical_status` has a fixed coded vocabulary. Grunt
   work; easy upgrade if the agent starts writing wrong joins.
 
+*Resolved in P1.1 (2026-04-13):* `medication_request` now carries a
+derived `drug_class` column populated from the shared
+`data/drug_classes.json` mapping at ingest time. See the **Row-level
+enrichment** section below.
+
+### Row-level enrichment *(Phase 1, April 13, 2026)*
+
+Pure ViewDefinitions can only surface fields reachable via
+FHIRPath-lite. Anything derived — drug classes, episodes, severity
+scores — lives in `patient-journey/core/sql_on_fhir/enrich.py`, which
+binds three things together per view:
+
+1. **View name** (e.g. `medication_request`)
+2. **Extra columns** the sink appends to the DDL
+3. **A row mutator** that runs after the FHIRPath runtime has
+   populated the declared columns but before the row hits the INSERT
+
+The registry is applied by default in both `materialize()` and
+`materialize_all()`; callers that want a pure (unenriched) build can
+pass `enrichments={}`. The MCP tool description in `sof_tools.py` is
+enrichment-aware too, so columns show up with a `-- enriched` suffix
+in the agent's system prompt.
+
+**`medication_request.drug_class`** — single TEXT column. Resolution
+precedence is RxNorm code first (exact match against the `rxnorm_codes`
+list in `drug_classes.json`), then case-insensitive keyword match
+against `medication_text` / `rxnorm_display`. First match wins — we
+expose a canonical single drug class per row so `GROUP BY drug_class`
+never double-counts. Values map to the twelve class keys defined in
+`drug_classes.json`: `anticoagulants`, `antiplatelets`,
+`ace_inhibitors`, `arbs`, `jak_inhibitors`, `immunosuppressants`,
+`nsaids`, `opioids`, `anticonvulsants`, `psych_medications`,
+`stimulants`, `diabetes_medications`, or `NULL` when nothing matched.
+
+**Pitch-snapshot distribution** (`research/ehi-ignite.db`, 200 patients,
+1,948 medication requests):
+
+| `drug_class`           | Rows  |
+|------------------------|------:|
+| `NULL`                 | 1,746 |
+| `nsaids`               |    97 |
+| `opioids`              |    35 |
+| `diabetes_medications` |    16 |
+| `arbs`                 |    13 |
+| `antiplatelets`        |    13 |
+| `immunosuppressants`   |    13 |
+| `anticonvulsants`      |     4 |
+| `anticoagulants`       |     4 |
+| `ace_inhibitors`       |     4 |
+| `stimulants`           |     2 |
+| `psych_medications`    |     1 |
+
+Every shipped class has at least one row in the pitch snapshot, which
+means every risk-group cohort query the agent could write against
+the submission DB will return a non-empty result.
+
 ### Reference tests
 
-| File                                | What it covers                                                             |
-|-------------------------------------|----------------------------------------------------------------------------|
-| `api/tests/test_sof_tools.py`       | 22 tests — gate, LIMIT+1 probe, truncation, schema rendering, runner.      |
-| `api/tests/test_sof_materialize.py` | 8 tests — mtime gate, atomic swap, env-driven path, error-swallowing.      |
+| File                                | What it covers                                                                 |
+|-------------------------------------|--------------------------------------------------------------------------------|
+| `api/tests/test_sof_tools.py`       | 22 tests — gate, LIMIT+1 probe, truncation, schema rendering, runner.          |
+| `api/tests/test_sof_materialize.py` | 8 tests — mtime gate, atomic swap, env-driven path, error-swallowing.          |
+| `patient-journey/tests/test_sql_on_fhir.py` | 39 tests — FHIRPath, runner, sqlite sink, **+ 15 enrichment tests (P1.1)**. |
 
 Every test is hermetic: no test touches the real `data/sof.db` or the
 committed `research/ehi-ignite.db`.

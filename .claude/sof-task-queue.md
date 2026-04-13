@@ -35,10 +35,10 @@ Tasks are dispatched **in phase order**. Do not pull Phase 1 work while any Phas
 
 ## Phase 1 — Clinically smart tables
 
-- [ ] ⭐ **P1.1** — `drug_class` enrichment on `medication_request`
-  - Files: `patient-journey/core/sql_on_fhir/sqlite_sink.py` (edit), `patient-journey/core/sql_on_fhir/enrich.py` (new), `patient-journey/tests/test_sql_on_fhir.py` (extend)
+- [x] ⭐ **P1.1** — `drug_class` enrichment on `medication_request` *(done, 2026-04-13 — commit pending in same pass as queue update)*
+  - Files: `patient-journey/core/sql_on_fhir/sqlite_sink.py` (edit), `patient-journey/core/sql_on_fhir/enrich.py` (new), `patient-journey/core/sql_on_fhir/__init__.py` (edit), `patient-journey/tests/test_sql_on_fhir.py` (extend, +15 tests), `api/core/sof_tools.py` (edit — schema renderer + preamble), `research/ehi-ignite.db` (rebuilt), `research/README.md` / `research/SQL-ON-FHIR-REVIEW.md` / `CLAUDE.md` (doc updates)
   - Read first: `patient-journey/core/drug_classifier.py`, `patient-journey/core/sql_on_fhir/sqlite_sink.py`
-  - Smoke test: `python3 -m pytest patient-journey/tests/test_sql_on_fhir.py -q` + `SELECT drug_class, COUNT(*) FROM medication_request GROUP BY drug_class` returns non-empty groups
+  - Smoke test: `python3 -m pytest patient-journey/tests/test_sql_on_fhir.py -q` + `SELECT drug_class, COUNT(*) FROM medication_request GROUP BY drug_class` returns non-empty groups ✅
 - [ ] **P1.2** — Derived `medication_episode` table via `episode_detector`
   - Files: `patient-journey/core/sql_on_fhir/sqlite_sink.py` (edit), `patient-journey/core/sql_on_fhir/views/README.md` (new — documents pure vs derived views)
   - Read first: `patient-journey/core/episode_detector.py`
@@ -77,8 +77,9 @@ _(none)_
 - **P0.2** — FastAPI startup hook materializes `data/sof.db` with mtime gate (`0edbd8b`, 2026-04-13)
 - **P0.3** — 200-patient pitch snapshot committed at `research/ehi-ignite.db` (`472994d`, 2026-04-13)
 - **P0.4** — `run_sql` tool surface documented in `SQL-ON-FHIR-REVIEW.md` addendum + `CLAUDE.md` (2026-04-13)
+- **P1.1** — `drug_class` enrichment on `medication_request`: enrich.py module, default-on registry, sof_tools schema aware, 15 new tests, pitch snapshot rebuilt (2026-04-13)
 
-> **Phase 0 closed.** All four Phase-0 tasks are complete. Phase 1 is unblocked.
+> **Phase 0 closed.** P1.1 shipped on the same day. Next up: P1.2 (`medication_episode`) or a parallelizable Phase 1 task.
 
 ---
 

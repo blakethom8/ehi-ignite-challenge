@@ -23,7 +23,13 @@ polymorphic `value[x]` resolution.
 from .view_definition import ViewDefinition, Column, SelectClause
 from .fhirpath import evaluate
 from .runner import run_view
-from .sqlite_sink import materialize
+from .sqlite_sink import materialize, materialize_all, open_db
+from .enrich import (
+    Enrichment,
+    default_enrichments,
+    load_drug_classifier,
+    medication_request_enrichment,
+)
 
 __all__ = [
     "ViewDefinition",
@@ -32,4 +38,10 @@ __all__ = [
     "evaluate",
     "run_view",
     "materialize",
+    "materialize_all",
+    "open_db",
+    "Enrichment",
+    "default_enrichments",
+    "load_drug_classifier",
+    "medication_request_enrichment",
 ]

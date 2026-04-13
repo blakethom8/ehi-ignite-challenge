@@ -1,0 +1,22 @@
+{
+  "resourceType": "ViewDefinition",
+  "name": "encounter",
+  "resource": "Encounter",
+  "status": "active",
+  "description": "Flattened Encounter view — one row per encounter with class, type, start/end, and patient reference.",
+  "select": [
+    {
+      "column": [
+        {"name": "id", "path": "id", "type": "id"},
+        {"name": "patient_ref", "path": "subject.reference", "type": "string"},
+        {"name": "status", "path": "status", "type": "code"},
+        {"name": "class_code", "path": "class.code", "type": "code"},
+        {"name": "type_text", "path": "type.first().text", "type": "string"},
+        {"name": "type_code", "path": "type.first().coding.first().code", "type": "code"},
+        {"name": "reason_text", "path": "reasonCode.first().text", "type": "string"},
+        {"name": "period_start", "path": "period.start", "type": "dateTime"},
+        {"name": "period_end", "path": "period.end", "type": "dateTime"}
+      ]
+    }
+  ]
+}

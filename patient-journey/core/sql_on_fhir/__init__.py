@@ -30,6 +30,12 @@ from .enrich import (
     load_drug_classifier,
     medication_request_enrichment,
 )
+from .derived import (
+    Derivation,
+    build_medication_episodes,
+    default_derivations,
+    medication_episode_derivation,
+)
 
 __all__ = [
     "ViewDefinition",
@@ -44,4 +50,8 @@ __all__ = [
     "default_enrichments",
     "load_drug_classifier",
     "medication_request_enrichment",
+    "Derivation",
+    "build_medication_episodes",
+    "default_derivations",
+    "medication_episode_derivation",
 ]

@@ -261,6 +261,12 @@ def get_schemas_for_prompt() -> str:
     ``enrich.default_enrichments`` — e.g. ``drug_class`` on
     ``medication_request`` — so the agent's system prompt always
     matches the column list the warehouse was actually built with.
+
+    Derived tables registered in ``derived.default_derivations`` are
+    appended after the pure views with every column tagged
+    ``-- derived``, so the agent sees ``medication_episode`` alongside
+    ``medication_request`` and knows to GROUP-BY episodes when a user
+    asks about treatment duration or active prescriptions.
     """
     try:
         from core.sql_on_fhir.sqlite_sink import _sql_type  # type: ignore
@@ -273,6 +279,12 @@ def get_schemas_for_prompt() -> str:
         enrichments = default_enrichments()
     except Exception:  # pragma: no cover — enrich module is in-tree
         enrichments = {}
+
+    try:
+        from core.sql_on_fhir.derived import default_derivations  # type: ignore
+        derivations = default_derivations()
+    except Exception:  # pragma: no cover — derived module is in-tree
+        derivations = {}
 
     views = _load_view_definitions()
     if not views:
@@ -300,6 +312,24 @@ def get_schemas_for_prompt() -> str:
         lines.append(",\n".join(col_lines))
         lines.append(");")
         chunks.append("\n".join(lines))
+
+    # Derived tables — rendered after views, tagged per-column. Comma
+    # goes before the inline ``-- derived`` marker so the whole block
+    # still lexes as a valid DDL if anyone paste-tests it.
+    for derivation in derivations.values():
+        if not derivation.columns:
+            continue
+        header = f"-- {derivation.table_name}: {derivation.description or 'derived table'}"
+        lines = [header, f"CREATE TABLE {derivation.table_name} ("]
+        raw_cols = [f"  {c.name} {_sql_type(c)}" for c in derivation.columns]
+        col_lines = []
+        for idx, raw in enumerate(raw_cols):
+            sep = "," if idx < len(raw_cols) - 1 else ""
+            col_lines.append(f"{raw}{sep}  -- derived")
+        lines.append("\n".join(col_lines))
+        lines.append(");")
+        chunks.append("\n".join(lines))
+
     return "\n\n".join(chunks)
 
 
@@ -329,6 +359,12 @@ Rules:
   'opioids', 'anticonvulsants', 'psych_medications', 'stimulants',
   'diabetes_medications' — or NULL if nothing matched. Use
   `GROUP BY drug_class` for risk-class distributions.
+- Tables whose columns are all marked `-- derived` are built after the pure
+  views by grouping / aggregating across rows. `medication_episode` collapses
+  every `medication_request` on the same drug into one treatment episode with
+  `start_date`, `end_date`, `is_active`, `request_count`, `duration_days`
+  — use it (not raw `medication_request`) whenever the user asks about
+  "how long was patient X on drug Y" or "who is currently on Z".
 
 Schemas:
 

@@ -18,6 +18,11 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1] / "core" / "sql_on_fhir"
 sys.path.insert(0, str(ROOT))
 
+from derived import (  # type: ignore  # noqa: E402
+    build_medication_episodes,
+    default_derivations,
+    medication_episode_derivation,
+)
 from enrich import (  # type: ignore  # noqa: E402
     default_enrichments,
     load_drug_classifier,
@@ -353,6 +358,9 @@ def _med_resource(
     rxnorm_code: str | None = None,
     rxnorm_display: str | None = None,
     text: str | None = None,
+    authored_on: str = "2023-01-01",
+    status: str = "active",
+    subject_ref: str = "urn:uuid:pt-x",
 ) -> dict:
     coding = []
     if rxnorm_code or rxnorm_display:
@@ -366,10 +374,10 @@ def _med_resource(
     return {
         "resourceType": "MedicationRequest",
         "id": res_id,
-        "status": "active",
+        "status": status,
         "intent": "order",
-        "subject": {"reference": "urn:uuid:pt-x"},
-        "authoredOn": "2023-01-01",
+        "subject": {"reference": subject_ref},
+        "authoredOn": authored_on,
         "medicationCodeableConcept": {
             "text": text,
             "coding": coding or None,
@@ -537,3 +545,209 @@ class TestMaterializeWithEnrichment:
             "SELECT id, drug_class FROM medication_request ORDER BY id"
         ).fetchall()
         assert rows == [("m1", "anticoagulants"), ("m2", "nsaids")]
+
+
+# ---------------------------------------------------------------------------
+# Derived tables — medication_episode (P1.2)
+# ---------------------------------------------------------------------------
+
+
+class TestMedicationEpisodeDerivation:
+    def test_default_registry_has_medication_episode(self):
+        reg = default_derivations()
+        assert "medication_episode" in reg
+        derivation = reg["medication_episode"]
+        assert derivation.depends_on == ["medication_request"]
+        # Column schema must match the DDL in derived.py
+        col_names = [c.name for c in derivation.columns]
+        for expected in (
+            "episode_id",
+            "patient_ref",
+            "display",
+            "rxnorm_code",
+            "drug_class",
+            "latest_status",
+            "is_active",
+            "start_date",
+            "end_date",
+            "request_count",
+            "duration_days",
+            "first_request_id",
+        ):
+            assert expected in col_names
+
+    def test_groups_by_display_into_single_episode(self):
+        view = _medication_view()
+        resources = [
+            _med_resource("m1", text="warfarin 5 mg", authored_on="2022-01-15"),
+            _med_resource("m2", text="warfarin 5 mg", authored_on="2022-06-20"),
+            _med_resource("m3", text="warfarin 5 mg", authored_on="2022-12-01"),
+        ]
+        conn = sqlite3.connect(":memory:")
+        counts = materialize_all([view], resources, conn)
+        assert counts["medication_request"] == 3
+        assert counts["medication_episode"] == 1
+        row = conn.execute(
+            "SELECT patient_ref, display, request_count, start_date, end_date, "
+            "is_active, drug_class FROM medication_episode"
+        ).fetchone()
+        # Patient is only ever prescribed warfarin (status=active default),
+        # so the episode is live today → end_date is NULL.
+        assert row[0] == "urn:uuid:pt-x"
+        assert row[1] == "warfarin 5 mg"
+        assert row[2] == 3
+        assert row[3] == "2022-01-15"
+        assert row[4] is None
+        assert row[5] == 1
+        assert row[6] == "anticoagulants"
+
+    def test_inactive_episode_has_end_date_and_duration(self):
+        view = _medication_view()
+        resources = [
+            _med_resource(
+                "m1", text="lisinopril 10 mg",
+                authored_on="2020-01-01", status="completed",
+            ),
+            _med_resource(
+                "m2", text="lisinopril 10 mg",
+                authored_on="2020-07-10", status="stopped",
+            ),
+        ]
+        conn = sqlite3.connect(":memory:")
+        materialize_all([view], resources, conn)
+        row = conn.execute(
+            "SELECT is_active, start_date, end_date, latest_status, duration_days "
+            "FROM medication_episode"
+        ).fetchone()
+        assert row[0] == 0
+        assert row[1] == "2020-01-01"
+        assert row[2] == "2020-07-10"
+        assert row[3] == "stopped"
+        # Jan 1 → Jul 10 = 191 days exactly
+        assert row[4] == pytest.approx(191.0, abs=0.001)
+
+    def test_case_insensitive_grouping(self):
+        view = _medication_view()
+        resources = [
+            _med_resource("m1", text="Aspirin 81 MG"),
+            _med_resource("m2", text="aspirin 81 mg"),
+            _med_resource("m3", text="ASPIRIN 81 MG "),
+        ]
+        conn = sqlite3.connect(":memory:")
+        materialize_all([view], resources, conn)
+        rows = conn.execute(
+            "SELECT request_count FROM medication_episode"
+        ).fetchall()
+        assert len(rows) == 1
+        assert rows[0][0] == 3
+
+    def test_episodes_separated_per_patient(self):
+        view = _medication_view()
+        resources = [
+            _med_resource(
+                "m1", text="metformin 500 mg",
+                subject_ref="urn:uuid:pt-a",
+            ),
+            _med_resource(
+                "m2", text="metformin 500 mg",
+                subject_ref="urn:uuid:pt-b",
+            ),
+        ]
+        conn = sqlite3.connect(":memory:")
+        materialize_all([view], resources, conn)
+        rows = conn.execute(
+            "SELECT patient_ref FROM medication_episode ORDER BY patient_ref"
+        ).fetchall()
+        assert [r[0] for r in rows] == ["urn:uuid:pt-a", "urn:uuid:pt-b"]
+
+    def test_different_drugs_different_episodes(self):
+        view = _medication_view()
+        resources = [
+            _med_resource("m1", text="warfarin 5 mg"),
+            _med_resource("m2", text="ibuprofen 400 mg"),
+        ]
+        conn = sqlite3.connect(":memory:")
+        materialize_all([view], resources, conn)
+        rows = conn.execute(
+            "SELECT display, drug_class FROM medication_episode ORDER BY display"
+        ).fetchall()
+        assert rows == [
+            ("ibuprofen 400 mg", "nsaids"),
+            ("warfarin 5 mg", "anticoagulants"),
+        ]
+
+    def test_empty_derivations_opts_out(self):
+        view = _medication_view()
+        resources = [_med_resource("m1", text="warfarin 5 mg")]
+        conn = sqlite3.connect(":memory:")
+        counts = materialize_all([view], resources, conn, derivations={})
+        assert "medication_episode" not in counts
+        tables = [
+            r[0]
+            for r in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            ).fetchall()
+        ]
+        assert "medication_episode" not in tables
+
+    def test_dependency_missing_skips_derivation(self):
+        # Partial build: only the patient view, no medication_request.
+        patient_view = ViewDefinition.from_json_file(
+            ROOT / "views" / "patient.json"
+        )
+        resources = [
+            {
+                "resourceType": "Patient",
+                "id": "p1",
+                "gender": "female",
+                "birthDate": "1970-01-01",
+            }
+        ]
+        conn = sqlite3.connect(":memory:")
+        counts = materialize_all([patient_view], resources, conn)
+        # medication_episode should not be built when its source table isn't
+        # part of the run — we must not raise, just silently skip.
+        assert "medication_episode" not in counts
+        tables = [
+            r[0]
+            for r in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            ).fetchall()
+        ]
+        assert "medication_episode" not in tables
+
+    def test_build_medication_episodes_is_idempotent(self):
+        view = _medication_view()
+        resources = [
+            _med_resource("m1", text="warfarin 5 mg", authored_on="2022-01-01"),
+            _med_resource("m2", text="warfarin 5 mg", authored_on="2022-06-01"),
+        ]
+        conn = sqlite3.connect(":memory:")
+        materialize_all([view], resources, conn)
+        first = conn.execute("SELECT COUNT(*) FROM medication_episode").fetchone()[0]
+        # Calling build again should drop+recreate without duplicating rows.
+        build_medication_episodes(conn)
+        build_medication_episodes(conn)
+        second = conn.execute("SELECT COUNT(*) FROM medication_episode").fetchone()[0]
+        assert first == second == 1
+
+    def test_rows_without_display_are_skipped(self):
+        view = _medication_view()
+        resources = [
+            _med_resource("m1", text=None),  # no display at all
+            _med_resource("m2", text="warfarin 5 mg"),
+        ]
+        conn = sqlite3.connect(":memory:")
+        materialize_all([view], resources, conn)
+        rows = conn.execute(
+            "SELECT display FROM medication_episode"
+        ).fetchall()
+        assert len(rows) == 1
+        assert rows[0][0] == "warfarin 5 mg"
+
+    def test_medication_episode_derivation_helper(self):
+        derivation = medication_episode_derivation()
+        assert derivation.table_name == "medication_episode"
+        assert "medication_request" in derivation.depends_on
+        assert callable(derivation.build)
+        assert len(derivation.columns) == 12

@@ -16,6 +16,14 @@ columns onto a view at ingest time — for example, mapping each
 SQLite sink. The enrichment registry is applied by default so the
 warehouse always carries the clinically-smart columns; callers that
 want a pure ViewDefinition build can pass ``enrichments={}``.
+
+Optional **derivations** (see ``derived.py``) run a second pass after
+every ViewDefinition has been materialized. Derivations read from one
+or more already-populated view tables and build brand-new tables
+whose rows are *computed* — e.g. ``medication_episode`` groups
+``medication_request`` rows into continuous treatment episodes. Like
+enrichments, derivations ship default-on; pass ``derivations={}`` to
+opt out.
 """
 
 from __future__ import annotations
@@ -26,10 +34,12 @@ from pathlib import Path
 from typing import Iterable, Optional, Sequence
 
 try:
+    from .derived import Derivation, default_derivations
     from .enrich import Enrichment, default_enrichments
     from .runner import _eval_select, _passes_where, run_view
     from .view_definition import Column, SelectClause, ViewDefinition
 except ImportError:  # running as a loose script
+    from derived import Derivation, default_derivations  # type: ignore
     from enrich import Enrichment, default_enrichments  # type: ignore
     from runner import _eval_select, _passes_where, run_view  # type: ignore
     from view_definition import Column, SelectClause, ViewDefinition  # type: ignore
@@ -47,6 +57,20 @@ def _resolve_enrichments(
     if enrichments is None:
         return default_enrichments()
     return enrichments
+
+
+def _resolve_derivations(
+    derivations: Optional[dict[str, Derivation]],
+) -> dict[str, Derivation]:
+    """Sentinel-aware resolver for derived tables.
+
+    Mirrors ``_resolve_enrichments``: ``None`` → default registry,
+    ``{}`` → opt out of every derived table. Kept separate from the
+    enrichment resolver so the two hooks can evolve independently.
+    """
+    if derivations is None:
+        return default_derivations()
+    return derivations
 
 
 _TYPE_MAP = {
@@ -140,6 +164,7 @@ def materialize_all(
     resources: Iterable[dict],
     conn: sqlite3.Connection,
     enrichments: Optional[dict[str, Enrichment]] = None,
+    derivations: Optional[dict[str, Derivation]] = None,
 ) -> dict[str, int]:
     """Single-pass materialization: iterate `resources` once and dispatch to
     every matching ViewDefinition. Much faster than calling `materialize`
@@ -149,8 +174,17 @@ def materialize_all(
     If ``enrichments`` is ``None`` the default registry (drug_class on
     ``medication_request``) is applied; pass ``{}`` to get a pure
     ViewDefinition build with zero derived columns.
+
+    After every view has been populated, any matching ``derivations``
+    run a second pass — each derivation reads from one or more of the
+    just-built tables and produces a new derived table (e.g.
+    ``medication_episode``). Derivations whose declared dependencies
+    are missing from ``views`` are silently skipped so a partial build
+    ("just patient + condition") doesn't explode. ``derivations=None``
+    means the default registry; ``{}`` opts out of every derivation.
     """
     resolved = _resolve_enrichments(enrichments)
+    resolved_deriv = _resolve_derivations(derivations)
 
     # Pre-build tables + per-view SQL + column lists
     prep: dict[str, dict] = {}
@@ -229,4 +263,14 @@ def materialize_all(
             conn.executemany(entry["sql"], entry["batch"])
             entry["batch"].clear()
     conn.commit()
+
+    # Derivation pass — runs after every view is flushed so builders
+    # can SELECT from the just-populated tables. Skip any derivation
+    # whose source tables weren't part of this run (partial build).
+    view_names = {v.name for v in views}
+    for name, derivation in resolved_deriv.items():
+        if any(dep not in view_names for dep in derivation.depends_on):
+            continue
+        counts[name] = derivation.build(conn)
+
     return counts

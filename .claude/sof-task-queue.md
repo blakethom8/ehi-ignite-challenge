@@ -42,12 +42,12 @@ Tasks are dispatched **in phase order**. Do not pull Phase 1 work while any Phas
 - [x] **P1.2** — Derived `medication_episode` table via `episode_detector` *(done `4b2de2f`, 2026-04-13)*
   - Files: `patient-journey/core/sql_on_fhir/derived.py` (new — Derivation registry), `patient-journey/core/sql_on_fhir/sqlite_sink.py` (edit — derivation pass + sentinel resolver), `patient-journey/core/sql_on_fhir/__init__.py` (edit), `patient-journey/core/sql_on_fhir/views/README.md` (new — documents pure vs enriched vs derived), `api/core/sof_tools.py` (edit — render derived tables in prompt), `patient-journey/tests/test_sql_on_fhir.py` (+11 tests), `research/ehi-ignite.db` (rebuilt)
   - Smoke test: `SELECT * FROM medication_episode LIMIT 5` returns rows ✅ (820 episodes in pitch snapshot: 512 completed + 308 active)
-- [ ] **P1.3** — `views/condition_active.json` filtered subset view
-  - Files: new JSON, test
-  - Smoke test: pytest asserts row count ≤ `condition`
-- [ ] **P1.4** — `observation_latest` SQLite VIEW
-  - Files: `sqlite_sink.py` (edit), test
-  - Smoke test: row count ≤ observation row count and each (patient_ref, loinc_code) pair appears at most once
+- [x] **P1.3** — `views/condition_active.json` filtered subset view *(done `ca9e284`, 2026-04-13)*
+  - Files: `patient-journey/core/sql_on_fhir/views/condition_active.json` (new — same columns as condition + view-level where clause), `patient-journey/core/sql_on_fhir/views/README.md` (edit — new row in pure-views table + subset footnote), `patient-journey/tests/test_sql_on_fhir.py` (+6 tests), `research/ehi-ignite.db` (rebuilt)
+  - Smoke test: pitch snapshot `condition_active`=674 rows, exact 'active' subset of `condition`=1410 ✅
+- [x] **P1.4** — `observation_latest` SQLite VIEW *(done `ca9e284`, 2026-04-13)*
+  - Files: `patient-journey/core/sql_on_fhir/derived.py` (edit — `Derivation.kind` field + `build_observation_latest` + registry entry), `patient-journey/core/sql_on_fhir/__init__.py` (edit — re-exports), `api/core/sof_tools.py` (edit — renderer emits CREATE VIEW/TABLE by kind + preamble guidance), `patient-journey/core/sql_on_fhir/views/README.md` (edit — 4th layer + schema), `patient-journey/tests/test_sql_on_fhir.py` (+10 tests), `research/ehi-ignite.db` (rebuilt)
+  - Smoke test: pitch snapshot `observation_latest`=5,546 rows = 5,546 distinct (patient_ref, loinc_code) pairs, live reflection of source table verified in test ✅
 
 ## Phase 2 — NL search demo
 
@@ -78,8 +78,10 @@ _(none)_
 - **P0.4** — `run_sql` tool surface documented in `SQL-ON-FHIR-REVIEW.md` addendum + `CLAUDE.md` (2026-04-13)
 - **P1.1** — `drug_class` enrichment on `medication_request`: enrich.py module, default-on registry, sof_tools schema aware, 15 new tests, pitch snapshot rebuilt (2026-04-13)
 - **P1.2** — Derived `medication_episode` table: derived.py registry, sink derivation pass with sentinel resolver, views/README.md (pure/enriched/derived layers), sof_tools renders derived tables in the LLM prompt, 11 new tests, pitch snapshot rebuilt with 820 episodes (`4b2de2f`, 2026-04-13)
+- **P1.3** — `condition_active` filtered subset view: new ViewDefinition JSON with view-level where clause (active|recurrence|relapse), same column shape as `condition`, 6 new tests, pitch snapshot carries 674 active conditions out of 1,410 total (`ca9e284`, 2026-04-13)
+- **P1.4** — `observation_latest` SQLite VIEW: Derivation gains `kind="view"` mode, build_observation_latest emits DROP+CREATE VIEW with ROW_NUMBER() OVER partition, sof_tools emits CREATE VIEW vs CREATE TABLE by kind, 10 new tests, pitch snapshot carries 5,546 latest-per-pair observations (live projection, always fresh) (`ca9e284`, 2026-04-13)
 
-> **Phase 1 half-shipped.** P1.1 + P1.2 done. Next up: P1.3 (`condition_active` filtered view) and P1.4 (`observation_latest` SQLite VIEW) — these two are parallelizable.
+> **Phase 1 closed.** All four Phase 1 tasks done — the warehouse now exposes four categories of query target: pure ViewDefinitions, filtered subset views (P1.3), enriched columns (P1.1), and derived artifacts in two flavours (materialized table P1.2, lazy view P1.4). Next up: Phase 2 (NL search demo) — but P2.1 and P2.2 are both blocked on open questions in `sof-project-plan.md`. Tomorrow should unblock those before resuming the loop.
 
 ---
 

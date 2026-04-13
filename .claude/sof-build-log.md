@@ -508,6 +508,213 @@ by reading the last 2500 chars of the rendered prompt.
 
 ---
 
+### P1.3 — `condition_active` filtered subset view
+
+**Shipped:** 2026-04-13
+**Commit:** `ca9e284` (joint commit with P1.4)
+**Files:**
+- `patient-journey/core/sql_on_fhir/views/condition_active.json` — new. Same column list as `condition.json` plus a view-level `where` clause: `clinicalStatus.coding.where(code = 'active' or code = 'recurrence' or code = 'relapse').exists()`.
+- `patient-journey/core/sql_on_fhir/views/README.md` — edit. Pure-views table gains a new row, the `condition_active` subset is footnoted as the "problem list right now" view.
+- `patient-journey/tests/test_sql_on_fhir.py` — +6 tests in `TestConditionActiveView`. New helper `_condition_resource(res_id, clinical_status=…)`.
+- `research/ehi-ignite.db` — rebuilt (joint with P1.4).
+
+**What it does:** Exposes a filtered slice of the condition table
+that only contains clinically-active problems. Using it instead of
+raw `condition` turns "show me what this patient is dealing with
+right now" into a one-liner — no need for `WHERE clinical_status =
+'active'` every time, no chance of accidentally omitting recurrences
+or relapses that count as active for surgical-risk purposes.
+
+The JSON deliberately keeps the same column shape as
+`condition.json`. That's the whole point: any query that groups or
+joins on `condition` can be repointed at `condition_active` with a
+table-name substitution, no SELECT-list rewrite. Tested by
+`test_column_shape_matches_condition_view`.
+
+**Architectural decision — subset views are pure ViewDefinitions,
+not enrichments or derivations.** The subset is expressible in
+FHIRPath-lite (`clinicalStatus.coding.where(...).exists()`) and the
+existing runner already evaluates view-level `where` clauses via
+`_passes_where`. No Python sink changes needed — filtered views are
+as standards-compliant as the base views. A future DuckDB or
+Pathling consumer of our JSON would get the same filtered table for
+free.
+
+**Architectural decision — multi-value `or` instead of a single
+`clinicalStatus.coding.first().code = 'active'` equality.** The
+first-coding form would silently drop any Condition resource whose
+first coding slot is a different status but whose second slot is
+`active`. The `where(...).exists()` form returns `true` as long as
+any coding in the array matches, so it's robust to multi-coding
+(e.g. a Condition encoded in both HL7 and SNOMED systems). Tested
+by `test_recurrence_and_relapse_pass_filter`.
+
+**Smoke test A — unit suite:**
+```
+python3 -m pytest patient-journey/tests/test_sql_on_fhir.py \
+  -q -k "ConditionActive"
+......                                                                   [100%]
+6 passed, 50 deselected in 0.07s
+```
+
+**Smoke test B — pitch-snapshot numbers:**
+```
+SELECT clinical_status, COUNT(*) FROM condition GROUP BY clinical_status;
+  resolved | 736
+  active   | 674
+
+SELECT clinical_status, COUNT(*) FROM condition_active GROUP BY clinical_status;
+  active   | 674
+```
+Exact subset as expected. Synthea doesn't generate
+`recurrence`/`relapse` conditions in our 200-patient sample, but the
+filter accepts them (tested hermetically in
+`test_recurrence_and_relapse_pass_filter`).
+
+**Follow-ups surfaced:**
+- `condition_active` currently only filters by `clinicalStatus`. A
+  production problem-list view would probably also exclude
+  `verificationStatus = 'entered-in-error'`. Deferred until we see
+  a real entered-in-error condition in the dataset — none in
+  Synthea's output today.
+- Potential companion views we could add later if it helps the
+  pitch demo: `encounter_recent` (last 90 days), `allergies_active`.
+  Flag for discussion, not needed for Phase 1 closing.
+
+---
+
+### P1.4 — `observation_latest` SQLite VIEW
+
+**Shipped:** 2026-04-13
+**Commit:** `ca9e284` (joint commit with P1.3)
+**Files:**
+- `patient-journey/core/sql_on_fhir/derived.py` — edit. `Derivation` gains a `kind: str = "table"` field; `kind="view"` means the derivation emits a SQLite `CREATE VIEW` rather than `CREATE TABLE`. New `build_observation_latest`, `_observation_latest_columns`, `observation_latest_derivation`. Registry extended to two entries. Module docstring rewritten to cover both derivation kinds.
+- `patient-journey/core/sql_on_fhir/__init__.py` — re-export `build_observation_latest` and `observation_latest_derivation`.
+- `api/core/sof_tools.py` — `get_schemas_for_prompt` now branches on `derivation.kind`: `kind="view"` emits `CREATE VIEW` + per-column `-- view` tags, `kind="table"` still emits `CREATE TABLE` + `-- derived`. Tool preamble gains a dedicated bullet teaching the agent to reach for `observation_latest` when the user asks about "current A1c / creatinine / BP".
+- `patient-journey/core/sql_on_fhir/views/README.md` — fourth layer documented. Derived-artifacts table now has a `Kind` column; schema section gains an `observation_latest` block explaining the ROW_NUMBER() approach and the staleness contract.
+- `patient-journey/tests/test_sql_on_fhir.py` — +10 tests in `TestObservationLatestView`. New helpers `_obs_resource` and `_observation_view`.
+- `research/ehi-ignite.db` — rebuilt with the new view. Joint build with P1.3.
+
+**What it does:** Surfaces the most recent `observation` row per
+`(patient_ref, loinc_code)` pair as a lazy SQLite `VIEW`. Backing
+DDL:
+
+```sql
+CREATE VIEW observation_latest AS
+SELECT <every observation column>
+FROM (
+    SELECT *, ROW_NUMBER() OVER (
+        PARTITION BY patient_ref, loinc_code
+        ORDER BY effective_date DESC, id DESC
+    ) AS _rn
+    FROM observation
+    WHERE patient_ref IS NOT NULL AND loinc_code IS NOT NULL
+) ranked
+WHERE _rn = 1
+```
+
+Tiebreaker: when two rows share an `effective_date`, the higher
+lexicographic `id` wins. Deterministic, arbitrary, documented in the
+docstring.
+
+**Architectural decision — extended `Derivation` instead of a new
+module.** I considered creating a separate `sql_views.py` registry
+but the `Derivation` dataclass already has all the right fields
+(`depends_on`, `build`, `columns`, `description`) and the sink
+already loops them with dependency skipping. The only new thing is
+*what* `build()` emits. A single `kind` field distinguishes the two
+and keeps all derived-artifact wiring in one place. Future kinds
+(materialized views? indexed columns?) can reuse the same hook.
+
+**Architectural decision — live view, not a materialized cache.**
+The question the demo needs to answer — "what's the patient's
+current blood pressure reading" — has to be right at query time,
+not at the last rebuild time. A SQLite VIEW recomputes the
+`ROW_NUMBER()` projection on every `SELECT`, so a subsequent
+`INSERT INTO observation ...` is reflected immediately with no
+rebuild required. Explicitly tested in
+`test_observation_latest_is_live_sqlite_view`.
+
+**Architectural decision — exclude NULL `patient_ref` / `loinc_code`
+in the inner query.** Those rows can't be meaningfully grouped by
+"latest per patient per test" and if we left them in they'd all
+collapse into a single `(NULL, NULL)` partition and arbitrarily
+surface one. Tested by `test_null_loinc_excluded`.
+
+**Architectural decision — tiebreaker is `id DESC`, not the
+chronologically-latest insertion.** SQLite doesn't expose a
+`rowid`-based stable ordering out of the box, and piggybacking on
+insertion order would make the tests non-deterministic. String
+compare on `id` is deterministic and good enough for a demo where
+ties are extremely rare. Tested by `test_tiebreaker_prefers_higher_id`.
+
+**Smoke test A — unit suite:**
+```
+python3 -m pytest patient-journey/tests/test_sql_on_fhir.py \
+  api/tests/test_sof_tools.py api/tests/test_sof_materialize.py -q
+........................................................................ [ 75%]
+........................                                                 [100%]
+96 passed in 0.29s
+```
+(+16 from this commit: 6 for P1.3, 10 for P1.4.)
+
+**Smoke test B — pitch-snapshot shape:**
+```
+observation:        40,476 rows
+observation_latest:  5,546 rows  (= 5,546 distinct (patient_ref, loinc_code) pairs)
+```
+Collision test (`SELECT COUNT(*), COUNT(DISTINCT patient_ref||'|'||loinc_code)
+FROM observation_latest`) returned `(5546, 5546)` — exactly one row per
+pair, no duplicates.
+
+**Smoke test C — top-5 most-common latest observations:**
+| LOINC display                                                              | Patients |
+|---------------------------------------------------------------------------:|---------:|
+| Tobacco smoking status NHIS                                                |      200 |
+| Platelet mean volume [Entitic volume] in Blood by Automated count          |      200 |
+| Platelet distribution width [Entitic volume] in Blood by Automated count   |      200 |
+| Pain severity - 0-10 verbal numeric rating [Score] - Reported              |      200 |
+| MCV [Entitic volume] by Automated count                                    |      200 |
+
+Every one of the 200 patients has a latest reading for these five
+common LOINC codes, so a demo query like
+`SELECT value_quantity FROM observation_latest WHERE loinc_code='4548-4'`
+will return non-empty results for essentially every patient.
+
+**Smoke test D — rendered LLM schema:**
+The MCP tool description now contains two new blocks at the end:
+
+```
+-- condition_active: (from JSON — pure view, treated as a regular table)
+CREATE TABLE condition_active ( … );
+
+-- observation_latest: SQLite VIEW …
+CREATE VIEW observation_latest (
+  id TEXT  -- view,
+  patient_ref TEXT  -- view,
+  ...
+);
+```
+
+The agent can now tell tables apart from live views at a glance.
+
+**Follow-ups surfaced:**
+- `observation_latest` uses `ROW_NUMBER() OVER (PARTITION BY …)`.
+  SQLite 3.25+ supports window functions; the project CI runs on
+  Python 3.13 which bundles SQLite ≥ 3.42, so we're fine, but this
+  is the first place in the warehouse that depends on window
+  functions. Worth a note if we ever target a more minimal embedded
+  SQLite.
+- Could add `observation_first` for "patient's earliest reading"
+  by flipping the `ORDER BY` direction — cheap, deferred until a
+  demo needs it.
+- `kind="view"` is currently only surfaced in the schema renderer
+  and the module docstring. If we add more view-kind derivations,
+  we should probably hoist a helper like
+  `derived.is_view(derivation)` so call sites stay consistent.
+
+---
+
 ## Phase 2 — NL search demo
 
 _(no entries yet)_

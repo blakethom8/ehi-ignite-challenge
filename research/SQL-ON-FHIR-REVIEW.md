@@ -379,7 +379,7 @@ differentiated* in a competition crowded with generic LLM-over-FHIR pitches.
 - `patient-journey/tests/test_sql_on_fhir.py` — 24 passing tests
 - `research/sof-bench-50.md`, `research/sof-bench-300.md` — raw benchmark output
 - `data/sof_demo.db` — materialized SQLite from `demo.py`
-- `research/ehi-ignite.db` — 200-patient pitch snapshot (P0.3, 11.43 MB, committed)
+- `research/ehi-ignite.db` — 200-patient pitch snapshot (P0.3, ~12 MB, committed; now carries condition_active + medication_episode + observation_latest)
 
 ---
 
@@ -595,13 +595,132 @@ during the pitch. A one-line query now answers "who is currently on
 an anticoagulant?" — a question that cost 40+ lines of Python
 before the SOF layer existed.
 
+### Filtered subset views *(Phase 1 — P1.3, April 13, 2026)*
+
+A fourth ViewDefinition idiom landed alongside the derived tables:
+**filtered subset views**. These are still pure ViewDefinitions
+(standards-compliant, JSON-only), but they carry a view-level `where`
+clause that prunes rows before they hit SQLite. The column shape is
+identical to a sibling "full" view, so existing queries can swap one
+for the other without any column-mapping work.
+
+**`condition_active`** *(same shape as `condition`, only the active
+rows)*. View-level filter:
+
+```json
+"where": [
+  {"path": "clinicalStatus.coding.where(code = 'active' or code = 'recurrence' or code = 'relapse').exists()"}
+]
+```
+
+The `coding.where(...).exists()` form is deliberate: `clinicalStatus`
+is a `CodeableConcept`, so the status code can appear in any coding
+slot. Using `.first().code = 'active'` would silently drop rows where
+the first coding slot is a translation into a different code system.
+The `exists()` form is robust to multi-coding.
+
+In the pitch snapshot: **674 active conditions** out of 1,410 total
+(47.8%), so the filter actually matters — it's the difference between
+"patient X has a problem list of 8 things" and "patient X has a
+lifetime condition history of 17 things". Clinicians want the former;
+the warehouse now supports both shapes natively.
+
+**Why a view and not a `WHERE` clause per query.** Two reasons: it
+makes the agent's SQL shorter (no risk of forgetting the clinical
+filter on a long query), and it surfaces the concept "active problem
+list" as a named table in the system prompt so the agent can reach
+for it by name.
+
+### SQLite view derivations *(Phase 1 — P1.4, April 13, 2026)*
+
+P1.2 shipped derivations as materialized tables: build time runs
+Python code, persists rows to SQLite, consumes storage. P1.4 extends
+the `Derivation` dataclass with a `kind` field so a derivation can
+also ship as a lazy SQLite `CREATE VIEW`:
+
+```python
+@dataclass
+class Derivation:
+    table_name: str
+    depends_on: list[str]
+    build: DerivationBuilder
+    columns: list[Column] = field(default_factory=list)
+    kind: str = "table"  # "table" or "view"
+    description: str = ""
+```
+
+`kind="table"` behaves exactly as P1.2 did. `kind="view"` means the
+builder issues `DROP VIEW IF EXISTS` + `CREATE VIEW`, and row counts
+come back from a follow-up `SELECT COUNT(*)`. The schema renderer in
+`sof_tools.get_schemas_for_prompt` branches on `kind` so the agent's
+system prompt emits `CREATE VIEW` vs `CREATE TABLE` accurately, with
+every column tagged `-- view` vs `-- derived` respectively.
+
+**When to pick which.**
+
+| Pick `kind=` | When the derivation…                                                     |
+|--------------|---------------------------------------------------------------------------|
+| `"table"`    | involves Python logic, touches the enrichment registry, or is expensive   |
+| `"view"`     | is cheap SQL, and staleness would be a clinical bug                       |
+
+`medication_episode` is a table: it runs a Python grouping pass, probes
+the `drug_class` enrichment column, and computes date math the FHIRPath
+runtime can't express. `observation_latest` is a view: it's a single
+`ROW_NUMBER()` window and a clinician reading "current A1c" cannot
+tolerate a stale value hiding behind a forgotten rebuild.
+
+**`observation_latest`** *(latest observation per `(patient_ref,
+loinc_code)` pair)*. DDL:
+
+```sql
+CREATE VIEW "observation_latest" AS
+SELECT id, patient_ref, encounter_ref, status, category,
+       loinc_code, display, effective_date,
+       value_quantity, value_unit, value_string
+FROM (
+    SELECT …, ROW_NUMBER() OVER (
+        PARTITION BY patient_ref, loinc_code
+        ORDER BY effective_date DESC, id DESC
+    ) AS _rn
+    FROM "observation"
+    WHERE patient_ref IS NOT NULL AND loinc_code IS NOT NULL
+) ranked
+WHERE _rn = 1
+```
+
+Three design points worth calling out:
+
+1. **Deterministic tiebreaker.** When two rows share an
+   `effective_date`, the higher `id` wins. Without this, "latest A1c"
+   could flip between two equally-dated readings on a rebuild.
+2. **NULL-key exclusion.** Rows where `patient_ref` or `loinc_code`
+   is NULL are dropped in the subquery so they don't collapse into a
+   bogus `(NULL, NULL)` partition.
+3. **Live projection, not a snapshot.** Every `SELECT * FROM
+   observation_latest` re-runs the window against the current
+   `observation` table. A manual `INSERT INTO observation` is
+   visible on the very next SELECT without any rebuild pass — the
+   hermetic test asserts this explicitly.
+
+In the pitch snapshot: **5,546 rows = 5,546 distinct
+`(patient_ref, loinc_code)` pairs**, a 7.3× reduction from the
+40,476-row source table. That matches the intuition that each patient
+has ~28 distinct lab/vital codes on file and typically several readings
+per code.
+
+The clinical payoff: a query like "what's this patient's most recent
+creatinine, A1c, BP" used to be three `ORDER BY effective_date DESC
+LIMIT 1` scans against `observation`. It's now three row lookups
+against `observation_latest` — shorter SQL for the agent, correct by
+construction.
+
 ### Reference tests
 
-| File                                | What it covers                                                                                                  |
-|-------------------------------------|-----------------------------------------------------------------------------------------------------------------|
-| `api/tests/test_sof_tools.py`       | 22 tests — gate, LIMIT+1 probe, truncation, schema rendering (incl. derived tables), runner.                    |
-| `api/tests/test_sof_materialize.py` | 8 tests — mtime gate, atomic swap, env-driven path, error-swallowing.                                           |
-| `patient-journey/tests/test_sql_on_fhir.py` | 50 tests — FHIRPath, runner, sqlite sink, **+ 15 enrichment tests (P1.1)**, **+ 11 derivation tests (P1.2)**. |
+| File                                | What it covers                                                                                                   |
+|-------------------------------------|------------------------------------------------------------------------------------------------------------------|
+| `api/tests/test_sof_tools.py`       | 22 tests — gate, LIMIT+1 probe, truncation, schema rendering (incl. derived tables + VIEW emission), runner.     |
+| `api/tests/test_sof_materialize.py` | 8 tests — mtime gate, atomic swap, env-driven path, error-swallowing.                                            |
+| `patient-journey/tests/test_sql_on_fhir.py` | 66 tests — FHIRPath, runner, sqlite sink, **+15 enrichment (P1.1)**, **+11 derivation (P1.2)**, **+6 condition_active (P1.3)**, **+10 observation_latest (P1.4)**. |
 
 Every test is hermetic: no test touches the real `data/sof.db` or the
 committed `research/ehi-ignite.db`.

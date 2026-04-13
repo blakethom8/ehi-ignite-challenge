@@ -32,7 +32,38 @@
 
 ## Phase 0 — Lock the prototype in
 
-_(no entries yet — P0.1 not started)_
+### P0.1 — `run_sql` MCP tool on the provider assistant agent
+
+**Shipped:** 2026-04-13
+**Commit:** `cf0efaa`
+**Files:**
+- `api/core/sof_tools.py` — new SELECT-only gate + read-only sqlite runner + schema renderer
+- `api/tests/test_sof_tools.py` — new, 22 unit tests covering gate, runner, schema
+- `api/core/provider_assistant_agent_sdk.py` — registers `mcp__fhir_chart__run_sql` and traces it as a TOOL span
+
+**What it does:** Gives the Claude Agent SDK runtime a third MCP tool —
+`run_sql(query, limit)` — that executes read-only SELECT/WITH statements
+against `data/sof.db` (the SQL-on-FHIR warehouse). The gate strips string
+literals + comments before tokenizing so quoted values like `'drop'` are
+legal, but any DDL/DML keyword (DROP, INSERT, UPDATE, DELETE, ATTACH,
+PRAGMA, CREATE, ALTER, REPLACE, TRUNCATE, VACUUM, REINDEX, ANALYZE) is
+rejected and multi-statement input is blocked. Results are capped at 500
+rows; when the caller omits a LIMIT we inject `LIMIT limit+1` so we can
+return a `truncated` flag without a second query. The tool description
+embeds CREATE TABLE statements for all five bundled ViewDefinitions so
+the agent can self-serve joins (Synthea's `urn:uuid:` reference convention
+is called out in the preamble).
+
+**Smoke test:**
+```
+uv run pytest api/tests/test_sof_tools.py -q
+......................                                                   [100%]
+22 passed in 0.04s
+```
+
+**Follow-ups surfaced:**
+- `run_sql` assumes `data/sof.db` exists. P0.2 (FastAPI startup hook) is the follow-up that materializes it on boot.
+- Schema description today is CREATE TABLE only — once P1.1 lands the `drug_class` column, the prompt should mention it explicitly so the agent knows to group by it.
 
 ---
 

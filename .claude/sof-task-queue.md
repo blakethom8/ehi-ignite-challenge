@@ -15,7 +15,7 @@ Tasks are dispatched **in phase order**. Do not pull Phase 1 work while any Phas
 
 ## Phase 0 — Lock the prototype in
 
-- [ ] ⭐ **P0.1** — Add `run_sql(query, limit)` tool to `provider_assistant_agent_sdk`
+- [x] ⭐ **P0.1** — Add `run_sql(query, limit)` tool to `provider_assistant_agent_sdk` *(done `cf0efaa`, 2026-04-13)*
   - Files: `api/core/provider_assistant_agent_sdk.py` (edit), `api/core/sof_tools.py` (new), `api/tests/test_sof_tools.py` (new)
   - Read first: `api/core/provider_assistant_agent_sdk.py`, `patient-journey/core/sql_on_fhir/views/*.json`, `patient-journey/core/sql_on_fhir/sqlite_sink.py`
   - Smoke test: `uv run pytest api/tests/test_sof_tools.py -q`
@@ -73,7 +73,7 @@ _(none)_
 
 ## Completed
 
-_(none yet — Phase 0 has not started)_
+- **P0.1** — `run_sql` wired into the agent SDK (`cf0efaa`, 2026-04-13)
 
 ---
 

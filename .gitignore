@@ -25,3 +25,9 @@ data/sof.db-*
 data/sof.db.tmp
 data/sof_*.db
 data/sof_*.db-*
+
+# Pitch / reviewer snapshot — intentionally committed (≤ 20 MB, 200 patients).
+# Every other *.db under research/ should stay out of git.
+research/*.db
+research/*.db-*
+!research/ehi-ignite.db

@@ -34,6 +34,11 @@ from api.core.provider_assistant import (
     AssistantResult,
     get_relevant_provider_evidence,
 )
+from api.core.sof_tools import (
+    build_tool_description as _sof_build_tool_description,
+    run_sql as _sof_run_sql,
+    tool_result_payload as _sof_tool_result_payload,
+)
 from api.core.tracing import SpanKind, start_span
 
 
@@ -277,10 +282,48 @@ async def _run_agent(
             ]
         }
 
+    @tool(
+        "run_sql",
+        _sof_build_tool_description(),
+        {
+            "query": str,
+            "limit": int,
+        },
+    )
+    async def run_sql(args: dict[str, Any]) -> dict[str, Any]:
+        query_text = str(args.get("query", "")).strip()
+        if not query_text:
+            return {
+                "content": [{"type": "text", "text": "query is required"}],
+                "is_error": True,
+            }
+        raw_limit = args.get("limit", 50)
+        try:
+            limit_int = int(raw_limit)
+        except (TypeError, ValueError):
+            limit_int = 50
+
+        with start_span(
+            SpanKind.TOOL,
+            "run_sql",
+            input_data={"query": query_text, "limit": limit_int},
+        ) as _sql_span:
+            result = _sof_run_sql(query_text, limit=limit_int)
+            if _sql_span:
+                _sql_span.output_data = json.dumps(
+                    {
+                        "row_count": result.row_count,
+                        "truncated": result.truncated,
+                        "error": result.error,
+                    },
+                    default=str,
+                )
+        return _sof_tool_result_payload(result)
+
     mcp_server = create_sdk_mcp_server(
         name="fhir_chart",
         version="1.0.0",
-        tools=[get_patient_snapshot, query_chart_evidence],
+        tools=[get_patient_snapshot, query_chart_evidence, run_sql],
     )
 
     built_in_tools: list[str] = []
@@ -292,6 +335,7 @@ async def _run_agent(
     allowed_tools = [
         "mcp__fhir_chart__get_patient_snapshot",
         "mcp__fhir_chart__query_chart_evidence",
+        "mcp__fhir_chart__run_sql",
     ]
     allowed_tools.extend(built_in_tools)
 

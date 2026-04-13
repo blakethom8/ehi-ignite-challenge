@@ -20,8 +20,8 @@ Tasks are dispatched **in phase order**. Do not pull Phase 1 work while any Phas
   - Read first: `api/core/provider_assistant_agent_sdk.py`, `patient-journey/core/sql_on_fhir/views/*.json`, `patient-journey/core/sql_on_fhir/sqlite_sink.py`
   - Smoke test: `uv run pytest api/tests/test_sof_tools.py -q`
   - Acceptance: the tool is discoverable by the agent SDK, SELECT-only gate rejects DROP/INSERT, the system prompt includes the five view schemas
-- [ ] **P0.2** — FastAPI startup hook materializes `data/sof.db` if stale
-  - Files: `api/main.py` (edit), `api/core/sof_materialize.py` (new)
+- [x] **P0.2** — FastAPI startup hook materializes `data/sof.db` if stale *(done `0edbd8b`, 2026-04-13)*
+  - Files: `api/main.py` (edit), `api/core/sof_materialize.py` (new), `api/tests/test_sof_materialize.py` (new), `.gitignore` (edit)
   - Read first: `api/main.py`, `patient-journey/core/sql_on_fhir/sqlite_sink.py`, `patient-journey/core/sql_on_fhir/loader.py`
   - Smoke test: delete `data/sof.db`, boot API, confirm DB exists and row counts are >0
   - Acceptance: idempotent — second boot is fast (mtime check)
@@ -74,6 +74,7 @@ _(none)_
 ## Completed
 
 - **P0.1** — `run_sql` wired into the agent SDK (`cf0efaa`, 2026-04-13)
+- **P0.2** — FastAPI startup hook materializes `data/sof.db` with mtime gate (`0edbd8b`, 2026-04-13)
 
 ---
 

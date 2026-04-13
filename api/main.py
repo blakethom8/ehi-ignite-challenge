@@ -16,6 +16,7 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env", override=False)
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from api.core.sof_materialize import materialize_from_env
 from api.middleware.tracing import TracingMiddleware
 from api.routers import patients
 from api.routers import corpus
@@ -27,6 +28,17 @@ app = FastAPI(
     description="Clinical intelligence layer over FHIR patient data",
     version="0.1.0",
 )
+
+
+@app.on_event("startup")
+def _materialize_sof_db() -> None:
+    """Rebuild data/sof.db on boot if any ViewDefinition or bundle is newer.
+
+    Idempotent — a fresh DB triggers no work. Controlled by the
+    ``SOF_AUTO_MATERIALIZE``/``SOF_PATIENT_LIMIT``/``SOF_DB_PATH`` env vars;
+    never raises (see ``sof_materialize.materialize_from_env``).
+    """
+    materialize_from_env()
 
 app.add_middleware(
     CORSMiddleware,

@@ -20,5 +20,8 @@ __pycache__/
 *.pyc
 data/traces.db
 data/traces.db-*
+data/sof.db
+data/sof.db-*
+data/sof.db.tmp
 data/sof_*.db
 data/sof_*.db-*

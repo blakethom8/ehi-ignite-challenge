@@ -25,7 +25,7 @@ Tasks are dispatched **in phase order**. Do not pull Phase 1 work while any Phas
   - Read first: `api/main.py`, `patient-journey/core/sql_on_fhir/sqlite_sink.py`, `patient-journey/core/sql_on_fhir/loader.py`
   - Smoke test: delete `data/sof.db`, boot API, confirm DB exists and row counts are >0
   - Acceptance: idempotent — second boot is fast (mtime check)
-- [ ] **P0.3** — 200-patient pitch snapshot at `research/ehi-ignite.db`
+- [x] **P0.3** — 200-patient pitch snapshot at `research/ehi-ignite.db` *(done `472994d`, 2026-04-13)*
   - Files: `research/ehi-ignite.db` (new), `.gitignore` (edit), `research/README.md` (edit)
   - Smoke test: `python3 -c "import sqlite3; c=sqlite3.connect('research/ehi-ignite.db'); print(c.execute('SELECT COUNT(*) FROM patient').fetchone())"` prints `(200,)`
   - Acceptance: file size < 20 MB
@@ -75,6 +75,7 @@ _(none)_
 
 - **P0.1** — `run_sql` wired into the agent SDK (`cf0efaa`, 2026-04-13)
 - **P0.2** — FastAPI startup hook materializes `data/sof.db` with mtime gate (`0edbd8b`, 2026-04-13)
+- **P0.3** — 200-patient pitch snapshot committed at `research/ehi-ignite.db` (`472994d`, 2026-04-13)
 
 ---
 

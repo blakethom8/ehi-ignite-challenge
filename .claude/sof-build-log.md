@@ -135,6 +135,69 @@ mtime gate is working, no rewrite occurred.
   request. Acceptable for dev; P0.3 will ship a pre-built 200-patient
   snapshot so deploys can skip the cold-start cost entirely.
 
+### P0.3 — 200-patient pitch snapshot committed at `research/ehi-ignite.db`
+
+**Shipped:** 2026-04-13
+**Commit:** `472994d`
+**Files:**
+- `research/ehi-ignite.db` — new, **committed binary** (11.43 MB)
+- `.gitignore` — now allow-lists the snapshot while blocking every other
+  `research/*.db` (and the `-wal`/`-shm` siblings)
+- `research/README.md` — documents the rebuild command, the row counts,
+  and the column layout of each ViewDefinition table
+
+**What it does:** Freezes a reviewer-facing dataset into the repo so
+graders, pitch demos, and reproducible `run_sql` examples all hit the
+same 200 patients without anyone first having to run a multi-minute
+ingest against the 1,180 Synthea bundles. Because the SOF warehouse is
+deterministic (no random sampling, sorted glob, fixed patient limit)
+the committed DB is reproducible byte-for-byte from anyone's checkout.
+
+**Build command** (used to produce the committed file):
+```bash
+rm -f research/ehi-ignite.db
+SOF_DB_PATH=research/ehi-ignite.db SOF_PATIENT_LIMIT=200 \
+  uv run python -c "from api.core.sof_materialize import materialize_from_env; print(materialize_from_env())"
+```
+
+**Build report:**
+
+| Table                | Rows    |
+|----------------------|---------|
+| `patient`            |     200 |
+| `condition`          |   1,410 |
+| `medication_request` |   1,948 |
+| `observation`        |  40,476 |
+| `encounter`          |   6,714 |
+
+Build time: 8.44s. File size: 11.43 MB (queue budget: 20 MB).
+
+**Smoke test:**
+```bash
+python3 -c "import sqlite3; c=sqlite3.connect('research/ehi-ignite.db'); print(c.execute('SELECT COUNT(*) FROM patient').fetchone())"
+(200,)
+```
+
+**.gitignore design note:** rather than broadly un-ignoring a single
+file, I added a three-line block that (a) ignores every `*.db` and
+`-wal`/`-shm` sibling under `research/`, then (b) explicitly
+allow-lists `research/ehi-ignite.db`. This is the "protected asset"
+pattern — no future broad rule can silently drop the pitch DB, and
+any accidental second snapshot (e.g. `research/ehi-ignite-next.db`)
+stays out of the commit.
+
+**Follow-ups surfaced:**
+- The snapshot is **not** re-materialized on boot — production still
+  uses `data/sof.db` via the P0.2 startup hook. If someone edits a
+  ViewDefinition, they need to rerun the build command above to
+  refresh the committed snapshot. A CI check that diffs the views
+  dir mtime against the committed DB mtime would close this gap;
+  deferred to a later pass.
+- When P1.1 adds a `drug_class` column to the medication view, this
+  snapshot will have to be rebuilt and re-committed in the same
+  commit so reviewers never see a schema mismatch between the
+  snapshot and the agent's system prompt.
+
 ---
 
 ## Phase 1 — Clinically smart tables

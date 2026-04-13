@@ -313,19 +313,25 @@ def get_schemas_for_prompt() -> str:
         lines.append(");")
         chunks.append("\n".join(lines))
 
-    # Derived tables — rendered after views, tagged per-column. Comma
-    # goes before the inline ``-- derived`` marker so the whole block
-    # still lexes as a valid DDL if anyone paste-tests it.
+    # Derived artifacts — rendered after views. Table derivations
+    # emit CREATE TABLE, view derivations emit CREATE VIEW so the
+    # agent can tell at a glance whether it's querying a stored
+    # snapshot or a live projection. Comma goes before the inline
+    # ``-- derived`` marker so the whole block still lexes as valid
+    # DDL if anyone paste-tests it.
     for derivation in derivations.values():
         if not derivation.columns:
             continue
-        header = f"-- {derivation.table_name}: {derivation.description or 'derived table'}"
-        lines = [header, f"CREATE TABLE {derivation.table_name} ("]
+        kind = getattr(derivation, "kind", "table")
+        keyword = "VIEW" if kind == "view" else "TABLE"
+        tag = "-- view" if kind == "view" else "-- derived"
+        header = f"-- {derivation.table_name}: {derivation.description or 'derived ' + kind}"
+        lines = [header, f"CREATE {keyword} {derivation.table_name} ("]
         raw_cols = [f"  {c.name} {_sql_type(c)}" for c in derivation.columns]
         col_lines = []
         for idx, raw in enumerate(raw_cols):
             sep = "," if idx < len(raw_cols) - 1 else ""
-            col_lines.append(f"{raw}{sep}  -- derived")
+            col_lines.append(f"{raw}{sep}  {tag}")
         lines.append("\n".join(col_lines))
         lines.append(");")
         chunks.append("\n".join(lines))
@@ -365,6 +371,11 @@ Rules:
   `start_date`, `end_date`, `is_active`, `request_count`, `duration_days`
   — use it (not raw `medication_request`) whenever the user asks about
   "how long was patient X on drug Y" or "who is currently on Z".
+- Rendered as `CREATE VIEW` with columns marked `-- view` are lazy SQLite
+  projections — always fresh, no rebuild needed. `observation_latest` surfaces
+  the most recent observation per (patient_ref, loinc_code) pair — use it
+  whenever the user asks "what's the patient's current A1c / creatinine /
+  blood pressure" so you don't have to write ORDER BY / LIMIT 1 by hand.
 
 Schemas:
 

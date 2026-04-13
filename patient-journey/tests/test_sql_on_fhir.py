@@ -20,8 +20,10 @@ sys.path.insert(0, str(ROOT))
 
 from derived import (  # type: ignore  # noqa: E402
     build_medication_episodes,
+    build_observation_latest,
     default_derivations,
     medication_episode_derivation,
+    observation_latest_derivation,
 )
 from enrich import (  # type: ignore  # noqa: E402
     default_enrichments,
@@ -751,3 +753,370 @@ class TestMedicationEpisodeDerivation:
         assert "medication_request" in derivation.depends_on
         assert callable(derivation.build)
         assert len(derivation.columns) == 12
+
+
+# ---------------------------------------------------------------------------
+# Filtered subset view — condition_active (P1.3)
+# ---------------------------------------------------------------------------
+
+
+def _condition_resource(
+    res_id: str,
+    *,
+    clinical_status: str | None = "active",
+    display: str = "Test condition",
+    snomed_code: str = "44054006",
+    patient_ref: str = "urn:uuid:pt-x",
+) -> dict:
+    resource: dict = {
+        "resourceType": "Condition",
+        "id": res_id,
+        "subject": {"reference": patient_ref},
+        "code": {
+            "text": display,
+            "coding": [
+                {
+                    "system": "http://snomed.info/sct",
+                    "code": snomed_code,
+                    "display": display,
+                }
+            ],
+        },
+    }
+    if clinical_status is not None:
+        resource["clinicalStatus"] = {
+            "coding": [
+                {
+                    "system": (
+                        "http://terminology.hl7.org/CodeSystem/condition-clinical"
+                    ),
+                    "code": clinical_status,
+                }
+            ]
+        }
+    return resource
+
+
+class TestConditionActiveView:
+    def test_active_condition_passes_filter(self):
+        view = ViewDefinition.from_json_file(
+            ROOT / "views" / "condition_active.json"
+        )
+        resources = [_condition_resource("c1", clinical_status="active")]
+        rows = list(run_view(view, resources))
+        assert len(rows) == 1
+        assert rows[0]["clinical_status"] == "active"
+
+    def test_resolved_condition_excluded(self):
+        view = ViewDefinition.from_json_file(
+            ROOT / "views" / "condition_active.json"
+        )
+        resources = [_condition_resource("c1", clinical_status="resolved")]
+        rows = list(run_view(view, resources))
+        assert rows == []
+
+    def test_recurrence_and_relapse_pass_filter(self):
+        view = ViewDefinition.from_json_file(
+            ROOT / "views" / "condition_active.json"
+        )
+        resources = [
+            _condition_resource("c1", clinical_status="recurrence"),
+            _condition_resource("c2", clinical_status="relapse"),
+        ]
+        rows = list(run_view(view, resources))
+        assert len(rows) == 2
+        statuses = sorted(r["clinical_status"] for r in rows)
+        assert statuses == ["recurrence", "relapse"]
+
+    def test_missing_clinical_status_excluded(self):
+        # Defensive: a Condition without clinicalStatus falls out of the
+        # active subset rather than leaking into the problem list.
+        view = ViewDefinition.from_json_file(
+            ROOT / "views" / "condition_active.json"
+        )
+        resources = [_condition_resource("c1", clinical_status=None)]
+        rows = list(run_view(view, resources))
+        assert rows == []
+
+    def test_subset_is_subset_of_condition(self):
+        # Materialize both condition and condition_active against the same
+        # mixed input and verify the filtered table is a strict subset of
+        # the full table — same id space, fewer or equal rows.
+        base_view = ViewDefinition.from_json_file(ROOT / "views" / "condition.json")
+        active_view = ViewDefinition.from_json_file(
+            ROOT / "views" / "condition_active.json"
+        )
+        resources = [
+            _condition_resource("c1", clinical_status="active"),
+            _condition_resource("c2", clinical_status="resolved"),
+            _condition_resource("c3", clinical_status="recurrence"),
+            _condition_resource("c4", clinical_status="inactive"),
+            _condition_resource("c5", clinical_status="relapse"),
+            _condition_resource("c6", clinical_status=None),
+        ]
+        conn = sqlite3.connect(":memory:")
+        counts = materialize_all([base_view, active_view], resources, conn)
+        assert counts["condition"] == 6
+        assert counts["condition_active"] == 3
+
+        base_ids = {
+            r[0]
+            for r in conn.execute('SELECT id FROM "condition"').fetchall()
+        }
+        active_ids = {
+            r[0]
+            for r in conn.execute('SELECT id FROM "condition_active"').fetchall()
+        }
+        assert active_ids.issubset(base_ids)
+        assert active_ids == {"c1", "c3", "c5"}
+
+    def test_column_shape_matches_condition_view(self):
+        # The JSON contract: condition_active carries the same columns as
+        # condition so any query that groups or joins on condition can be
+        # pointed at condition_active without a rewrite.
+        base = ViewDefinition.from_json_file(ROOT / "views" / "condition.json")
+        active = ViewDefinition.from_json_file(
+            ROOT / "views" / "condition_active.json"
+        )
+        base_cols = [c.name for c in base.all_columns()]
+        active_cols = [c.name for c in active.all_columns()]
+        assert base_cols == active_cols
+
+
+# ---------------------------------------------------------------------------
+# observation_latest (SQLite VIEW) — P1.4
+# ---------------------------------------------------------------------------
+
+
+def _obs_resource(
+    res_id: str,
+    *,
+    loinc_code: str,
+    value: float,
+    effective_date: str,
+    patient_ref: str = "urn:uuid:pt-x",
+    display: str | None = None,
+) -> dict:
+    return {
+        "resourceType": "Observation",
+        "id": res_id,
+        "status": "final",
+        "subject": {"reference": patient_ref},
+        "effectiveDateTime": effective_date,
+        "code": {
+            "text": display or loinc_code,
+            "coding": [
+                {
+                    "system": "http://loinc.org",
+                    "code": loinc_code,
+                    "display": display or loinc_code,
+                }
+            ],
+        },
+        "valueQuantity": {"value": value, "unit": "x"},
+    }
+
+
+def _observation_view() -> ViewDefinition:
+    return ViewDefinition.from_json_file(ROOT / "views" / "observation.json")
+
+
+class TestObservationLatestView:
+    def test_default_registry_has_observation_latest(self):
+        reg = default_derivations()
+        assert "observation_latest" in reg
+        derivation = reg["observation_latest"]
+        assert derivation.depends_on == ["observation"]
+        assert derivation.kind == "view"
+
+    def test_most_recent_row_per_loinc_wins(self):
+        view = _observation_view()
+        resources = [
+            _obs_resource(
+                "o1", loinc_code="4548-4", value=5.5, effective_date="2020-01-01"
+            ),
+            _obs_resource(
+                "o2", loinc_code="4548-4", value=6.8, effective_date="2022-06-01"
+            ),
+            _obs_resource(
+                "o3", loinc_code="4548-4", value=7.1, effective_date="2024-03-15"
+            ),
+        ]
+        conn = sqlite3.connect(":memory:")
+        counts = materialize_all([view], resources, conn)
+        assert counts["observation"] == 3
+        assert counts["observation_latest"] == 1
+        row = conn.execute(
+            "SELECT value_quantity, effective_date FROM observation_latest"
+        ).fetchone()
+        assert row[0] == 7.1
+        assert row[1] == "2024-03-15"
+
+    def test_one_row_per_patient_loinc_pair(self):
+        view = _observation_view()
+        resources = [
+            _obs_resource("a1", loinc_code="4548-4", value=6.0,
+                          effective_date="2023-01-01", patient_ref="urn:uuid:p1"),
+            _obs_resource("a2", loinc_code="4548-4", value=7.0,
+                          effective_date="2024-01-01", patient_ref="urn:uuid:p1"),
+            _obs_resource("b1", loinc_code="4548-4", value=5.5,
+                          effective_date="2023-06-01", patient_ref="urn:uuid:p2"),
+            _obs_resource("c1", loinc_code="2160-0", value=0.9,
+                          effective_date="2024-02-01", patient_ref="urn:uuid:p1"),
+        ]
+        conn = sqlite3.connect(":memory:")
+        materialize_all([view], resources, conn)
+        rows = conn.execute(
+            "SELECT patient_ref, loinc_code, value_quantity "
+            "FROM observation_latest "
+            "ORDER BY patient_ref, loinc_code"
+        ).fetchall()
+        # Three groups: (p1, 4548-4), (p1, 2160-0), (p2, 4548-4)
+        assert len(rows) == 3
+        # p1's A1c is the 2024 reading, not 2023
+        assert ("urn:uuid:p1", "4548-4", 7.0) in rows
+        assert ("urn:uuid:p1", "2160-0", 0.9) in rows
+        assert ("urn:uuid:p2", "4548-4", 5.5) in rows
+
+    def test_row_count_le_observation(self):
+        view = _observation_view()
+        resources = [
+            _obs_resource(
+                f"o{i}", loinc_code="4548-4", value=float(i),
+                effective_date=f"202{i}-01-01",
+            )
+            for i in range(5)
+        ]
+        conn = sqlite3.connect(":memory:")
+        counts = materialize_all([view], resources, conn)
+        # All five observations share the same (patient, loinc) pair,
+        # so observation_latest should collapse to 1.
+        obs_count = conn.execute(
+            "SELECT COUNT(*) FROM observation"
+        ).fetchone()[0]
+        latest_count = conn.execute(
+            "SELECT COUNT(*) FROM observation_latest"
+        ).fetchone()[0]
+        assert latest_count <= obs_count
+        assert latest_count == 1
+        assert counts["observation_latest"] == latest_count
+
+    def test_tiebreaker_prefers_higher_id(self):
+        view = _observation_view()
+        # Two rows with identical effective_date — the higher id must win.
+        resources = [
+            _obs_resource("aaa", loinc_code="4548-4", value=5.0,
+                          effective_date="2024-01-01"),
+            _obs_resource("zzz", loinc_code="4548-4", value=9.9,
+                          effective_date="2024-01-01"),
+        ]
+        conn = sqlite3.connect(":memory:")
+        materialize_all([view], resources, conn)
+        row = conn.execute(
+            "SELECT id, value_quantity FROM observation_latest"
+        ).fetchone()
+        assert row[0] == "zzz"
+        assert row[1] == 9.9
+
+    def test_observation_latest_is_live_sqlite_view(self):
+        # The view must reflect mutations to the underlying table
+        # without a rebuild. This is what sets it apart from
+        # medication_episode (which is a materialized table).
+        view = _observation_view()
+        resources = [
+            _obs_resource("o1", loinc_code="4548-4", value=5.0,
+                          effective_date="2020-01-01"),
+        ]
+        conn = sqlite3.connect(":memory:")
+        materialize_all([view], resources, conn)
+        row = conn.execute(
+            "SELECT value_quantity FROM observation_latest"
+        ).fetchone()
+        assert row[0] == 5.0
+
+        # Manually insert a newer observation (simulating a subsequent
+        # ingest run) — the view should surface it without us calling
+        # build_observation_latest again.
+        conn.execute(
+            'INSERT INTO "observation" '
+            "(id, patient_ref, loinc_code, effective_date, value_quantity) "
+            "VALUES (?, ?, ?, ?, ?)",
+            ("o2", "urn:uuid:pt-x", "4548-4", "2024-06-01", 9.9),
+        )
+        conn.commit()
+        row = conn.execute(
+            "SELECT id, value_quantity FROM observation_latest"
+        ).fetchone()
+        assert row[0] == "o2"
+        assert row[1] == 9.9
+
+    def test_empty_derivations_opts_out(self):
+        view = _observation_view()
+        resources = [
+            _obs_resource("o1", loinc_code="4548-4", value=5.0,
+                          effective_date="2024-01-01"),
+        ]
+        conn = sqlite3.connect(":memory:")
+        materialize_all([view], resources, conn, derivations={})
+        tables = [
+            r[0]
+            for r in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='view'"
+            ).fetchall()
+        ]
+        assert "observation_latest" not in tables
+
+    def test_view_dropped_and_recreated_is_idempotent(self):
+        view = _observation_view()
+        resources = [
+            _obs_resource("o1", loinc_code="4548-4", value=5.0,
+                          effective_date="2020-01-01"),
+            _obs_resource("o2", loinc_code="4548-4", value=7.0,
+                          effective_date="2022-01-01"),
+        ]
+        conn = sqlite3.connect(":memory:")
+        materialize_all([view], resources, conn)
+        build_observation_latest(conn)
+        build_observation_latest(conn)
+        rows = conn.execute(
+            "SELECT COUNT(*) FROM observation_latest"
+        ).fetchone()
+        assert rows[0] == 1
+
+    def test_null_loinc_excluded(self):
+        view = _observation_view()
+        # Observation with no coding at all — loinc_code will be NULL.
+        bad = {
+            "resourceType": "Observation",
+            "id": "bad",
+            "status": "final",
+            "subject": {"reference": "urn:uuid:pt-x"},
+            "effectiveDateTime": "2024-01-01",
+            "code": {"text": "no coding"},
+            "valueQuantity": {"value": 1.0, "unit": "x"},
+        }
+        good = _obs_resource(
+            "good", loinc_code="4548-4", value=5.5, effective_date="2024-01-01"
+        )
+        conn = sqlite3.connect(":memory:")
+        materialize_all([view], [bad, good], conn)
+        rows = conn.execute(
+            "SELECT id FROM observation_latest"
+        ).fetchall()
+        assert [r[0] for r in rows] == ["good"]
+
+    def test_observation_latest_derivation_helper(self):
+        derivation = observation_latest_derivation()
+        assert derivation.table_name == "observation_latest"
+        assert derivation.kind == "view"
+        assert "observation" in derivation.depends_on
+        assert callable(derivation.build)
+        col_names = [c.name for c in derivation.columns]
+        for expected in (
+            "id",
+            "patient_ref",
+            "loinc_code",
+            "effective_date",
+            "value_quantity",
+        ):
+            assert expected in col_names

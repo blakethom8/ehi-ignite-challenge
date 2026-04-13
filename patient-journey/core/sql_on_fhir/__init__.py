@@ -33,8 +33,10 @@ from .enrich import (
 from .derived import (
     Derivation,
     build_medication_episodes,
+    build_observation_latest,
     default_derivations,
     medication_episode_derivation,
+    observation_latest_derivation,
 )
 
 __all__ = [
@@ -52,6 +54,8 @@ __all__ = [
     "medication_request_enrichment",
     "Derivation",
     "build_medication_episodes",
+    "build_observation_latest",
     "default_derivations",
     "medication_episode_derivation",
+    "observation_latest_derivation",
 ]

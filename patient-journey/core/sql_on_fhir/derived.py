@@ -1,27 +1,34 @@
-"""Derived tables for the SQL-on-FHIR warehouse.
+"""Derived artifacts for the SQL-on-FHIR warehouse.
 
 A ``Derivation`` is a post-materialization pass that reads from one or
-more already-populated view tables and writes a brand-new table whose
-rows are *computed* rather than projected. The ViewDefinition runtime
-is intentionally standards-pure — FHIRPath-lite cannot express "group
-consecutive MedicationRequests for the same drug into a continuous
-treatment episode" — so derivations are the escape hatch for clinical
-logic that the warehouse still needs to expose to SQL consumers.
+more already-populated view tables and emits a brand-new artifact —
+either a *materialized table* (fast reads, explicit storage) or a
+*SQLite view* (lazy, always fresh, zero storage). The ViewDefinition
+runtime is intentionally standards-pure — FHIRPath-lite cannot
+express "group consecutive MedicationRequests for the same drug into
+a continuous treatment episode" — so derivations are the escape
+hatch for clinical logic that the warehouse still needs to expose to
+SQL consumers.
 
-Today we ship exactly one derivation:
+Today we ship two derivations:
 
-- ``medication_episode`` — built from ``medication_request`` by grouping
-  rows per ``(patient_ref, normalized display)`` pair and collapsing
-  each group into a single episode with start/end dates, latest
-  status, and a ``drug_class`` carried forward from the enrichment
-  pass so cohort queries like "patients with an active anticoagulant
+- ``medication_episode`` — a **materialized table** built from
+  ``medication_request`` by grouping rows per
+  ``(patient_ref, normalized display)`` pair and collapsing each
+  group into a single episode with start/end dates, latest status,
+  and a ``drug_class`` carried forward from the enrichment pass so
+  cohort queries like "patients with an active anticoagulant
   episode" stay a one-line ``GROUP BY``.
+- ``observation_latest`` — a **SQLite VIEW** that surfaces the most
+  recent ``observation`` row per ``(patient_ref, loinc_code)`` pair.
+  Lazy (computed at query time), so it's always in sync with
+  ``observation`` without needing a rebuild.
 
 The registry mirrors the ``enrich`` module's sentinel pattern:
 ``None`` in the sink means "apply the default derivations", ``{}``
-means "pure ViewDefinition build, no derived tables". Keeping the
-default on means every warehouse — dev, prod, pitch snapshot — carries
-the same clinically-smart surface.
+means "pure ViewDefinition build, no derived artifacts". Keeping the
+default on means every warehouse — dev, prod, pitch snapshot —
+carries the same clinically-smart surface.
 """
 
 from __future__ import annotations
@@ -47,10 +54,14 @@ DerivationBuilder = Callable[[sqlite3.Connection], int]
 
 @dataclass
 class Derivation:
-    """A single derived table.
+    """A single derived artifact — either a table or a SQLite view.
 
     Attributes:
-        table_name: the SQLite table this derivation will create.
+        table_name: the SQLite object this derivation will create.
+            Kept named ``table_name`` for historical reasons even
+            though the underlying artifact may be a ``CREATE VIEW``;
+            from the agent's point of view they're both selectable
+            by name.
         depends_on: the source table names that must already exist
             before ``build`` is called. The sink uses this list to
             short-circuit derivations whose dependencies were opted
@@ -58,11 +69,16 @@ class Derivation:
             will skip ``medication_episode`` because
             ``medication_request`` isn't there.
         build: a callable that takes an open SQLite connection,
-            (re)creates the target table, and returns the row count.
+            (re)creates the target artifact, and returns the row
+            count. For materialized tables this is the INSERT count;
+            for SQLite views it's ``SELECT COUNT(*) FROM <view>``.
         columns: the schema, as a list of ``Column`` entries. Used by
             the LLM tool surface (``api/core/sof_tools``) to render
-            this table in the agent's system prompt. Must match the
-            DDL emitted by ``build``.
+            this artifact in the agent's system prompt. Must match
+            the DDL emitted by ``build``.
+        kind: ``"table"`` or ``"view"``. Informational — surfaced to
+            the LLM prompt so the agent can tell whether it's
+            querying a materialized snapshot or a live projection.
         description: human-readable description surfaced in the
             prompt alongside ``table_name``.
     """
@@ -71,6 +87,7 @@ class Derivation:
     depends_on: list[str]
     build: DerivationBuilder
     columns: list[Column] = field(default_factory=list)
+    kind: str = "table"
     description: str = ""
 
 
@@ -304,6 +321,107 @@ def medication_episode_derivation() -> Derivation:
 
 
 # ---------------------------------------------------------------------------
+# observation_latest (SQLite VIEW)
+# ---------------------------------------------------------------------------
+
+
+_OBSERVATION_COLUMNS: list[tuple[str, str]] = [
+    ("id", "TEXT"),
+    ("patient_ref", "TEXT"),
+    ("encounter_ref", "TEXT"),
+    ("status", "TEXT"),
+    ("category", "TEXT"),
+    ("loinc_code", "TEXT"),
+    ("display", "TEXT"),
+    ("effective_date", "TEXT"),
+    ("value_quantity", "REAL"),
+    ("value_unit", "TEXT"),
+    ("value_string", "TEXT"),
+]
+
+
+_OBSERVATION_LATEST_DDL = """
+CREATE VIEW "observation_latest" AS
+SELECT
+    id, patient_ref, encounter_ref, status, category,
+    loinc_code, display, effective_date,
+    value_quantity, value_unit, value_string
+FROM (
+    SELECT
+        id, patient_ref, encounter_ref, status, category,
+        loinc_code, display, effective_date,
+        value_quantity, value_unit, value_string,
+        ROW_NUMBER() OVER (
+            PARTITION BY patient_ref, loinc_code
+            ORDER BY effective_date DESC, id DESC
+        ) AS _rn
+    FROM "observation"
+    WHERE patient_ref IS NOT NULL AND loinc_code IS NOT NULL
+) ranked
+WHERE _rn = 1
+"""
+
+
+def build_observation_latest(conn: sqlite3.Connection) -> int:
+    """Create the ``observation_latest`` SQLite VIEW.
+
+    Lazy artifact: the view is (re)defined once at materialization
+    time but every ``SELECT`` recomputes against the current
+    ``observation`` table, so the "latest" row per
+    ``(patient_ref, loinc_code)`` stays fresh without a rebuild.
+
+    Tiebreaker when two rows share an ``effective_date``: the higher
+    ``id`` wins (lexicographic). This is deterministic but arbitrary
+    — callers who need strict "last written" semantics should fall
+    back to ``observation`` and order by their own column.
+
+    Returns the live row count so the materialization report can
+    surface it next to the other counts.
+    """
+    conn.execute('DROP VIEW IF EXISTS "observation_latest"')
+    conn.execute(_OBSERVATION_LATEST_DDL)
+    conn.commit()
+    row = conn.execute(
+        'SELECT COUNT(*) FROM "observation_latest"'
+    ).fetchone()
+    return int(row[0]) if row else 0
+
+
+def _observation_latest_columns() -> list[Column]:
+    """Column schema for ``observation_latest``. Must match the
+    projection list inside ``_OBSERVATION_LATEST_DDL``.
+    """
+    type_map = {
+        "TEXT": "string",
+        "REAL": "decimal",
+        "INTEGER": "integer",
+    }
+    return [
+        Column(
+            name=name,
+            path="<derived>",
+            type=type_map.get(sql_type, "string"),
+        )
+        for name, sql_type in _OBSERVATION_COLUMNS
+    ]
+
+
+def observation_latest_derivation() -> Derivation:
+    """The default ``observation_latest`` derivation entry (SQLite VIEW)."""
+    return Derivation(
+        table_name="observation_latest",
+        depends_on=["observation"],
+        build=build_observation_latest,
+        columns=_observation_latest_columns(),
+        kind="view",
+        description=(
+            "SQLite VIEW — most recent observation per (patient_ref, loinc_code). "
+            "Lazy projection over observation, so it's always in sync."
+        ),
+    )
+
+
+# ---------------------------------------------------------------------------
 # Registry
 # ---------------------------------------------------------------------------
 
@@ -316,4 +434,5 @@ def default_derivations() -> dict[str, Derivation]:
     """
     return {
         "medication_episode": medication_episode_derivation(),
+        "observation_latest": observation_latest_derivation(),
     }

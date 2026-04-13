@@ -5,9 +5,9 @@ SOF runtime materializes into `data/sof.db` (production) and
 `research/ehi-ignite.db` (pitch snapshot). It's the source of truth
 for the warehouse's table shape.
 
-There are **three** kinds of tables in the warehouse. Knowing which
-kind you're looking at explains why a column exists — and where to go
-to change it.
+There are **four** kinds of query targets in the warehouse. Knowing
+which kind you're looking at explains why a column exists — and
+where to go to change it.
 
 ---
 
@@ -21,13 +21,19 @@ FHIR resource. A separate SQL-on-FHIR runtime (DuckDB, Pathling, the
 reference implementation) could consume these same JSON files and
 produce the same columns.
 
-| Table                | Source file              | Resource         |
-|----------------------|--------------------------|------------------|
-| `patient`            | `patient.json`           | Patient          |
-| `condition`          | `condition.json`         | Condition        |
-| `medication_request` | `medication_request.json`| MedicationRequest|
-| `observation`        | `observation.json`       | Observation      |
-| `encounter`          | `encounter.json`         | Encounter        |
+| Table                | Source file                | Resource         |
+|----------------------|----------------------------|------------------|
+| `patient`            | `patient.json`             | Patient          |
+| `condition`          | `condition.json`           | Condition        |
+| `condition_active`   | `condition_active.json`    | Condition ‡      |
+| `medication_request` | `medication_request.json`  | MedicationRequest|
+| `observation`        | `observation.json`         | Observation      |
+| `encounter`          | `encounter.json`           | Encounter        |
+
+‡ `condition_active` is a **filtered subset view** — same column
+shape as `condition`, but a view-level `where` clause filters out
+everything whose `clinicalStatus` isn't `active`, `recurrence`, or
+`relapse`. Use it as a problem list; `condition` is the full history.
 
 **To change a column:** edit the JSON, bump the snapshot, done. No
 Python changes needed.
@@ -94,9 +100,19 @@ weren't part of the current run are silently skipped.
 **Default-on.** Every warehouse carries the derived tables by
 default. Pass `derivations={}` to `materialize_all` to skip them.
 
-| Derived table        | Depends on           | Module                |
-|----------------------|----------------------|-----------------------|
-| `medication_episode` | `medication_request` | `derived.py` (P1.2)   |
+| Derived artifact     | Kind  | Depends on           | Module                |
+|----------------------|-------|----------------------|-----------------------|
+| `medication_episode` | table | `medication_request` | `derived.py` (P1.2)   |
+| `observation_latest` | view  | `observation`        | `derived.py` (P1.4)   |
+
+`kind="table"` means the derivation writes a real `CREATE TABLE` +
+INSERT — it's materialized, consumes storage, and has to be rebuilt
+when the source changes. `kind="view"` means the derivation issues
+`CREATE VIEW` and the rows are computed lazily on every `SELECT`.
+Views are the right choice when the derivation is cheap to express
+in SQL and staleness would be a bug; tables are the right choice
+when the derivation involves Python logic or would be expensive to
+re-run per query.
 
 ### `medication_episode` schema
 
@@ -120,10 +136,28 @@ lower-cased, stripped display name. Active-status logic is shared with
 the safety panel so the warehouse and the clinician UI never disagree
 about "is this patient still on X".
 
-**To add a derived table:** add an entry to
-`derived.default_derivations()`. The sink picks it up automatically
-on the next rebuild. Document the schema here and flag it in the
-build log.
+### `observation_latest` schema (VIEW, P1.4)
+
+Identical column shape to `observation` — the SQL is a
+`ROW_NUMBER() OVER (PARTITION BY patient_ref, loinc_code ORDER BY
+effective_date DESC, id DESC)` projection that keeps only the
+top-ranked row per group. Tiebreaker when two rows share an
+`effective_date`: the higher `id` wins.
+
+Use it when the user asks "what is the patient's current A1c /
+creatinine / blood pressure" — `SELECT value_quantity FROM
+observation_latest WHERE patient_ref = '…' AND loinc_code = '…'`
+returns exactly one row. The underlying `observation` table is
+still there if you need the full time series.
+
+Because it's a SQLite `CREATE VIEW` (not a materialized table),
+`observation_latest` is always fresh: a subsequent INSERT into
+`observation` is visible on the next `SELECT` without any rebuild.
+
+**To add a derived artifact:** add an entry to
+`derived.default_derivations()` with `kind="table"` or
+`kind="view"`. The sink picks it up automatically on the next
+rebuild. Document the schema here and flag it in the build log.
 
 ---
 

@@ -39,10 +39,9 @@ Tasks are dispatched **in phase order**. Do not pull Phase 1 work while any Phas
   - Files: `patient-journey/core/sql_on_fhir/sqlite_sink.py` (edit), `patient-journey/core/sql_on_fhir/enrich.py` (new), `patient-journey/core/sql_on_fhir/__init__.py` (edit), `patient-journey/tests/test_sql_on_fhir.py` (extend, +15 tests), `api/core/sof_tools.py` (edit — schema renderer + preamble), `research/ehi-ignite.db` (rebuilt), `research/README.md` / `research/SQL-ON-FHIR-REVIEW.md` / `CLAUDE.md` (doc updates)
   - Read first: `patient-journey/core/drug_classifier.py`, `patient-journey/core/sql_on_fhir/sqlite_sink.py`
   - Smoke test: `python3 -m pytest patient-journey/tests/test_sql_on_fhir.py -q` + `SELECT drug_class, COUNT(*) FROM medication_request GROUP BY drug_class` returns non-empty groups ✅
-- [ ] **P1.2** — Derived `medication_episode` table via `episode_detector`
-  - Files: `patient-journey/core/sql_on_fhir/sqlite_sink.py` (edit), `patient-journey/core/sql_on_fhir/views/README.md` (new — documents pure vs derived views)
-  - Read first: `patient-journey/core/episode_detector.py`
-  - Smoke test: `SELECT * FROM medication_episode LIMIT 5` returns rows
+- [x] **P1.2** — Derived `medication_episode` table via `episode_detector` *(done `4b2de2f`, 2026-04-13)*
+  - Files: `patient-journey/core/sql_on_fhir/derived.py` (new — Derivation registry), `patient-journey/core/sql_on_fhir/sqlite_sink.py` (edit — derivation pass + sentinel resolver), `patient-journey/core/sql_on_fhir/__init__.py` (edit), `patient-journey/core/sql_on_fhir/views/README.md` (new — documents pure vs enriched vs derived), `api/core/sof_tools.py` (edit — render derived tables in prompt), `patient-journey/tests/test_sql_on_fhir.py` (+11 tests), `research/ehi-ignite.db` (rebuilt)
+  - Smoke test: `SELECT * FROM medication_episode LIMIT 5` returns rows ✅ (820 episodes in pitch snapshot: 512 completed + 308 active)
 - [ ] **P1.3** — `views/condition_active.json` filtered subset view
   - Files: new JSON, test
   - Smoke test: pytest asserts row count ≤ `condition`
@@ -78,8 +77,9 @@ _(none)_
 - **P0.3** — 200-patient pitch snapshot committed at `research/ehi-ignite.db` (`472994d`, 2026-04-13)
 - **P0.4** — `run_sql` tool surface documented in `SQL-ON-FHIR-REVIEW.md` addendum + `CLAUDE.md` (2026-04-13)
 - **P1.1** — `drug_class` enrichment on `medication_request`: enrich.py module, default-on registry, sof_tools schema aware, 15 new tests, pitch snapshot rebuilt (2026-04-13)
+- **P1.2** — Derived `medication_episode` table: derived.py registry, sink derivation pass with sentinel resolver, views/README.md (pure/enriched/derived layers), sof_tools renders derived tables in the LLM prompt, 11 new tests, pitch snapshot rebuilt with 820 episodes (`4b2de2f`, 2026-04-13)
 
-> **Phase 0 closed.** P1.1 shipped on the same day. Next up: P1.2 (`medication_episode`) or a parallelizable Phase 1 task.
+> **Phase 1 half-shipped.** P1.1 + P1.2 done. Next up: P1.3 (`condition_active` filtered view) and P1.4 (`observation_latest` SQLite VIEW) — these two are parallelizable.
 
 ---
 

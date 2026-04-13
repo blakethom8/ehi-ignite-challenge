@@ -104,7 +104,9 @@ ehi-ignite-challenge/
 │   ├── app.py
 │   ├── core/                              ← drug_classifier, episode_detector (migrate to api/core/)
 │   │   └── sql_on_fhir/                   ← SQL-on-FHIR v2 engine: ViewDefinition → SQLite ⭐
-│   │       └── views/                     ← 5 ViewDefinitions: patient, condition, medication, observation, encounter
+│   │       ├── enrich.py                  ← extra columns spliced onto view rows at ingest (drug_class)
+│   │       ├── derived.py                 ← derived tables built after views flush (medication_episode)
+│   │       └── views/                     ← 5 ViewDefinitions + README of the three warehouse layers
 │   ├── views/                             ← reference implementations for React ports
 │   ├── CONTEXT-ENGINEERING.md             ← READ THIS — LLM context pipeline design ⭐
 │   └── DATA-DEFINITIONS.md               ← READ THIS — data model reference ⭐
@@ -220,18 +222,24 @@ stats = compute_patient_stats(record)
 | `docs/architecture/tracing.md` | LLM observability — traces, spans, token/cost tracking, Langfuse |
 | `research/SQL-ON-FHIR-REVIEW.md` | SOF prototype "was it worth it" review **+ `run_sql` tool-surface addendum** (Phase 0) |
 | `research/README.md` | Pitch snapshot layout + regen command for `research/ehi-ignite.db` |
+| `patient-journey/core/sql_on_fhir/views/README.md` | Pure vs enriched vs derived — the three warehouse layers and how to extend each |
 | `design/DESIGN.md` | Miro-inspired design tokens + component guide |
 
 ### SQL-on-FHIR quick reference
 
 - **Engine:** `patient-journey/core/sql_on_fhir/` — ViewDefinition → SQLite (stable, reused everywhere)
-- **Enrichment registry:** `patient-journey/core/sql_on_fhir/enrich.py` — derived columns spliced in at ingest time
-- **LLM tool:** `api/core/sof_tools.run_sql(query, limit)` — SELECT-only gate, 500-row cap, read-only connection
+- **Three-layer warehouse** (see `patient-journey/core/sql_on_fhir/views/README.md`):
+  1. **Pure ViewDefinition tables** — JSON under `views/`. Standards-compliant projection.
+  2. **Enriched columns** — `enrich.py`. Extra columns spliced onto view rows at ingest time (e.g. `medication_request.drug_class`).
+  3. **Derived tables** — `derived.py`. Whole new tables built by aggregating across view rows after the views are materialized (e.g. `medication_episode`).
+- **LLM tool:** `api/core/sof_tools.run_sql(query, limit)` — SELECT-only gate, 500-row cap, read-only connection. Automatically renders enrichments and derivations into the agent's system prompt so the schema is always in sync with the warehouse.
 - **Warehouse:** `data/sof.db` (gitignored, materialized on FastAPI startup via `api/core/sof_materialize.py`)
-- **Pitch snapshot:** `research/ehi-ignite.db` (committed, 200 patients, 11 MB, reviewer-facing)
-- **Views shipped today:** `patient`, `condition`, `medication_request` (+ `drug_class` enrichment), `observation`, `encounter`
+- **Pitch snapshot:** `research/ehi-ignite.db` (committed, 200 patients, ~12 MB, reviewer-facing)
+- **Views shipped today:** `patient`, `condition`, `medication_request` (+ `drug_class` enrichment), `observation`, `encounter`, plus the derived `medication_episode` table
 - **Drug-class cohort query** (canonical Phase 1 example):
   `SELECT drug_class, COUNT(*) FROM medication_request GROUP BY drug_class ORDER BY 2 DESC`
+- **Active-treatment cohort query** (P1.2 example — use `medication_episode`, not raw `medication_request`):
+  `SELECT drug_class, COUNT(*) FROM medication_episode WHERE is_active=1 GROUP BY drug_class`
 
 ---
 

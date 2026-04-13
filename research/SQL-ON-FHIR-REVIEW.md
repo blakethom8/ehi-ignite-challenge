@@ -528,13 +528,80 @@ Every shipped class has at least one row in the pitch snapshot, which
 means every risk-group cohort query the agent could write against
 the submission DB will return a non-empty result.
 
+### Derived tables *(Phase 1, April 13, 2026)*
+
+Enrichments add *columns* to existing views. Derivations add whole
+new *tables* — built by reading from the just-materialized view
+tables and aggregating rows. The two hooks live side by side in the
+sink: every view flushes first, then `sqlite_sink.materialize_all`
+walks the derivation registry in `patient-journey/core/sql_on_fhir/derived.py`
+and calls each `Derivation.build(conn)` in turn. Derivations whose
+declared `depends_on` sources aren't part of the current run are
+silently skipped, so partial builds don't explode.
+
+Like enrichments, derivations are default-on: pass `derivations={}`
+to `materialize_all` for a pure ViewDefinition build. The schema
+renderer in `sof_tools.get_schemas_for_prompt` walks the derivation
+registry too, so derived tables show up in the agent's system prompt
+with every column tagged `-- derived`, and the preamble tells the
+agent to reach for them when the user asks about treatment duration
+or active prescriptions.
+
+**`medication_episode`** *(one row per `(patient, drug)` continuous
+treatment episode)*. Built from `medication_request` by grouping on
+`(patient_ref, normalized display)` — same lower-cased, stripped key
+that `core/episode_detector.detect_medication_episodes` uses, so the
+SQL warehouse and the clinician-facing safety panel cannot disagree
+about which prescriptions belong to which episode. Each group
+collapses into a single row carrying:
+
+| Column             | Type    | Notes                                                   |
+|--------------------|---------|---------------------------------------------------------|
+| `episode_id`       | TEXT PK | `{patient_ref}::{normalized_display}`                   |
+| `patient_ref`      | TEXT    | Matches `medication_request.patient_ref`                |
+| `display`          | TEXT    | Earliest-seen `medication_text` / `rxnorm_display`      |
+| `rxnorm_code`      | TEXT    | First non-null RxNorm code in the episode               |
+| `drug_class`       | TEXT    | Carried forward from the enrichment pass                |
+| `latest_status`    | TEXT    | Status of the most recent request                       |
+| `is_active`        | INTEGER | `1` if `latest_status` in (`active`, `on-hold`)         |
+| `start_date`       | TEXT    | Min `authored_on` in the group                          |
+| `end_date`         | TEXT    | Max `authored_on`, `NULL` when the episode is active    |
+| `request_count`    | INTEGER | How many `medication_request` rows rolled up            |
+| `duration_days`    | REAL    | `(end - start)` in days, `NULL` when active             |
+| `first_request_id` | TEXT    | `id` of the earliest `medication_request` in the group  |
+
+**Pitch-snapshot rollup** (`research/ehi-ignite.db`, 200 patients,
+1,948 medication requests → 820 episodes):
+
+| `drug_class`           | Active | Completed |
+|------------------------|-------:|----------:|
+| `NULL`                 |    252 |       392 |
+| `nsaids`               |     11 |        72 |
+| `opioids`              |      1 |        25 |
+| `diabetes_medications` |     16 |         0 |
+| `arbs`                 |     13 |         0 |
+| `antiplatelets`        |      3 |         9 |
+| `immunosuppressants`   |      5 |         6 |
+| `anticoagulants`       |      4 |         0 |
+| `ace_inhibitors`       |      0 |         4 |
+| `anticonvulsants`      |      1 |         3 |
+| `stimulants`           |      1 |         1 |
+| `psych_medications`    |      1 |         0 |
+| **total**              |**308** |   **512** |
+
+Four active anticoagulant episodes across 200 patients. That's a
+real, queryable, surgery-relevant cohort the demo can point at
+during the pitch. A one-line query now answers "who is currently on
+an anticoagulant?" — a question that cost 40+ lines of Python
+before the SOF layer existed.
+
 ### Reference tests
 
-| File                                | What it covers                                                                 |
-|-------------------------------------|--------------------------------------------------------------------------------|
-| `api/tests/test_sof_tools.py`       | 22 tests — gate, LIMIT+1 probe, truncation, schema rendering, runner.          |
-| `api/tests/test_sof_materialize.py` | 8 tests — mtime gate, atomic swap, env-driven path, error-swallowing.          |
-| `patient-journey/tests/test_sql_on_fhir.py` | 39 tests — FHIRPath, runner, sqlite sink, **+ 15 enrichment tests (P1.1)**. |
+| File                                | What it covers                                                                                                  |
+|-------------------------------------|-----------------------------------------------------------------------------------------------------------------|
+| `api/tests/test_sof_tools.py`       | 22 tests — gate, LIMIT+1 probe, truncation, schema rendering (incl. derived tables), runner.                    |
+| `api/tests/test_sof_materialize.py` | 8 tests — mtime gate, atomic swap, env-driven path, error-swallowing.                                           |
+| `patient-journey/tests/test_sql_on_fhir.py` | 50 tests — FHIRPath, runner, sqlite sink, **+ 15 enrichment tests (P1.1)**, **+ 11 derivation tests (P1.2)**. |
 
 Every test is hermetic: no test touches the real `data/sof.db` or the
 committed `research/ehi-ignite.db`.

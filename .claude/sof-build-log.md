@@ -359,6 +359,155 @@ a non-empty result for every surgical-safety category we care about.
 
 ---
 
+### P1.2 — Derived `medication_episode` table
+
+**Shipped:** 2026-04-13
+**Commit:** `4b2de2f`
+**Files:**
+- `patient-journey/core/sql_on_fhir/derived.py` — new (~240 lines). `Derivation` dataclass (table_name, depends_on, build callable, Column schema, description), `build_medication_episodes(conn)` which drops + recreates the target table and iterates `medication_request` rows, `_medication_episode_columns()` (the 12-column schema that must match `_MED_EPISODE_DDL` — asserted in a test), and `default_derivations()` registry.
+- `patient-journey/core/sql_on_fhir/sqlite_sink.py` — edit. `materialize_all` takes a new `derivations` kwarg with `_resolve_derivations` sentinel resolver (`None` → default registry, `{}` → opt out). After every view flush, iterate derivations and call `build(conn)`; skip any whose `depends_on` sources aren't in this run (partial builds don't explode). Module docstring updated to describe the enrichment + derivation two-pass design.
+- `patient-journey/core/sql_on_fhir/__init__.py` — re-export `Derivation`, `build_medication_episodes`, `default_derivations`, `medication_episode_derivation`.
+- `patient-journey/core/sql_on_fhir/views/README.md` — new. Documents the three layers of the warehouse (pure ViewDefinition tables, enriched columns, derived tables) with examples, the full `medication_episode` schema, and rebuild commands. This is the file tomorrow's reviewer should read first to understand why `drug_class` lives outside the JSON but `episode_id` lives outside the Python enrichment registry.
+- `api/core/sof_tools.py` — `get_schemas_for_prompt()` now walks `default_derivations()` and appends a `CREATE TABLE` block for every derived table after the pure views, with every column tagged `-- derived`. Comma placement was reordered to go *before* the inline comment so the whole schema still lexes as valid DDL if a human paste-tests it. The tool preamble now tells the agent "use `medication_episode` (not raw `medication_request`) when a user asks about treatment duration or active prescriptions".
+- `patient-journey/tests/test_sql_on_fhir.py` — extended from 39 → 50 tests. New `TestMedicationEpisodeDerivation` class with 11 tests. Also extended `_med_resource` helper to accept `authored_on`, `status`, and `subject_ref` kwargs for date/status/patient variation.
+- `research/ehi-ignite.db` — rebuilt. Now 11.75 MB, still 200 patients, with 820 rows in the new `medication_episode` table.
+
+**What it does:** Adds a *second pass* to the warehouse build. After
+every ViewDefinition has populated its SQL table, the sink iterates
+the derivation registry and calls each `Derivation.build(conn)` in
+turn. Derivations read from the just-materialized tables and write
+new tables whose rows are *computed* — the escape hatch for clinical
+abstractions that FHIRPath-lite has no way to express.
+
+Today we ship exactly one derivation: `medication_episode`. It
+groups every `medication_request` row per
+`(patient_ref, normalized display)` pair (same `display.strip().lower()`
+key that `core/episode_detector.detect_medication_episodes` uses) and
+collapses each group into a single row carrying:
+
+- `episode_id` (PK: `patient_ref::normalized_display`)
+- `patient_ref`, `display`, `rxnorm_code`, `drug_class`
+- `latest_status` + `is_active` (`1` when latest status is `active`
+  or `on-hold` — same rule the safety panel uses)
+- `start_date` (min `authored_on`), `end_date` (max `authored_on`,
+  `NULL` when the episode is still active)
+- `request_count`, `duration_days`, `first_request_id`
+
+The `drug_class` column is carried forward from the P1.1 enrichment
+pass — so a cohort query like
+`SELECT COUNT(*) FROM medication_episode WHERE drug_class='anticoagulants' AND is_active=1`
+is now a one-liner, which is exactly the surgical-safety question
+Max Gibber asks first.
+
+**Architectural decision — derivations are a separate hook from
+enrichments.** Enrichments splice extra *columns* onto an existing
+view's rows. Derivations build whole new *tables* by aggregating
+across view rows. They're different shapes of work and I gave them
+their own sentinel resolver / registry so they can evolve
+independently. P1.3 (`condition_active` filtered subset) will use
+neither — it's a pure ViewDefinition. P1.4 (`observation_latest`) is
+a SQLite `VIEW` not a table, so it'll be a third hook. The three
+layers are now cleanly separated and documented in
+`views/README.md`.
+
+**Architectural decision — derivations live outside the JSON.**
+Same reasoning as P1.1: the SQL-on-FHIR v2 spec has no `groupBy` or
+post-aggregation clause, so shoehorning episode-collapsing logic into
+`views/medication_request.json` would break standards compliance.
+A future DuckDB/Pathling consumer of our views would still produce a
+clean `medication_request` table; it just wouldn't have the derived
+`medication_episode` alongside it, which is a graceful degradation.
+
+**Architectural decision — dependency-aware skip, not error.** A
+partial build like
+`materialize_all([patient_view], resources, conn)` must not raise
+when `medication_episode` can't find its source table. The sink
+checks `derivation.depends_on` against the `views` list and silently
+skips mismatches. Tested in `test_dependency_missing_skips_derivation`.
+
+**Smoke test A — unit suite:**
+```
+python3 -m pytest patient-journey/tests/test_sql_on_fhir.py \
+  api/tests/test_sof_tools.py api/tests/test_sof_materialize.py -q
+................................................................................  [100%]
+80 passed in 0.14s
+```
+
+**Smoke test B — rebuilt pitch snapshot:**
+```
+rm -f research/ehi-ignite.db
+SOF_DB_PATH=research/ehi-ignite.db SOF_PATIENT_LIMIT=200 \
+  python3 -c "from api.core.sof_materialize import materialize_from_env; print(materialize_from_env())"
+```
+Output:
+```
+MaterializeReport(
+  db_path='research/ehi-ignite.db', built=True,
+  row_counts={
+    'condition': 1410, 'encounter': 6714,
+    'medication_request': 1948, 'observation': 40476,
+    'patient': 200, 'medication_episode': 820,
+  },
+  duration_s=5.04, patient_limit=200, ...)
+```
+
+1,948 medication_request rows collapse into 820 episodes — about a
+2.4× compression, which is what we'd expect from Synthea (one
+MedicationRequest per encounter for ongoing meds).
+
+**Smoke test C — episode demographics against the snapshot:**
+
+| `drug_class`         | `is_active=0` | `is_active=1` |
+|----------------------|--------------:|--------------:|
+| `NULL`               | 392           | 252           |
+| `nsaids`             |  72           |  11           |
+| `opioids`            |  25           |   1           |
+| `diabetes_medications` |   0         |  16           |
+| `arbs`               |   0           |  13           |
+| `antiplatelets`      |   9           |   3           |
+| `immunosuppressants` |   6           |   5           |
+| `ace_inhibitors`     |   4           |   0           |
+| `anticoagulants`     |   0           |   4           |
+| `anticonvulsants`    |   3           |   1           |
+| `stimulants`         |   1           |   1           |
+| `psych_medications`  |   0           |   1           |
+| `**total**`          | **512**       | **308**       |
+
+Four active anticoagulant episodes across 200 patients — that's a
+real, queryable, surgery-relevant cohort for the pitch demo.
+
+**Smoke test D — rendered LLM schema:**
+The `build_tool_description()` output now ends with a
+`medication_episode` CREATE TABLE block where every column is tagged
+`-- derived`, followed by the preamble instruction "use
+`medication_episode` (not raw `medication_request`) whenever the
+user asks about treatment duration or active prescriptions". Verified
+by reading the last 2500 chars of the rendered prompt.
+
+**Follow-ups surfaced:**
+- `duration_days` is `(end - start)` in days and only populated when
+  the episode has a concrete `end_date`. Active episodes have
+  `duration_days = NULL`. If we want "how many days has this patient
+  been on X so far", we'll need a second column (`active_days`)
+  computed against `now()` at query time — flag for P2 if it comes up.
+- The grouping key is case-insensitive on the display string. That
+  still splits "Aspirin 81 MG" from "Aspirin 325 MG" into separate
+  episodes, which is correct for dosage-sensitive safety checks but
+  might over-split cases where the same drug is re-prescribed at a
+  different dose. If we need a "same molecule, any dose" view we'd
+  group on RxNorm ingredient codes — defer until a user case
+  actually requires it.
+- `medication_episode` is rebuilt from scratch every materialization
+  pass (DROP TABLE + INSERT from SELECT). Idempotent and safe but
+  not incremental. Fine for our ≤ 1,200-patient scale; revisit if we
+  ever materialize against the full 50k Synthea corpus.
+- The three warehouse layers (pure / enriched / derived) are now
+  documented in one place (`views/README.md`). Future additions
+  should update that file and link back to the corresponding
+  enrichment or derivation module.
+
+---
+
 ## Phase 2 — NL search demo
 
 _(no entries yet)_

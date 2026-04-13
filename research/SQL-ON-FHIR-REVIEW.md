@@ -379,3 +379,108 @@ differentiated* in a competition crowded with generic LLM-over-FHIR pitches.
 - `patient-journey/tests/test_sql_on_fhir.py` — 24 passing tests
 - `research/sof-bench-50.md`, `research/sof-bench-300.md` — raw benchmark output
 - `data/sof_demo.db` — materialized SQLite from `demo.py`
+- `research/ehi-ignite.db` — 200-patient pitch snapshot (P0.3, 11.43 MB, committed)
+
+---
+
+## Addendum — `run_sql` LLM tool surface *(Phase 0, April 13, 2026)*
+
+Phase 0 closed the gap between "we have a SQL-on-FHIR warehouse" and
+"the LLM can actually use it." The `run_sql` tool is the contract
+between the Claude Agent SDK runtime and the ViewDefinition tables.
+This section is the canonical reference for what that tool does, what
+it refuses to do, and how it's wired into the rest of the stack.
+
+### Module layout
+
+| Module                                                | Role                                                                                           |
+|-------------------------------------------------------|------------------------------------------------------------------------------------------------|
+| `api/core/sof_tools.py`                               | Pure-Python gate + runner + schema renderer. Has no agent-SDK dependencies, fully unit-tested. |
+| `api/core/sof_materialize.py`                         | Idempotent rebuild of `data/sof.db` from the Synthea bundles. Fires on FastAPI startup.        |
+| `api/core/provider_assistant_agent_sdk.py`            | Registers `mcp__fhir_chart__run_sql` with the Claude Agent SDK and traces every call.         |
+| `patient-journey/core/sql_on_fhir/`                   | The ViewDefinition → SQLite ingest engine reused by both of the above.                         |
+
+### Tool signature
+
+```python
+run_sql(query: str, limit: int = 50) -> SqlRunResult
+```
+
+`SqlRunResult` fields:
+
+| Field        | Type                          | Notes                                                                     |
+|--------------|-------------------------------|---------------------------------------------------------------------------|
+| `columns`    | `list[str]`                   | Column names from the cursor.description.                                 |
+| `rows`       | `list[list[Any]]`             | At most `min(limit, 500)` rows.                                           |
+| `row_count`  | `int`                         | Length of `rows`.                                                         |
+| `truncated`  | `bool`                        | True when the warehouse had at least `limit + 1` matching rows.           |
+| `query`      | `str`                         | The query actually executed (may include an injected `LIMIT`).            |
+| `error`      | `str \| None`                 | Populated on gate rejection or SQLite failure. The tool never raises.     |
+
+### Safety gate (what gets rejected)
+
+1. **Empty / whitespace-only queries** → `rejected: empty query`
+2. **Multi-statement** (any semicolon after comment/string stripping)
+   → `rejected: multi-statement queries are not allowed`
+3. **Non-read leading keyword** — only `SELECT` and `WITH` are
+   accepted. `INSERT`, `UPDATE`, `DELETE`, `EXPLAIN`, etc. are rejected
+   with `only SELECT/WITH queries are allowed (got <TOKEN>)`.
+4. **Forbidden keyword anywhere** (whole-word match, after stripping
+   string literals and `--` / `/* */` comments): `drop`, `insert`,
+   `update`, `delete`, `attach`, `detach`, `pragma`, `create`,
+   `alter`, `replace`, `truncate`, `vacuum`, `reindex`, `analyze`.
+   Rejected with `forbidden keyword: <TOKEN>`.
+5. **Database-level read-only guarantee** — the runner opens the DB
+   with `file:<path>?mode=ro` so even a gate bypass can't mutate disk.
+
+Column aliases like `dropped_count` are still legal because the
+tokenizer matches whole words and the stripper removes the noise
+bytes before tokenizing. Literal quoted values containing forbidden
+keywords (e.g. `WHERE status = 'Drop'`) also pass because quoted
+strings are stripped before the forbidden-word scan.
+
+### Row cap + truncation probe
+
+`MAX_ROWS = 500` is the hard ceiling; any caller-supplied `limit` is
+clamped into `[1, 500]`. When the caller's query doesn't already end
+in `LIMIT n [OFFSET m]` the runner wraps it in `LIMIT capped + 1` and
+slices the extra row off the result — that single-row overshoot is
+how we populate the `truncated` flag without a second round-trip. If
+the query already has a trailing `LIMIT`, the runner respects it and
+still caps the in-memory payload at `capped` rows.
+
+### Schemas surfaced to the agent
+
+`get_schemas_for_prompt()` walks every ViewDefinition in
+`patient-journey/core/sql_on_fhir/views/` and emits a compact
+CREATE TABLE block per view, in the same column-type mapping
+`sqlite_sink._sql_type` uses at ingest time. That block is embedded in
+`build_tool_description()` and shipped as the MCP tool description so
+the agent self-serves joins without us ever hand-writing a schema
+prompt. Today this covers `patient`, `condition`, `medication_request`,
+`observation`, and `encounter` — five tables. The Synthea reference
+convention (`urn:uuid:<id>`) is called out in the preamble so the
+agent knows to write `x.patient_ref = 'urn:uuid:' || p.id` joins.
+
+### Known limitations (Phase 0)
+
+- **No `drug_class` column yet.** P1.1 will add it to the medication
+  view and this addendum must be updated the same day so the prompt,
+  the committed snapshot, and the docs all agree.
+- **No date arithmetic in the FHIRPath runtime**, so queries needing
+  "within the last 90 days" have to do string comparison on ISO-8601
+  text. Works for Synthea, could bite us on a real payer feed.
+- **Schema description is CREATE TABLE only.** It does not yet
+  describe the join graph, cardinalities, or the fact that
+  `condition.clinical_status` has a fixed coded vocabulary. Grunt
+  work; easy upgrade if the agent starts writing wrong joins.
+
+### Reference tests
+
+| File                                | What it covers                                                             |
+|-------------------------------------|----------------------------------------------------------------------------|
+| `api/tests/test_sof_tools.py`       | 22 tests — gate, LIMIT+1 probe, truncation, schema rendering, runner.      |
+| `api/tests/test_sof_materialize.py` | 8 tests — mtime gate, atomic swap, env-driven path, error-swallowing.      |
+
+Every test is hermetic: no test touches the real `data/sof.db` or the
+committed `research/ehi-ignite.db`.

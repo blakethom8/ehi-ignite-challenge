@@ -198,6 +198,55 @@ stays out of the commit.
   commit so reviewers never see a schema mismatch between the
   snapshot and the agent's system prompt.
 
+### P0.4 — `run_sql` tool surface documented *(scribe-only)*
+
+**Shipped:** 2026-04-13
+**Commit:** captured in the same docs commit as this build-log entry
+**Files:**
+- `research/SQL-ON-FHIR-REVIEW.md` — ~120-line addendum appended to the
+  end of the "was it worth it" review. Documents the module layout
+  (`sof_tools.py` / `sof_materialize.py` / agent SDK wiring), the
+  `SqlRunResult` contract, the five gate failure modes, the row cap +
+  `LIMIT+1` truncation probe, the schema surfacing into the system
+  prompt, and the 30 reference tests across `test_sof_tools.py` +
+  `test_sof_materialize.py`. Also lists the known Phase-0 limitations
+  (no `drug_class` yet, no date arithmetic, schema description is
+  CREATE-TABLE-only).
+- `CLAUDE.md` — added `sof_tools.py` and `sof_materialize.py` rows to
+  the `api/core/` tree, surfaced `patient-journey/core/sql_on_fhir/`
+  and its `views/` subtree, added a `research/` tree entry for the
+  review doc + pitch snapshot, added two new rows to the Key
+  Reference Docs table, and appended a "SQL-on-FHIR quick reference"
+  block listing the engine, LLM tool, warehouse, pitch snapshot, and
+  the five shipped views.
+
+**Why scribe-only:** No executable code changed in this task. The goal
+is to make sure anyone picking the project up tomorrow (human or
+agent) can see the `run_sql` contract without having to reverse it
+out of the source. The review doc is the narrative home; CLAUDE.md is
+the tree/map. Both now point at each other.
+
+**Smoke test:** N/A — docs only. Manual read-through confirms the
+addendum matches the actual `sof_tools.py` source byte-for-byte on:
+forbidden keyword list, row cap (500), default limit (50), gate
+return contract, `SqlRunResult` fields.
+
+**Follow-ups surfaced:**
+- When P1.1 ships the `drug_class` column, **three** docs need the
+  same-day update: this build log, the SQL-ON-FHIR-REVIEW addendum
+  ("Known limitations" bullet), and whichever table diagram the
+  pitch deck ends up using. Easy to forget — put the reminder at
+  the top of the P1.1 task brief.
+- The review doc now has two distinct dated sections (main review +
+  Phase 0 addendum). If we keep appending, the doc will drift into
+  changelog territory. Consider splitting into
+  `SQL-ON-FHIR-REVIEW.md` (stable) and `SQL-ON-FHIR-CHANGELOG.md`
+  (append-only) if we add a third date-stamped section.
+
+> **Phase 0 closed.** P0.1 → P0.4 all shipped on 2026-04-13. Phase 1
+> (clinically smart tables) is unblocked and the first task is P1.1
+> (`drug_class` column on the `medication_request` view).
+
 ---
 
 ## Phase 1 — Clinically smart tables

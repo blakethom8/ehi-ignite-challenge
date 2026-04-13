@@ -46,6 +46,8 @@ ehi-ignite-challenge/
 │       ├── provider_assistant_service.py  ← mode selector (agent-sdk / deterministic)
 │       ├── provider_assistant_agent_sdk.py ← Claude Agent SDK runtime (instrumented)
 │       ├── provider_assistant.py          ← deterministic fact ranking + evidence retrieval
+│       ├── sof_tools.py                   ← run_sql MCP tool: SELECT-only gate + read-only runner
+│       ├── sof_materialize.py             ← FastAPI startup hook — rebuilds data/sof.db on mtime gate
 │       ├── loader.py
 │       ├── drug_classifier.py
 │       ├── episode_detector.py
@@ -101,9 +103,15 @@ ehi-ignite-challenge/
 ├── patient-journey/                       ← LEGACY Streamlit (reference only — DO NOT EXTEND)
 │   ├── app.py
 │   ├── core/                              ← drug_classifier, episode_detector (migrate to api/core/)
+│   │   └── sql_on_fhir/                   ← SQL-on-FHIR v2 engine: ViewDefinition → SQLite ⭐
+│   │       └── views/                     ← 5 ViewDefinitions: patient, condition, medication, observation, encounter
 │   ├── views/                             ← reference implementations for React ports
 │   ├── CONTEXT-ENGINEERING.md             ← READ THIS — LLM context pipeline design ⭐
 │   └── DATA-DEFINITIONS.md               ← READ THIS — data model reference ⭐
+│
+├── research/
+│   ├── SQL-ON-FHIR-REVIEW.md              ← SOF prototype review + run_sql tool surface addendum ⭐
+│   └── ehi-ignite.db                      ← 200-patient pitch snapshot (committed, 11 MB)
 │
 ├── data/
 │   └── synthea-samples/
@@ -210,7 +218,17 @@ stats = compute_patient_stats(record)
 | `docs/architecture/ECOSYSTEM-OVERVIEW.md` | Platform framing and complete directory layout |
 | `docs/architecture/DEPLOYMENT.md` | Hetzner + Docker Compose deployment guide |
 | `docs/architecture/tracing.md` | LLM observability — traces, spans, token/cost tracking, Langfuse |
+| `research/SQL-ON-FHIR-REVIEW.md` | SOF prototype "was it worth it" review **+ `run_sql` tool-surface addendum** (Phase 0) |
+| `research/README.md` | Pitch snapshot layout + regen command for `research/ehi-ignite.db` |
 | `design/DESIGN.md` | Miro-inspired design tokens + component guide |
+
+### SQL-on-FHIR quick reference
+
+- **Engine:** `patient-journey/core/sql_on_fhir/` — ViewDefinition → SQLite (stable, reused everywhere)
+- **LLM tool:** `api/core/sof_tools.run_sql(query, limit)` — SELECT-only gate, 500-row cap, read-only connection
+- **Warehouse:** `data/sof.db` (gitignored, materialized on FastAPI startup via `api/core/sof_materialize.py`)
+- **Pitch snapshot:** `research/ehi-ignite.db` (committed, 200 patients, 11 MB, reviewer-facing)
+- **Views shipped today:** `patient`, `condition`, `medication_request`, `observation`, `encounter`
 
 ---
 

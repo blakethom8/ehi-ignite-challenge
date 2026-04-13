@@ -29,7 +29,7 @@ Tasks are dispatched **in phase order**. Do not pull Phase 1 work while any Phas
   - Files: `research/ehi-ignite.db` (new), `.gitignore` (edit), `research/README.md` (edit)
   - Smoke test: `python3 -c "import sqlite3; c=sqlite3.connect('research/ehi-ignite.db'); print(c.execute('SELECT COUNT(*) FROM patient').fetchone())"` prints `(200,)`
   - Acceptance: file size < 20 MB
-- [ ] **P0.4** — Document the `run_sql` tool surface (scribe-only task)
+- [x] **P0.4** — Document the `run_sql` tool surface *(done, 2026-04-13 — commit pending in same pass as queue update)*
   - Files: `research/SQL-ON-FHIR-REVIEW.md` (append), `CLAUDE.md` (add mention of `sql_on_fhir` module)
   - Dispatch: `sof-scribe` directly (no builder needed)
 
@@ -76,6 +76,9 @@ _(none)_
 - **P0.1** — `run_sql` wired into the agent SDK (`cf0efaa`, 2026-04-13)
 - **P0.2** — FastAPI startup hook materializes `data/sof.db` with mtime gate (`0edbd8b`, 2026-04-13)
 - **P0.3** — 200-patient pitch snapshot committed at `research/ehi-ignite.db` (`472994d`, 2026-04-13)
+- **P0.4** — `run_sql` tool surface documented in `SQL-ON-FHIR-REVIEW.md` addendum + `CLAUDE.md` (2026-04-13)
+
+> **Phase 0 closed.** All four Phase-0 tasks are complete. Phase 1 is unblocked.
 
 ---
 

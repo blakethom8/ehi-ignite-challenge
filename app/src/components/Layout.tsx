@@ -358,7 +358,7 @@ export function Layout({ children }: LayoutProps) {
 
         <div className="flex h-[calc(100vh-72px)] flex-col overflow-hidden lg:flex-row">
           <aside
-            className={`relative flex max-h-[50vh] w-full shrink-0 flex-col overflow-hidden border-b border-r border-[#e9eaef] transition-all duration-200 lg:max-h-none lg:border-b-0 ${
+            className={`relative flex max-h-[50vh] w-full shrink-0 flex-col overflow-y-auto overflow-x-hidden border-b border-r border-[#e9eaef] transition-all duration-200 lg:max-h-none lg:border-b-0 ${
               sidebarCollapsed ? "lg:w-14" : "lg:w-72"
             } ${isAnalysis ? "bg-[#f7fffc]" : "bg-white"}`}
           >

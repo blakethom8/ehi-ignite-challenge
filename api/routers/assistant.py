@@ -130,6 +130,26 @@ def provider_chat(payload: ProviderAssistantRequest) -> ProviderAssistantRespons
     # Capture trace detail for transparency
     trace_detail = _build_trace_detail()
 
+    # For deterministic engine (no tracing spans), build a synthetic trace
+    # showing what facts/context the engine used
+    if trace_detail is None:
+        trace_detail = TraceDetail(
+            trace_id="deterministic",
+            system_prompt_preview=(
+                f"Engine: deterministic (rule-based fact ranking)\n"
+                f"Patient: {payload.patient_id}\n"
+                f"Question: {payload.question}\n"
+                f"Stance: {payload.stance}\n\n"
+                f"The deterministic engine builds a fact corpus from the patient's FHIR bundle, "
+                f"ranks facts by keyword relevance to the question, and synthesizes a direct answer "
+                f"from the top-ranked facts. No LLM is involved."
+            ),
+        )
+
+    # Include retrieved facts from the engine
+    if result.retrieved_facts:
+        trace_detail.retrieved_facts = result.retrieved_facts
+
     return ProviderAssistantResponse(
         patient_id=payload.patient_id,
         answer=result.answer,

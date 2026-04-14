@@ -184,44 +184,66 @@ function ContextModal({ trace, onClose }: { trace: TraceDetail; onClose: () => v
 
         {/* Body — two columns */}
         <div className="flex-1 overflow-hidden flex min-h-0">
-          {/* Left: Tool calls timeline */}
-          <div className="w-1/2 border-r border-slate-200 overflow-y-auto p-4">
-            <h3 className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-3">
-              Tool Calls ({trace.tool_calls.length})
-            </h3>
-            <div className="space-y-2">
-              {trace.tool_calls.map((tc, i) => (
-                <div key={i} className={`rounded-lg border p-3 text-[11px] ${tc.error ? "border-red-200 bg-red-50" : "border-slate-200 bg-white"}`}>
-                  <div className="flex items-center gap-1.5 mb-1.5">
-                    {TOOL_ICONS[tc.tool_name] || <Terminal size={10} />}
-                    <span className="font-semibold text-slate-800">{tc.tool_name}</span>
-                    {tc.duration_ms != null && (
-                      <span className="ml-auto text-[9px] text-slate-400">{tc.duration_ms.toFixed(0)}ms</span>
-                    )}
-                  </div>
-                  {tc.input_summary && (
-                    <div className="mb-1.5">
-                      <span className="text-[9px] font-semibold uppercase text-slate-400">Input</span>
-                      <pre className="whitespace-pre-wrap text-[10px] text-slate-700 font-mono bg-slate-50 rounded px-2 py-1 mt-0.5 max-h-48 overflow-y-auto">
-                        {tc.input_summary}
-                      </pre>
+          {/* Left: Tool calls + retrieved facts */}
+          <div className="w-1/2 border-r border-slate-200 overflow-y-auto p-4 space-y-4">
+            {/* Tool calls */}
+            {trace.tool_calls.length > 0 && (
+              <div>
+                <h3 className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-2">
+                  Tool Calls ({trace.tool_calls.length})
+                </h3>
+                <div className="space-y-2">
+                  {trace.tool_calls.map((tc, i) => (
+                    <div key={i} className={`rounded-lg border p-3 text-[11px] ${tc.error ? "border-red-200 bg-red-50" : "border-slate-200 bg-white"}`}>
+                      <div className="flex items-center gap-1.5 mb-1.5">
+                        {TOOL_ICONS[tc.tool_name] || <Terminal size={10} />}
+                        <span className="font-semibold text-slate-800">{tc.tool_name}</span>
+                        {tc.duration_ms != null && (
+                          <span className="ml-auto text-[9px] text-slate-400">{tc.duration_ms.toFixed(0)}ms</span>
+                        )}
+                      </div>
+                      {tc.input_summary && (
+                        <div className="mb-1.5">
+                          <span className="text-[9px] font-semibold uppercase text-slate-400">Input</span>
+                          <pre className="whitespace-pre-wrap text-[10px] text-slate-700 font-mono bg-slate-50 rounded px-2 py-1 mt-0.5 max-h-48 overflow-y-auto">
+                            {tc.input_summary}
+                          </pre>
+                        </div>
+                      )}
+                      <div>
+                        <span className="text-[9px] font-semibold uppercase text-slate-400">Result</span>
+                        <p className={`text-[10px] mt-0.5 ${tc.error ? "text-red-600 font-medium" : "text-slate-700"}`}>
+                          {tc.error ? `Error: ${tc.error}` : tc.output_summary}
+                        </p>
+                      </div>
                     </div>
-                  )}
-                  <div>
-                    <span className="text-[9px] font-semibold uppercase text-slate-400">Result</span>
-                    <p className={`text-[10px] mt-0.5 ${tc.error ? "text-red-600 font-medium" : "text-slate-700"}`}>
-                      {tc.error ? `Error: ${tc.error}` : tc.output_summary}
-                    </p>
-                  </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              </div>
+            )}
+
+            {/* Retrieved facts — the actual data used */}
+            {trace.retrieved_facts.length > 0 && (
+              <div>
+                <h3 className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-2">
+                  Retrieved Facts ({trace.retrieved_facts.length})
+                </h3>
+                <div className="space-y-1">
+                  {trace.retrieved_facts.map((fact, i) => (
+                    <div key={i} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] text-slate-700 leading-relaxed">
+                      <span className="text-[9px] font-semibold text-blue-500 mr-1.5">F{i + 1}</span>
+                      {fact}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Right: System prompt / context */}
           <div className="w-1/2 overflow-y-auto p-4">
-            <h3 className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-3">
-              System Prompt (Agent Context)
+            <h3 className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-2">
+              Agent Context / System Prompt
             </h3>
             {trace.system_prompt_preview ? (
               <pre className="whitespace-pre-wrap text-[10px] leading-relaxed text-slate-700 font-mono bg-slate-50 rounded-lg p-3">

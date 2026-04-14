@@ -469,6 +469,7 @@ export interface TraceDetail {
   total_cost_usd: number | null;
   tool_calls: ToolCallDetail[];
   system_prompt_preview: string;
+  retrieved_facts: string[];
 }
 
 export interface ProviderAssistantResponse {

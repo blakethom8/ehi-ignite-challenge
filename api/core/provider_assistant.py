@@ -81,6 +81,7 @@ class AssistantResult:
     citations: list[AssistantCitationPayload]
     follow_ups: list[str]
     engine: str = "deterministic"
+    retrieved_facts: list[str] | None = None  # fact texts for transparency
 
 
 def _tokenize(text: str) -> set[str]:
@@ -610,4 +611,5 @@ def answer_provider_question(
         citations=citations,
         follow_ups=_follow_ups(intent),
         engine="deterministic",
+        retrieved_facts=[f.text for f in top_facts],
     )

@@ -606,7 +606,8 @@ class TraceDetail(BaseModel):
     output_tokens: int = 0
     total_cost_usd: float | None = None
     tool_calls: list[ToolCallDetail] = []
-    system_prompt_preview: str = ""   # first N chars of the system prompt
+    system_prompt_preview: str = ""   # system prompt the agent received
+    retrieved_facts: list[str] = []   # actual fact texts used in the response
 
 
 class ProviderAssistantResponse(BaseModel):

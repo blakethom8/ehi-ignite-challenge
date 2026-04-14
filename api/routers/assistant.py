@@ -43,7 +43,7 @@ def _build_trace_detail() -> TraceDetail | None:
                     data = json.loads(span.input_data)
                     prompt = data.get("system_prompt", "")
                     if prompt:
-                        system_prompt = prompt[:2000]
+                        system_prompt = prompt[:12000]
                 except (json.JSONDecodeError, AttributeError):
                     pass
 

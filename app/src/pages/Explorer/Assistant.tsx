@@ -114,7 +114,7 @@ function ToolCallsSection({ trace }: { trace: TraceDetail }) {
 }
 
 function ToolCallCard({ tc }: { tc: ToolCallDetail }) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(!!tc.error); // auto-expand errors
   const icon = TOOL_ICONS[tc.tool_name] || <Terminal size={10} className="text-slate-400" />;
   const hasError = !!tc.error;
 
@@ -125,8 +125,10 @@ function ToolCallCard({ tc }: { tc: ToolCallDetail }) {
         className="flex items-center gap-1.5 w-full px-2 py-1.5 hover:bg-slate-100/50 transition-colors text-left"
       >
         {icon}
-        <span className="font-medium text-slate-700">{tc.tool_name}</span>
-        <span className="text-slate-400 ml-1 truncate flex-1">{tc.output_summary}</span>
+        <span className={`font-medium ${hasError ? "text-red-700" : "text-slate-700"}`}>{tc.tool_name}</span>
+        <span className={`ml-1 truncate flex-1 ${hasError ? "text-red-500" : "text-slate-400"}`}>
+          {hasError ? `Error: ${tc.error}` : tc.output_summary}
+        </span>
         {tc.duration_ms != null && (
           <span className="text-[9px] text-slate-400 shrink-0">{tc.duration_ms.toFixed(0)}ms</span>
         )}
@@ -137,19 +139,100 @@ function ToolCallCard({ tc }: { tc: ToolCallDetail }) {
           {tc.input_summary && (
             <div>
               <span className="text-[9px] font-semibold uppercase text-slate-400">Input</span>
-              <pre className="whitespace-pre-wrap text-[10px] text-slate-600 font-mono bg-white rounded px-1.5 py-1 mt-0.5 max-h-32 overflow-y-auto">
+              <pre className="whitespace-pre-wrap text-[10px] text-slate-600 font-mono bg-white rounded px-1.5 py-1 mt-0.5 max-h-40 overflow-y-auto">
                 {tc.input_summary}
               </pre>
             </div>
           )}
           <div>
             <span className="text-[9px] font-semibold uppercase text-slate-400">Result</span>
-            <p className={`text-[10px] mt-0.5 ${hasError ? "text-red-600" : "text-slate-600"}`}>
+            <p className={`text-[10px] mt-0.5 ${hasError ? "text-red-600 font-medium" : "text-slate-600"}`}>
               {hasError ? `Error: ${tc.error}` : tc.output_summary}
             </p>
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Context modal ────────────────────────────────────────────────────────────
+
+function ContextModal({ trace, onClose }: { trace: TraceDetail; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
+      <div
+        className="bg-white rounded-xl shadow-xl w-[90vw] max-w-4xl max-h-[85vh] flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="shrink-0 flex items-center justify-between px-5 py-3 border-b border-slate-200">
+          <div>
+            <h2 className="text-sm font-semibold text-[#1c1c1e]">Agent Context &amp; Execution Trace</h2>
+            <p className="text-[11px] text-slate-500 mt-0.5">
+              Trace {trace.trace_id.slice(0, 8)}
+              {trace.duration_ms != null && ` · ${(trace.duration_ms / 1000).toFixed(1)}s`}
+              {trace.input_tokens > 0 && ` · ${trace.input_tokens.toLocaleString()} input tokens`}
+              {trace.output_tokens > 0 && ` · ${trace.output_tokens.toLocaleString()} output tokens`}
+              {trace.total_cost_usd != null && ` · $${trace.total_cost_usd.toFixed(4)}`}
+            </p>
+          </div>
+          <button onClick={onClose} className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors">
+            ✕
+          </button>
+        </div>
+
+        {/* Body — two columns */}
+        <div className="flex-1 overflow-hidden flex min-h-0">
+          {/* Left: Tool calls timeline */}
+          <div className="w-1/2 border-r border-slate-200 overflow-y-auto p-4">
+            <h3 className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-3">
+              Tool Calls ({trace.tool_calls.length})
+            </h3>
+            <div className="space-y-2">
+              {trace.tool_calls.map((tc, i) => (
+                <div key={i} className={`rounded-lg border p-3 text-[11px] ${tc.error ? "border-red-200 bg-red-50" : "border-slate-200 bg-white"}`}>
+                  <div className="flex items-center gap-1.5 mb-1.5">
+                    {TOOL_ICONS[tc.tool_name] || <Terminal size={10} />}
+                    <span className="font-semibold text-slate-800">{tc.tool_name}</span>
+                    {tc.duration_ms != null && (
+                      <span className="ml-auto text-[9px] text-slate-400">{tc.duration_ms.toFixed(0)}ms</span>
+                    )}
+                  </div>
+                  {tc.input_summary && (
+                    <div className="mb-1.5">
+                      <span className="text-[9px] font-semibold uppercase text-slate-400">Input</span>
+                      <pre className="whitespace-pre-wrap text-[10px] text-slate-700 font-mono bg-slate-50 rounded px-2 py-1 mt-0.5 max-h-48 overflow-y-auto">
+                        {tc.input_summary}
+                      </pre>
+                    </div>
+                  )}
+                  <div>
+                    <span className="text-[9px] font-semibold uppercase text-slate-400">Result</span>
+                    <p className={`text-[10px] mt-0.5 ${tc.error ? "text-red-600 font-medium" : "text-slate-700"}`}>
+                      {tc.error ? `Error: ${tc.error}` : tc.output_summary}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Right: System prompt / context */}
+          <div className="w-1/2 overflow-y-auto p-4">
+            <h3 className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-3">
+              System Prompt (Agent Context)
+            </h3>
+            {trace.system_prompt_preview ? (
+              <pre className="whitespace-pre-wrap text-[10px] leading-relaxed text-slate-700 font-mono bg-slate-50 rounded-lg p-3">
+                {trace.system_prompt_preview}
+              </pre>
+            ) : (
+              <p className="text-[11px] text-slate-400">No system prompt captured for this request.</p>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -164,6 +247,7 @@ export function ExplorerAssistant() {
   const [stance, setStance] = useState<"opinionated" | "balanced">("opinionated");
   const [messagesByPatient, setMessagesByPatient] = useState<Record<string, ChatMessage[]>>({});
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const [contextModal, setContextModal] = useState<TraceDetail | null>(null);
 
   const messages = useMemo(() => {
     if (!patientId) return [];
@@ -264,6 +348,9 @@ export function ExplorerAssistant() {
 
   return (
     <div className="flex h-full flex-col">
+      {/* Context modal */}
+      {contextModal && <ContextModal trace={contextModal} onClose={() => setContextModal(null)} />}
+
       {/* ── Header bar ──────────────────────────────────────────────── */}
       <div className="shrink-0 flex items-center justify-between gap-3 pb-3 border-b border-slate-200">
         <div className="flex items-center gap-2">
@@ -367,6 +454,15 @@ export function ExplorerAssistant() {
                     )}
                     {msg.citations.length > 0 && (
                       <span className="text-[10px] text-slate-400">{msg.citations.length} citations</span>
+                    )}
+                    {msg.trace && (
+                      <button
+                        onClick={() => setContextModal(msg.trace)}
+                        className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-600 hover:bg-blue-100 transition-colors"
+                      >
+                        <Eye size={10} />
+                        View Full Context
+                      </button>
                     )}
                   </div>
 

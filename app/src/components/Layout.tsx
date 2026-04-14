@@ -518,7 +518,7 @@ export function Layout({ children }: LayoutProps) {
             )}
           </aside>
 
-          <main className={`flex-1 overflow-y-auto ${isAnalysis ? "bg-[#edf7f5]" : "bg-[#f5f6f8]"}`}>
+          <main className={`flex-1 overflow-y-auto px-4 py-3 ${isAnalysis ? "bg-[#edf7f5]" : "bg-[#f5f6f8]"}`}>
             {children}
           </main>
         </div>

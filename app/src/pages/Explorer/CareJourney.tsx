@@ -71,7 +71,8 @@ export function ExplorerCareJourney() {
             {data.medication_episodes.length} medications &middot;{" "}
             {data.conditions.length} conditions &middot;{" "}
             {data.procedures.length} procedures &middot;{" "}
-            {data.encounters.length} encounters &middot; {dateSpan}
+            {data.encounters.length} encounters &middot;{" "}
+            {data.diagnostic_reports.length} lab reports &middot; {dateSpan}
           </p>
         </div>
 
@@ -88,46 +89,59 @@ export function ExplorerCareJourney() {
       </div>
 
       {/* ── Zoom controls ────────────────────────────────────────────── */}
-      <div className="flex items-center gap-2 text-xs shrink-0">
-        <span className="text-slate-400 font-medium">Zoom</span>
-        <button
-          onClick={() => {
-            const now = new Date();
-            const ago = new Date(now.getFullYear() - 5, now.getMonth(), now.getDate());
-            setDateRange([ago.toISOString(), now.toISOString()]);
-          }}
-          className="flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-slate-300 bg-white text-slate-700 shadow-sm hover:bg-slate-50 transition-colors"
-        >
-          <Clock className="w-3.5 h-3.5" />
-          Recent 5Y
-        </button>
+      <div className="flex items-center gap-1.5 text-xs shrink-0 flex-wrap">
+        <span className="text-slate-400 font-medium mr-0.5">Zoom</span>
+        {[
+          { label: "1Y", years: 1 },
+          { label: "5Y", years: 5 },
+          { label: "10Y", years: 10 },
+          { label: "20Y", years: 20 },
+        ].map(({ label, years }) => (
+          <button
+            key={label}
+            onClick={() => {
+              const now = new Date();
+              const ago = new Date(now.getFullYear() - years, now.getMonth(), now.getDate());
+              setDateRange([ago.toISOString(), now.toISOString()]);
+            }}
+            className="px-2 py-1 rounded border border-slate-300 bg-white text-slate-700 shadow-sm hover:bg-slate-50 transition-colors"
+          >
+            {label}
+          </button>
+        ))}
         <button
           onClick={() => setDateRange(null)}
-          className="flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-slate-300 bg-white text-slate-700 shadow-sm hover:bg-slate-50 transition-colors"
+          className="flex items-center gap-1 px-2 py-1 rounded border border-slate-300 bg-white text-slate-700 shadow-sm hover:bg-slate-50 transition-colors"
         >
-          <Maximize2 className="w-3.5 h-3.5" />
-          Fit All
+          <Maximize2 className="w-3 h-3" />
+          All
         </button>
         {dateRange && (
           <span className="text-[10px] text-slate-400 ml-1">
-            {new Date(dateRange[0]).getFullYear()} &ndash; {new Date(dateRange[1]).getFullYear()}
+            {new Date(dateRange[0]).toLocaleDateString("en-US", { month: "short", year: "numeric" })} &ndash;{" "}
+            {new Date(dateRange[1]).toLocaleDateString("en-US", { month: "short", year: "numeric" })}
           </span>
         )}
 
         <span className="text-[10px] text-slate-400 ml-auto">
-          Click a row for details
+          Click a row for details &middot; Drag minimap to zoom
         </span>
       </div>
 
       {/* ── Gantt chart + detail pane ────────────────────────────────── */}
       <div className="flex border border-slate-200 rounded-lg bg-white overflow-hidden flex-1 min-h-0">
-        <div className="flex-1 min-w-0 overflow-auto">
-          <CareJourneyChart
-            data={data}
-            dateRange={dateRange}
-            onRowClick={(item) => setSelectedItem(item)}
-            selectedRowId={selectedItem?.rowId ?? null}
-          />
+        <div className="relative flex-1 min-w-0">
+          <div className="h-full overflow-y-auto scroll-visible" style={{ scrollbarWidth: "thin", scrollbarGutter: "stable" }}>
+            <CareJourneyChart
+              data={data}
+              dateRange={dateRange}
+              onDateRangeChange={setDateRange}
+              onRowClick={(item) => setSelectedItem(item)}
+              selectedRowId={selectedItem?.rowId ?? null}
+            />
+          </div>
+          {/* Fade indicator when content overflows */}
+          <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-white to-transparent" />
         </div>
 
         {selectedItem && (

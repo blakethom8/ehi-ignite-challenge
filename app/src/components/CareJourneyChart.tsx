@@ -6,6 +6,7 @@ import type {
   ConditionEpisodeItem,
   EncounterMarker,
   ProcedureMarker,
+  DiagnosticReportItem,
 } from "../types";
 
 // ── Colors (exported for reuse in CareJourneyDetail) ────────────────────────
@@ -44,6 +45,7 @@ const ENCOUNTER_CLASS_COLORS: Record<string, string> = {
 };
 
 const PROCEDURE_COLOR = "#8b5cf6";
+const DIAGNOSTIC_COLOR = "#0891b2"; // cyan/teal for lab reports
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
@@ -54,7 +56,7 @@ const BAR_PAD = 4; // vertical padding inside each row for the bar
 
 // ── Row model ───────────────────────────────────────────────────────────────
 
-export type SourceKind = "medication" | "condition" | "procedure" | "encounter";
+export type SourceKind = "medication" | "condition" | "procedure" | "encounter" | "diagnostic_report";
 
 interface DotMarker {
   ms: number;
@@ -323,12 +325,13 @@ function buildRows(data: CareJourneyResponse): GanttRow[] {
     const color = ENCOUNTER_CLASS_COLORS[cls] || "#9ca3af";
     const clsLabel = { EMER: "Emergency", IMP: "Inpatient", AMB: "Ambulatory", WELLNESS: "Wellness", VR: "Virtual", OTHER: "Other" }[cls] || cls;
 
-    // Encounters rendered as a single row with dot markers
+    // Encounter class group — collapsible, with dot summary
     rows.push({
       id: `enc_${cls}`,
       label: `${clsLabel} (${items.length})`,
       level: 1,
-      collapsible: false,
+      childCount: items.length,
+      collapsible: true,
       startMs: null, endMs: null, isOngoing: false,
       color,
       opacity: 1,
@@ -345,6 +348,86 @@ function buildRows(data: CareJourneyResponse): GanttRow[] {
       tooltip: `${items.length} ${clsLabel.toLowerCase()} encounters`,
       parentId: "enc",
     });
+
+    // Individual encounter rows (children of the class group)
+    // Sort by date descending (most recent first)
+    const sorted = [...items].filter((e) => e.start).sort((a, b) => {
+      return new Date(b.start!).getTime() - new Date(a.start!).getTime();
+    });
+    for (const e of sorted) {
+      const startMs = toMs(e.start);
+      const dateLabel = e.start ? new Date(e.start).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "";
+      // Show diagnosis if available, otherwise type_text
+      const dxLabel = e.diagnoses && e.diagnoses.length > 0
+        ? e.diagnoses[0]
+        : e.type_text || "";
+      const label = `${dateLabel}${dxLabel ? ` — ${truncate(dxLabel, 25)}` : ""}`;
+      rows.push({
+        id: `enc_item_${e.encounter_id}`,
+        label,
+        level: 2,
+        collapsible: false,
+        startMs,
+        endMs: startMs ? startMs + 24 * 60 * 60 * 1000 : null,
+        isOngoing: false,
+        color,
+        opacity: 0.7,
+        sourceKind: "encounter",
+        sourceData: e,
+        tooltip:
+          `${clsLabel} encounter\n${e.type_text}\nDate: ${fmtDate(e.start)}` +
+          (e.diagnoses?.length ? `\nDiagnosis: ${e.diagnoses.join(", ")}` : "") +
+          (e.reason_display ? `\nReason: ${e.reason_display}` : ""),
+        parentId: `enc_${cls}`,
+      });
+    }
+  }
+
+  // ── Diagnostic Reports (grouped by type, shown as dot markers) ────────
+  if (data.diagnostic_reports.length > 0) {
+    rows.push({
+      id: "dx_reports",
+      label: "Lab Reports",
+      level: 0,
+      childCount: data.diagnostic_reports.length,
+      collapsible: true,
+      startMs: null, endMs: null, isOngoing: false,
+      color: DIAGNOSTIC_COLOR, opacity: 1,
+      tooltip: `${data.diagnostic_reports.length} diagnostic reports`,
+      parentId: null,
+    });
+
+    // Group by display name
+    const byName = new Map<string, DiagnosticReportItem[]>();
+    for (const dr of data.diagnostic_reports) {
+      const key = dr.display;
+      if (!byName.has(key)) byName.set(key, []);
+      byName.get(key)!.push(dr);
+    }
+    const reportGroups = [...byName.entries()].sort((a, b) => b[1].length - a[1].length);
+
+    for (const [reportName, items] of reportGroups) {
+      rows.push({
+        id: `dxr_${reportName.replace(/\W/g, "_").slice(0, 30)}`,
+        label: `${truncate(reportName, 28)} (${items.length})`,
+        level: 1,
+        collapsible: false,
+        startMs: null, endMs: null, isOngoing: false,
+        color: DIAGNOSTIC_COLOR,
+        opacity: 1,
+        dotMarkers: items
+          .filter((dr) => dr.date)
+          .map((dr) => ({
+            ms: toMs(dr.date)!,
+            color: DIAGNOSTIC_COLOR,
+            tooltip: `${reportName}\nDate: ${fmtDate(dr.date)}\nResults: ${dr.result_count} observations`,
+            sourceKind: "diagnostic_report" as SourceKind,
+            sourceData: dr,
+          })),
+        tooltip: `${items.length}× ${reportName}`,
+        parentId: "dx_reports",
+      });
+    }
   }
 
   return rows;
@@ -428,28 +511,28 @@ export interface SelectedCareItem {
 interface CareJourneyChartProps {
   data: CareJourneyResponse;
   dateRange: [string, string] | null;
+  onDateRangeChange?: (range: [string, string] | null) => void;
   onRowClick?: (item: SelectedCareItem) => void;
   selectedRowId?: string | null;
 }
 
-export function CareJourneyChart({ data, dateRange, onRowClick, selectedRowId }: CareJourneyChartProps) {
+export function CareJourneyChart({ data, dateRange, onDateRangeChange, onRowClick, selectedRowId }: CareJourneyChartProps) {
   const allRows = useMemo(() => buildRows(data), [data]);
 
   // Collapse state: set of ids that are collapsed
+  // Default: show top-level groups and subgroup headers, but NOT individual items
   const [collapsed, setCollapsed] = useState<Set<string>>(() => {
-    // Default: top-level groups expanded, subgroups collapsed for large groups
     const s = new Set<string>();
     for (const r of allRows) {
-      if (r.level === 1 && r.collapsible && (r.childCount ?? 0) > 6) {
+      // Collapse all level-1 subgroups (drug classes, active/resolved, encounter classes)
+      if (r.level === 1 && r.collapsible) {
         s.add(r.id);
       }
     }
-    // Resolved conditions collapsed by default
-    s.add("cond_resolved");
-    // Procedures collapsed (often very long)
+    // Collapse entire sections that aren't medications/conditions
     s.add("proc");
-    // Encounters collapsed (lots of dots)
     s.add("enc");
+    s.add("dx_reports");
     return s;
   });
 
@@ -461,6 +544,16 @@ export function CareJourneyChart({ data, dateRange, onRowClick, selectedRowId }:
       return next;
     });
   }, []);
+
+  const expandAll = useCallback(() => setCollapsed(new Set()), []);
+
+  const collapseAll = useCallback(() => {
+    const s = new Set<string>();
+    for (const r of allRows) {
+      if (r.collapsible) s.add(r.id);
+    }
+    setCollapsed(s);
+  }, [allRows]);
 
   // Filter visible rows based on collapse state
   const visibleRows = useMemo(() => {
@@ -478,28 +571,39 @@ export function CareJourneyChart({ data, dateRange, onRowClick, selectedRowId }:
     return visible;
   }, [allRows, collapsed]);
 
-  // Time range
+  // Full data extent (for minimap) — use actual API dates, not the "now" sentinel
+  const [fullMin, fullMax] = useMemo(() => {
+    const dates: number[] = [];
+    for (const m of data.medication_episodes) {
+      if (m.start_date) dates.push(new Date(m.start_date).getTime());
+      if (m.end_date) dates.push(new Date(m.end_date).getTime());
+    }
+    for (const c of data.conditions) {
+      if (c.onset_date) dates.push(new Date(c.onset_date).getTime());
+      if (c.end_date) dates.push(new Date(c.end_date).getTime());
+    }
+    for (const e of data.encounters) {
+      if (e.start) dates.push(new Date(e.start).getTime());
+    }
+    for (const p of data.procedures) {
+      if (p.start) dates.push(new Date(p.start).getTime());
+    }
+    if (dates.length === 0) {
+      return [Date.now() - 5 * 365.25 * 24 * 3600 * 1000, Date.now()];
+    }
+    const min = Math.min(...dates);
+    const max = Math.max(...dates);
+    const pad = (max - min) * 0.03;
+    return [min - pad, max + pad];
+  }, [data]);
+
+  // Visible time range (may be zoomed)
   const [viewMin, viewMax] = useMemo(() => {
     if (dateRange) {
       return [new Date(dateRange[0]).getTime(), new Date(dateRange[1]).getTime()];
     }
-    // Default: fit all data with padding
-    let min = Infinity;
-    let max = -Infinity;
-    for (const r of allRows) {
-      if (r.startMs) min = Math.min(min, r.startMs);
-      if (r.endMs) max = Math.max(max, r.endMs);
-      if (r.dotMarkers) {
-        for (const d of r.dotMarkers) {
-          min = Math.min(min, d.ms);
-          max = Math.max(max, d.ms);
-        }
-      }
-    }
-    if (min === Infinity) { min = Date.now() - 5 * 365.25 * 24 * 3600 * 1000; max = Date.now(); }
-    const pad = (max - min) * 0.03;
-    return [min - pad, max + pad];
-  }, [allRows, dateRange]);
+    return [fullMin, fullMax];
+  }, [fullMin, fullMax, dateRange]);
 
   // Refs and state for hover tooltip
   const [tooltip, setTooltip] = useState<{ x: number; y: number; text: string } | null>(null);
@@ -542,23 +646,57 @@ export function CareJourneyChart({ data, dateRange, onRowClick, selectedRowId }:
         </div>
       )}
 
-      <div className="flex" style={{ minHeight: totalH + 36 }}>
+      {/* ── Minimap / range selector (pinned at top) ────────────────── */}
+      <Minimap
+        fullMin={fullMin}
+        fullMax={fullMax}
+        viewMin={viewMin}
+        viewMax={viewMax}
+        width={svgWidth}
+        leftOffset={LEFT_W}
+        allRows={allRows}
+        onRangeChange={(min, max) => {
+          if (onDateRangeChange) {
+            onDateRangeChange([new Date(min).toISOString(), new Date(max).toISOString()]);
+          }
+        }}
+      />
+
+      <div className="flex" style={{ height: totalH + 36 }}>
         {/* ── Left panel: tree labels ────────────────────────────────── */}
         <div className="shrink-0 border-r border-slate-200" style={{ width: LEFT_W }}>
-          {/* Time axis spacer */}
-          <div className="h-[32px] border-b border-slate-200 bg-slate-50" />
+          {/* Header with expand/collapse controls */}
+          <div className="h-[32px] border-b border-slate-200 bg-slate-50 flex items-center justify-between px-2">
+            <span className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Care Journey</span>
+            <div className="flex gap-1">
+              <button
+                onClick={expandAll}
+                className="text-[9px] text-slate-400 hover:text-slate-600 px-1.5 py-0.5 rounded hover:bg-white transition-colors"
+                title="Expand all"
+              >
+                Expand
+              </button>
+              <button
+                onClick={collapseAll}
+                className="text-[9px] text-slate-400 hover:text-slate-600 px-1.5 py-0.5 rounded hover:bg-white transition-colors"
+                title="Collapse all"
+              >
+                Collapse
+              </button>
+            </div>
+          </div>
 
           {visibleRows.map((row) => {
             const isCollapsed = collapsed.has(row.id);
             return (
               <div
                 key={row.id}
-                className={`flex items-center gap-1 border-b border-slate-100 select-none ${
+                className={`flex items-center gap-1 select-none ${
                   row.id === selectedRowId
-                    ? "bg-blue-50"
+                    ? "bg-blue-50 border-b border-slate-100"
                     : row.level === 0
-                    ? "bg-slate-50"
-                    : ""
+                    ? "bg-slate-50 border-b border-slate-200 border-t border-t-slate-200"
+                    : "border-b border-slate-100"
                 } ${
                   row.level === 0
                     ? "font-semibold text-slate-800"
@@ -659,7 +797,11 @@ export function CareJourneyChart({ data, dateRange, onRowClick, selectedRowId }:
                     x={0} y={y} width={svgWidth} height={ROW_H}
                     fill={row.id === selectedRowId ? "#eff6ff" : row.level === 0 ? "#f8f9fa" : i % 2 === 0 ? "white" : "#fcfcfd"}
                   />
-                  <line x1={0} y1={y + ROW_H} x2={svgWidth} y2={y + ROW_H} stroke="#f1f2f4" strokeWidth={0.5} />
+                  {/* Section separator for top-level groups */}
+                  {row.level === 0 && (
+                    <line x1={0} y1={y} x2={svgWidth} y2={y} stroke="#e2e4e8" strokeWidth={1} />
+                  )}
+                  <line x1={0} y1={y + ROW_H} x2={svgWidth} y2={y + ROW_H} stroke={row.level === 0 ? "#e2e4e8" : "#f1f2f4"} strokeWidth={row.level === 0 ? 1 : 0.5} />
 
                   {/* Bar for items with start/end */}
                   {row.startMs != null && row.endMs != null && (() => {
@@ -779,6 +921,162 @@ export function CareJourneyChart({ data, dateRange, onRowClick, selectedRowId }:
             })()}
           </svg>
         </div>
+      </div>
+
+    </div>
+  );
+}
+
+// ── Minimap component ───────────────────────────────────────────────────────
+
+interface MinimapProps {
+  fullMin: number;
+  fullMax: number;
+  viewMin: number;
+  viewMax: number;
+  width: number;
+  leftOffset: number;
+  allRows: GanttRow[];
+  onRangeChange: (min: number, max: number) => void;
+}
+
+function Minimap({ fullMin, fullMax, viewMin, viewMax, width, leftOffset, allRows, onRangeChange }: MinimapProps) {
+  const minimapRef = useRef<HTMLDivElement>(null);
+  const [dragging, setDragging] = useState<"left" | "right" | "center" | null>(null);
+  const dragStartRef = useRef<{ x: number; viewMin: number; viewMax: number }>({ x: 0, viewMin: 0, viewMax: 0 });
+
+  const MINIMAP_H = 36;
+  const fullRange = fullMax - fullMin;
+  if (fullRange <= 0) return null;
+
+  const toX = (ms: number) => ((ms - fullMin) / fullRange) * width;
+  const fromX = (x: number) => fullMin + (x / width) * fullRange;
+
+  const selLeft = toX(viewMin);
+  const selRight = toX(viewMax);
+  const selWidth = Math.max(selRight - selLeft, 4);
+
+  // Collect all event timestamps for density visualization
+  const densityBuckets = useMemo(() => {
+    const BUCKETS = 100;
+    const buckets = new Array(BUCKETS).fill(0);
+    for (const r of allRows) {
+      if (r.dotMarkers) {
+        for (const d of r.dotMarkers) {
+          const idx = Math.floor(((d.ms - fullMin) / fullRange) * BUCKETS);
+          if (idx >= 0 && idx < BUCKETS) buckets[idx]++;
+        }
+      }
+      if (r.startMs) {
+        const idx = Math.floor(((r.startMs - fullMin) / fullRange) * BUCKETS);
+        if (idx >= 0 && idx < BUCKETS) buckets[idx]++;
+      }
+    }
+    const max = Math.max(...buckets, 1);
+    return buckets.map((v) => v / max);
+  }, [allRows, fullMin, fullRange]);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent, handle: "left" | "right" | "center") => {
+    e.preventDefault();
+    setDragging(handle);
+    dragStartRef.current = { x: e.clientX, viewMin, viewMax };
+  }, [viewMin, viewMax]);
+
+  useEffect(() => {
+    if (!dragging) return;
+
+    const handleMove = (e: MouseEvent) => {
+      const el = minimapRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const scale = fullRange / rect.width;
+      const dx = (e.clientX - dragStartRef.current.x) * scale;
+      const { viewMin: startMin, viewMax: startMax } = dragStartRef.current;
+
+      let newMin = startMin;
+      let newMax = startMax;
+
+      if (dragging === "left") {
+        newMin = Math.max(fullMin, Math.min(startMin + dx, startMax - fullRange * 0.01));
+      } else if (dragging === "right") {
+        newMax = Math.min(fullMax, Math.max(startMax + dx, startMin + fullRange * 0.01));
+      } else { // center — pan
+        const span = startMax - startMin;
+        newMin = startMin + dx;
+        newMax = startMax + dx;
+        if (newMin < fullMin) { newMin = fullMin; newMax = fullMin + span; }
+        if (newMax > fullMax) { newMax = fullMax; newMin = fullMax - span; }
+      }
+
+      onRangeChange(newMin, newMax);
+    };
+
+    const handleUp = () => setDragging(null);
+
+    window.addEventListener("mousemove", handleMove);
+    window.addEventListener("mouseup", handleUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMove);
+      window.removeEventListener("mouseup", handleUp);
+    };
+  }, [dragging, fullMin, fullMax, fullRange, onRangeChange]);
+
+  return (
+    <div
+      ref={minimapRef}
+      className="relative select-none"
+      style={{ marginLeft: leftOffset, height: MINIMAP_H }}
+    >
+      {/* Density background */}
+      <svg width={width} height={MINIMAP_H} className="block">
+        <rect x={0} y={0} width={width} height={MINIMAP_H} fill="#f8f9fa" />
+        {densityBuckets.map((v, i) => {
+          const bw = width / densityBuckets.length;
+          return (
+            <rect
+              key={i}
+              x={i * bw}
+              y={MINIMAP_H - v * (MINIMAP_H - 4)}
+              width={bw}
+              height={v * (MINIMAP_H - 4)}
+              fill="#c7d2fe"
+              opacity={0.5}
+            />
+          );
+        })}
+
+        {/* Dimmed areas outside selection */}
+        <rect x={0} y={0} width={selLeft} height={MINIMAP_H} fill="rgba(0,0,0,0.08)" />
+        <rect x={selLeft + selWidth} y={0} width={width - selLeft - selWidth} height={MINIMAP_H} fill="rgba(0,0,0,0.08)" />
+
+        {/* Selection highlight */}
+        <rect x={selLeft} y={0} width={selWidth} height={MINIMAP_H} fill="rgba(91,118,254,0.08)" stroke="#5b76fe" strokeWidth={1} />
+      </svg>
+
+      {/* Drag handles */}
+      <div
+        className="absolute top-0 w-1.5 rounded-sm cursor-ew-resize bg-[#5b76fe] hover:bg-[#4a65ed]"
+        style={{ left: selLeft - 1, height: MINIMAP_H }}
+        onMouseDown={(e) => handleMouseDown(e, "left")}
+      />
+      <div
+        className="absolute top-0 w-1.5 rounded-sm cursor-ew-resize bg-[#5b76fe] hover:bg-[#4a65ed]"
+        style={{ left: selLeft + selWidth - 1, height: MINIMAP_H }}
+        onMouseDown={(e) => handleMouseDown(e, "right")}
+      />
+      {/* Center drag area */}
+      <div
+        className="absolute top-0 cursor-grab active:cursor-grabbing"
+        style={{ left: selLeft + 2, width: selWidth - 4, height: MINIMAP_H }}
+        onMouseDown={(e) => handleMouseDown(e, "center")}
+      />
+
+      {/* Date labels */}
+      <div className="absolute top-0 left-0 text-[9px] text-slate-400 px-1 leading-[36px]">
+        {new Date(fullMin).getFullYear()}
+      </div>
+      <div className="absolute top-0 right-0 text-[9px] text-slate-400 px-1 leading-[36px]">
+        {new Date(fullMax).getFullYear()}
       </div>
     </div>
   );

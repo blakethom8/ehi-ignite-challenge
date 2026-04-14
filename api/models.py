@@ -538,6 +538,7 @@ class EncounterMarker(BaseModel):
     type_text: str
     start: str | None
     reason_display: str
+    diagnoses: list[str] = []       # linked condition display names
 
 
 class ProcedureMarker(BaseModel):
@@ -546,6 +547,14 @@ class ProcedureMarker(BaseModel):
     start: str | None
     end: str | None
     reason_display: str
+
+
+class DiagnosticReportItem(BaseModel):
+    report_id: str
+    display: str
+    category: str
+    date: str | None
+    result_count: int
 
 
 class CareJourneyResponse(BaseModel):
@@ -557,6 +566,7 @@ class CareJourneyResponse(BaseModel):
     conditions: list[ConditionEpisodeItem]
     encounters: list[EncounterMarker]
     procedures: list[ProcedureMarker]
+    diagnostic_reports: list[DiagnosticReportItem]
     drug_classes_present: list[str]
 
 

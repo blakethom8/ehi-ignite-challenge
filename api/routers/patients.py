@@ -56,6 +56,7 @@ from api.models import (
     ConditionEpisodeItem,
     EncounterMarker,
     ProcedureMarker,
+    DiagnosticReportItem,
     CareJourneyResponse,
 )
 from api.core.interaction_checker import check_interactions
@@ -1174,12 +1175,15 @@ def get_care_journey(patient_id: str) -> CareJourneyResponse:
             for r in cond_rows
         ]
 
-        # Encounters
+        # Encounters with linked diagnoses
         enc_rows = conn.execute(
-            """SELECT id, class_code, type_text, period_start, reason_text
-               FROM encounter
-               WHERE patient_ref = ?
-               ORDER BY period_start""",
+            """SELECT e.id, e.class_code, e.type_text, e.period_start, e.reason_text,
+                      GROUP_CONCAT(c.display, '||') AS dx_list
+               FROM encounter e
+               LEFT JOIN condition c ON c.encounter_ref = 'urn:uuid:' || e.id
+               WHERE e.patient_ref = ?
+               GROUP BY e.id
+               ORDER BY e.period_start""",
             (patient_ref,),
         ).fetchall()
 
@@ -1190,6 +1194,7 @@ def get_care_journey(patient_id: str) -> CareJourneyResponse:
                 type_text=r["type_text"] or "",
                 start=r["period_start"],
                 reason_display=r["reason_text"] or "",
+                diagnoses=[d.strip() for d in r["dx_list"].split("||") if d.strip()] if r["dx_list"] else [],
             )
             for r in enc_rows
         ]
@@ -1197,7 +1202,7 @@ def get_care_journey(patient_id: str) -> CareJourneyResponse:
     finally:
         conn.close()
 
-    # Procedures from FHIR bundle (not in SOF warehouse)
+    # Procedures + diagnostic reports from FHIR bundle (not in SOF warehouse)
     result = load_patient(patient_id)
     procedures: list[ProcedureMarker] = []
     if result:
@@ -1213,6 +1218,32 @@ def get_care_journey(patient_id: str) -> CareJourneyResponse:
                 reason_display=p.reason_display or "",
             ))
         procedures.sort(key=lambda x: x.start or "")
+
+    # Diagnostic reports from raw FHIR bundle
+    diagnostic_reports: list[DiagnosticReportItem] = []
+    if path:
+        with open(path) as f:
+            bundle = json.load(f)
+        for entry in bundle.get("entry", []):
+            resource = entry.get("resource", {})
+            if resource.get("resourceType") == "DiagnosticReport":
+                code_text = resource.get("code", {}).get("text", "")
+                if not code_text:
+                    codings = resource.get("code", {}).get("coding", [])
+                    code_text = codings[0].get("display", "Unknown") if codings else "Unknown"
+                categories = resource.get("category", [])
+                cat_text = ""
+                if categories:
+                    cat_codings = categories[0].get("coding", [])
+                    cat_text = cat_codings[0].get("display", "") if cat_codings else categories[0].get("text", "")
+                diagnostic_reports.append(DiagnosticReportItem(
+                    report_id=resource.get("id", ""),
+                    display=code_text,
+                    category=cat_text,
+                    date=resource.get("effectiveDateTime"),
+                    result_count=len(resource.get("result", [])),
+                ))
+        diagnostic_reports.sort(key=lambda x: x.date or "")
 
     # Compute date bounds and distinct drug classes
     all_dates: list[str] = []
@@ -1230,6 +1261,9 @@ def get_care_journey(patient_id: str) -> CareJourneyResponse:
     for p in procedures:
         if p.start:
             all_dates.append(p.start)
+    for dr in diagnostic_reports:
+        if dr.date:
+            all_dates.append(dr.date)
 
     earliest = min(all_dates) if all_dates else None
     latest = max(all_dates) if all_dates else None
@@ -1247,5 +1281,6 @@ def get_care_journey(patient_id: str) -> CareJourneyResponse:
         conditions=conditions,
         encounters=encounters,
         procedures=procedures,
+        diagnostic_reports=diagnostic_reports,
         drug_classes_present=drug_classes,
     )

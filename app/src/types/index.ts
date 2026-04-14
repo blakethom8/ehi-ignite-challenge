@@ -413,6 +413,7 @@ export interface EncounterMarker {
   type_text: string;
   start: string | null;
   reason_display: string;
+  diagnoses: string[];
 }
 
 export interface ProcedureMarker {
@@ -421,6 +422,14 @@ export interface ProcedureMarker {
   start: string | null;
   end: string | null;
   reason_display: string;
+}
+
+export interface DiagnosticReportItem {
+  report_id: string;
+  display: string;
+  category: string;
+  date: string | null;
+  result_count: number;
 }
 
 export interface CareJourneyResponse {
@@ -432,6 +441,7 @@ export interface CareJourneyResponse {
   conditions: ConditionEpisodeItem[];
   encounters: EncounterMarker[];
   procedures: ProcedureMarker[];
+  diagnostic_reports: DiagnosticReportItem[];
   drug_classes_present: string[];
 }
 

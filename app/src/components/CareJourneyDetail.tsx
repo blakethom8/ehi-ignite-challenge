@@ -8,6 +8,7 @@ import type {
   ConditionEpisodeItem,
   ProcedureMarker,
   EncounterMarker,
+  DiagnosticReportItem,
 } from "../types";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -132,6 +133,18 @@ function EncounterFullDetail({ patientId, enc }: { patientId: string; enc: Encou
 
   return (
     <div className="space-y-0">
+      {/* Diagnoses — most important clinical info, shown first */}
+      {enc.diagnoses && enc.diagnoses.length > 0 && (
+        <div className="mb-2 pb-2 border-b border-slate-200">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-[#a5a8b5] mb-1.5">Diagnosis</p>
+          {enc.diagnoses.map((dx, i) => (
+            <div key={i} className="flex items-center gap-1.5 py-0.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-red-400 shrink-0" />
+              <span className="text-[12px] font-medium text-[#1c1c1e]">{dx}</span>
+            </div>
+          ))}
+        </div>
+      )}
       <Row label="Type">{data.encounter_type || "\u2014"}</Row>
       <Row label="Class">
         <StatusBadge
@@ -197,11 +210,22 @@ interface CareJourneyDetailProps {
   onClose: () => void;
 }
 
+function DiagnosticReportDetail({ report }: { report: DiagnosticReportItem }) {
+  return (
+    <div className="space-y-0">
+      <Row label="Category">{report.category || "Laboratory"}</Row>
+      <Row label="Date">{fmtDate(report.date)}</Row>
+      <Row label="Results">{report.result_count} observations</Row>
+    </div>
+  );
+}
+
 const KIND_LABELS: Record<string, string> = {
   medication: "Medication",
   condition: "Condition",
   procedure: "Procedure",
   encounter: "Encounter",
+  diagnostic_report: "Lab Report",
 };
 
 const KIND_COLORS: Record<string, string> = {
@@ -209,15 +233,22 @@ const KIND_COLORS: Record<string, string> = {
   condition: "#ef4444",
   procedure: "#8b5cf6",
   encounter: "#5b76fe",
+  diagnostic_report: "#0891b2",
 };
 
 export function CareJourneyDetail({ item, patientId, onClose }: CareJourneyDetailProps) {
-  const name =
-    item.kind === "medication" ? (item.data as MedicationEpisodeItem).display :
-    item.kind === "condition" ? (item.data as ConditionEpisodeItem).display :
-    item.kind === "procedure" ? (item.data as ProcedureMarker).display :
-    item.kind === "encounter" ? (item.data as EncounterMarker).type_text || "Encounter" :
-    "Details";
+  const name = (() => {
+    if (item.kind === "medication") return (item.data as MedicationEpisodeItem).display;
+    if (item.kind === "condition") return (item.data as ConditionEpisodeItem).display;
+    if (item.kind === "procedure") return (item.data as ProcedureMarker).display;
+    if (item.kind === "diagnostic_report") return (item.data as DiagnosticReportItem).display;
+    if (item.kind === "encounter") {
+      const enc = item.data as EncounterMarker;
+      // Show diagnosis as the name if available
+      return enc.diagnoses?.length ? enc.diagnoses[0] : enc.type_text || "Encounter";
+    }
+    return "Details";
+  })();
 
   return (
     <div className="flex h-full flex-col bg-white">
@@ -248,6 +279,7 @@ export function CareJourneyDetail({ item, patientId, onClose }: CareJourneyDetai
         {item.kind === "condition" && <ConditionDetail cond={item.data as ConditionEpisodeItem} />}
         {item.kind === "procedure" && <ProcedureDetail proc={item.data as ProcedureMarker} />}
         {item.kind === "encounter" && <EncounterFullDetail patientId={patientId} enc={item.data as EncounterMarker} />}
+        {item.kind === "diagnostic_report" && <DiagnosticReportDetail report={item.data as DiagnosticReportItem} />}
       </div>
     </div>
   );

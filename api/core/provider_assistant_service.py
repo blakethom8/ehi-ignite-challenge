@@ -53,11 +53,39 @@ def answer_provider_question(
     Unified provider-assistant entry point.
 
     Modes:
-    - deterministic (default)
-    - anthropic (alias: anthropic_agent, agent_sdk)
+    - deterministic (default) — rule-based keyword matching, no LLM
+    - context (recommended) — clean context + single Claude call (~3-5s)
+    - anthropic (alias: agent_sdk) — multi-turn agent loop (~15-30s)
     """
     mode = _assistant_mode()
     fallback_enabled = _env_bool("PROVIDER_ASSISTANT_FALLBACK_TO_DETERMINISTIC", True)
+
+    # Context mode: single-turn Claude call with pre-built clinical context
+    if mode in {"context", "context_single_turn", "single_turn"}:
+        try:
+            from api.core.provider_assistant_context import answer_with_context
+
+            result = answer_with_context(
+                patient_id=patient_id,
+                question=question,
+                history=history,
+                stance=stance,
+            )
+            _record_trace_metadata(result)
+            return result
+        except Exception as exc:
+            if not fallback_enabled:
+                raise RuntimeError(f"Context mode failed: {exc}") from exc
+            LOGGER.warning("Context mode failed (%s). Falling back to deterministic.", str(exc))
+            fallback = answer_deterministic(
+                patient_id=patient_id,
+                question=question,
+                history=history,
+                stance=stance,
+            )
+            fallback.engine = "deterministic-fallback"
+            _record_trace_metadata(fallback)
+            return fallback
 
     if mode in {"anthropic", "anthropic_agent", "agent_sdk", "anthropic_sdk"}:
         try:

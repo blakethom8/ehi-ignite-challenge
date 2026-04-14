@@ -66,11 +66,12 @@ ehi-ignite-challenge/
 │   │   └── api/client.ts
 │   └── vite.config.ts
 │
-├── deploy/                                ← Docker Compose + nginx configs
-│   ├── docker-compose.prod.yml
-│   ├── nginx.conf
-│   ├── Dockerfile.api
-│   └── Dockerfile.app
+├── deploy/                                ← Docker Compose + nginx configs (LIVE)
+│   ├── docker-compose.prod.yml            ← production compose (api:8090, app:8091)
+│   ├── Dockerfile.api                     ← Python 3.13 + uv + FastAPI
+│   ├── Dockerfile.app                     ← Node build + nginx serve
+│   ├── nginx-app.conf                     ← SPA routing inside the app container
+│   └── nginx-host.conf                    ← Hetzner 2 host nginx (ehi.healthcaredataai.com)
 │
 ├── design/                                ← design system reference
 │   ├── README.md
@@ -184,9 +185,10 @@ stats = compute_patient_stats(record)
 - Run: `cd app && npm run dev` (runs on :5173)
 
 ### Deployment
-- Hetzner CX21 VPS (~€4.85/mo)
+- **Production:** https://ehi.healthcaredataai.com (Hetzner 2 — 5.78.148.70)
 - Docker Compose + nginx + Let's Encrypt SSL
-- See `docs/architecture/DEPLOYMENT.md` for full setup
+- Manual deploy: `ssh hetzner2 'cd /opt/ehi-ignite && git pull origin master && docker compose -f deploy/docker-compose.prod.yml up -d --build'`
+- See `deploy/` for configs, `docs/architecture/DEPLOYMENT.md` for full setup
 
 ### Design System
 - Miro-inspired (see `design/DESIGN.md`)

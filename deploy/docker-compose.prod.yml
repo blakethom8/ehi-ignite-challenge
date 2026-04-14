@@ -1,0 +1,24 @@
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.api
+    env_file: ../.env
+    environment:
+      - ENVIRONMENT=production
+      - SOF_AUTO_MATERIALIZE=true
+    volumes:
+      - ../data:/app/data
+    ports:
+      - "127.0.0.1:8090:8000"
+    restart: unless-stopped
+
+  app:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.app
+    ports:
+      - "127.0.0.1:8091:80"
+    depends_on:
+      - api
+    restart: unless-stopped

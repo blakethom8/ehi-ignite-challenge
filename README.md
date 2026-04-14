@@ -1,81 +1,107 @@
 # EHI Ignite Challenge
 
-**HHS $490K Competition** — Build tools that transform single-patient FHIR EHI exports into usable, actionable experiences.
+**Clinical intelligence tools that transform raw FHIR patient records into actionable insights for clinicians.**
 
-**Phase 1 Deadline:** May 13, 2026  
-**Competition Site:** https://ehignitechallenge.org/
+Built for the [HHS EHI Ignite Challenge](https://ehignitechallenge.org/) — a $490K competition to make Electronic Health Information (EHI) exports genuinely useful.
 
-## What This Is
+**Live demo:** [ehi.healthcaredataai.com](https://ehi.healthcaredataai.com)
 
-The federal government now mandates that every certified EHR (Epic, Cerner, etc.) must export a patient's complete health record on demand. The format is FHIR R4 NDJSON. The problem: "computable ≠ usable." These exports are technically correct but practically overwhelming. HHS is paying $490K for teams that solve this.
+---
+
+## The Problem
+
+Federal regulations now require every certified EHR (Epic, Cerner, etc.) to export a patient's complete health record on demand as FHIR R4. The result: technically computable but practically overwhelming. A complex patient can have 5,000+ resources — conditions, medications, labs, encounters, procedures — scattered across decades of care.
+
+Clinicians don't need more records. They need the right 5 facts in 30 seconds.
+
+## What This Does
+
+- **Patient Explorer** — Browse, search, and profile 1,180 synthetic patient records (Synthea FHIR R4)
+- **Clinical Safety Panel** — Drug class risk classification, interaction checking, allergy criticality
+- **Care Journey Timeline** — Medication episodes, condition arcs, and encounter history on an interactive Gantt chart
+- **SQL-on-FHIR Warehouse** — ViewDefinition-driven ETL from raw FHIR bundles into a queryable SQLite layer
+- **Provider Assistant** — Claude-powered chart Q&A with evidence-backed citations grounded in the patient's actual record
+
+## Tech Stack
+
+| Layer | Stack |
+|---|---|
+| **Backend** | Python 3.13, FastAPI, SQLite (SQL-on-FHIR), Anthropic Claude SDK |
+| **Frontend** | React 19, TypeScript, Vite, Tailwind CSS, shadcn/ui, Plotly.js |
+| **Data** | 1,180 Synthea FHIR R4 patient bundles, SQL-on-FHIR v2 ViewDefinitions |
+| **Deploy** | Docker Compose, nginx, Hetzner VPS |
+
+## Quick Start
+
+### Prerequisites
+
+- Python 3.13+ and [uv](https://docs.astral.sh/uv/)
+- Node.js 20+
+- Anthropic API key (for the Provider Assistant feature)
+
+### Setup
+
+```bash
+# Clone
+git clone https://github.com/blakethom8/ehi-ignite-challenge.git
+cd ehi-ignite-challenge
+
+# Backend
+cp .env.example .env
+# Edit .env with your ANTHROPIC_API_KEY
+uv sync
+uv run uvicorn api.main:app --reload --port 8000
+
+# Frontend (separate terminal)
+cd app
+npm install
+npm run dev
+```
+
+The app runs at `http://localhost:5173` with the API at `http://localhost:8000`.
+
+### Data
+
+The app uses [Synthea](https://github.com/synthetichealth/synthea) synthetic FHIR R4 patient bundles. Download the individual patient bundles to `data/synthea-samples/synthea-r4-individual/fhir/`:
+
+```bash
+# Download from Synthea releases or generate your own
+# See data/ directory for structure details
+```
+
+The SQL-on-FHIR warehouse (`data/sof.db`) is materialized automatically on API startup.
+
+## Production Deployment
+
+See [`deploy/`](deploy/) for Docker Compose configs and nginx setup.
+
+```bash
+# On the server
+cd /opt/ehi-ignite
+cp .env.example .env
+# Edit .env with real ANTHROPIC_API_KEY
+docker compose -f deploy/docker-compose.prod.yml up -d --build
+```
 
 ## Project Structure
 
 ```
 ehi-ignite-challenge/
-├── README.md                     ← you are here
-├── data/
-│   ├── synthea-samples/          ← downloaded synthetic FHIR datasets
-│   │   ├── sample-bulk-fhir-datasets-10-patients/  ← bulk NDJSON format
-│   │   └── synthea-r4-individual/fhir/             ← per-patient FHIR bundles
-│   └── real-world-examples/      ← real EHR export docs / format specs
-├── docs/
-│   ├── DATA-OVERVIEW.md          ← what the data looks like, resource counts
-│   └── FHIR-PRIMER.md            ← quick reference for FHIR R4 concepts
-├── ideas/
-│   └── FEATURE-IDEAS.md          ← use cases, agent concepts, product strategy
-├── docs/
-│   └── architecture/             ← system design docs
-└── src/                          ← code experiments
+├── api/                    ← FastAPI backend
+│   ├── core/               ← Clinical intelligence modules
+│   ├── routers/            ← REST endpoints
+│   └── agents/             ← Claude Agent SDK profiles
+├── app/                    ← React + Vite frontend
+│   └── src/
+│       ├── pages/          ← Explorer, PatientJourney views
+│       └── components/     ← Shared UI components
+├── fhir_explorer/          ← FHIR parser library (shared)
+├── patient-journey/        ← SQL-on-FHIR engine + data models
+├── deploy/                 ← Docker + nginx production configs
+├── data/                   ← FHIR bundles + SQLite databases
+└── research/               ← Competition research + pitch snapshot
 ```
 
-## Key Data Facts (from 10-patient Synthea analysis)
+## License
 
-| Resource Type | Count (10 patients) | Notes |
-|---|---|---|
-| Observation | 9,878 | Labs, vitals, social history |
-| DiagnosticReport | 2,101 | Radiology, pathology, lab panels |
-| DocumentReference | 1,215 | Clinical notes (often C-CDA XML inside) |
-| Procedure | 2,056 | Surgeries, interventions |
-| MedicationRequest | 1,745 | Prescriptions |
-| Encounter | 1,215 | All visits |
-| Condition | 555 | Diagnoses, problem list |
-| Immunization | 161 | Vaccine history |
-| AllergyIntolerance | 11 | Drug/food/environmental |
-
-**Avg per patient: ~1,545 resources** (ranging from 65 for a healthy young patient to 2,640 for a complex chronic patient)
-
-## Patient Complexity Spectrum
-
-**Simple Patient** (Mariette443, 65 resources): No chronic conditions, no meds. Just routine labs, immunizations, 4 encounters. Basically a healthy 20-something.
-
-**Moderate Patient** (Steven797, 98 resources): 5 conditions (hypertension, obesity, allergies), 3 meds, 12 claims. Blue Cross Blue Shield. Manageable.
-
-**Complex Patient** (Marine542, 5,518+ resources): 219 conditions. Diabetes → CKD → dialysis → kidney transplant. 13 unique medications including tacrolimus (immunosuppressant), insulin, metformin. 708 encounters spanning 67 years of life. This is your chronic multi-system patient.
-
-## Sample Data Links
-
-- [SMART on FHIR bulk datasets (Synthea)](https://github.com/smart-on-fhir/sample-bulk-fhir-datasets) — 10/100/1000 patients
-- [Synthea patient generator](https://github.com/synthetichealth/synthea)
-- [EHI Export API reference implementation](https://github.com/smart-on-fhir/ehi-server)
-- [Argonaut EHI Export draft spec](https://build.fhir.org/ig/argonautproject/ehi-api/ehi-export.html)
-
-## Provider Assistant Runtimes
-
-The provider assistant now supports deterministic and Anthropic Agent SDK modes behind the same API endpoint.
-
-- Env template: `.env.example`
-- Integration guide: `docs/architecture/ANTHROPIC-AGENT-SDK.md`
-- Operating report: `docs/architecture/ANTHROPIC-SDK-OPERATING-REPORT.md`
-- Context engineering report: `docs/architecture/FHIR-AGENT-CONTEXT-ENGINEERING-REPORT.md`
-- Harness playbook: `docs/architecture/CLAUDE-SDK-HARNESS-PLAYBOOK.md`
-- Tracing architecture: `docs/architecture/tracing.md`
-- Agent profile files: `api/agents/provider-assistant/`
-
-### Local Env Setup
-
-```bash
-cp .env.example .env
-# edit .env with your real ANTHROPIC_API_KEY
-set -a; source .env; set +a
-```
+MIT — see [LICENSE](LICENSE).

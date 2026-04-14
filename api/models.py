@@ -591,6 +591,24 @@ class ProviderAssistantRequest(BaseModel):
     stance: str = "opinionated"    # "opinionated" | "balanced"
 
 
+class ToolCallDetail(BaseModel):
+    tool_name: str                 # "run_sql" | "query_chart_evidence" | "get_patient_snapshot"
+    input_summary: str             # human-readable input (e.g. the SQL query)
+    output_summary: str            # human-readable output (e.g. "12 rows returned")
+    duration_ms: float | None = None
+    error: str | None = None
+
+
+class TraceDetail(BaseModel):
+    trace_id: str
+    duration_ms: float | None = None
+    input_tokens: int = 0
+    output_tokens: int = 0
+    total_cost_usd: float | None = None
+    tool_calls: list[ToolCallDetail] = []
+    system_prompt_preview: str = ""   # first N chars of the system prompt
+
+
 class ProviderAssistantResponse(BaseModel):
     patient_id: str
     answer: str
@@ -599,3 +617,4 @@ class ProviderAssistantResponse(BaseModel):
     engine: str = "deterministic"  # "deterministic" | "anthropic-agent-sdk" | "deterministic-fallback"
     citations: list[ProviderAssistantCitation]
     follow_ups: list[str]
+    trace: TraceDetail | None = None  # tool calls + context transparency

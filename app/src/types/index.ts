@@ -453,6 +453,24 @@ export interface ProviderAssistantRequest {
   stance?: "opinionated" | "balanced";
 }
 
+export interface ToolCallDetail {
+  tool_name: string;
+  input_summary: string;
+  output_summary: string;
+  duration_ms: number | null;
+  error: string | null;
+}
+
+export interface TraceDetail {
+  trace_id: string;
+  duration_ms: number | null;
+  input_tokens: number;
+  output_tokens: number;
+  total_cost_usd: number | null;
+  tool_calls: ToolCallDetail[];
+  system_prompt_preview: string;
+}
+
 export interface ProviderAssistantResponse {
   patient_id: string;
   answer: string;
@@ -461,4 +479,5 @@ export interface ProviderAssistantResponse {
   engine: "deterministic" | "anthropic-agent-sdk" | "deterministic-fallback" | string;
   citations: ProviderAssistantCitation[];
   follow_ups: string[];
+  trace: TraceDetail | null;
 }

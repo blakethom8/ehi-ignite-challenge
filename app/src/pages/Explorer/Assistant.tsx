@@ -3,13 +3,15 @@ import type { FormEvent } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import axios from "axios";
-import { AlertTriangle, Bot, ChevronRight, MessageSquare, Send, Sparkles, User } from "lucide-react";
+import { AlertTriangle, Bot, ChevronDown, ChevronRight, Database, Eye, MessageSquare, Search, Send, Sparkles, Terminal, User } from "lucide-react";
 import { api } from "../../api/client";
 import { EmptyState } from "../../components/EmptyState";
 import type {
   ProviderAssistantCitation,
   ProviderAssistantResponse,
   ProviderAssistantTurn,
+  TraceDetail,
+  ToolCallDetail,
 } from "../../types";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -24,6 +26,7 @@ type ChatMessage =
       engine: ProviderAssistantResponse["engine"];
       citations: ProviderAssistantCitation[];
       followUps: string[];
+      trace: TraceDetail | null;
     };
 
 const STARTER_PROMPTS = [
@@ -61,6 +64,94 @@ function errorMessage(error: unknown): string {
   }
   if (error instanceof Error && error.message.trim()) return error.message;
   return "Request failed. Try again.";
+}
+
+// ── Expandable section ───────────────────────────────────────────────────────
+
+function ExpandableSection({
+  title, icon, defaultOpen = false, count, children,
+}: {
+  title: string;
+  icon: React.ReactNode;
+  defaultOpen?: boolean;
+  count?: number;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="rounded-lg border border-slate-200 bg-slate-50 overflow-hidden">
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-1.5 w-full px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 hover:bg-slate-100 transition-colors"
+      >
+        {open ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
+        {icon}
+        {title}
+        {count != null && <span className="ml-auto text-slate-400 font-normal lowercase">{count}</span>}
+      </button>
+      {open && <div className="px-2.5 pb-2">{children}</div>}
+    </div>
+  );
+}
+
+// ── Tool calls display ───────────────────────────────────────────────────────
+
+const TOOL_ICONS: Record<string, React.ReactNode> = {
+  run_sql: <Database size={10} className="text-purple-500" />,
+  query_chart_evidence: <Search size={10} className="text-blue-500" />,
+  get_patient_snapshot: <Eye size={10} className="text-green-500" />,
+  baseline_evidence: <Terminal size={10} className="text-slate-500" />,
+};
+
+function ToolCallsSection({ trace }: { trace: TraceDetail }) {
+  return (
+    <div className="space-y-1">
+      {trace.tool_calls.map((tc, i) => (
+        <ToolCallCard key={i} tc={tc} />
+      ))}
+    </div>
+  );
+}
+
+function ToolCallCard({ tc }: { tc: ToolCallDetail }) {
+  const [expanded, setExpanded] = useState(false);
+  const icon = TOOL_ICONS[tc.tool_name] || <Terminal size={10} className="text-slate-400" />;
+  const hasError = !!tc.error;
+
+  return (
+    <div className={`rounded-md border text-[11px] ${hasError ? "border-red-200 bg-red-50" : "border-slate-200 bg-slate-50"}`}>
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="flex items-center gap-1.5 w-full px-2 py-1.5 hover:bg-slate-100/50 transition-colors text-left"
+      >
+        {icon}
+        <span className="font-medium text-slate-700">{tc.tool_name}</span>
+        <span className="text-slate-400 ml-1 truncate flex-1">{tc.output_summary}</span>
+        {tc.duration_ms != null && (
+          <span className="text-[9px] text-slate-400 shrink-0">{tc.duration_ms.toFixed(0)}ms</span>
+        )}
+        {expanded ? <ChevronDown size={10} className="text-slate-400 shrink-0" /> : <ChevronRight size={10} className="text-slate-400 shrink-0" />}
+      </button>
+      {expanded && (
+        <div className="px-2 pb-2 space-y-1">
+          {tc.input_summary && (
+            <div>
+              <span className="text-[9px] font-semibold uppercase text-slate-400">Input</span>
+              <pre className="whitespace-pre-wrap text-[10px] text-slate-600 font-mono bg-white rounded px-1.5 py-1 mt-0.5 max-h-32 overflow-y-auto">
+                {tc.input_summary}
+              </pre>
+            </div>
+          )}
+          <div>
+            <span className="text-[9px] font-semibold uppercase text-slate-400">Result</span>
+            <p className={`text-[10px] mt-0.5 ${hasError ? "text-red-600" : "text-slate-600"}`}>
+              {hasError ? `Error: ${tc.error}` : tc.output_summary}
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -114,6 +205,7 @@ export function ExplorerAssistant() {
               engine: data.engine,
               citations: data.citations,
               followUps: data.follow_ups,
+              trace: data.trace,
             },
           ],
         };
@@ -248,6 +340,11 @@ export function ExplorerAssistant() {
               {/* Assistant message */}
               {msg.role === "assistant" && (
                 <div className="space-y-2">
+                  {/* Tool calls — show what the agent did */}
+                  {msg.trace && msg.trace.tool_calls.length > 0 && (
+                    <ToolCallsSection trace={msg.trace} />
+                  )}
+
                   <pre className="whitespace-pre-wrap text-[13px] leading-relaxed text-[#1c1c1e] font-sans">{msg.content}</pre>
 
                   {/* Meta badges */}
@@ -256,6 +353,18 @@ export function ExplorerAssistant() {
                     <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
                       {msg.engine}
                     </span>
+                    {msg.trace && (
+                      <>
+                        {msg.trace.duration_ms != null && (
+                          <span className="text-[10px] text-slate-400">{(msg.trace.duration_ms / 1000).toFixed(1)}s</span>
+                        )}
+                        {msg.trace.input_tokens > 0 && (
+                          <span className="text-[10px] text-slate-400">
+                            {msg.trace.input_tokens.toLocaleString()} in / {msg.trace.output_tokens.toLocaleString()} out tokens
+                          </span>
+                        )}
+                      </>
+                    )}
                     {msg.citations.length > 0 && (
                       <span className="text-[10px] text-slate-400">{msg.citations.length} citations</span>
                     )}
@@ -263,16 +372,26 @@ export function ExplorerAssistant() {
 
                   {/* Citations */}
                   {msg.citations.length > 0 && (
-                    <div className="space-y-1 rounded-lg border border-slate-200 bg-slate-50 p-2">
-                      <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Evidence</p>
-                      {msg.citations.map((c) => (
-                        <div key={`${c.source_type}:${c.resource_id}`} className="rounded bg-white px-2 py-1.5 text-[11px]">
-                          <span className="font-medium text-[#1c1c1e]">{c.label}</span>
-                          {c.event_date && <span className="text-slate-400 ml-1">· {fmt(c.event_date)}</span>}
-                          <p className="text-slate-600 mt-0.5">{c.detail}</p>
-                        </div>
-                      ))}
-                    </div>
+                    <ExpandableSection title="Evidence" icon={<Search size={10} />} defaultOpen count={msg.citations.length}>
+                      <div className="space-y-1">
+                        {msg.citations.map((c) => (
+                          <div key={`${c.source_type}:${c.resource_id}`} className="rounded bg-white px-2 py-1.5 text-[11px]">
+                            <span className="font-medium text-[#1c1c1e]">{c.label}</span>
+                            {c.event_date && <span className="text-slate-400 ml-1">· {fmt(c.event_date)}</span>}
+                            <p className="text-slate-600 mt-0.5">{c.detail}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </ExpandableSection>
+                  )}
+
+                  {/* Context — what the agent had access to */}
+                  {msg.trace && msg.trace.system_prompt_preview && (
+                    <ExpandableSection title="Agent Context" icon={<Eye size={10} />} defaultOpen={false}>
+                      <pre className="whitespace-pre-wrap text-[10px] leading-relaxed text-slate-600 font-mono bg-white rounded p-2 max-h-60 overflow-y-auto">
+                        {msg.trace.system_prompt_preview}
+                      </pre>
+                    </ExpandableSection>
                   )}
 
                   {/* Follow-up prompts — inline */}

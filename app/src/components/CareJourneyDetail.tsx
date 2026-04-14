@@ -57,6 +57,9 @@ function MedicationDetail({ med }: { med: MedicationEpisodeItem }) {
           <span className="text-slate-400">Unclassified</span>
         )}
       </Row>
+      {med.reason && (
+        <Row label="Reason"><span className="font-medium">{med.reason}</span></Row>
+      )}
       <Row label="Status">
         <StatusBadge
           label={med.is_active ? "Active" : med.status}

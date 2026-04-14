@@ -166,7 +166,7 @@ function buildRows(data: CareJourneyResponse): GanttRow[] {
       const endMs = toMs(m.end_date) || now;
       rows.push({
         id: `med_item_${m.episode_id}`,
-        label: truncate(m.display, 35),
+        label: m.reason ? `${m.display} — for ${m.reason}` : m.display,
         level: 2,
         collapsible: false,
         startMs,
@@ -177,7 +177,8 @@ function buildRows(data: CareJourneyResponse): GanttRow[] {
         sourceKind: "medication",
         sourceData: m,
         tooltip:
-          `${m.display}\nClass: ${cls === "unclassified" ? "Unclassified" : drugClassLabel(cls)}\n` +
+          `${m.display}\n${m.reason ? `Reason: ${m.reason}\n` : ""}` +
+          `Class: ${cls === "unclassified" ? "Unclassified" : drugClassLabel(cls)}\n` +
           `Status: ${m.is_active ? "Active" : m.status}\n` +
           `Start: ${fmtDate(m.start_date)}\nEnd: ${fmtDate(m.end_date)}\n` +
           `Prescriptions: ${m.request_count}` +
@@ -227,7 +228,7 @@ function buildRows(data: CareJourneyResponse): GanttRow[] {
       const endMs = toMs(c.end_date) || now;
       rows.push({
         id: `cond_item_${c.condition_id}`,
-        label: truncate(c.display, 35),
+        label: c.display,
         level: 2,
         collapsible: false,
         startMs,
@@ -273,11 +274,13 @@ function buildRows(data: CareJourneyResponse): GanttRow[] {
     const procGroups = [...procByName.entries()].sort((a, b) => b[1].length - a[1].length);
 
     for (const [procName, items] of procGroups) {
+      const groupId = `proc_${procName.replace(/\W/g, "_").slice(0, 30)}`;
       rows.push({
-        id: `proc_${procName.replace(/\W/g, "_").slice(0, 30)}`,
+        id: groupId,
         label: `${truncate(procName, 30)} (${items.length})`,
         level: 1,
-        collapsible: false,
+        childCount: items.length,
+        collapsible: items.length > 1,
         startMs: null, endMs: null, isOngoing: false,
         color: PROCEDURE_COLOR,
         opacity: 1,
@@ -294,6 +297,37 @@ function buildRows(data: CareJourneyResponse): GanttRow[] {
         tooltip: `${items.length}× ${procName}`,
         parentId: "proc",
       });
+
+      // Individual procedure rows (children)
+      if (items.length === 1) {
+        // Single-item groups: make the group row itself clickable
+        rows[rows.length - 1].sourceKind = "procedure";
+        rows[rows.length - 1].sourceData = items[0];
+      } else {
+        // Multi-item groups: add expandable children
+        const sorted = [...items].filter((p) => p.start).sort((a, b) =>
+          new Date(b.start!).getTime() - new Date(a.start!).getTime()
+        );
+        for (const p of sorted) {
+          const dateLabel = p.start ? new Date(p.start).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "";
+          rows.push({
+            id: `proc_item_${p.procedure_id}`,
+            label: `${dateLabel}${p.reason_display ? ` — ${p.reason_display}` : ""}`,
+            level: 2,
+            collapsible: false,
+            startMs: toMs(p.start),
+            endMs: toMs(p.start) ? toMs(p.start)! + 24 * 60 * 60 * 1000 : null,
+            isOngoing: false,
+            color: PROCEDURE_COLOR,
+            opacity: 0.7,
+            sourceKind: "procedure",
+            sourceData: p,
+            tooltip: `${procName}\nDate: ${fmtDate(p.start)}` +
+              (p.reason_display ? `\nReason: ${p.reason_display}` : ""),
+            parentId: groupId,
+          });
+        }
+      }
     }
   }
 
@@ -361,7 +395,7 @@ function buildRows(data: CareJourneyResponse): GanttRow[] {
       const dxLabel = e.diagnoses && e.diagnoses.length > 0
         ? e.diagnoses[0]
         : e.type_text || "";
-      const label = `${dateLabel}${dxLabel ? ` — ${truncate(dxLabel, 25)}` : ""}`;
+      const label = `${dateLabel}${dxLabel ? ` — ${dxLabel}` : ""}`;
       rows.push({
         id: `enc_item_${e.encounter_id}`,
         label,
@@ -571,6 +605,37 @@ export function CareJourneyChart({ data, dateRange, onDateRangeChange, onRowClic
     return visible;
   }, [allRows, collapsed]);
 
+  // Keyboard navigation: Arrow Up/Down to move between clickable rows
+  useEffect(() => {
+    if (!selectedRowId || !onRowClick) return;
+
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+      e.preventDefault();
+
+      // Get clickable visible rows (those with sourceKind)
+      const clickable = visibleRows.filter((r) => r.sourceKind);
+      const curIdx = clickable.findIndex((r) => r.id === selectedRowId);
+      if (curIdx === -1) return;
+
+      const nextIdx = e.key === "ArrowDown"
+        ? Math.min(curIdx + 1, clickable.length - 1)
+        : Math.max(curIdx - 1, 0);
+
+      if (nextIdx !== curIdx) {
+        const next = clickable[nextIdx];
+        onRowClick({ kind: next.sourceKind!, rowId: next.id, data: next.sourceData });
+
+        // Scroll the row into view
+        const rowEl = containerRef.current?.querySelector(`[data-row-id="${next.id}"]`);
+        rowEl?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      }
+    };
+
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [selectedRowId, visibleRows, onRowClick]);
+
   // Full data extent (for minimap) — use actual API dates, not the "now" sentinel
   const [fullMin, fullMax] = useMemo(() => {
     const dates: number[] = [];
@@ -636,15 +701,38 @@ export function CareJourneyChart({ data, dateRange, onDateRangeChange, onRowClic
 
   return (
     <div ref={containerRef} className="relative">
-      {/* ── Tooltip ──────────────────────────────────────────────────── */}
-      {tooltip && (
-        <div
-          className="absolute z-50 pointer-events-none px-2.5 py-1.5 bg-gray-900 text-white text-[11px] rounded-md shadow-lg whitespace-pre-wrap max-w-xs leading-relaxed"
-          style={{ left: tooltip.x + LEFT_W + 8, top: tooltip.y + 32 }}
-        >
-          {tooltip.text}
-        </div>
-      )}
+      {/* ── Tooltip (smart positioning — flips when near edges) ────── */}
+      {tooltip && (() => {
+        const containerW = containerRef.current?.clientWidth ?? 800;
+        const containerH = containerRef.current?.clientHeight ?? 600;
+        const tipW = 240; // max-w-xs ≈ 20rem = 320px, but most are ~240
+        const tipH = 80;
+
+        // Default: right of cursor, below
+        let left = tooltip.x + LEFT_W + 8;
+        let top = tooltip.y + 32;
+
+        // Flip left if would overflow right edge
+        if (left + tipW > containerW - 16) {
+          left = tooltip.x + LEFT_W - tipW - 8;
+        }
+        // Flip up if would overflow bottom
+        if (top + tipH > containerH - 16) {
+          top = tooltip.y - tipH - 8;
+        }
+        // Clamp to stay in bounds
+        left = Math.max(8, Math.min(left, containerW - tipW - 8));
+        top = Math.max(8, top);
+
+        return (
+          <div
+            className="absolute z-50 pointer-events-none px-2.5 py-1.5 bg-gray-900 text-white text-[11px] rounded-md shadow-lg whitespace-pre-wrap max-w-xs leading-relaxed"
+            style={{ left, top }}
+          >
+            {tooltip.text}
+          </div>
+        );
+      })()}
 
       {/* ── Minimap / range selector (pinned at top) ────────────────── */}
       <Minimap
@@ -664,7 +752,7 @@ export function CareJourneyChart({ data, dateRange, onDateRangeChange, onRowClic
 
       <div className="flex" style={{ height: totalH + 36 }}>
         {/* ── Left panel: tree labels ────────────────────────────────── */}
-        <div className="shrink-0 border-r border-slate-200" style={{ width: LEFT_W }}>
+        <div className="shrink-0 border-r border-slate-200" style={{ width: LEFT_W, overflow: "visible" }}>
           {/* Header with expand/collapse controls */}
           <div className="h-[32px] border-b border-slate-200 bg-slate-50 flex items-center justify-between px-2">
             <span className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Care Journey</span>
@@ -688,9 +776,11 @@ export function CareJourneyChart({ data, dateRange, onDateRangeChange, onRowClic
 
           {visibleRows.map((row) => {
             const isCollapsed = collapsed.has(row.id);
+            const isDetailRow = row.level === 2;
             return (
               <div
                 key={row.id}
+                data-row-id={row.id}
                 className={`flex items-center gap-1 select-none ${
                   row.id === selectedRowId
                     ? "bg-blue-50 border-b border-slate-100"
@@ -708,6 +798,8 @@ export function CareJourneyChart({ data, dateRange, onDateRangeChange, onRowClic
                   height: ROW_H,
                   paddingLeft: row.level === 0 ? 8 : row.level === 1 ? 24 : 40,
                   fontSize: row.level === 0 ? 12 : 11,
+                  // Let detail row text overflow into the SVG area
+                  ...(isDetailRow ? { overflow: "visible", position: "relative" as const, zIndex: 2 } : {}),
                 }}
                 onClick={() => {
                   if (row.sourceKind && row.sourceData && onRowClick) {
@@ -717,7 +809,7 @@ export function CareJourneyChart({ data, dateRange, onDateRangeChange, onRowClic
               >
                 {row.collapsible ? (
                   <button
-                    onClick={() => toggleCollapse(row.id)}
+                    onClick={(e) => { e.stopPropagation(); toggleCollapse(row.id); }}
                     className="shrink-0 w-4 h-4 flex items-center justify-center rounded hover:bg-slate-200 transition-colors"
                   >
                     {isCollapsed ? (
@@ -736,12 +828,27 @@ export function CareJourneyChart({ data, dateRange, onDateRangeChange, onRowClic
                   style={{ backgroundColor: row.color }}
                 />
 
-                <span className="truncate" title={row.tooltip.split("\n")[0]}>
-                  {row.label}
-                </span>
+                {isDetailRow ? (
+                  /* Detail rows: text overflows with a fade-out gradient */
+                  <span
+                    className="whitespace-nowrap pointer-events-none"
+                    style={{
+                      maskImage: "linear-gradient(to right, black 85%, transparent 100%)",
+                      WebkitMaskImage: "linear-gradient(to right, black 85%, transparent 100%)",
+                      paddingRight: 60,
+                    }}
+                    title={row.tooltip.split("\n")[0]}
+                  >
+                    {row.label}
+                  </span>
+                ) : (
+                  <span className="truncate" title={row.tooltip.split("\n")[0]}>
+                    {row.label}
+                  </span>
+                )}
 
                 {row.childCount != null && row.level < 2 && (
-                  <span className="ml-auto pr-2 text-[10px] text-slate-400 tabular-nums">
+                  <span className="ml-auto pr-2 text-[10px] text-slate-400 tabular-nums shrink-0">
                     {row.childCount}
                   </span>
                 )}

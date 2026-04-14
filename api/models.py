@@ -521,6 +521,7 @@ class MedicationEpisodeItem(BaseModel):
     end_date: str | None
     duration_days: float | None
     request_count: int
+    reason: str | None = None      # resolved from reasonReference → Condition
 
 
 class ConditionEpisodeItem(BaseModel):
@@ -546,7 +547,7 @@ class ProcedureMarker(BaseModel):
     display: str
     start: str | None
     end: str | None
-    reason_display: str
+    reason_display: str            # from reasonReference → Condition display
 
 
 class DiagnosticReportItem(BaseModel):

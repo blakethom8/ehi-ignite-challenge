@@ -396,6 +396,7 @@ export interface MedicationEpisodeItem {
   end_date: string | null;
   duration_days: number | null;
   request_count: number;
+  reason: string | null;
 }
 
 export interface ConditionEpisodeItem {

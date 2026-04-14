@@ -1202,28 +1202,75 @@ def get_care_journey(patient_id: str) -> CareJourneyResponse:
     finally:
         conn.close()
 
-    # Procedures + diagnostic reports from FHIR bundle (not in SOF warehouse)
-    result = load_patient(patient_id)
+    # ── FHIR bundle enrichment (procedures, diagnostic reports, reason links) ──
+    # Open the raw bundle once for everything not in the SOF warehouse.
     procedures: list[ProcedureMarker] = []
-    if result:
-        record, _stats = result
-        for p in record.procedures:
-            start = p.performed_period.start.isoformat() if (p.performed_period and p.performed_period.start) else None
-            end = p.performed_period.end.isoformat() if (p.performed_period and p.performed_period.end) else None
-            procedures.append(ProcedureMarker(
-                procedure_id=p.procedure_id,
-                display=p.code.label(),
-                start=start,
-                end=end,
-                reason_display=p.reason_display or "",
-            ))
-        procedures.sort(key=lambda x: x.start or "")
-
-    # Diagnostic reports from raw FHIR bundle
     diagnostic_reports: list[DiagnosticReportItem] = []
+
     if path:
         with open(path) as f:
             bundle = json.load(f)
+
+        # Build a fullUrl → resource index for resolving references
+        ref_index: dict[str, dict] = {}
+        for entry in bundle.get("entry", []):
+            full_url = entry.get("fullUrl", "")
+            if full_url:
+                ref_index[full_url] = entry["resource"]
+
+        def resolve_reason(reason_refs: list[dict]) -> str:
+            """Resolve reasonReference list to a display string."""
+            reasons = []
+            for ref in reason_refs:
+                display = ref.get("display", "")
+                if not display:
+                    target = ref_index.get(ref.get("reference", ""), {})
+                    display = target.get("code", {}).get("text", "")
+                if display:
+                    reasons.append(display)
+            return "; ".join(reasons)
+
+        # --- Medication reason enrichment ---
+        # Build a map: normalized drug display → reason from MedicationRequest
+        med_reasons: dict[str, str] = {}
+        for entry in bundle.get("entry", []):
+            resource = entry.get("resource", {})
+            if resource.get("resourceType") == "MedicationRequest":
+                drug_text = resource.get("medicationCodeableConcept", {}).get("text", "")
+                reason_refs = resource.get("reasonReference", [])
+                if drug_text and reason_refs:
+                    reason = resolve_reason(reason_refs)
+                    if reason:
+                        med_reasons[drug_text.strip().lower()] = reason
+
+        # Enrich medication episodes with resolved reasons
+        for m in medication_episodes:
+            key = m.display.strip().lower()
+            if key in med_reasons:
+                m.reason = med_reasons[key]
+
+        # --- Procedures ---
+        for entry in bundle.get("entry", []):
+            resource = entry.get("resource", {})
+            if resource.get("resourceType") == "Procedure":
+                code_text = resource.get("code", {}).get("text", "")
+                if not code_text:
+                    codings = resource.get("code", {}).get("coding", [])
+                    code_text = codings[0].get("display", "Unknown") if codings else "Unknown"
+                period = resource.get("performedPeriod", {})
+                start = period.get("start")
+                end = period.get("end")
+                reason = resolve_reason(resource.get("reasonReference", []))
+                procedures.append(ProcedureMarker(
+                    procedure_id=resource.get("id", ""),
+                    display=code_text,
+                    start=start,
+                    end=end,
+                    reason_display=reason,
+                ))
+        procedures.sort(key=lambda x: x.start or "")
+
+        # --- Diagnostic reports ---
         for entry in bundle.get("entry", []):
             resource = entry.get("resource", {})
             if resource.get("resourceType") == "DiagnosticReport":

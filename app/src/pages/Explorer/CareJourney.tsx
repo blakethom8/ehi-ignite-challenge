@@ -1,12 +1,15 @@
 import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Heart, Pill, Maximize2, Clock } from "lucide-react";
+import { Heart, Pill, Maximize2, Clock, LayoutGrid, CalendarDays } from "lucide-react";
 import { api } from "../../api/client";
 import { EmptyState } from "../../components/EmptyState";
 import { CareJourneyChart } from "../../components/CareJourneyChart";
 import { CareJourneyDetail } from "../../components/CareJourneyDetail";
+import { EncounterTimeline } from "../../components/EncounterTimeline";
 import type { SelectedCareItem } from "../../components/CareJourneyChart";
+
+type ViewMode = "category" | "encounters";
 
 export function ExplorerCareJourney() {
   const [params] = useSearchParams();
@@ -20,6 +23,7 @@ export function ExplorerCareJourney() {
 
   const [dateRange, setDateRange] = useState<[string, string] | null>(null);
   const [selectedItem, setSelectedItem] = useState<SelectedCareItem | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>("category");
 
   // ── No patient ─────────────────────────────────────────────────────────
   if (!patientId) {
@@ -88,57 +92,92 @@ export function ExplorerCareJourney() {
         </div>
       </div>
 
-      {/* ── Zoom controls ────────────────────────────────────────────── */}
+      {/* ── Controls bar ────────────────────────────────────────────── */}
       <div className="flex items-center gap-1.5 text-xs shrink-0 flex-wrap">
-        <span className="text-slate-400 font-medium mr-0.5">Zoom</span>
-        {[
-          { label: "1Y", years: 1 },
-          { label: "5Y", years: 5 },
-          { label: "10Y", years: 10 },
-          { label: "20Y", years: 20 },
-        ].map(({ label, years }) => (
+        {/* View mode toggle */}
+        <div className="flex rounded-md border border-slate-300 overflow-hidden mr-2">
           <button
-            key={label}
-            onClick={() => {
-              const now = new Date();
-              const ago = new Date(now.getFullYear() - years, now.getMonth(), now.getDate());
-              setDateRange([ago.toISOString(), now.toISOString()]);
-            }}
-            className="px-2 py-1 rounded border border-slate-300 bg-white text-slate-700 shadow-sm hover:bg-slate-50 transition-colors"
+            onClick={() => { setViewMode("category"); setSelectedItem(null); }}
+            className={`flex items-center gap-1 px-2.5 py-1 transition-colors ${
+              viewMode === "category" ? "bg-[#5b76fe] text-white" : "bg-white text-slate-600 hover:bg-slate-50"
+            }`}
           >
-            {label}
+            <LayoutGrid className="w-3 h-3" />
+            Category
           </button>
-        ))}
-        <button
-          onClick={() => setDateRange(null)}
-          className="flex items-center gap-1 px-2 py-1 rounded border border-slate-300 bg-white text-slate-700 shadow-sm hover:bg-slate-50 transition-colors"
-        >
-          <Maximize2 className="w-3 h-3" />
-          All
-        </button>
-        {dateRange && (
-          <span className="text-[10px] text-slate-400 ml-1">
-            {new Date(dateRange[0]).toLocaleDateString("en-US", { month: "short", year: "numeric" })} &ndash;{" "}
-            {new Date(dateRange[1]).toLocaleDateString("en-US", { month: "short", year: "numeric" })}
-          </span>
+          <button
+            onClick={() => { setViewMode("encounters"); setSelectedItem(null); }}
+            className={`flex items-center gap-1 px-2.5 py-1 transition-colors ${
+              viewMode === "encounters" ? "bg-[#5b76fe] text-white" : "bg-white text-slate-600 hover:bg-slate-50"
+            }`}
+          >
+            <CalendarDays className="w-3 h-3" />
+            Encounters
+          </button>
+        </div>
+
+        {/* Zoom controls — only for category view */}
+        {viewMode === "category" && (
+          <>
+            <span className="text-slate-400 font-medium mr-0.5">Zoom</span>
+            {[
+              { label: "1Y", years: 1 },
+              { label: "5Y", years: 5 },
+              { label: "10Y", years: 10 },
+              { label: "20Y", years: 20 },
+            ].map(({ label, years }) => (
+              <button
+                key={label}
+                onClick={() => {
+                  const now = new Date();
+                  const ago = new Date(now.getFullYear() - years, now.getMonth(), now.getDate());
+                  setDateRange([ago.toISOString(), now.toISOString()]);
+                }}
+                className="px-2 py-1 rounded border border-slate-300 bg-white text-slate-700 shadow-sm hover:bg-slate-50 transition-colors"
+              >
+                {label}
+              </button>
+            ))}
+            <button
+              onClick={() => setDateRange(null)}
+              className="flex items-center gap-1 px-2 py-1 rounded border border-slate-300 bg-white text-slate-700 shadow-sm hover:bg-slate-50 transition-colors"
+            >
+              <Maximize2 className="w-3 h-3" />
+              All
+            </button>
+            {dateRange && (
+              <span className="text-[10px] text-slate-400 ml-1">
+                {new Date(dateRange[0]).toLocaleDateString("en-US", { month: "short", year: "numeric" })} &ndash;{" "}
+                {new Date(dateRange[1]).toLocaleDateString("en-US", { month: "short", year: "numeric" })}
+              </span>
+            )}
+          </>
         )}
 
         <span className="text-[10px] text-slate-400 ml-auto">
-          Click a row for details &middot; Drag minimap to zoom
+          {viewMode === "category" ? "Click a row for details \u00B7 Drag minimap to zoom" : "Click an encounter for details"}
         </span>
       </div>
 
-      {/* ── Gantt chart + detail pane ────────────────────────────────── */}
+      {/* ── Main content + detail pane ───────────────────────────────── */}
       <div className="flex border border-slate-200 rounded-lg bg-white overflow-hidden flex-1 min-h-0">
         <div className="relative flex-1 min-w-0">
           <div className="h-full overflow-y-auto scroll-visible" style={{ scrollbarWidth: "thin", scrollbarGutter: "stable" }}>
-            <CareJourneyChart
-              data={data}
-              dateRange={dateRange}
-              onDateRangeChange={setDateRange}
-              onRowClick={(item) => setSelectedItem(item)}
-              selectedRowId={selectedItem?.rowId ?? null}
-            />
+            {viewMode === "category" ? (
+              <CareJourneyChart
+                data={data}
+                dateRange={dateRange}
+                onDateRangeChange={setDateRange}
+                onRowClick={(item) => setSelectedItem(item)}
+                selectedRowId={selectedItem?.rowId ?? null}
+              />
+            ) : (
+              <EncounterTimeline
+                data={data}
+                onSelect={(item) => setSelectedItem(item)}
+                selectedRowId={selectedItem?.rowId ?? null}
+              />
+            )}
           </div>
           {/* Fade indicator when content overflows */}
           <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-white to-transparent" />
@@ -157,7 +196,9 @@ export function ExplorerCareJourney() {
 
       {/* ── Legend ────────────────────────────────────────────────────── */}
       <p className="text-[10px] text-slate-400 leading-relaxed shrink-0">
-        Click arrows to expand/collapse. Click a bar or dot for details.
+        {viewMode === "category"
+          ? "Click arrows to expand/collapse. Click a bar or dot for details."
+          : "Click an encounter to see linked resources in the detail pane."}
         Solid = active, faded = stopped/resolved. Arrow tip = ongoing.
       </p>
     </div>

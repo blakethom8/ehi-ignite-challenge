@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from "react";
-import type { CareJourneyResponse, EncounterMarker } from "../types";
+import type { CareJourneyResponse } from "../types";
 import type { SelectedCareItem } from "./CareJourneyChart";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────

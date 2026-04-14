@@ -9,9 +9,7 @@ import {
   XCircle,
   FileJson2,
   Network,
-  ShieldAlert,
   Layers,
-  ExternalLink,
 } from "lucide-react";
 import { api } from "../../api/client";
 

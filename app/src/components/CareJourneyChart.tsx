@@ -471,7 +471,7 @@ function buildRows(data: CareJourneyResponse): GanttRow[] {
 
 interface Tick { ms: number; label: string; isMajor: boolean }
 
-function computeTicks(minMs: number, maxMs: number, width: number): Tick[] {
+function computeTicks(minMs: number, maxMs: number, _width: number): Tick[] {
   const rangeYears = (maxMs - minMs) / (365.25 * 24 * 3600 * 1000);
   const ticks: Tick[] = [];
 
@@ -1057,8 +1057,6 @@ function Minimap({ fullMin, fullMax, viewMin, viewMax, width, leftOffset, allRow
   if (fullRange <= 0) return null;
 
   const toX = (ms: number) => ((ms - fullMin) / fullRange) * width;
-  const fromX = (x: number) => fullMin + (x / width) * fullRange;
-
   const selLeft = toX(viewMin);
   const selRight = toX(viewMax);
   const selWidth = Math.max(selRight - selLeft, 4);

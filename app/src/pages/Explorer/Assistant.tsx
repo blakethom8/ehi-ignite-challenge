@@ -324,13 +324,6 @@ export function ExplorerAssistant() {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length, mutation.isPending]);
 
-  const lastFollowUps = useMemo(() => {
-    for (let i = messages.length - 1; i >= 0; i--) {
-      if (messages[i].role === "assistant") return (messages[i] as Extract<ChatMessage, { role: "assistant" }>).followUps;
-    }
-    return [];
-  }, [messages]);
-
   function submitQuestion(rawQuestion: string) {
     if (!patientId) return;
     const question = rawQuestion.trim();

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Heart, Pill, Maximize2, Clock, LayoutGrid, CalendarDays } from "lucide-react";
+import { Heart, Pill, Maximize2, LayoutGrid, CalendarDays } from "lucide-react";
 import { api } from "../../api/client";
 import { EmptyState } from "../../components/EmptyState";
 import { CareJourneyChart } from "../../components/CareJourneyChart";

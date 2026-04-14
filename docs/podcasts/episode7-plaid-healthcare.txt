@@ -1,0 +1,275 @@
+Thank you for tuning in to Out of the Fire podcast where we talk about fire interoperability data
+and anything else. This week we're continuing our conversation with Brendan Keeler and Jason
+of Fast and Health. I think that's like you see that similar take with like Apple Health where
+I go in and I look at my data and it's like I know they're not doing anything with it or they're
+doing like the minimum necessary and they're trying to best manage that data but even like raw data
+how do you best display it to the patient? There's many different takes on that but I feel like
+the first step is obviously just make the connection because that in and of itself is an extremely
+difficult process in healthcare. So yeah so you do agree Jason that that's like a value add and it
+sounds like fast and that's doing that which is great to hear. I think that ultimately we also have
+to think about interoperability is not the end goal in and of itself though many people will say
+it is the end goal but like the patient improving outcomes and getting access to their care
+and having more cost effective and actionable healthcare is the goal right? So how do we get to
+that? It's just data to insights. Do we then start thinking about exchanging? You know we've
+seen a lot of effort from CQA and CMS on quality measures and actual insights for patients and
+that's one of the things that like I loved when I was a viewer was because we had a patient face
+and kudos to all the folks out there working on that patient specific patient facing platform
+for insights where it's not just your data you don't have to try to figure it out yourself. We
+will tell you when your next visit goes needs to happen what you need to do to better manage your
+condition. Do you feel like that's a big part of this plaid ultimate value add service for all
+different jobs to be done to have access to not just the data but the insights? So like just
+personally I feel like data out of context is kind of like a formal naval gazing like as a patient
+they're really not a lot there's not a lot that a patient that doesn't have a medical background
+can necessarily do with just a raw information and that's primarily because if you look at the data
+that you're getting through these pipes you're actually going to see record information that's
+really intended to be used by building systems that's intended to be used by other practitioners is
+not written with the patient intent in mind right and so when you you have to if you want this data to
+be valuable to the patient you have to do some sort of parsing of the data some sort of synthesis
+of meaning from it and translation effectively to something that a patient could actually understand
+and that's not to say that there aren't patients that are also you know have a very acute
+understanding of their medical data and the details of it but at the same time I think for a
+majority of individuals it's it's not useful it requires at this kind of these insights now does it
+make sense for a platform like plaid like fastened to try to do all the things I mean I'm going to
+just straight up say that I don't think we can right I don't think that's where we provide the
+most value it's not an area that I think makes sense for us to kind of tackle head on right now but
+like I said I think they're when when we can see a broad consensus across our customers that hey
+there's certain certain fundamental understandings they want to get from the data that we're pulling
+certain you know enrichment and things like that that we can do as we're parsing the data and
+collecting it on behalf of these organizations and customers I think that makes sense but
+trying to glean insights for patients I don't know if that's a good fit for us I think one of the
+other things to kind of keep in mind is again ignoring tefka right if you're just looking at it
+from the point of view of a patient access API every connection every link to a health system and
+healthcare organization is in is done in so Jason or let's say John Doe at New York Presbyterian
+Hospital is completely isolated from John Doe at UCSF even though they might be the same patient
+right they might have you know flown from one side of the country to the other and had some
+started treatment an application like fast and we don't do any sort of work trying to put those
+like link those records together try to synthesize some sort of understanding and I think that is
+the benefit of the kind of value that our customers kind of take on when they aggregate the data
+from all these different data sources and we're ignoring all the data that's outside of the
+the clinical sphere right we're talking about integration with payers there's integration with
+smart wearables and smart medical devices just running information if you want right like there's
+all these other kinds of data that that can be some class together to give these incredible insights
+to patients you're going to find an actual like financial big projects will right yeah so I don't
+think it makes sense for us or a flat in general to do but there might be businesses that think
+differently I would strongly agree with that I mean I think what's telling is plaid's origin is as a
+personal finance management tool like a mint.com and a struggle to use totally and other aggregators
+that existed prior to plaid. plaid is the sexiest financial aggregator is not the first is not the
+only there's plenty of competition teller and you know the MX and variety of others but so they
+pivoted away from personal finance management because they said we didn't just solve the
+infrastructural problem they pivot away from the point solution the application layer and they
+haven't really gone back the only thing you have is the ability as a consumer to log in and manage
+where your connections are see when you've used plaid and maybe disconnect things that's cool and
+that's a good infrastructural waiver infrastructure to surface themselves to consumers with the play
+in the sort of space what's even more interesting telling is that if you look at the use cases on plaid.com
+personal finance management is not one of them it is listed it is lending it is mortgages it is
+crypto it is the end consumers of embedded finance where we don't say oh we're going to go put it
+into the nice little you know the little box somewhere and then trouble it somewhere it's we're
+embedding it into the use case where they need it at the point in time they need it because they
+are most motivated the average consumer to go through the full flow and convert at the highest rate
+when they need it for mortgage when they need it for lending when they need it for what else did
+they list here. I mean fraud fraud was a big thing on by you see there's a quote from plaid CEO
+where fraud is as number one discussion topics for banks and then fact surpassing regulation so
+they don't like fraud totally and so if you think about it from that framing the the infrastructural
+capabilities meant to service the use cases and actually Jason alluded to this he said clinical trials
+he said life insurance maybe some life insurance but I'm just I'm just forgetting which ones you
+said but like these use cases are the embedded health care where we start to put this capability
+into the non provider case scenarios eventually that people need health data and they need
+to make their lives easier to underwrite their life insurance or to participate in a clinical trial
+that's where it becomes most impactful that's where you see the highest conversion rate I think we
+see that similar trend here that we saw with plaid and it does beg the question why why is plaid so
+much more mature why is the banking industry have it figured out well there's a lot more demand
+because plaid can be used by almost any business in America when you think of it from a use case
+perspective everyone needs payments and as core plaid can help facilitate payments in an account
+to count fashion that is much more secure than the old way of typing over your your your account
+and routing number can the same be said for health data it remains to be seen does every business in
+America need potentially health health data maybe if that maybe if you're saying as an employer they
+need it for managing their employees health care but I don't know that it's as an acute of a need
+so there's a demand side signal here that drives why plaid is more mature is in that for better or
+worse there's more potential buyers for the infrastructural solution that being said I'm very bullish
+for Jason I'm very bullish for flex but I'm very bullish for this because there are a number of
+high leverage opportunities in use cases that like we just mentioned that really really need it
+to improve onboarding for clinical trials or helping patients select the right Medicare plan or
+a variety of other things that just are on top today I saw the demo you did Jason was clear
+and I asked use case and that's huge I know Brendan you posted that you you were able to
+connect and go through that and I feel that is an awesome awesome accomplishment so
+put us to you on that do you feel like that's going to really grow and become one of the major
+use cases of one faster yeah well I mean so just fundamentally the way that we view fast and is
+that we're a turnkey solution for accessing medical records wherever they live right it shouldn't
+matter if they're access if patients want to show their medical records via a rect patient access
+APIs or if they want to facilitate the collection of medical records directly from the Tefka network
+could be IS or if they want us to use eFactors maybe down the line but what we have done with the
+Tefka IS network you know we are incredibly proud of the work we did there it's been
+something that I've been trying to do for like two years and and the thing about the thing about
+Tefka is the patient experience when you start comparing that to this portal authentication mechanism
+it's just it's so incredibly clear that it is a much more patient centric a much more
+friendly mechanism for an individual to consent and share their medical records right all the
+essentially have to do is verify their identity using an ID verification platform like clear or ID
+dot me so they take a photo of their face take a photo of some government issue ID if the platform
+doesn't know who they are already and then they basically click and specify which institutions
+they want to share their records from because what we do with that verified identities we actually
+federate a request out to the Tefka network and say hey who knows about this John Doe that
+lives at this address with this birthday and we get back a response of eventually probably a half
+dozen to a dozen different institutions that know about that individual and then we give the
+the patient the ability to say yes these are the institutions that I want to share with my personal
+health record app with my clinical trial with my care coordination company that that experience is
+fundamentally just it leaves and pounds better than having to say all right remember all the
+institutions you've been to find them in a catalog that might actually be a subset of all the
+institutions that you actually visited and then remember your username and password log in and
+then go through an experience and we haven't talked about this but every EHR actually controls
+the consent flow within and it's going to differ significantly depending on the EHR that the
+hospital helps us to use it so epics consent flow versus cerners consent flow versus the
+thing you know versus all script are all different and in some cases they're really friendly and they
+help the patient walk through that process but in other cases they give them big red exclamation
+signs or warnings saying hey there's an untrusted app that wants to you know access your data
+and let the patient wants to do this and they may be completely aware of what's going on it can be
+a really scary and a very time consuming process for them and when you compare that to what you get
+with tefka is like the rain doesn't butterfly is what it could be it's and it's dumb right like
+it's if you know the password and username of like your wife or your spouse or your grandma you could
+technically pull all their health records where it's I don't necessarily want my son like pulling
+down all my records and then sharing them on like road walks or something but like they could if
+they just see your password and username while something like clear even with ias that would prevent
+that because that's not who's the personal accessing that that's because you know the user in
+a path so there's a security equation there too there's definitely a security equation and
+hopefully a bit a little bit of devil's advocate is more fun when we're not all agreeing like I do
+think we need to think separately about the authentication layer and the authorization layer and so
+if we think about aisle two as identity proofing and then through authenticating and then you will
+after that step how do we choose to provision data back to an application is really important
+and so authorization I think people want that to disappear I think that's still important because I
+don't necessarily want to share everything back to the app or trust that the app will take everything
+and only use the things that I say in the app there's something to figure out and tease out there
+as we get deeper right now I'm with Jason wait let me do ias I'm like holy shit this is everything
+we thought it would be and so it's it needs to be scaled it needs to be you know I would need
+to get it down to the south gory equivalent and agnostic to the how but right now it's working
+on stuff and nowhere else is it working and it gets scaled but then we do have to figure out those
+edge gays because they're on authorization those edge gays is around you know caregivers and
+things like that like how do we handle that so with things there's still plenty of work to do but
+authorization is really really uh is it an important stuff that needs to be considered the scary
+app page I want to put something out what's in there that like there will be abuses of this there will
+be abuses of this and the more the more we reduce friction we get rid of this scary app page we
+let people just sort of sign up with every any app that happens as soon as abuses happen then the
+networks or the legislators or regulators will pull back on what they've granted us because this
+is an artificial construct that market forces would not look as we see with banking as we
+started with does not happen in a vacuum JP Morgan Chase is charging the aggregators in banking
+in a vacuum and that's what we would see here in a vacuum and so I am cautious of removing if we
+go forward towards no friction and abuses happen the pendulum will swing back and it'll swing
+back harder than we want it to so getting having a certification of apps or something in allowing
+the uncertified app and having the scary screen versus a certified app that has a scary screen
+seems smart to me because then we can have clearer guidance for as we scale this to less tech savvy
+what people look at the elderly or whatever they could be diluted by bad actors to connect their
+health data and having to use maliciously and so like that is the the the it may be a small risk
+but small risk with outsize outcomes means an expected value could be extremely negative and
+could lead to the whole cards how's the cards falling down before we built it firmly with a
+firmer foundation that's my pushback in that I don't disagree that it's been weaponized these screens
+but there is something to it in the sense that inform the more we can inform and provide transparency
+about you know good actors the better we prevent against potential abuse and that as we reduce
+friction we increase the likelihood inevitable likelihood of abuse with any exchange there's
+inevitably at some point fraud and abuse and so I don't want that fusion to come where we end up
+like banking so I push back on that at all I do agree that there is the potential for significant harm
+when it comes to the abuse the misuse of a PHI personal like private health information but what I
+don't think is the right answer is for the EHR themselves to be the ones determining if there
+should be a warning for an app or not and I do not think they should be gaining it behind oh have
+you paid a developer registration fee to be an own act I would think that would be a leak it should
+be a leak right other information blocking all so yeah yeah yeah totally agree that yeah but yeah
+I completely agree I think there is this potential now for the market to basically decide hey
+these are apps that are busted and vetted and their group views and use you know social proves
+to basically determine which apps you want to use or not and that comes back to your comment about
+authorization as an individual the way that I use apps is I basically give it you know the minimum
+amount of information that's necessary for the app to function first just to see what it does how
+it uses the information and if I don't trust it I'll just delete it but I should be able to then say oh
+no this is an app I like this is an app that I trust I've used it for years all right let me give it
+more consent let me give it access to more of my information because I think it's doing the right
+thing and everyone around me that's also using the app has had good experiences with it right and
+there hasn't been any you know violations or public articles written about how this app is doing
+things in a sketchy way agree with you completely I think authorization is definitely a missing
+component when it comes to autosco works but I think that is something that we can solve after
+the fact I think right now it's just the disability that we have to you know access medical records via
+verified identity it is just it's it's night and day like it is such a fulfilling experience for
+patients that's my slash end of being contrarian just for the sake of the podcast but yeah I have
+to sign up Jason like where do I sign up for that no I mean for I asked to try the
+you do reach out to me I think one of the things that we're dealing with IAS at the moment is we
+there's and I don't know how deep you want to go into Tefka and IAS and the nuance there but
+there's about a hundred and seven years so epic sites that are live a couple I think there's
+a hundred or so meta tech sites that are being added monthly herner sites are not online yet and
+they they're going to be what is a q1 of next year where their qin is going to be online
+Athena is really I think one of the few EHRs that are broadly available and responding on the
+network and that means that for most individuals you know you come in and start using fast and you go
+all right we'll expect you to find 10 different health systems that I visited and that I can
+remember it recently but when you actually go through the process you verify your identity
+with a photo of your face and a copy of your government issue ID and you get back one or nothing
+you lose trust in the system you don't gain it and so that's that's one of the issues right
+if you have an ability to like yeah where well we only have hundreds of sites whatever out of
+what is it 500 or whatever how many of the consoles are there but like not having somebody like
+certain areas a pretty big part of the system right so cool on authorization I just want to add
+that I recently had a conversation with his name is eau he actually is in israel there's a
+equivalent of a taffka kind of like they have a 2027 law that was just passed that authorization
+is part of that in addition to the european health data space that's in another situation and they're
+also looking at it from that so you as a consumer of health care data services basically you can authorize
+the the different types of data that you want to share for different types of purposes that is all
+written into these laws which is interesting it's not just like consent to everything or just
+log in and get all your data it's like no you have to be able to segment by this is behavioral
+that this is lab data this is your you know this which I think is going to be huge I think one
+percent of patients will last will use it just like gdpr and so I think that is still worth doing
+granular consent is really important for a small percentage of patient a small percentage of
+use cases but like when you are on a EU webpage how often are you like if you do like I'm not
+going to do any cookies or my dual cookies right and so there's a small percentage of users that
+utilize that functionality and from a invest in a societal investment where do we put our energy
+is that where we want to do it I think yes I think consent fine green consent is a really important
+enough problem for a small enough segment but there's really really you know HIV behavioral health
+um uh reproductive care inmates there's there's a lot of different use cases that it really does
+matter a lot and so even if most people don't utilize this capabilities it's noble and just
+to still pursue but there's a real cost of building that level of infrastructure is really really
+hard from a regulatory burden perspective on the servers and things to segment and and shop up
+things that have been aggregated and so I think that's one interesting nuance there and the other
+is where does that consent layer live is it a centralized service is really important because if it's
+not then you have a decentralized consent and you need to go and find all the consents that exist
+everywhere that's hard so I have to figure that out too as we get deeper into these niche the next
+layer past tepka based tepka is of authorization sent caregivers all those fun next level problems
+yeah I mean financial another financial industry like a take is you know authorize users like they
+let you out there as users told you account that's like built in how most health financial
+companies let you manage that data uh and also like I'm also a manager of my wife's
+bunch of credit cards account even though she's the credit card because I'm just the one that like
+pays the credit card whatever so I think those are kind of like standard things that like we should
+think about as well in health care yeah okay I think that the delegated access and and proxy
+authorizations are pretty complicated because there's a lot of state by state level you know decision
+make you there and then you also come against the wall of like well certain EHRs have implemented
+some of this functionality others haven't and so it's like from a technical level you there's
+there's just no global this is the right way to do it um yet and yeah yeah so I guess really
+that's how to make to make this fire related or like fire technical related like there is a
+implementation guide and fire for consent flow and all that and proxy that so we're just like
+as the industry catches up to like the standards I think we'll see that as well probably more built
+more and more on top of this so uh okay uh fascinating discussion thank you all one less
+take is one bold prediction for 2027 that you guys can share I can go first I think the CMS
+prior authorization rule which is heavily based on the venture totally not what we're talking about
+on this one man that's going to be a shit show so get ready that is due January 1st 2027 for all
+payers to make available prior authorization APIs to providers and pair to pair APIs for
+payers to with consent poll from other payers the prior claims history sands adjudication or
+remittance details uh provider access APIs for providers to access claims details for their
+attributed populations sands remittances and then the the patient access API gets an
+upgrade and gets additional and prior authorization information all that coming to you live
+January 1st 2027 infinitely harder than the patient access APIs do you know in 2021
+Jason's connected to some of flexibus connected to a lot of but that was easy mode this is
+extra ultra hard fire this is cql this is da Vinci this is cds hooks holy moly that's going to be
+a fun little year for that if that stays on that target date so that's my i don't think it's that
+hot of a take but i do think uh it's gonna be a heck of a year in terms of fire expertise being
+needed if we continue that back okay hot take i don't necessarily think this is much about hot
+take either but i think we've been talking a lot about phr's being you know this the central
+repository for all your medical records from all these different sources what i'm actually seeing
+is i'm seeing that there's a lot of very niche very community specific chronic illness specific
+kind of applications i don't believe there's going to be like a winner take all personal
+algorithm what i'm really seeing is that there's going to be these very you know condition specific
+apps or there's going to be you know a very specific personalized medicine type of app that's
+going to solve a problem for a specific group of people and they're going to take into account
+maybe the food that you're eating plus your medical records plus you know your fitness routine
+and then there might be a completely different app that's going to try to that's going to win
+in you know a different kind of condition space um think that is really really interesting to me
+i think that as this it feels more real than the way that people discuss personal health
+record apps is kind of this one unified monolithic building block of an application i don't see
+that i think it's it's going to be a lot more nuanced and it's going to be a lot more interesting
+referring to visuals yeah socialization is the memory of the game i was like in health care
+because of because of the complexity and what you need to go through as a patient
+a lot of these closed all right awesome this has been a terrific terrific conversation
+hopefully we can do it again with uh Joshua Kelly when he's recovered from his broken toe and uh
+i also welcome anybody that listens to the show and wants to come on and talk shop and try to
+get us all to agree and disagree provide spicy takes on all of these topics thank you so much
+gentlemen and the Brendan please have a fantastic opportunity please time and hope the baby selfie
+and your thanks thank you thank you for having me on thank you thank you

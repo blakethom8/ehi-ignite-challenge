@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, NavLink, useLocation, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -7,6 +7,8 @@ import {
   BarChart3,
   BookMarked,
   CalendarDays,
+  ChevronsLeft,
+  ChevronsRight,
   ClipboardCheck,
   Database,
   FileJson2,
@@ -45,6 +47,7 @@ interface NavItem {
 const CLINICAL_NAV_LINKS: NavItem[] = [
   { to: "/explorer", label: "Overview", icon: Database, description: "Patient summary" },
   { to: "/explorer/timeline", label: "Timeline", icon: CalendarDays, description: "Encounter history" },
+  { to: "/explorer/care-journey", label: "Care Journey", icon: Heart, description: "Visual care timeline" },
   { to: "/explorer/safety", label: "Safety", icon: ShieldAlert, description: "Pre-op risk flags" },
   { to: "/explorer/interactions", label: "Interactions", icon: Zap, description: "Drug-drug interactions" },
   { to: "/explorer/conditions", label: "Conditions", icon: Activity, description: "Surgical risk ranking" },
@@ -55,7 +58,7 @@ const CLINICAL_NAV_LINKS: NavItem[] = [
   { to: "/explorer/assistant", label: "Assistant", icon: MessageSquareText, description: "Provider chart Q&A" },
   { to: "/explorer/corpus", label: "Corpus", icon: BarChart3, description: "Population statistics" },
   { to: "/explorer/distributions", label: "Distributions", icon: BarChart2, description: "Lab value distributions" },
-  { to: "/journey", label: "Patient Journey", icon: Heart, description: "Clinical briefing" },
+  { to: "/journey", label: "Patient Journey", icon: Activity, description: "Clinical briefing" },
 ];
 
 const ANALYSIS_NAV_LINKS: NavItem[] = [
@@ -272,6 +275,17 @@ export function Layout({ children }: LayoutProps) {
 
   const [paletteOpen, setPaletteOpen] = useState(false);
 
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
+    try { return localStorage.getItem("ehi-sidebar-collapsed") === "true"; } catch { return false; }
+  });
+  const toggleSidebar = useCallback(() => {
+    setSidebarCollapsed((prev) => {
+      const next = !prev;
+      try { localStorage.setItem("ehi-sidebar-collapsed", String(next)); } catch { /* noop */ }
+      return next;
+    });
+  }, []);
+
   const environment: AppEnvironment = location.pathname.startsWith("/analysis") ? "analysis" : "clinical";
   const isAnalysis = environment === "analysis";
 
@@ -344,53 +358,78 @@ export function Layout({ children }: LayoutProps) {
 
         <div className="flex h-[calc(100vh-72px)] flex-col overflow-hidden lg:flex-row">
           <aside
-            className={`flex max-h-[50vh] w-full shrink-0 flex-col overflow-hidden border-b border-r border-[#e9eaef] lg:max-h-none lg:w-72 lg:border-b-0 ${
-              isAnalysis ? "bg-[#f7fffc]" : "bg-white"
-            }`}
+            className={`relative flex max-h-[50vh] w-full shrink-0 flex-col overflow-hidden border-b border-r border-[#e9eaef] transition-all duration-200 lg:max-h-none lg:border-b-0 ${
+              sidebarCollapsed ? "lg:w-14" : "lg:w-72"
+            } ${isAnalysis ? "bg-[#f7fffc]" : "bg-white"}`}
           >
             {!isAnalysis && (
               <>
-                <div className="shrink-0 border-b border-[#e9eaef] px-4 pb-4 pt-5">
-                  <div className="mb-1 flex items-center gap-2">
-                    <Activity size={18} className="text-[#5b76fe]" />
-                    <span className="text-sm font-semibold tracking-tight text-[#1c1c1e]">Clinical Workspace</span>
+                {/* Workspace header + collapse toggle */}
+                <div className="shrink-0 border-b border-[#e9eaef] px-2 pb-3 pt-4 lg:px-3">
+                  <div className="flex items-center justify-between">
+                    <div className={`flex items-center gap-2 ${sidebarCollapsed ? "justify-center w-full" : ""}`}>
+                      <Activity size={18} className="shrink-0 text-[#5b76fe]" />
+                      {!sidebarCollapsed && (
+                        <span className="text-sm font-semibold tracking-tight text-[#1c1c1e]">Clinical Workspace</span>
+                      )}
+                    </div>
+                    <button
+                      onClick={toggleSidebar}
+                      className={`hidden lg:flex shrink-0 items-center justify-center w-6 h-6 rounded hover:bg-[#f5f6f8] text-[#a5a8b5] hover:text-[#555a6a] transition-colors ${sidebarCollapsed ? "absolute right-1 top-4" : ""}`}
+                      title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+                    >
+                      {sidebarCollapsed ? <ChevronsRight size={14} /> : <ChevronsLeft size={14} />}
+                    </button>
                   </div>
-                  <p className="text-xs text-[#a5a8b5]">Patient-level safety and chart review</p>
+                  {!sidebarCollapsed && (
+                    <p className="mt-1 text-xs text-[#a5a8b5]">Patient-level safety and chart review</p>
+                  )}
                 </div>
 
-                <div className="shrink-0 border-b border-[#e9eaef] px-4 py-3">
-                  <button
-                    onClick={() => setPaletteOpen(true)}
-                    className="flex w-full items-center gap-2 rounded-lg border border-[#e9eaef] bg-[#f5f6f8] px-3 py-2 text-sm text-[#a5a8b5] transition-colors hover:border-[#5b76fe] hover:text-[#555a6a]"
-                  >
-                    <span className="flex-1 text-left">Search patients…</span>
-                    <kbd className="shrink-0 rounded border border-[#e9eaef] bg-white px-1 py-0.5 font-mono text-[10px]">
-                      ⌘K
-                    </kbd>
-                  </button>
-                </div>
+                {/* Search + patient list (hidden when collapsed) */}
+                {!sidebarCollapsed && (
+                  <>
+                    <div className="shrink-0 border-b border-[#e9eaef] px-4 py-3">
+                      <button
+                        onClick={() => setPaletteOpen(true)}
+                        className="flex w-full items-center gap-2 rounded-lg border border-[#e9eaef] bg-[#f5f6f8] px-3 py-2 text-sm text-[#a5a8b5] transition-colors hover:border-[#5b76fe] hover:text-[#555a6a]"
+                      >
+                        <span className="flex-1 text-left">Search patients…</span>
+                        <kbd className="shrink-0 rounded border border-[#e9eaef] bg-white px-1 py-0.5 font-mono text-[10px]">
+                          ⌘K
+                        </kbd>
+                      </button>
+                    </div>
 
-                <PatientList selectedId={patientId} onSelect={handleSelectPatient} />
+                    <PatientList selectedId={patientId} onSelect={handleSelectPatient} />
+                  </>
+                )}
 
-                <nav className="space-y-0.5 border-t border-[#e9eaef] px-3 py-4">
-                  <p className="mb-2 px-2 text-xs font-medium uppercase tracking-wider text-[#a5a8b5]">Views</p>
+                {/* Nav links */}
+                <nav className={`space-y-0.5 border-t border-[#e9eaef] ${sidebarCollapsed ? "px-1 py-2" : "px-3 py-4"}`}>
+                  {!sidebarCollapsed && (
+                    <p className="mb-2 px-2 text-xs font-medium uppercase tracking-wider text-[#a5a8b5]">Views</p>
+                  )}
                   {CLINICAL_NAV_LINKS.map(({ to, label, icon: Icon, description }) => (
                     <NavLink
                       key={to}
                       to={withPatientQuery(to, patientId)}
+                      title={sidebarCollapsed ? label : undefined}
                       className={({ isActive }) =>
-                        `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${
-                          isActive
-                            ? "bg-[#eef1ff] font-medium text-[#5b76fe]"
-                            : "text-[#555a6a] hover:bg-[#f5f6f8] hover:text-[#1c1c1e]"
+                        `flex items-center rounded-lg transition-colors ${
+                          sidebarCollapsed
+                            ? `justify-center p-2.5 ${isActive ? "bg-[#eef1ff] text-[#5b76fe]" : "text-[#555a6a] hover:bg-[#f5f6f8] hover:text-[#1c1c1e]"}`
+                            : `gap-3 px-3 py-2.5 text-sm ${isActive ? "bg-[#eef1ff] font-medium text-[#5b76fe]" : "text-[#555a6a] hover:bg-[#f5f6f8] hover:text-[#1c1c1e]"}`
                         }`
                       }
                     >
-                      <Icon size={16} />
-                      <div>
-                        <div>{label}</div>
-                        <div className="text-xs font-normal opacity-60">{description}</div>
-                      </div>
+                      <Icon size={sidebarCollapsed ? 18 : 16} />
+                      {!sidebarCollapsed && (
+                        <div>
+                          <div>{label}</div>
+                          <div className="text-xs font-normal opacity-60">{description}</div>
+                        </div>
+                      )}
                     </NavLink>
                   ))}
                 </nav>
@@ -399,62 +438,84 @@ export function Layout({ children }: LayoutProps) {
 
             {isAnalysis && (
               <>
-                <div className="shrink-0 border-b border-[#d5ebe5] px-4 pb-4 pt-5">
-                  <div className="mb-1 flex items-center gap-2">
-                    <BookMarked size={18} className="text-[#0f766e]" />
-                    <span className="text-sm font-semibold tracking-tight text-[#0f172a]">Data Lab</span>
+                <div className="shrink-0 border-b border-[#d5ebe5] px-2 pb-3 pt-4 lg:px-3">
+                  <div className="flex items-center justify-between">
+                    <div className={`flex items-center gap-2 ${sidebarCollapsed ? "justify-center w-full" : ""}`}>
+                      <BookMarked size={18} className="shrink-0 text-[#0f766e]" />
+                      {!sidebarCollapsed && (
+                        <span className="text-sm font-semibold tracking-tight text-[#0f172a]">Data Lab</span>
+                      )}
+                    </div>
+                    <button
+                      onClick={toggleSidebar}
+                      className={`hidden lg:flex shrink-0 items-center justify-center w-6 h-6 rounded hover:bg-[#edf9f5] text-[#55706c] hover:text-[#0f172a] transition-colors ${sidebarCollapsed ? "absolute right-1 top-4" : ""}`}
+                      title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+                    >
+                      {sidebarCollapsed ? <ChevronsRight size={14} /> : <ChevronsLeft size={14} />}
+                    </button>
                   </div>
-                  <p className="text-xs text-[#55706c]">Definitions, methodology, and reliability evidence</p>
+                  {!sidebarCollapsed && (
+                    <p className="mt-1 text-xs text-[#55706c]">Definitions, methodology, and reliability evidence</p>
+                  )}
                 </div>
 
-                <div className="shrink-0 border-b border-[#d5ebe5] px-4 py-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-[#55706c]">Corpus Snapshot</p>
-                  <div className="mt-2 grid grid-cols-2 gap-2">
-                    <div className="rounded-lg bg-white px-2.5 py-2 shadow-[rgb(213_235_229)_0px_0px_0px_1px]">
-                      <p className="text-[10px] uppercase tracking-wider text-[#55706c]">Patients</p>
-                      <p className="text-sm font-semibold text-[#0f172a]">
-                        {corpusStats ? corpusStats.total_patients.toLocaleString() : "..."}
-                      </p>
-                    </div>
-                    <div className="rounded-lg bg-white px-2.5 py-2 shadow-[rgb(213_235_229)_0px_0px_0px_1px]">
-                      <p className="text-[10px] uppercase tracking-wider text-[#55706c]">Resources</p>
-                      <p className="text-sm font-semibold text-[#0f172a]">
-                        {corpusStats ? corpusStats.total_resources.toLocaleString() : "..."}
-                      </p>
+                {!sidebarCollapsed && (
+                  <div className="shrink-0 border-b border-[#d5ebe5] px-4 py-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-[#55706c]">Corpus Snapshot</p>
+                    <div className="mt-2 grid grid-cols-2 gap-2">
+                      <div className="rounded-lg bg-white px-2.5 py-2 shadow-[rgb(213_235_229)_0px_0px_0px_1px]">
+                        <p className="text-[10px] uppercase tracking-wider text-[#55706c]">Patients</p>
+                        <p className="text-sm font-semibold text-[#0f172a]">
+                          {corpusStats ? corpusStats.total_patients.toLocaleString() : "..."}
+                        </p>
+                      </div>
+                      <div className="rounded-lg bg-white px-2.5 py-2 shadow-[rgb(213_235_229)_0px_0px_0px_1px]">
+                        <p className="text-[10px] uppercase tracking-wider text-[#55706c]">Resources</p>
+                        <p className="text-sm font-semibold text-[#0f172a]">
+                          {corpusStats ? corpusStats.total_resources.toLocaleString() : "..."}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
 
-                <nav className="space-y-0.5 border-t border-[#d5ebe5] px-3 py-4">
-                  <p className="mb-2 px-2 text-xs font-medium uppercase tracking-wider text-[#55706c]">Data Views</p>
+                <nav className={`space-y-0.5 border-t border-[#d5ebe5] ${sidebarCollapsed ? "px-1 py-2" : "px-3 py-4"}`}>
+                  {!sidebarCollapsed && (
+                    <p className="mb-2 px-2 text-xs font-medium uppercase tracking-wider text-[#55706c]">Data Views</p>
+                  )}
                   {ANALYSIS_NAV_LINKS.map(({ to, label, icon: Icon, description }) => (
                     <NavLink
                       key={to}
                       to={to}
+                      title={sidebarCollapsed ? label : undefined}
                       className={({ isActive }) =>
-                        `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${
-                          isActive
-                            ? "bg-[#dff6ef] font-medium text-[#0f766e]"
-                            : "text-[#35524d] hover:bg-[#edf9f5] hover:text-[#0f172a]"
+                        `flex items-center rounded-lg transition-colors ${
+                          sidebarCollapsed
+                            ? `justify-center p-2.5 ${isActive ? "bg-[#dff6ef] text-[#0f766e]" : "text-[#35524d] hover:bg-[#edf9f5] hover:text-[#0f172a]"}`
+                            : `gap-3 px-3 py-2.5 text-sm ${isActive ? "bg-[#dff6ef] font-medium text-[#0f766e]" : "text-[#35524d] hover:bg-[#edf9f5] hover:text-[#0f172a]"}`
                         }`
                       }
                     >
-                      <Icon size={16} />
-                      <div>
-                        <div>{label}</div>
-                        <div className="text-xs font-normal opacity-70">{description}</div>
-                      </div>
+                      <Icon size={sidebarCollapsed ? 18 : 16} />
+                      {!sidebarCollapsed && (
+                        <div>
+                          <div>{label}</div>
+                          <div className="text-xs font-normal opacity-70">{description}</div>
+                        </div>
+                      )}
                     </NavLink>
                   ))}
                 </nav>
               </>
             )}
 
-            <div className={`shrink-0 border-t px-4 py-3 ${isAnalysis ? "border-[#d5ebe5]" : "border-[#e9eaef]"}`}>
-              <p className={`text-xs ${isAnalysis ? "text-[#55706c]" : "text-[#a5a8b5]"}`}>
-                EHI Ignite Challenge · Phase 1
-              </p>
-            </div>
+            {!sidebarCollapsed && (
+              <div className={`shrink-0 border-t px-4 py-3 ${isAnalysis ? "border-[#d5ebe5]" : "border-[#e9eaef]"}`}>
+                <p className={`text-xs ${isAnalysis ? "text-[#55706c]" : "text-[#a5a8b5]"}`}>
+                  EHI Ignite Challenge · Phase 1
+                </p>
+              </div>
+            )}
           </aside>
 
           <main className={`flex-1 overflow-y-auto ${isAnalysis ? "bg-[#edf7f5]" : "bg-[#f5f6f8]"}`}>

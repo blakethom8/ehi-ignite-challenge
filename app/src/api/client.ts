@@ -16,6 +16,7 @@ import type {
   AllergyCriticalityBreakdown,
   ProviderAssistantRequest,
   ProviderAssistantResponse,
+  CareJourneyResponse,
 } from "../types";
 
 const http = axios.create({
@@ -83,6 +84,10 @@ export const api = {
   /** Allergy criticality + category breakdown across the full corpus */
   getAllergyCriticalityBreakdown: (): Promise<AllergyCriticalityBreakdown> =>
     http.get<AllergyCriticalityBreakdown>("/corpus/allergies/criticality-breakdown").then((r) => r.data),
+
+  /** Care journey — medication episodes, conditions, encounters for Gantt timeline */
+  getCareJourney: (patientId: string): Promise<CareJourneyResponse> =>
+    http.get<CareJourneyResponse>(`/patients/${patientId}/care-journey`).then((r) => r.data),
 
   /** Provider-facing chart Q&A */
   chatProviderAssistant: (payload: ProviderAssistantRequest): Promise<ProviderAssistantResponse> =>

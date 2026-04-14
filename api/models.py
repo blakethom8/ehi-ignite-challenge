@@ -507,6 +507,59 @@ class FieldCoverageResponse(BaseModel):
 # Provider Assistant (chat)
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Care Journey (multi-lane Gantt timeline)
+# ---------------------------------------------------------------------------
+
+class MedicationEpisodeItem(BaseModel):
+    episode_id: str
+    display: str
+    drug_class: str | None
+    status: str
+    is_active: bool
+    start_date: str | None
+    end_date: str | None
+    duration_days: float | None
+    request_count: int
+
+
+class ConditionEpisodeItem(BaseModel):
+    condition_id: str
+    display: str
+    clinical_status: str
+    onset_date: str | None
+    end_date: str | None       # recorded_date for resolved; None for active
+    is_active: bool
+
+
+class EncounterMarker(BaseModel):
+    encounter_id: str
+    class_code: str
+    type_text: str
+    start: str | None
+    reason_display: str
+
+
+class ProcedureMarker(BaseModel):
+    procedure_id: str
+    display: str
+    start: str | None
+    end: str | None
+    reason_display: str
+
+
+class CareJourneyResponse(BaseModel):
+    patient_id: str
+    name: str
+    earliest_date: str | None
+    latest_date: str | None
+    medication_episodes: list[MedicationEpisodeItem]
+    conditions: list[ConditionEpisodeItem]
+    encounters: list[EncounterMarker]
+    procedures: list[ProcedureMarker]
+    drug_classes_present: list[str]
+
+
 class ProviderAssistantTurn(BaseModel):
     role: str    # "user" | "assistant"
     content: str

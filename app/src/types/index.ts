@@ -382,6 +382,59 @@ export interface ProviderAssistantCitation {
   event_date: string | null;
 }
 
+// ---------------------------------------------------------------------------
+// Care Journey (multi-lane Gantt timeline)
+// ---------------------------------------------------------------------------
+
+export interface MedicationEpisodeItem {
+  episode_id: string;
+  display: string;
+  drug_class: string | null;
+  status: string;
+  is_active: boolean;
+  start_date: string | null;
+  end_date: string | null;
+  duration_days: number | null;
+  request_count: number;
+}
+
+export interface ConditionEpisodeItem {
+  condition_id: string;
+  display: string;
+  clinical_status: string;
+  onset_date: string | null;
+  end_date: string | null;
+  is_active: boolean;
+}
+
+export interface EncounterMarker {
+  encounter_id: string;
+  class_code: string;
+  type_text: string;
+  start: string | null;
+  reason_display: string;
+}
+
+export interface ProcedureMarker {
+  procedure_id: string;
+  display: string;
+  start: string | null;
+  end: string | null;
+  reason_display: string;
+}
+
+export interface CareJourneyResponse {
+  patient_id: string;
+  name: string;
+  earliest_date: string | null;
+  latest_date: string | null;
+  medication_episodes: MedicationEpisodeItem[];
+  conditions: ConditionEpisodeItem[];
+  encounters: EncounterMarker[];
+  procedures: ProcedureMarker[];
+  drug_classes_present: string[];
+}
+
 export interface ProviderAssistantRequest {
   patient_id: string;
   question: string;

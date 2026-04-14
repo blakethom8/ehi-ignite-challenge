@@ -184,7 +184,7 @@ export function ExplorerCareJourney() {
         </div>
 
         {selectedItem && (
-          <div className="w-80 shrink-0 border-l border-slate-200 overflow-hidden">
+          <div className="w-80 shrink-0 border-l border-slate-200 overflow-y-auto scroll-visible" style={{ scrollbarWidth: "thin" }}>
             <CareJourneyDetail
               item={selectedItem}
               patientId={patientId}

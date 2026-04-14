@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import type { CareJourneyResponse, EncounterMarker } from "../types";
 import type { SelectedCareItem } from "./CareJourneyChart";
 
@@ -76,14 +76,44 @@ export function EncounterTimeline({ data, onSelect, selectedRowId }: EncounterTi
     return map;
   }, [encounters, data.medication_episodes, data.procedures]);
 
+  // Keyboard navigation
+  const containerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!selectedRowId || !onSelect) return;
+
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+      e.preventDefault();
+
+      const curIdx = encounters.findIndex((enc) => `enc_tl_${enc.encounter_id}` === selectedRowId);
+      if (curIdx === -1) return;
+
+      const nextIdx = e.key === "ArrowDown"
+        ? Math.min(curIdx + 1, encounters.length - 1)
+        : Math.max(curIdx - 1, 0);
+
+      if (nextIdx !== curIdx) {
+        const next = encounters[nextIdx];
+        const rowId = `enc_tl_${next.encounter_id}`;
+        onSelect({ kind: "encounter", rowId, data: next });
+
+        const rowEl = containerRef.current?.querySelector(`[data-enc-id="${next.encounter_id}"]`);
+        rowEl?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      }
+    };
+
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [selectedRowId, encounters, onSelect]);
+
   if (encounters.length === 0) {
     return <div className="text-center text-slate-400 py-8 text-sm">No encounters found.</div>;
   }
 
   return (
-    <div className="divide-y divide-slate-100">
+    <div ref={containerRef} className="divide-y divide-slate-100">
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-2 bg-slate-50 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+      <div className="flex items-center gap-3 px-4 py-2 bg-slate-50 text-[10px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-200">
         <span className="w-24 shrink-0">Date</span>
         <span className="w-20 shrink-0">Class</span>
         <span className="flex-1">Details</span>
@@ -97,13 +127,14 @@ export function EncounterTimeline({ data, onSelect, selectedRowId }: EncounterTi
         return (
           <div
             key={enc.encounter_id}
+            data-enc-id={enc.encounter_id}
             className={`flex items-start gap-3 px-4 py-2.5 cursor-pointer transition-colors ${
               isSelected ? "bg-blue-50" : "hover:bg-slate-50"
             }`}
             onClick={() => onSelect({ kind: "encounter", rowId, data: enc })}
           >
             {/* Date */}
-            <span className="w-24 shrink-0 text-[11px] text-slate-500 pt-0.5 tabular-nums">
+            <span className="w-24 shrink-0 text-[12px] text-slate-700 font-medium pt-0.5 tabular-nums">
               {fmtDate(enc.start)}
             </span>
 
@@ -115,7 +146,7 @@ export function EncounterTimeline({ data, onSelect, selectedRowId }: EncounterTi
             {/* Details */}
             <div className="flex-1 min-w-0">
               {/* Diagnosis or type */}
-              <div className="text-[12px] text-slate-800 font-medium leading-snug">
+              <div className="text-[13px] text-[#1c1c1e] font-semibold leading-snug">
                 {enc.diagnoses.length > 0 ? (
                   enc.diagnoses.map((dx, i) => (
                     <span key={i}>
@@ -124,13 +155,13 @@ export function EncounterTimeline({ data, onSelect, selectedRowId }: EncounterTi
                     </span>
                   ))
                 ) : (
-                  <span className="text-slate-500">{enc.type_text || "Encounter"}</span>
+                  <span>{enc.type_text || "Encounter"}</span>
                 )}
               </div>
 
               {/* Linked resources from that visit */}
               {linked.length > 0 && (
-                <div className="mt-1 text-[10px] text-slate-400 leading-relaxed">
+                <div className="mt-1 text-[11px] text-slate-600 leading-relaxed">
                   {linked.map((item, i) => (
                     <div key={i}>{item}</div>
                   ))}

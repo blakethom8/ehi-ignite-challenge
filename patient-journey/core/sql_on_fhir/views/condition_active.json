@@ -1,0 +1,34 @@
+{
+  "resourceType": "ViewDefinition",
+  "name": "condition_active",
+  "resource": "Condition",
+  "status": "active",
+  "description": "Filtered subset of condition showing only clinically-active problems (clinicalStatus = active|recurrence|relapse). Same column shape as condition, so existing queries can swap one for the other. Use this when the user asks 'what's on the problem list right now' — condition is the full history.",
+  "where": [
+    {"path": "clinicalStatus.coding.where(code = 'active' or code = 'recurrence' or code = 'relapse').exists()"}
+  ],
+  "select": [
+    {
+      "column": [
+        {"name": "id", "path": "id", "type": "id"},
+        {"name": "patient_ref", "path": "subject.reference", "type": "string"},
+        {"name": "encounter_ref", "path": "encounter.reference", "type": "string"},
+        {"name": "clinical_status", "path": "clinicalStatus.coding.first().code", "type": "code"},
+        {"name": "verification_status", "path": "verificationStatus.coding.first().code", "type": "code"},
+        {"name": "onset_date", "path": "onsetDateTime", "type": "dateTime"},
+        {"name": "recorded_date", "path": "recordedDate", "type": "dateTime"},
+        {"name": "display", "path": "code.text", "type": "string"}
+      ],
+      "select": [
+        {
+          "forEach": "code.coding",
+          "column": [
+            {"name": "code_system", "path": "system", "type": "uri"},
+            {"name": "code", "path": "code", "type": "code"},
+            {"name": "code_display", "path": "display", "type": "string"}
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -13,6 +13,7 @@ import { ExplorerAnesthesia } from "./pages/Explorer/Anesthesia";
 import { ExplorerDistributions } from "./pages/Explorer/Distributions";
 import { ExplorerInteractions } from "./pages/Explorer/Interactions";
 import { ExplorerAssistant } from "./pages/Explorer/Assistant";
+import { ExplorerCareJourney } from "./pages/Explorer/CareJourney";
 import { JourneyPlaceholder } from "./pages/Journey/Placeholder";
 import { AnalysisOverview } from "./pages/Analysis/Overview";
 import { AnalysisMethodology } from "./pages/Analysis/Methodology";
@@ -34,6 +35,7 @@ export default function App() {
   const routes = [
     { path: "/explorer", element: <ExplorerOverview /> },
     { path: "/explorer/timeline", element: <ExplorerTimeline /> },
+    { path: "/explorer/care-journey", element: <ExplorerCareJourney /> },
     { path: "/explorer/corpus", element: <ExplorerCorpus /> },
     { path: "/explorer/safety", element: <ExplorerSafety /> },
     { path: "/explorer/immunizations", element: <ExplorerImmunizations /> },

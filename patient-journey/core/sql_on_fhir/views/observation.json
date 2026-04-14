@@ -1,0 +1,24 @@
+{
+  "resourceType": "ViewDefinition",
+  "name": "observation",
+  "resource": "Observation",
+  "status": "active",
+  "description": "Flattened Observation view — one row per observation. Captures LOINC code, value, unit, category, and effective timestamp.",
+  "select": [
+    {
+      "column": [
+        {"name": "id", "path": "id", "type": "id"},
+        {"name": "patient_ref", "path": "subject.reference", "type": "string"},
+        {"name": "encounter_ref", "path": "encounter.reference", "type": "string"},
+        {"name": "status", "path": "status", "type": "code"},
+        {"name": "category", "path": "category.first().coding.first().code", "type": "code"},
+        {"name": "loinc_code", "path": "code.coding.first().code", "type": "code"},
+        {"name": "display", "path": "code.text", "type": "string"},
+        {"name": "effective_date", "path": "effectiveDateTime", "type": "dateTime"},
+        {"name": "value_quantity", "path": "valueQuantity.value", "type": "decimal"},
+        {"name": "value_unit", "path": "valueQuantity.unit", "type": "string"},
+        {"name": "value_string", "path": "valueString", "type": "string"}
+      ]
+    }
+  ]
+}

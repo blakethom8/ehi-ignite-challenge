@@ -52,6 +52,12 @@ from api.models import (
     PatientRiskSummaryResponse,
     InteractionResult,
     InteractionResponse,
+    MedicationEpisodeItem,
+    ConditionEpisodeItem,
+    EncounterMarker,
+    ProcedureMarker,
+    DiagnosticReportItem,
+    CareJourneyResponse,
 )
 from api.core.interaction_checker import check_interactions
 
@@ -1066,3 +1072,262 @@ def encounter_raw(patient_id: str, encounter_id: str) -> dict:
                 return resource
 
     raise HTTPException(status_code=404, detail=f"Encounter not found: {encounter_id}")
+
+
+# ---------------------------------------------------------------------------
+# Care Journey (multi-lane Gantt timeline from SOF warehouse)
+# ---------------------------------------------------------------------------
+
+def _patient_fhir_uuid(patient_id: str) -> str | None:
+    """Look up the FHIR patient resource UUID from the bundle file.
+
+    The filename stem UUID is the *bundle* ID, not the patient resource ID.
+    We must open the bundle and find the Patient entry's fullUrl.
+    """
+    path = path_from_patient_id(patient_id)
+    if path is None:
+        return None
+    with open(path) as f:
+        bundle = json.load(f)
+    for entry in bundle.get("entry", []):
+        resource = entry.get("resource", {})
+        if resource.get("resourceType") == "Patient":
+            full_url = entry.get("fullUrl", "")
+            # fullUrl is like "urn:uuid:<uuid>"
+            if full_url.startswith("urn:uuid:"):
+                return full_url.removeprefix("urn:uuid:")
+            return resource.get("id", "")
+    return None
+
+
+def _sof_db_path() -> Path:
+    from api.core.sof_tools import DEFAULT_SOF_DB
+    return DEFAULT_SOF_DB
+
+
+@router.get("/{patient_id}/care-journey", response_model=CareJourneyResponse)
+def get_care_journey(patient_id: str) -> CareJourneyResponse:
+    """Return medication episodes, conditions, and encounters for the Gantt timeline."""
+    import sqlite3
+
+    path = path_from_patient_id(patient_id)
+    if path is None:
+        raise HTTPException(status_code=404, detail="Patient not found")
+
+    db_path = _sof_db_path()
+    if not db_path.exists():
+        raise HTTPException(status_code=503, detail="SOF warehouse not materialized yet")
+
+    fhir_uuid = _patient_fhir_uuid(patient_id)
+    if fhir_uuid is None:
+        raise HTTPException(status_code=404, detail="Cannot resolve patient FHIR UUID")
+    patient_ref = f"urn:uuid:{fhir_uuid}"
+    name = patient_display_name(path)
+
+    conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+    conn.row_factory = sqlite3.Row
+    try:
+        # Medication episodes
+        med_rows = conn.execute(
+            """SELECT episode_id, display, drug_class, latest_status, is_active,
+                      start_date, end_date, duration_days, request_count
+               FROM medication_episode
+               WHERE patient_ref = ?
+               ORDER BY start_date""",
+            (patient_ref,),
+        ).fetchall()
+
+        medication_episodes = [
+            MedicationEpisodeItem(
+                episode_id=r["episode_id"],
+                display=r["display"],
+                drug_class=r["drug_class"],
+                status=r["latest_status"],
+                is_active=bool(r["is_active"]),
+                start_date=r["start_date"],
+                end_date=r["end_date"],
+                duration_days=r["duration_days"],
+                request_count=r["request_count"],
+            )
+            for r in med_rows
+        ]
+
+        # Conditions with onset dates
+        cond_rows = conn.execute(
+            """SELECT id, display, clinical_status, onset_date,
+                      CASE WHEN clinical_status NOT IN ('active', 'recurrence', 'relapse')
+                           THEN recorded_date END AS proxy_end_date
+               FROM condition
+               WHERE patient_ref = ? AND onset_date IS NOT NULL
+               ORDER BY onset_date""",
+            (patient_ref,),
+        ).fetchall()
+
+        conditions = [
+            ConditionEpisodeItem(
+                condition_id=r["id"],
+                display=r["display"],
+                clinical_status=r["clinical_status"],
+                onset_date=r["onset_date"],
+                end_date=r["proxy_end_date"],
+                is_active=r["clinical_status"] in ("active", "recurrence", "relapse"),
+            )
+            for r in cond_rows
+        ]
+
+        # Encounters with linked diagnoses
+        enc_rows = conn.execute(
+            """SELECT e.id, e.class_code, e.type_text, e.period_start, e.reason_text,
+                      GROUP_CONCAT(c.display, '||') AS dx_list
+               FROM encounter e
+               LEFT JOIN condition c ON c.encounter_ref = 'urn:uuid:' || e.id
+               WHERE e.patient_ref = ?
+               GROUP BY e.id
+               ORDER BY e.period_start""",
+            (patient_ref,),
+        ).fetchall()
+
+        encounters = [
+            EncounterMarker(
+                encounter_id=r["id"],
+                class_code=r["class_code"] or "",
+                type_text=r["type_text"] or "",
+                start=r["period_start"],
+                reason_display=r["reason_text"] or "",
+                diagnoses=[d.strip() for d in r["dx_list"].split("||") if d.strip()] if r["dx_list"] else [],
+            )
+            for r in enc_rows
+        ]
+
+    finally:
+        conn.close()
+
+    # ── FHIR bundle enrichment (procedures, diagnostic reports, reason links) ──
+    # Open the raw bundle once for everything not in the SOF warehouse.
+    procedures: list[ProcedureMarker] = []
+    diagnostic_reports: list[DiagnosticReportItem] = []
+
+    if path:
+        with open(path) as f:
+            bundle = json.load(f)
+
+        # Build a fullUrl → resource index for resolving references
+        ref_index: dict[str, dict] = {}
+        for entry in bundle.get("entry", []):
+            full_url = entry.get("fullUrl", "")
+            if full_url:
+                ref_index[full_url] = entry["resource"]
+
+        def resolve_reason(reason_refs: list[dict]) -> str:
+            """Resolve reasonReference list to a display string."""
+            reasons = []
+            for ref in reason_refs:
+                display = ref.get("display", "")
+                if not display:
+                    target = ref_index.get(ref.get("reference", ""), {})
+                    display = target.get("code", {}).get("text", "")
+                if display:
+                    reasons.append(display)
+            return "; ".join(reasons)
+
+        # --- Medication reason enrichment ---
+        # Build a map: normalized drug display → reason from MedicationRequest
+        med_reasons: dict[str, str] = {}
+        for entry in bundle.get("entry", []):
+            resource = entry.get("resource", {})
+            if resource.get("resourceType") == "MedicationRequest":
+                drug_text = resource.get("medicationCodeableConcept", {}).get("text", "")
+                reason_refs = resource.get("reasonReference", [])
+                if drug_text and reason_refs:
+                    reason = resolve_reason(reason_refs)
+                    if reason:
+                        med_reasons[drug_text.strip().lower()] = reason
+
+        # Enrich medication episodes with resolved reasons
+        for m in medication_episodes:
+            key = m.display.strip().lower()
+            if key in med_reasons:
+                m.reason = med_reasons[key]
+
+        # --- Procedures ---
+        for entry in bundle.get("entry", []):
+            resource = entry.get("resource", {})
+            if resource.get("resourceType") == "Procedure":
+                code_text = resource.get("code", {}).get("text", "")
+                if not code_text:
+                    codings = resource.get("code", {}).get("coding", [])
+                    code_text = codings[0].get("display", "Unknown") if codings else "Unknown"
+                period = resource.get("performedPeriod", {})
+                start = period.get("start")
+                end = period.get("end")
+                reason = resolve_reason(resource.get("reasonReference", []))
+                procedures.append(ProcedureMarker(
+                    procedure_id=resource.get("id", ""),
+                    display=code_text,
+                    start=start,
+                    end=end,
+                    reason_display=reason,
+                ))
+        procedures.sort(key=lambda x: x.start or "")
+
+        # --- Diagnostic reports ---
+        for entry in bundle.get("entry", []):
+            resource = entry.get("resource", {})
+            if resource.get("resourceType") == "DiagnosticReport":
+                code_text = resource.get("code", {}).get("text", "")
+                if not code_text:
+                    codings = resource.get("code", {}).get("coding", [])
+                    code_text = codings[0].get("display", "Unknown") if codings else "Unknown"
+                categories = resource.get("category", [])
+                cat_text = ""
+                if categories:
+                    cat_codings = categories[0].get("coding", [])
+                    cat_text = cat_codings[0].get("display", "") if cat_codings else categories[0].get("text", "")
+                diagnostic_reports.append(DiagnosticReportItem(
+                    report_id=resource.get("id", ""),
+                    display=code_text,
+                    category=cat_text,
+                    date=resource.get("effectiveDateTime"),
+                    result_count=len(resource.get("result", [])),
+                ))
+        diagnostic_reports.sort(key=lambda x: x.date or "")
+
+    # Compute date bounds and distinct drug classes
+    all_dates: list[str] = []
+    for m in medication_episodes:
+        if m.start_date:
+            all_dates.append(m.start_date)
+        if m.end_date:
+            all_dates.append(m.end_date)
+    for c in conditions:
+        if c.onset_date:
+            all_dates.append(c.onset_date)
+    for e in encounters:
+        if e.start:
+            all_dates.append(e.start)
+    for p in procedures:
+        if p.start:
+            all_dates.append(p.start)
+    for dr in diagnostic_reports:
+        if dr.date:
+            all_dates.append(dr.date)
+
+    earliest = min(all_dates) if all_dates else None
+    latest = max(all_dates) if all_dates else None
+
+    drug_classes = sorted({
+        m.drug_class for m in medication_episodes if m.drug_class
+    })
+
+    return CareJourneyResponse(
+        patient_id=patient_id,
+        name=name,
+        earliest_date=earliest,
+        latest_date=latest,
+        medication_episodes=medication_episodes,
+        conditions=conditions,
+        encounters=encounters,
+        procedures=procedures,
+        diagnostic_reports=diagnostic_reports,
+        drug_classes_present=drug_classes,
+    )

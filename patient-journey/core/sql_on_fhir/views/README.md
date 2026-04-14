@@ -1,0 +1,178 @@
+# SQL-on-FHIR views
+
+This directory holds the canonical ViewDefinition JSON files that the
+SOF runtime materializes into `data/sof.db` (production) and
+`research/ehi-ignite.db` (pitch snapshot). It's the source of truth
+for the warehouse's table shape.
+
+There are **four** kinds of query targets in the warehouse. Knowing
+which kind you're looking at explains why a column exists — and
+where to go to change it.
+
+---
+
+## 1. Pure ViewDefinition tables
+
+> "What a standards-compliant SQL-on-FHIR runtime would produce."
+
+These are driven entirely by the JSON files in this directory. Every
+column is reachable from a FHIRPath-lite expression against the raw
+FHIR resource. A separate SQL-on-FHIR runtime (DuckDB, Pathling, the
+reference implementation) could consume these same JSON files and
+produce the same columns.
+
+| Table                | Source file                | Resource         |
+|----------------------|----------------------------|------------------|
+| `patient`            | `patient.json`             | Patient          |
+| `condition`          | `condition.json`           | Condition        |
+| `condition_active`   | `condition_active.json`    | Condition ‡      |
+| `medication_request` | `medication_request.json`  | MedicationRequest|
+| `observation`        | `observation.json`         | Observation      |
+| `encounter`          | `encounter.json`           | Encounter        |
+
+‡ `condition_active` is a **filtered subset view** — same column
+shape as `condition`, but a view-level `where` clause filters out
+everything whose `clinicalStatus` isn't `active`, `recurrence`, or
+`relapse`. Use it as a problem list; `condition` is the full history.
+
+**To change a column:** edit the JSON, bump the snapshot, done. No
+Python changes needed.
+
+---
+
+## 2. Enriched columns on pure tables
+
+> "Clinically-smart columns that FHIRPath can't express."
+
+Some columns — like `drug_class` on `medication_request` — require
+logic that FHIRPath-lite has no way to express (RxNorm code lookups,
+keyword classification, severity scoring). Rather than shoehorn them
+into the JSON, they're spliced onto the row dict in Python *after*
+the runtime evaluates the ViewDefinition but *before* the row hits
+SQLite.
+
+This happens in `patient-journey/core/sql_on_fhir/enrich.py`. Each
+`Enrichment` binds a view name to:
+
+1. A list of extra `Column` definitions (which the sink appends to
+   the `CREATE TABLE` statement).
+2. A `enrich_row(row)` callable that mutates the row in place.
+
+**Default-on.** Every warehouse built by `materialize_all` carries
+the enrichment columns by default. Pass `enrichments={}` to
+`materialize_all` if you need a pure ViewDefinition build for
+validation against another runtime.
+
+| Table                | Enrichment column | Module              |
+|----------------------|-------------------|---------------------|
+| `medication_request` | `drug_class`      | `enrich.py` (P1.1)  |
+
+**To add an enrichment column:** add an entry to
+`enrich.default_enrichments()` and extend the enrichment's
+`enrich_row` callable. The sink picks it up automatically on the next
+rebuild.
+
+---
+
+## 3. Derived tables
+
+> "New tables built by aggregating rows across one or more existing
+> tables."
+
+Some clinical abstractions aren't a column at all — they're a whole
+new row shape. A *medication episode*, for example, is built by
+grouping many `medication_request` rows for the same drug into a
+single continuous treatment span with a start date, end date, and
+status. That's a table, not a column.
+
+Derived tables are declared in
+`patient-journey/core/sql_on_fhir/derived.py`. Each `Derivation` has:
+
+1. A `table_name` (what to create).
+2. A list of `depends_on` source tables.
+3. A `build(conn)` callable that `SELECT`s from those sources and
+   writes to the new table, returning the row count.
+
+The sink runs every derivation *after* every view has been
+materialized, in a second pass. Derivations whose dependencies
+weren't part of the current run are silently skipped.
+
+**Default-on.** Every warehouse carries the derived tables by
+default. Pass `derivations={}` to `materialize_all` to skip them.
+
+| Derived artifact     | Kind  | Depends on           | Module                |
+|----------------------|-------|----------------------|-----------------------|
+| `medication_episode` | table | `medication_request` | `derived.py` (P1.2)   |
+| `observation_latest` | view  | `observation`        | `derived.py` (P1.4)   |
+
+`kind="table"` means the derivation writes a real `CREATE TABLE` +
+INSERT — it's materialized, consumes storage, and has to be rebuilt
+when the source changes. `kind="view"` means the derivation issues
+`CREATE VIEW` and the rows are computed lazily on every `SELECT`.
+Views are the right choice when the derivation is cheap to express
+in SQL and staleness would be a bug; tables are the right choice
+when the derivation involves Python logic or would be expensive to
+re-run per query.
+
+### `medication_episode` schema
+
+| Column             | Type    | Notes                                                   |
+|--------------------|---------|---------------------------------------------------------|
+| `episode_id`       | TEXT PK | `{patient_ref}::{normalized_display}`                  |
+| `patient_ref`      | TEXT    | Same value as `medication_request.patient_ref`          |
+| `display`          | TEXT    | Representative drug display (earliest-seen)             |
+| `rxnorm_code`      | TEXT    | First non-null RxNorm code in the episode               |
+| `drug_class`       | TEXT    | First non-null class from the enrichment pass           |
+| `latest_status`    | TEXT    | Status of the most recent request                       |
+| `is_active`        | INTEGER | `1` if `latest_status` in (`active`, `on-hold`)         |
+| `start_date`       | TEXT    | Min `authored_on` in the group                          |
+| `end_date`         | TEXT    | Max `authored_on`, or `NULL` if the episode is active   |
+| `request_count`    | INTEGER | How many `medication_request` rows rolled up            |
+| `duration_days`    | REAL    | `(end - start)` in days, or `NULL` when active          |
+| `first_request_id` | TEXT    | `id` of the earliest `medication_request` in the group  |
+
+Grouping key mirrors `core/episode_detector.detect_medication_episodes`:
+lower-cased, stripped display name. Active-status logic is shared with
+the safety panel so the warehouse and the clinician UI never disagree
+about "is this patient still on X".
+
+### `observation_latest` schema (VIEW, P1.4)
+
+Identical column shape to `observation` — the SQL is a
+`ROW_NUMBER() OVER (PARTITION BY patient_ref, loinc_code ORDER BY
+effective_date DESC, id DESC)` projection that keeps only the
+top-ranked row per group. Tiebreaker when two rows share an
+`effective_date`: the higher `id` wins.
+
+Use it when the user asks "what is the patient's current A1c /
+creatinine / blood pressure" — `SELECT value_quantity FROM
+observation_latest WHERE patient_ref = '…' AND loinc_code = '…'`
+returns exactly one row. The underlying `observation` table is
+still there if you need the full time series.
+
+Because it's a SQLite `CREATE VIEW` (not a materialized table),
+`observation_latest` is always fresh: a subsequent INSERT into
+`observation` is visible on the next `SELECT` without any rebuild.
+
+**To add a derived artifact:** add an entry to
+`derived.default_derivations()` with `kind="table"` or
+`kind="view"`. The sink picks it up automatically on the next
+rebuild. Document the schema here and flag it in the build log.
+
+---
+
+## Rebuilding the warehouse
+
+```bash
+# Dev: data/sof.db (gitignored, auto-built on API boot)
+uv run python -c "from api.core.sof_materialize import materialize_from_env; print(materialize_from_env())"
+
+# Pitch snapshot: research/ehi-ignite.db (committed, 200 patients)
+rm -f research/ehi-ignite.db
+SOF_DB_PATH=research/ehi-ignite.db SOF_PATIENT_LIMIT=200 \
+  uv run python -c "from api.core.sof_materialize import materialize_from_env; print(materialize_from_env())"
+```
+
+Every rebuild runs all three layers — pure views, enrichments,
+derivations — so what you see in SQL is exactly what the LLM tool
+(`api/core/sof_tools.run_sql`) sees at query time.

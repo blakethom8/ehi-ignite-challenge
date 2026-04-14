@@ -1,0 +1,20 @@
+{
+  "resourceType": "ViewDefinition",
+  "name": "patient",
+  "resource": "Patient",
+  "status": "active",
+  "description": "Flattened Patient view — one row per patient.",
+  "select": [
+    {
+      "column": [
+        {"name": "id", "path": "id", "type": "id"},
+        {"name": "gender", "path": "gender", "type": "code"},
+        {"name": "birth_date", "path": "birthDate", "type": "date"},
+        {"name": "marital_status", "path": "maritalStatus.text", "type": "string"},
+        {"name": "deceased", "path": "deceasedDateTime", "type": "dateTime"},
+        {"name": "family_name", "path": "name.first().family", "type": "string"},
+        {"name": "given_name", "path": "name.first().given.first()", "type": "string"}
+      ]
+    }
+  ]
+}

@@ -382,11 +382,94 @@ export interface ProviderAssistantCitation {
   event_date: string | null;
 }
 
+// ---------------------------------------------------------------------------
+// Care Journey (multi-lane Gantt timeline)
+// ---------------------------------------------------------------------------
+
+export interface MedicationEpisodeItem {
+  episode_id: string;
+  display: string;
+  drug_class: string | null;
+  status: string;
+  is_active: boolean;
+  start_date: string | null;
+  end_date: string | null;
+  duration_days: number | null;
+  request_count: number;
+  reason: string | null;
+}
+
+export interface ConditionEpisodeItem {
+  condition_id: string;
+  display: string;
+  clinical_status: string;
+  onset_date: string | null;
+  end_date: string | null;
+  is_active: boolean;
+}
+
+export interface EncounterMarker {
+  encounter_id: string;
+  class_code: string;
+  type_text: string;
+  start: string | null;
+  reason_display: string;
+  diagnoses: string[];
+}
+
+export interface ProcedureMarker {
+  procedure_id: string;
+  display: string;
+  start: string | null;
+  end: string | null;
+  reason_display: string;
+}
+
+export interface DiagnosticReportItem {
+  report_id: string;
+  display: string;
+  category: string;
+  date: string | null;
+  result_count: number;
+}
+
+export interface CareJourneyResponse {
+  patient_id: string;
+  name: string;
+  earliest_date: string | null;
+  latest_date: string | null;
+  medication_episodes: MedicationEpisodeItem[];
+  conditions: ConditionEpisodeItem[];
+  encounters: EncounterMarker[];
+  procedures: ProcedureMarker[];
+  diagnostic_reports: DiagnosticReportItem[];
+  drug_classes_present: string[];
+}
+
 export interface ProviderAssistantRequest {
   patient_id: string;
   question: string;
   history?: ProviderAssistantTurn[];
   stance?: "opinionated" | "balanced";
+}
+
+export interface ToolCallDetail {
+  tool_name: string;
+  input_summary: string;
+  output_summary: string;
+  duration_ms: number | null;
+  error: string | null;
+}
+
+export interface TraceDetail {
+  trace_id: string;
+  duration_ms: number | null;
+  input_tokens: number;
+  output_tokens: number;
+  total_cost_usd: number | null;
+  tool_calls: ToolCallDetail[];
+  system_prompt_preview: string;
+  retrieved_facts: string[];
 }
 
 export interface ProviderAssistantResponse {
@@ -397,4 +480,5 @@ export interface ProviderAssistantResponse {
   engine: "deterministic" | "anthropic-agent-sdk" | "deterministic-fallback" | string;
   citations: ProviderAssistantCitation[];
   follow_ups: string[];
+  trace: TraceDetail | null;
 }

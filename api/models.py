@@ -507,6 +507,70 @@ class FieldCoverageResponse(BaseModel):
 # Provider Assistant (chat)
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Care Journey (multi-lane Gantt timeline)
+# ---------------------------------------------------------------------------
+
+class MedicationEpisodeItem(BaseModel):
+    episode_id: str
+    display: str
+    drug_class: str | None
+    status: str
+    is_active: bool
+    start_date: str | None
+    end_date: str | None
+    duration_days: float | None
+    request_count: int
+    reason: str | None = None      # resolved from reasonReference → Condition
+
+
+class ConditionEpisodeItem(BaseModel):
+    condition_id: str
+    display: str
+    clinical_status: str
+    onset_date: str | None
+    end_date: str | None       # recorded_date for resolved; None for active
+    is_active: bool
+
+
+class EncounterMarker(BaseModel):
+    encounter_id: str
+    class_code: str
+    type_text: str
+    start: str | None
+    reason_display: str
+    diagnoses: list[str] = []       # linked condition display names
+
+
+class ProcedureMarker(BaseModel):
+    procedure_id: str
+    display: str
+    start: str | None
+    end: str | None
+    reason_display: str            # from reasonReference → Condition display
+
+
+class DiagnosticReportItem(BaseModel):
+    report_id: str
+    display: str
+    category: str
+    date: str | None
+    result_count: int
+
+
+class CareJourneyResponse(BaseModel):
+    patient_id: str
+    name: str
+    earliest_date: str | None
+    latest_date: str | None
+    medication_episodes: list[MedicationEpisodeItem]
+    conditions: list[ConditionEpisodeItem]
+    encounters: list[EncounterMarker]
+    procedures: list[ProcedureMarker]
+    diagnostic_reports: list[DiagnosticReportItem]
+    drug_classes_present: list[str]
+
+
 class ProviderAssistantTurn(BaseModel):
     role: str    # "user" | "assistant"
     content: str
@@ -527,6 +591,25 @@ class ProviderAssistantRequest(BaseModel):
     stance: str = "opinionated"    # "opinionated" | "balanced"
 
 
+class ToolCallDetail(BaseModel):
+    tool_name: str                 # "run_sql" | "query_chart_evidence" | "get_patient_snapshot"
+    input_summary: str             # human-readable input (e.g. the SQL query)
+    output_summary: str            # human-readable output (e.g. "12 rows returned")
+    duration_ms: float | None = None
+    error: str | None = None
+
+
+class TraceDetail(BaseModel):
+    trace_id: str
+    duration_ms: float | None = None
+    input_tokens: int = 0
+    output_tokens: int = 0
+    total_cost_usd: float | None = None
+    tool_calls: list[ToolCallDetail] = []
+    system_prompt_preview: str = ""   # system prompt the agent received
+    retrieved_facts: list[str] = []   # actual fact texts used in the response
+
+
 class ProviderAssistantResponse(BaseModel):
     patient_id: str
     answer: str
@@ -535,3 +618,4 @@ class ProviderAssistantResponse(BaseModel):
     engine: str = "deterministic"  # "deterministic" | "anthropic-agent-sdk" | "deterministic-fallback"
     citations: list[ProviderAssistantCitation]
     follow_ups: list[str]
+    trace: TraceDetail | None = None  # tool calls + context transparency

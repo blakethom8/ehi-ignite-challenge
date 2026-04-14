@@ -46,6 +46,8 @@ ehi-ignite-challenge/
 │       ├── provider_assistant_service.py  ← mode selector (agent-sdk / deterministic)
 │       ├── provider_assistant_agent_sdk.py ← Claude Agent SDK runtime (instrumented)
 │       ├── provider_assistant.py          ← deterministic fact ranking + evidence retrieval
+│       ├── sof_tools.py                   ← run_sql MCP tool: SELECT-only gate + read-only runner
+│       ├── sof_materialize.py             ← FastAPI startup hook — rebuilds data/sof.db on mtime gate
 │       ├── loader.py
 │       ├── drug_classifier.py
 │       ├── episode_detector.py
@@ -101,9 +103,17 @@ ehi-ignite-challenge/
 ├── patient-journey/                       ← LEGACY Streamlit (reference only — DO NOT EXTEND)
 │   ├── app.py
 │   ├── core/                              ← drug_classifier, episode_detector (migrate to api/core/)
+│   │   └── sql_on_fhir/                   ← SQL-on-FHIR v2 engine: ViewDefinition → SQLite ⭐
+│   │       ├── enrich.py                  ← extra columns spliced onto view rows at ingest (drug_class)
+│   │       ├── derived.py                 ← derived tables built after views flush (medication_episode)
+│   │       └── views/                     ← 5 ViewDefinitions + README of the three warehouse layers
 │   ├── views/                             ← reference implementations for React ports
 │   ├── CONTEXT-ENGINEERING.md             ← READ THIS — LLM context pipeline design ⭐
 │   └── DATA-DEFINITIONS.md               ← READ THIS — data model reference ⭐
+│
+├── research/
+│   ├── SQL-ON-FHIR-REVIEW.md              ← SOF prototype review + run_sql tool surface addendum ⭐
+│   └── ehi-ignite.db                      ← 200-patient pitch snapshot (committed, 11 MB)
 │
 ├── data/
 │   └── synthea-samples/
@@ -210,7 +220,34 @@ stats = compute_patient_stats(record)
 | `docs/architecture/ECOSYSTEM-OVERVIEW.md` | Platform framing and complete directory layout |
 | `docs/architecture/DEPLOYMENT.md` | Hetzner + Docker Compose deployment guide |
 | `docs/architecture/tracing.md` | LLM observability — traces, spans, token/cost tracking, Langfuse |
+| `research/SQL-ON-FHIR-REVIEW.md` | SOF prototype "was it worth it" review **+ `run_sql` tool-surface addendum** (Phase 0) |
+| `research/README.md` | Pitch snapshot layout + regen command for `research/ehi-ignite.db` |
+| `patient-journey/core/sql_on_fhir/views/README.md` | Pure views, filtered subset views, enriched columns, derived tables/views — the four warehouse layers and how to extend each |
 | `design/DESIGN.md` | Miro-inspired design tokens + component guide |
+
+### SQL-on-FHIR quick reference
+
+- **Engine:** `patient-journey/core/sql_on_fhir/` — ViewDefinition → SQLite (stable, reused everywhere)
+- **Four-layer warehouse** (see `patient-journey/core/sql_on_fhir/views/README.md`):
+  1. **Pure ViewDefinition tables** — JSON under `views/`. Standards-compliant projection from FHIR resources (`patient`, `condition`, `medication_request`, `observation`, `encounter`).
+  2. **Filtered subset views** — still pure JSON, plus a view-level `where` clause that prunes rows at ingest. Same column shape as the "full" sibling so queries can swap one for the other. *(e.g. `condition_active` — only `active` / `recurrence` / `relapse` rows; P1.3)*
+  3. **Enriched columns** — `enrich.py`. Extra columns spliced onto view rows at ingest time. *(e.g. `medication_request.drug_class`; P1.1)*
+  4. **Derived artifacts** — `derived.py`. Whole new query targets built after the views are materialized. Two flavours:
+     - `kind="table"` — materialized, built in Python. *(e.g. `medication_episode`; P1.2)*
+     - `kind="view"` — lazy SQLite `CREATE VIEW`, always fresh. *(e.g. `observation_latest`; P1.4)*
+- **LLM tool:** `api/core/sof_tools.run_sql(query, limit)` — SELECT-only gate, 500-row cap, read-only connection. Automatically renders enrichments and derivations into the agent's system prompt (including `CREATE VIEW` vs `CREATE TABLE` emission) so the schema is always in sync with the warehouse.
+- **Warehouse:** `data/sof.db` (gitignored, materialized on FastAPI startup via `api/core/sof_materialize.py`)
+- **Pitch snapshot:** `research/ehi-ignite.db` (committed, 200 patients, ~12 MB, reviewer-facing)
+- **Query targets shipped today:** `patient`, `condition`, `condition_active` (subset), `medication_request` (+ `drug_class` enrichment), `observation`, `encounter`, plus the derived `medication_episode` table and the derived `observation_latest` view
+- **Drug-class cohort query** (P1.1 canonical example):
+  `SELECT drug_class, COUNT(*) FROM medication_request GROUP BY drug_class ORDER BY 2 DESC`
+- **Active-treatment cohort query** (P1.2 example — use `medication_episode`, not raw `medication_request`):
+  `SELECT drug_class, COUNT(*) FROM medication_episode WHERE is_active=1 GROUP BY drug_class`
+- **Problem-list query** (P1.3 example — use `condition_active`, not raw `condition`):
+  `SELECT display, COUNT(*) FROM condition_active GROUP BY display ORDER BY 2 DESC`
+- **Current-lab query** (P1.4 example — use `observation_latest`, not raw `observation`):
+  `SELECT value_quantity, value_unit, effective_date FROM observation_latest WHERE patient_ref = 'urn:uuid:…' AND loinc_code = '4548-4'`
+  *(LOINC 4548-4 = HbA1c — returns exactly one row, always the most recent)*
 
 ---
 

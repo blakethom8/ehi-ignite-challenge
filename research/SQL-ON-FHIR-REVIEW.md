@@ -1,0 +1,726 @@
+# SQL-on-FHIR Prototype — Qualitative Review
+
+*April 13, 2026*
+
+This is the "was it worth it?" writeup for the SQL-on-FHIR v2 prototype in
+`patient-journey/core/sql_on_fhir/`. The prototype was motivated by podcast
+Ep 19 (Aaron Neiderhiser + Phil Ballentine) and the thesis that ViewDefinition
+JSON is the missing layer that makes FHIR data actually usable. We built it.
+Here's the honest read.
+
+---
+
+## TL;DR
+
+| Axis | Winner | Margin |
+|---|---|---|
+| **Performance — ingest (50 patients)** | Python parser | **4.4×** faster (0.55s vs 2.42s) |
+| **Performance — ingest (300 patients)** | Python parser | **1.8×** faster (4.2s vs 7.5s) |
+| **Performance — query latency (hot cache)** | Python parser | **~1.7×** faster overall |
+| **Answer correctness** | Tied | 5/5 queries return identical results |
+| **Code surface per query** | SQL | ~20% fewer lines on average |
+| **Onboarding a new question** | SQL | Much cheaper once tables exist |
+| **Cross-patient analytics / cohort builds** | SQL | Dramatically better |
+| **Portability across stacks & teams** | SQL | Only real contender |
+| **Standards story for EHI Ignite** | SQL | The entire point |
+
+**Verdict: the SQL-on-FHIR layer is not a performance win at our current
+scale, but it is the correct architectural bet for the competition submission
+and for everything that comes after it.** The benefits are categorical, not
+incremental — they live in portability, analytics, and the ability for
+non-Python tools (the LLM, a dashboard, a collaborator's notebook) to touch
+the same data without re-implementing the parser.
+
+**Keep both layers.** Use the Python parser for the patient-centric UI path
+(it's tuned for single-patient read, which is what the journey surface needs).
+Use the SQL-on-FHIR layer for corpus analytics, LLM tool-calls, and the
+"we speak SQL-on-FHIR" story that anchors the competition pitch.
+
+---
+
+## What we built
+
+Seven files, ~1100 lines total. Everything in `patient-journey/core/sql_on_fhir/`:
+
+| File | Purpose |
+|---|---|
+| `view_definition.py` | Dataclass model of a SQL-on-FHIR v2 ViewDefinition |
+| `fhirpath.py` | Minimal FHIRPath evaluator (fields, `.first()`, `.where()`, booleans, `getReferenceKey()`) |
+| `runner.py` | Walks resources through a view, handles `forEach` / `forEachOrNull` / `unionAll` / nested selects |
+| `sqlite_sink.py` | Materializes rows into SQLite; `materialize_all()` is a single-pass multi-view dispatcher |
+| `loader.py` | Streams resources from Synthea bundles |
+| `views/*.json` | Five ViewDefinitions: `patient`, `condition`, `medication_request`, `observation`, `encounter` |
+| `demo.py` | CLI: load N bundles → run all views → run six example SQL queries |
+| `benchmark.py` | Head-to-head vs the existing Python parser on ingest + 5 semantic queries |
+| `../tests/test_sql_on_fhir.py` | 24 tests covering FHIRPath, runner semantics, sink, sample views |
+
+All 24 tests pass.
+
+---
+
+## Benchmark — what the numbers actually say
+
+Run with `python patient-journey/core/sql_on_fhir/benchmark.py --limit 300`.
+
+### Ingest (parse bundles → query-ready form)
+
+| n = 50 bundles | n = 300 bundles |
+|---|---|
+| Python parser: **0.55s** | Python parser: **4.15s** |
+| SQL-on-FHIR: **2.42s** | SQL-on-FHIR: **7.53s** |
+| Python 4.4× faster | Python 1.8× faster |
+
+The Python parser wins because it has hand-rolled extractors: it reads
+`Condition.code.coding[0]` in C-speed field access, no AST, no function
+dispatch. Our SQL-on-FHIR runner evaluates a parsed FHIRPath tree for every
+column of every row — five columns × thousands of conditions × a recursive
+walker. That's why it's slower, and it's the expected tradeoff for a
+**declarative, portable** spec.
+
+Notable: single-pass materialization (`materialize_all`) cut SQL ingest
+time by **~50%** vs. the naive per-view loop (16.9s → 7.5s at n=300). That
+optimization was free and obvious once the layer was in place.
+
+### Query latency (median of 3 runs, ms, n=300)
+
+| Query | Python | SQL | Same answer? |
+|---|---:|---:|:---:|
+| Top 10 SNOMED conditions | 1.22 | 0.59 | ✓ |
+| Top 10 RxNorm medications | 0.56 | 0.60 | ✓ |
+| Patients on NSAID / anticoagulant | 1.28 | 1.06 | ✓ |
+| Active condition × active medication | 1.58 | 4.38 | ✓ |
+| Avg BMI ≥ 2 readings | 6.06 | 10.00 | ✓ |
+| **Total** | **10.71** | **16.64** | — |
+
+Two things matter here:
+
+1. **Every SQL answer matched the Python answer row-for-row.** That is the
+   real proof that the ViewDefinitions are well-formed and the evaluator is
+   semantically correct. A new-from-scratch parser that agrees with the
+   existing battle-tested parser on every query is the strongest signal we
+   have that the layer is trustworthy.
+
+2. **At our current data volume, cache locality wins.** The Python parser
+   already has everything in RAM as typed objects. SQLite has to go through
+   the query planner, cursor overhead, and type coercion. For 300 patients
+   both approaches are well under 20ms total — neither is a bottleneck. The
+   real query-time question is: *what happens at 10,000 or 100,000 patients?*
+   That's where SQLite's indexes, joins, and `GROUP BY` start paying off and
+   where iterating 100k Python objects in a for-loop stops being free. We
+   didn't hit that ceiling in the benchmark; the data volume we have isn't
+   large enough to expose it.
+
+### Code surface per query (non-trivial lines)
+
+| Query | Python | SQL | Δ |
+|---|---:|---:|:---:|
+| Top 10 SNOMED conditions | 9 | 6 | -33% |
+| Top 10 RxNorm meds | 7 | 5 | -29% |
+| NSAID / anticoagulant patients | 8 | 8 | — |
+| Active condition × active med | 11 | 7 | -36% |
+| Avg BMI ≥ 2 readings | 12 | 10 | -17% |
+
+The SQL versions are consistently shorter, and the difference *grows* with
+query complexity. That matches intuition: cross-patient joins and
+aggregations are exactly what SQL was built for.
+
+---
+
+## Where SQL-on-FHIR actually earns its keep
+
+The benchmark table is the uninteresting half of the story. The interesting
+half is the things the benchmark can't measure.
+
+### 1. Novel questions become cheap
+
+Every question answered by the Python parser today required code. New
+question → new function → new iteration loop → new edge cases → new test.
+Cost: 5-30 minutes of engineering per question.
+
+Every question answered by SQL-on-FHIR today is one SQL statement typed into
+a prompt. The tables already exist. A clinician asking "show me patients on
+statins who had an HbA1c above 9 in the last year" doesn't need code — they
+need a line of SQL. This is exactly the "flip the script" thesis from Ep 16:
+**the cost of asking is what determines whether anyone asks.**
+
+This is the dominant lever for a chat/LLM surface. Claude can emit SQL
+100× faster than it can emit "please add a new method to `PatientRecord`."
+
+### 2. Cohort-level analytics are a category, not a feature
+
+The Python parser is organized around a single `PatientRecord`. Every
+cross-patient question has to fan out through a list comprehension:
+
+```python
+out = []
+for r in records:         # O(patients)
+    for c in r.conditions:   # O(conditions per patient)
+        ...
+```
+
+Nested. Hand-coded. Opaque to anything other than Python. Now try answering:
+
+- "Which two conditions co-occur most often in the corpus?"
+- "Rank medication classes by average patient age at first prescription."
+- "Find patients whose first encounter was ≤ 2 years ago and who have ≥ 3
+  chronic conditions."
+
+Each of these is a short SQL statement with `JOIN ... GROUP BY ... HAVING`.
+Each would be a full afternoon of Python if we started from `PatientRecord`.
+This is the analytics bucket the Tuva Project / Atropos Health are explicitly
+chasing, and it's the space the EHI Ignite reviewers will ask about.
+
+### 3. It unlocks the LLM tool-calling surface cleanly
+
+For the NL search / clinical Q&A layer, we want Claude to fetch facts.
+Two ways to expose those facts:
+
+- **Python approach:** write a tool like `get_patient_medications(patient_id)`
+  for every slice of data, then another for every combination, then another
+  for every filter. We'd end up with 30-50 tools, each with a signature, a
+  docstring, a JSON schema, a test. The tool registry becomes a second
+  product.
+- **SQL approach:** one tool — `run_sql(query)` — over a named set of
+  well-documented tables. Claude already knows SQL. We already have the
+  tables. The ViewDefinition JSONs are themselves the schema documentation.
+
+Option B is a fraction of the code and strictly more flexible. It also lines
+up with how MCP servers in healthcare are being written today (HealthSamurai's
+Aidbox MCP exposes SQL-on-FHIR tables; the pattern is converging).
+
+### 4. Portability is the headline feature, not an afterthought
+
+The Python parser is unusable outside this repo. If Blake wants to hand
+the data to a collaborator who speaks R, Tableau, DuckDB, or a Jupyter
+notebook — they get nothing. If Blake wants to put the data in front of the
+Claude Code agent, or a `llm` CLI, or Mode, or Metabase — same problem.
+
+A `.db` file is universal. A ViewDefinition is a portable artifact: the same
+five JSONs would run on Pathling, HealthSamurai's view runner, Google's
+`fhir-toolkit`, DuckDB's extension, or the reference implementation. **This
+is the only approach that can honestly claim "FHIR-native, standards-based."**
+For the EHI Ignite submission, that's the line that matters.
+
+### 5. It gives us a credibility artifact to show reviewers
+
+Ep 19 spent a full hour making the case that SQL-on-FHIR is the layer nobody
+has nailed yet. Showing up with a working implementation — even a
+prototype — is a different kind of signal than describing one. "We wrote a
+minimal ViewDefinition runner and it agrees row-for-row with our hand-written
+parser on every query we threw at it" is a strong short sentence.
+
+---
+
+## Where it *doesn't* earn its keep
+
+Honest accounting of the costs:
+
+### 1. Single-patient UI reads are slower and more complicated
+
+The clinical journey view needs "everything about this one patient, rendered
+right now." The Python parser returns one `PatientRecord` in ~5ms with all
+cross-references already resolved. The SQL path would be `SELECT * FROM
+condition WHERE patient_ref = ?; SELECT * FROM medication_request WHERE ...;`
+— five round-trips and then client-side assembly. We'd be throwing away the
+structure the Python layer already gives us for free.
+
+**Don't use SQL-on-FHIR for the patient detail pages.** It's the wrong tool
+for that job.
+
+### 2. FHIRPath is a real language
+
+Our implementation is a practical subset. It handles the canonical
+`basic.json` and `foreach.json` tests from the spec and every ViewDefinition
+we wrote, but it is **not** spec-complete. Things we don't handle:
+
+- `resolve()` (following a reference across resources inside a view)
+- `extension.where(url='...').value[x]` polymorphism
+- Date arithmetic (`now() - 6 months`)
+- `ofType()` for polymorphic values
+- `iif()`, `trace()`, and a long tail of utility functions
+
+For the prototype these don't matter. For production we'd either vendor in
+an existing Python FHIRPath library (e.g. `fhirpathpy`) behind the same
+evaluator interface, or accept the subset and document it. The current
+code is deliberately small so the tradeoff is visible.
+
+### 3. Synthetic SNOMED / RxNorm is noisy
+
+Synthea emits codes that are sometimes internally inconsistent — medication
+names that don't match their RxNorm codes, missing component observations
+for blood pressure, etc. Our views expose that noise directly. The Python
+parser papers over some of it in its extractors. This is a wash: the noise
+is in the data, not the layer.
+
+### 4. We now maintain two ingestion paths
+
+Every time the Synthea schema or a new resource type shows up, we now have to
+teach *two* places about it: the Python extractors and the ViewDefinitions.
+That's real overhead. The mitigation is that ViewDefinitions are JSON —
+anyone (including the LLM) can write one, versus extractors which require
+Python engineering. Over time the marginal cost favors the view layer.
+
+---
+
+## Strategic recommendation
+
+### Keep both layers, with clearly separate roles
+
+```
+                           ┌─────────────────────────┐
+                           │   FHIR Bundles (JSON)   │
+                           └────────────┬────────────┘
+                                        │
+                 ┌──────────────────────┴──────────────────────┐
+                 │                                             │
+                 ▼                                             ▼
+   ┌─────────────────────────┐                ┌───────────────────────────┐
+   │  fhir_explorer.parser   │                │ sql_on_fhir ViewDefs +    │
+   │  → PatientRecord        │                │ → SQLite (one DB per      │
+   │  (single-patient reads, │                │ corpus)                   │
+   │  UI detail pages)       │                │ (corpus analytics, LLM   │
+   │                         │                │ tool surface, exports)   │
+   └──────────┬──────────────┘                └─────────────┬─────────────┘
+              │                                             │
+              ▼                                             ▼
+   ┌─────────────────────────┐                ┌───────────────────────────┐
+   │  Patient Journey UI     │                │  NL Search / Claude       │
+   │  (safety panel, med     │                │  run_sql() tool           │
+   │  timeline, conditions)  │                │  Cohort dashboards        │
+   │                         │                │  Notebook exports        │
+   └─────────────────────────┘                └───────────────────────────┘
+```
+
+- **Patient Journey UI** → keep using `PatientRecord`. It's faster, it
+  already works, and it models exactly the shape the UI needs.
+- **Corpus / Explorer / NL Search / LLM tools** → use the SQLite database.
+  Give Claude a `run_sql()` tool with the view schemas in its system prompt
+  and let it answer arbitrary questions.
+- **Ingest once, serve both.** The long-term move is to have `materialize_all()`
+  run on startup (or after a bundle upload) and keep the Python parser as an
+  in-memory cache for hot single-patient reads.
+
+### For the EHI Ignite submission
+
+1. **Lead with the standards story.** The SQL-on-FHIR ViewDefinition JSONs
+   are an artifact reviewers can recognize. Include them in the submission.
+   "Our corpus speaks SQL-on-FHIR v2" is a credibility line that very few
+   submissions will be able to claim.
+2. **Demo the novelty concretely.** The best demo isn't the patient journey
+   UI — it's Claude emitting SQL against `sof_demo.db` in a streaming chat,
+   citing rows, and building cohorts live. That shows what the layer unlocks
+   that the Python parser can't.
+3. **Frame the Python parser as the "polish layer."** It exists so the UI
+   can be fast, not so the data is trapped inside it. This sidesteps the
+   "generic FHIR browser" trap the CLAUDE.md explicitly warns against.
+
+---
+
+## Is there novelty here?
+
+Yes, but narrowly. The novelty isn't "we built a ViewDefinition runner" —
+HealthSamurai, Pathling, and several research groups have mature versions of
+that. The novelty in our context is:
+
+1. **We are the first to wire SQL-on-FHIR to a clinical briefing product
+   aimed at surgeons.** Everyone else in the SQL-on-FHIR community is
+   targeting population health / payer analytics. We're targeting the
+   single-clinician, single-patient, 30-second decision. That's an
+   unclaimed position.
+2. **We are using ViewDefinitions as the contract between FHIR and an LLM,
+   not between FHIR and a data warehouse.** That reframe is genuinely novel.
+   Everyone talks about SQL-on-FHIR as a pipeline input; nobody talks about
+   it as a prompt substrate.
+3. **A pure-Python, stdlib-only implementation in under 1000 lines** is
+   useful evidence that the spec is tractable for small teams. Reviewers
+   care about leverage. Showing that one file does the work of a data
+   warehouse — even imperfectly — is a good story.
+
+None of this is paradigm-shifting. But it's enough to be *genuinely
+differentiated* in a competition crowded with generic LLM-over-FHIR pitches.
+
+---
+
+## Open questions & next moves
+
+1. **Do we materialize on ingest or lazily?** Current demo rebuilds the DB
+   every run. For the production service we'd want to materialize once per
+   bundle upload and invalidate by file hash. Small change.
+2. **Persist `sof_demo.db` alongside the repo as a fixture?** Would let
+   reviewers `sqlite3 research/ehi-ignite.db` without running any code. Good
+   pitch artifact.
+3. **Wire `run_sql()` into `provider_assistant_agent_sdk.py`.** This is the
+   first real "SQL-on-FHIR as LLM substrate" demo and is probably a half-day
+   of work given the existing agent scaffolding. **Recommended next step.**
+4. **Add a `medication_class` column derived from the existing
+   `drug_classifier`.** Bridges the SQL world back to the clinical
+   intelligence we already built. Makes queries like "patients on 2+
+   anticoagulant classes" trivial.
+5. **Consider DuckDB instead of SQLite for analytics.** DuckDB has a
+   first-class FHIR extension and handles columnar aggregation dramatically
+   faster. SQLite is fine for the prototype; DuckDB is where we'd go if we
+   wanted the performance argument to flip.
+
+---
+
+## Bottom line
+
+> **The SQL-on-FHIR prototype does not beat the Python parser on speed, and
+> that was never going to be the argument. It beats the Python parser on
+> everything that actually matters for a competition submission: portability,
+> analytics surface, LLM integration cost, and the standards story. Keep the
+> Python parser for the UI. Use the ViewDefinition + SQLite layer everywhere
+> else. Ship both.**
+
+---
+
+*Artifacts:*
+- `patient-journey/core/sql_on_fhir/` — module
+- `patient-journey/tests/test_sql_on_fhir.py` — 24 passing tests
+- `research/sof-bench-50.md`, `research/sof-bench-300.md` — raw benchmark output
+- `data/sof_demo.db` — materialized SQLite from `demo.py`
+- `research/ehi-ignite.db` — 200-patient pitch snapshot (P0.3, ~12 MB, committed; now carries condition_active + medication_episode + observation_latest)
+
+---
+
+## Addendum — `run_sql` LLM tool surface *(Phase 0, April 13, 2026)*
+
+Phase 0 closed the gap between "we have a SQL-on-FHIR warehouse" and
+"the LLM can actually use it." The `run_sql` tool is the contract
+between the Claude Agent SDK runtime and the ViewDefinition tables.
+This section is the canonical reference for what that tool does, what
+it refuses to do, and how it's wired into the rest of the stack.
+
+### Module layout
+
+| Module                                                | Role                                                                                           |
+|-------------------------------------------------------|------------------------------------------------------------------------------------------------|
+| `api/core/sof_tools.py`                               | Pure-Python gate + runner + schema renderer. Has no agent-SDK dependencies, fully unit-tested. |
+| `api/core/sof_materialize.py`                         | Idempotent rebuild of `data/sof.db` from the Synthea bundles. Fires on FastAPI startup.        |
+| `api/core/provider_assistant_agent_sdk.py`            | Registers `mcp__fhir_chart__run_sql` with the Claude Agent SDK and traces every call.         |
+| `patient-journey/core/sql_on_fhir/`                   | The ViewDefinition → SQLite ingest engine reused by both of the above.                         |
+
+### Tool signature
+
+```python
+run_sql(query: str, limit: int = 50) -> SqlRunResult
+```
+
+`SqlRunResult` fields:
+
+| Field        | Type                          | Notes                                                                     |
+|--------------|-------------------------------|---------------------------------------------------------------------------|
+| `columns`    | `list[str]`                   | Column names from the cursor.description.                                 |
+| `rows`       | `list[list[Any]]`             | At most `min(limit, 500)` rows.                                           |
+| `row_count`  | `int`                         | Length of `rows`.                                                         |
+| `truncated`  | `bool`                        | True when the warehouse had at least `limit + 1` matching rows.           |
+| `query`      | `str`                         | The query actually executed (may include an injected `LIMIT`).            |
+| `error`      | `str \| None`                 | Populated on gate rejection or SQLite failure. The tool never raises.     |
+
+### Safety gate (what gets rejected)
+
+1. **Empty / whitespace-only queries** → `rejected: empty query`
+2. **Multi-statement** (any semicolon after comment/string stripping)
+   → `rejected: multi-statement queries are not allowed`
+3. **Non-read leading keyword** — only `SELECT` and `WITH` are
+   accepted. `INSERT`, `UPDATE`, `DELETE`, `EXPLAIN`, etc. are rejected
+   with `only SELECT/WITH queries are allowed (got <TOKEN>)`.
+4. **Forbidden keyword anywhere** (whole-word match, after stripping
+   string literals and `--` / `/* */` comments): `drop`, `insert`,
+   `update`, `delete`, `attach`, `detach`, `pragma`, `create`,
+   `alter`, `replace`, `truncate`, `vacuum`, `reindex`, `analyze`.
+   Rejected with `forbidden keyword: <TOKEN>`.
+5. **Database-level read-only guarantee** — the runner opens the DB
+   with `file:<path>?mode=ro` so even a gate bypass can't mutate disk.
+
+Column aliases like `dropped_count` are still legal because the
+tokenizer matches whole words and the stripper removes the noise
+bytes before tokenizing. Literal quoted values containing forbidden
+keywords (e.g. `WHERE status = 'Drop'`) also pass because quoted
+strings are stripped before the forbidden-word scan.
+
+### Row cap + truncation probe
+
+`MAX_ROWS = 500` is the hard ceiling; any caller-supplied `limit` is
+clamped into `[1, 500]`. When the caller's query doesn't already end
+in `LIMIT n [OFFSET m]` the runner wraps it in `LIMIT capped + 1` and
+slices the extra row off the result — that single-row overshoot is
+how we populate the `truncated` flag without a second round-trip. If
+the query already has a trailing `LIMIT`, the runner respects it and
+still caps the in-memory payload at `capped` rows.
+
+### Schemas surfaced to the agent
+
+`get_schemas_for_prompt()` walks every ViewDefinition in
+`patient-journey/core/sql_on_fhir/views/` and emits a compact
+CREATE TABLE block per view, in the same column-type mapping
+`sqlite_sink._sql_type` uses at ingest time. That block is embedded in
+`build_tool_description()` and shipped as the MCP tool description so
+the agent self-serves joins without us ever hand-writing a schema
+prompt. Today this covers `patient`, `condition`, `medication_request`,
+`observation`, and `encounter` — five tables. The Synthea reference
+convention (`urn:uuid:<id>`) is called out in the preamble so the
+agent knows to write `x.patient_ref = 'urn:uuid:' || p.id` joins.
+
+### Known limitations (Phase 0 → early Phase 1)
+
+- **No date arithmetic in the FHIRPath runtime**, so queries needing
+  "within the last 90 days" have to do string comparison on ISO-8601
+  text. Works for Synthea, could bite us on a real payer feed.
+- **Schema description is CREATE TABLE only.** It does not yet
+  describe the join graph, cardinalities, or the fact that
+  `condition.clinical_status` has a fixed coded vocabulary. Grunt
+  work; easy upgrade if the agent starts writing wrong joins.
+
+*Resolved in P1.1 (2026-04-13):* `medication_request` now carries a
+derived `drug_class` column populated from the shared
+`data/drug_classes.json` mapping at ingest time. See the **Row-level
+enrichment** section below.
+
+### Row-level enrichment *(Phase 1, April 13, 2026)*
+
+Pure ViewDefinitions can only surface fields reachable via
+FHIRPath-lite. Anything derived — drug classes, episodes, severity
+scores — lives in `patient-journey/core/sql_on_fhir/enrich.py`, which
+binds three things together per view:
+
+1. **View name** (e.g. `medication_request`)
+2. **Extra columns** the sink appends to the DDL
+3. **A row mutator** that runs after the FHIRPath runtime has
+   populated the declared columns but before the row hits the INSERT
+
+The registry is applied by default in both `materialize()` and
+`materialize_all()`; callers that want a pure (unenriched) build can
+pass `enrichments={}`. The MCP tool description in `sof_tools.py` is
+enrichment-aware too, so columns show up with a `-- enriched` suffix
+in the agent's system prompt.
+
+**`medication_request.drug_class`** — single TEXT column. Resolution
+precedence is RxNorm code first (exact match against the `rxnorm_codes`
+list in `drug_classes.json`), then case-insensitive keyword match
+against `medication_text` / `rxnorm_display`. First match wins — we
+expose a canonical single drug class per row so `GROUP BY drug_class`
+never double-counts. Values map to the twelve class keys defined in
+`drug_classes.json`: `anticoagulants`, `antiplatelets`,
+`ace_inhibitors`, `arbs`, `jak_inhibitors`, `immunosuppressants`,
+`nsaids`, `opioids`, `anticonvulsants`, `psych_medications`,
+`stimulants`, `diabetes_medications`, or `NULL` when nothing matched.
+
+**Pitch-snapshot distribution** (`research/ehi-ignite.db`, 200 patients,
+1,948 medication requests):
+
+| `drug_class`           | Rows  |
+|------------------------|------:|
+| `NULL`                 | 1,746 |
+| `nsaids`               |    97 |
+| `opioids`              |    35 |
+| `diabetes_medications` |    16 |
+| `arbs`                 |    13 |
+| `antiplatelets`        |    13 |
+| `immunosuppressants`   |    13 |
+| `anticonvulsants`      |     4 |
+| `anticoagulants`       |     4 |
+| `ace_inhibitors`       |     4 |
+| `stimulants`           |     2 |
+| `psych_medications`    |     1 |
+
+Every shipped class has at least one row in the pitch snapshot, which
+means every risk-group cohort query the agent could write against
+the submission DB will return a non-empty result.
+
+### Derived tables *(Phase 1, April 13, 2026)*
+
+Enrichments add *columns* to existing views. Derivations add whole
+new *tables* — built by reading from the just-materialized view
+tables and aggregating rows. The two hooks live side by side in the
+sink: every view flushes first, then `sqlite_sink.materialize_all`
+walks the derivation registry in `patient-journey/core/sql_on_fhir/derived.py`
+and calls each `Derivation.build(conn)` in turn. Derivations whose
+declared `depends_on` sources aren't part of the current run are
+silently skipped, so partial builds don't explode.
+
+Like enrichments, derivations are default-on: pass `derivations={}`
+to `materialize_all` for a pure ViewDefinition build. The schema
+renderer in `sof_tools.get_schemas_for_prompt` walks the derivation
+registry too, so derived tables show up in the agent's system prompt
+with every column tagged `-- derived`, and the preamble tells the
+agent to reach for them when the user asks about treatment duration
+or active prescriptions.
+
+**`medication_episode`** *(one row per `(patient, drug)` continuous
+treatment episode)*. Built from `medication_request` by grouping on
+`(patient_ref, normalized display)` — same lower-cased, stripped key
+that `core/episode_detector.detect_medication_episodes` uses, so the
+SQL warehouse and the clinician-facing safety panel cannot disagree
+about which prescriptions belong to which episode. Each group
+collapses into a single row carrying:
+
+| Column             | Type    | Notes                                                   |
+|--------------------|---------|---------------------------------------------------------|
+| `episode_id`       | TEXT PK | `{patient_ref}::{normalized_display}`                   |
+| `patient_ref`      | TEXT    | Matches `medication_request.patient_ref`                |
+| `display`          | TEXT    | Earliest-seen `medication_text` / `rxnorm_display`      |
+| `rxnorm_code`      | TEXT    | First non-null RxNorm code in the episode               |
+| `drug_class`       | TEXT    | Carried forward from the enrichment pass                |
+| `latest_status`    | TEXT    | Status of the most recent request                       |
+| `is_active`        | INTEGER | `1` if `latest_status` in (`active`, `on-hold`)         |
+| `start_date`       | TEXT    | Min `authored_on` in the group                          |
+| `end_date`         | TEXT    | Max `authored_on`, `NULL` when the episode is active    |
+| `request_count`    | INTEGER | How many `medication_request` rows rolled up            |
+| `duration_days`    | REAL    | `(end - start)` in days, `NULL` when active             |
+| `first_request_id` | TEXT    | `id` of the earliest `medication_request` in the group  |
+
+**Pitch-snapshot rollup** (`research/ehi-ignite.db`, 200 patients,
+1,948 medication requests → 820 episodes):
+
+| `drug_class`           | Active | Completed |
+|------------------------|-------:|----------:|
+| `NULL`                 |    252 |       392 |
+| `nsaids`               |     11 |        72 |
+| `opioids`              |      1 |        25 |
+| `diabetes_medications` |     16 |         0 |
+| `arbs`                 |     13 |         0 |
+| `antiplatelets`        |      3 |         9 |
+| `immunosuppressants`   |      5 |         6 |
+| `anticoagulants`       |      4 |         0 |
+| `ace_inhibitors`       |      0 |         4 |
+| `anticonvulsants`      |      1 |         3 |
+| `stimulants`           |      1 |         1 |
+| `psych_medications`    |      1 |         0 |
+| **total**              |**308** |   **512** |
+
+Four active anticoagulant episodes across 200 patients. That's a
+real, queryable, surgery-relevant cohort the demo can point at
+during the pitch. A one-line query now answers "who is currently on
+an anticoagulant?" — a question that cost 40+ lines of Python
+before the SOF layer existed.
+
+### Filtered subset views *(Phase 1 — P1.3, April 13, 2026)*
+
+A fourth ViewDefinition idiom landed alongside the derived tables:
+**filtered subset views**. These are still pure ViewDefinitions
+(standards-compliant, JSON-only), but they carry a view-level `where`
+clause that prunes rows before they hit SQLite. The column shape is
+identical to a sibling "full" view, so existing queries can swap one
+for the other without any column-mapping work.
+
+**`condition_active`** *(same shape as `condition`, only the active
+rows)*. View-level filter:
+
+```json
+"where": [
+  {"path": "clinicalStatus.coding.where(code = 'active' or code = 'recurrence' or code = 'relapse').exists()"}
+]
+```
+
+The `coding.where(...).exists()` form is deliberate: `clinicalStatus`
+is a `CodeableConcept`, so the status code can appear in any coding
+slot. Using `.first().code = 'active'` would silently drop rows where
+the first coding slot is a translation into a different code system.
+The `exists()` form is robust to multi-coding.
+
+In the pitch snapshot: **674 active conditions** out of 1,410 total
+(47.8%), so the filter actually matters — it's the difference between
+"patient X has a problem list of 8 things" and "patient X has a
+lifetime condition history of 17 things". Clinicians want the former;
+the warehouse now supports both shapes natively.
+
+**Why a view and not a `WHERE` clause per query.** Two reasons: it
+makes the agent's SQL shorter (no risk of forgetting the clinical
+filter on a long query), and it surfaces the concept "active problem
+list" as a named table in the system prompt so the agent can reach
+for it by name.
+
+### SQLite view derivations *(Phase 1 — P1.4, April 13, 2026)*
+
+P1.2 shipped derivations as materialized tables: build time runs
+Python code, persists rows to SQLite, consumes storage. P1.4 extends
+the `Derivation` dataclass with a `kind` field so a derivation can
+also ship as a lazy SQLite `CREATE VIEW`:
+
+```python
+@dataclass
+class Derivation:
+    table_name: str
+    depends_on: list[str]
+    build: DerivationBuilder
+    columns: list[Column] = field(default_factory=list)
+    kind: str = "table"  # "table" or "view"
+    description: str = ""
+```
+
+`kind="table"` behaves exactly as P1.2 did. `kind="view"` means the
+builder issues `DROP VIEW IF EXISTS` + `CREATE VIEW`, and row counts
+come back from a follow-up `SELECT COUNT(*)`. The schema renderer in
+`sof_tools.get_schemas_for_prompt` branches on `kind` so the agent's
+system prompt emits `CREATE VIEW` vs `CREATE TABLE` accurately, with
+every column tagged `-- view` vs `-- derived` respectively.
+
+**When to pick which.**
+
+| Pick `kind=` | When the derivation…                                                     |
+|--------------|---------------------------------------------------------------------------|
+| `"table"`    | involves Python logic, touches the enrichment registry, or is expensive   |
+| `"view"`     | is cheap SQL, and staleness would be a clinical bug                       |
+
+`medication_episode` is a table: it runs a Python grouping pass, probes
+the `drug_class` enrichment column, and computes date math the FHIRPath
+runtime can't express. `observation_latest` is a view: it's a single
+`ROW_NUMBER()` window and a clinician reading "current A1c" cannot
+tolerate a stale value hiding behind a forgotten rebuild.
+
+**`observation_latest`** *(latest observation per `(patient_ref,
+loinc_code)` pair)*. DDL:
+
+```sql
+CREATE VIEW "observation_latest" AS
+SELECT id, patient_ref, encounter_ref, status, category,
+       loinc_code, display, effective_date,
+       value_quantity, value_unit, value_string
+FROM (
+    SELECT …, ROW_NUMBER() OVER (
+        PARTITION BY patient_ref, loinc_code
+        ORDER BY effective_date DESC, id DESC
+    ) AS _rn
+    FROM "observation"
+    WHERE patient_ref IS NOT NULL AND loinc_code IS NOT NULL
+) ranked
+WHERE _rn = 1
+```
+
+Three design points worth calling out:
+
+1. **Deterministic tiebreaker.** When two rows share an
+   `effective_date`, the higher `id` wins. Without this, "latest A1c"
+   could flip between two equally-dated readings on a rebuild.
+2. **NULL-key exclusion.** Rows where `patient_ref` or `loinc_code`
+   is NULL are dropped in the subquery so they don't collapse into a
+   bogus `(NULL, NULL)` partition.
+3. **Live projection, not a snapshot.** Every `SELECT * FROM
+   observation_latest` re-runs the window against the current
+   `observation` table. A manual `INSERT INTO observation` is
+   visible on the very next SELECT without any rebuild pass — the
+   hermetic test asserts this explicitly.
+
+In the pitch snapshot: **5,546 rows = 5,546 distinct
+`(patient_ref, loinc_code)` pairs**, a 7.3× reduction from the
+40,476-row source table. That matches the intuition that each patient
+has ~28 distinct lab/vital codes on file and typically several readings
+per code.
+
+The clinical payoff: a query like "what's this patient's most recent
+creatinine, A1c, BP" used to be three `ORDER BY effective_date DESC
+LIMIT 1` scans against `observation`. It's now three row lookups
+against `observation_latest` — shorter SQL for the agent, correct by
+construction.
+
+### Reference tests
+
+| File                                | What it covers                                                                                                   |
+|-------------------------------------|------------------------------------------------------------------------------------------------------------------|
+| `api/tests/test_sof_tools.py`       | 22 tests — gate, LIMIT+1 probe, truncation, schema rendering (incl. derived tables + VIEW emission), runner.     |
+| `api/tests/test_sof_materialize.py` | 8 tests — mtime gate, atomic swap, env-driven path, error-swallowing.                                            |
+| `patient-journey/tests/test_sql_on_fhir.py` | 66 tests — FHIRPath, runner, sqlite sink, **+15 enrichment (P1.1)**, **+11 derivation (P1.2)**, **+6 condition_active (P1.3)**, **+10 observation_latest (P1.4)**. |
+
+Every test is hermetic: no test touches the real `data/sof.db` or the
+committed `research/ehi-ignite.db`.

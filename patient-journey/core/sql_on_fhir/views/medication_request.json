@@ -1,0 +1,23 @@
+{
+  "resourceType": "ViewDefinition",
+  "name": "medication_request",
+  "resource": "MedicationRequest",
+  "status": "active",
+  "description": "Flattened MedicationRequest view — one row per (request, RxNorm coding). Uses the first coding of medicationCodeableConcept.",
+  "select": [
+    {
+      "column": [
+        {"name": "id", "path": "id", "type": "id"},
+        {"name": "patient_ref", "path": "subject.reference", "type": "string"},
+        {"name": "encounter_ref", "path": "encounter.reference", "type": "string"},
+        {"name": "status", "path": "status", "type": "code"},
+        {"name": "intent", "path": "intent", "type": "code"},
+        {"name": "authored_on", "path": "authoredOn", "type": "dateTime"},
+        {"name": "medication_text", "path": "medicationCodeableConcept.text", "type": "string"},
+        {"name": "rxnorm_code", "path": "medicationCodeableConcept.coding.first().code", "type": "code"},
+        {"name": "rxnorm_display", "path": "medicationCodeableConcept.coding.first().display", "type": "string"},
+        {"name": "rxnorm_system", "path": "medicationCodeableConcept.coding.first().system", "type": "uri"}
+      ]
+    }
+  ]
+}

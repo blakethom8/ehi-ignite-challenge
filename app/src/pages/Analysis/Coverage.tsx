@@ -115,28 +115,40 @@ export function AnalysisCoverage() {
         <article className="rounded-2xl bg-white p-4 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
           <p className="text-xs font-semibold uppercase tracking-wider text-[#55706c]">Patients Profiled</p>
           <p className="mt-1 text-3xl font-semibold text-[#0f172a]">
-            {coverageLoading ? "..." : coverage?.total_patients.toLocaleString() ?? "0"}
+            {coverageLoading
+              ? <span className="mt-1 block h-8 w-20 animate-pulse rounded-lg bg-[#edf0f5]" />
+              : <>{coverage?.total_patients.toLocaleString() ?? "0"}</>
+            }
           </p>
         </article>
 
         <article className="rounded-2xl bg-white p-4 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
           <p className="text-xs font-semibold uppercase tracking-wider text-[#55706c]">Fields Tracked</p>
           <p className="mt-1 text-3xl font-semibold text-[#0f172a]">
-            {coverageLoading ? "..." : coverage?.fields.length.toLocaleString() ?? "0"}
+            {coverageLoading
+              ? <span className="mt-1 block h-8 w-20 animate-pulse rounded-lg bg-[#edf0f5]" />
+              : <>{coverage?.fields.length.toLocaleString() ?? "0"}</>
+            }
           </p>
         </article>
 
         <article className="rounded-2xl bg-white p-4 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
           <p className="text-xs font-semibold uppercase tracking-wider text-[#55706c]">Allergy Records</p>
           <p className="mt-1 text-3xl font-semibold text-[#0f172a]">
-            {allergyLoading ? "..." : allergy?.total_allergy_records.toLocaleString() ?? "0"}
+            {allergyLoading
+              ? <span className="mt-1 block h-8 w-20 animate-pulse rounded-lg bg-[#edf0f5]" />
+              : <>{allergy?.total_allergy_records.toLocaleString() ?? "0"}</>
+            }
           </p>
         </article>
 
         <article className="rounded-2xl bg-white p-4 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
           <p className="text-xs font-semibold uppercase tracking-wider text-[#55706c]">High Criticality Patients</p>
           <p className="mt-1 text-3xl font-semibold text-[#0f172a]">
-            {allergyLoading ? "..." : allergy?.patients_with_high_criticality.toLocaleString() ?? "0"}
+            {allergyLoading
+              ? <span className="mt-1 block h-8 w-20 animate-pulse rounded-lg bg-[#edf0f5]" />
+              : <>{allergy?.patients_with_high_criticality.toLocaleString() ?? "0"}</>
+            }
           </p>
         </article>
       </section>
@@ -156,7 +168,16 @@ export function AnalysisCoverage() {
               Fields Requiring Caution
             </p>
             <div className="mt-3 space-y-2.5">
-              {coverageLoading && <p className="text-sm text-[#9a3412]">Loading field coverage...</p>}
+              {coverageLoading && (
+                <div className="space-y-2">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="rounded-lg bg-white px-3 py-2">
+                      <div className="h-4 w-3/4 animate-pulse rounded bg-[#fde8dc]" />
+                      <div className="mt-1 h-3 w-1/4 animate-pulse rounded bg-[#fde8dc]" />
+                    </div>
+                  ))}
+                </div>
+              )}
               {!coverageLoading && cautionFields.length === 0 && (
                 <p className="text-sm text-[#9a3412]">No low-coverage fields in the current profile.</p>
               )}
@@ -175,7 +196,16 @@ export function AnalysisCoverage() {
               Allergy Category Mix
             </p>
             <div className="mt-3 space-y-2">
-              {allergyLoading && <p className="text-sm text-[#64748b]">Loading allergy profile...</p>}
+              {allergyLoading && (
+                <div className="space-y-2">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="flex items-center justify-between rounded-lg border border-[#edf0f5] px-3 py-2">
+                      <div className="h-4 w-1/2 animate-pulse rounded bg-[#edf0f5]" />
+                      <div className="h-4 w-12 animate-pulse rounded bg-[#edf0f5]" />
+                    </div>
+                  ))}
+                </div>
+              )}
               {!allergyLoading &&
                 Object.entries(allergy?.category_counts ?? {})
                   .sort((a, b) => b[1] - a[1])
@@ -194,7 +224,16 @@ export function AnalysisCoverage() {
               Top Allergy Substances
             </p>
             <div className="mt-3 space-y-2">
-              {allergyLoading && <p className="text-sm text-[#64748b]">Loading top substances...</p>}
+              {allergyLoading && (
+                <div className="space-y-2">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="rounded-lg border border-[#edf0f5] px-3 py-2">
+                      <div className="h-4 w-2/3 animate-pulse rounded bg-[#edf0f5]" />
+                      <div className="mt-1 h-3 w-1/2 animate-pulse rounded bg-[#edf0f5]" />
+                    </div>
+                  ))}
+                </div>
+              )}
               {!allergyLoading &&
                 (allergy?.top_substances ?? []).slice(0, 8).map((entry) => (
                   <div key={`${entry.substance}-${entry.criticality}`} className="rounded-lg border border-[#edf0f5] px-3 py-2">

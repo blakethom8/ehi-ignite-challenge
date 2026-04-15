@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import { AlertTriangle, Bot, ChevronDown, ChevronRight, Database, Eye, MessageSquare, Search, Send, Sparkles, Terminal, User } from "lucide-react";
@@ -383,6 +383,19 @@ export function ChatMessageBubble({
       <div className="flex-1 min-w-0 space-y-2">
         {!compact && msg.trace && msg.trace.tool_calls.length > 0 && (
           <ToolCallsSection trace={msg.trace} />
+        )}
+
+        {!compact && msg.trace && msg.trace.tool_calls.some((tc) => tc.tool_name === "build_clinical_context") && (
+          <p className="text-[11px] text-[#a5a8b5]">
+            <Link
+              to="/analysis/methodology"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-[#5b76fe] hover:underline transition-colors"
+            >
+              See the methodology that built this context →
+            </Link>
+          </p>
         )}
 
         <pre className={`whitespace-pre-wrap ${compact ? "text-[12px]" : "text-[13px]"} leading-relaxed text-[#1c1c1e] font-sans`}>{msg.content}</pre>

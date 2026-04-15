@@ -24,18 +24,19 @@ export function ChatWidget() {
 
   // Don't render on the full assistant page (avoid double UI)
   const isAssistantPage = location.pathname === "/explorer/assistant";
-  // Don't render if no patient selected
-  if (!patientId || isAssistantPage) return null;
 
   const hasMessages = chat.messages.length > 0;
   const lastAssistantMsg = [...chat.messages].reverse().find((m) => m.role === "assistant");
 
-  // Auto-scroll on new messages
+  // Auto-scroll on new messages — must be before any conditional return (rules of hooks)
   useEffect(() => {
     if (open && !minimized) {
       scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
     }
   }, [chat.messages.length, chat.isPending, open, minimized]);
+
+  // Don't render if no patient selected or on full assistant page
+  if (!patientId || isAssistantPage) return null;
 
   function handleSubmit(question: string) {
     const trimmed = question.trim();

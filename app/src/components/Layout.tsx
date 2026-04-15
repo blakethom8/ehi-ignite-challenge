@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, NavLink, useLocation, useSearchParams } from "react-router-dom";
+import { Link, NavLink, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
   Activity,
@@ -275,7 +275,7 @@ function PatientList({
 
 export function Layout({ children }: LayoutProps) {
   const location = useLocation();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const patientId = searchParams.get("patient");
 
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -303,10 +303,12 @@ export function Layout({ children }: LayoutProps) {
 
   const clinicalLanding = withPatientQuery("/explorer", patientId);
 
+  const navigate = useNavigate();
+
   const handleSelectPatient = (id: string) => {
-    const next = new URLSearchParams(searchParams);
-    next.set("patient", id);
-    setSearchParams(next);
+    // Use navigate (like landing page cards) to ensure reliable routing
+    const base = location.pathname.startsWith("/explorer") ? location.pathname : "/explorer";
+    navigate(`${base}?patient=${id}`);
   };
 
   useEffect(() => {

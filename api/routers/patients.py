@@ -18,6 +18,7 @@ from api.core.loader import (
     patient_id_from_path,
     path_from_patient_id,
     load_patient,
+    data_dir,
 )
 from api.models import (
     PatientListItem,
@@ -154,30 +155,45 @@ PROTOCOL_NOTES: dict[str, str] = {
 @router.get("", response_model=list[PatientListItem])
 def list_patients() -> list[PatientListItem]:
     """
-    Return a lightweight list of all patients — names and key stats only.
-    Reads file names without loading bundles, so this is fast regardless
-    of corpus size.
+    Return a lightweight list of all patients with pre-computed stats.
+    Uses the corpus cache (instant if already built, ~5-10s first time).
     """
-    files = list_patient_files()
-    items: list[PatientListItem] = []
-
-    for path in files:
-        patient_id = patient_id_from_path(path)
-        name = patient_display_name(path)
-        items.append(PatientListItem(
-            id=patient_id,
-            name=name,
-            age_years=0.0,
-            gender="",
-            complexity_tier="",
-            complexity_score=0.0,
-            total_resources=0,
-            encounter_count=0,
-            active_condition_count=0,
-            active_med_count=0,
-        ))
-
-    return items
+    try:
+        from fhir_explorer.catalog.corpus import load_corpus
+        catalog = load_corpus(data_dir())
+        return [
+            PatientListItem(
+                id=idx.patient_id,
+                name=idx.patient_name,
+                age_years=idx.age_years,
+                gender=idx.gender,
+                complexity_tier=idx.complexity_tier,
+                complexity_score=idx.complexity_score,
+                total_resources=idx.total_resources,
+                encounter_count=idx.encounter_count,
+                active_condition_count=idx.active_condition_count,
+                active_med_count=idx.active_med_count,
+            )
+            for idx in catalog.patients
+        ]
+    except Exception:
+        # Fallback to filename-only list if corpus cache fails
+        files = list_patient_files()
+        return [
+            PatientListItem(
+                id=patient_id_from_path(path),
+                name=patient_display_name(path),
+                age_years=0.0,
+                gender="",
+                complexity_tier="",
+                complexity_score=0.0,
+                total_resources=0,
+                encounter_count=0,
+                active_condition_count=0,
+                active_med_count=0,
+            )
+            for path in files
+        ]
 
 
 @router.get("/risk-summary", response_model=PatientRiskSummaryResponse)

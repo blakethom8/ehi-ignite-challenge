@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, NavLink, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -19,11 +19,13 @@ import {
   Layers3,
   MessageSquareText,
   Scissors,
+  Search,
   ShieldAlert,
   Star,
   Stethoscope,
   Syringe,
   TestTubeDiagonal,
+  UserRound,
   Zap,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -302,6 +304,127 @@ function PatientList({
   );
 }
 
+// ─── Patient Selector Dropdown ────────────────────────────────────────────────
+function PatientSelector({
+  patientId,
+  onSelect,
+}: {
+  patientId: string | null;
+  onSelect: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const { data: patients = [], isLoading } = useQuery({
+    queryKey: ["patients"],
+    queryFn: api.listPatients,
+    staleTime: Infinity,
+  });
+
+  const current = patients.find((p) => p.id === patientId);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return patients;
+    return patients.filter((p) => p.name.toLowerCase().includes(q));
+  }, [patients, search]);
+
+  // Close on outside click
+  useEffect(() => {
+    if (!open) return;
+    function handler(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+        setSearch("");
+      }
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  // Focus input when opened
+  useEffect(() => {
+    if (open) setTimeout(() => inputRef.current?.focus(), 50);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm transition-colors ${
+          open
+            ? "border-[#5b76fe] bg-[#eef1ff] text-[#5b76fe]"
+            : "border-[#e9eaef] bg-white text-[#555a6a] hover:border-[#5b76fe] hover:text-[#5b76fe]"
+        }`}
+        title="Switch patient"
+      >
+        <UserRound size={14} className="shrink-0" />
+        <span className="max-w-[180px] truncate font-medium">
+          {isLoading ? "Loading…" : current ? current.name : "Select patient"}
+        </span>
+        <ChevronDown size={13} className={`shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 top-full z-50 mt-1 w-72 rounded-xl border border-[#e9eaef] bg-white shadow-lg">
+          {/* Search input */}
+          <div className="flex items-center gap-2 border-b border-[#e9eaef] px-3 py-2">
+            <Search size={13} className="shrink-0 text-[#a5a8b5]" />
+            <input
+              ref={inputRef}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search patients…"
+              className="flex-1 bg-transparent text-sm text-[#1c1c1e] outline-none placeholder:text-[#a5a8b5]"
+            />
+          </div>
+          {/* List */}
+          <div className="max-h-64 overflow-y-auto py-1">
+            {filtered.length === 0 && (
+              <p className="px-4 py-3 text-sm text-[#a5a8b5]">No patients match</p>
+            )}
+            {filtered.slice(0, 100).map((p) => (
+              <button
+                key={p.id}
+                onClick={() => {
+                  onSelect(p.id);
+                  setOpen(false);
+                  setSearch("");
+                }}
+                className={`flex w-full items-start gap-2 px-3 py-2 text-left transition-colors hover:bg-[#f5f6f8] ${
+                  p.id === patientId ? "bg-[#eef1ff]" : ""
+                }`}
+              >
+                <div className="min-w-0 flex-1">
+                  <p className={`truncate text-sm font-medium ${
+                    p.id === patientId ? "text-[#5b76fe]" : "text-[#1c1c1e]"
+                  }`}>
+                    {p.name}
+                  </p>
+                  <p className="truncate text-[11px] text-[#a5a8b5]">
+                    {p.gender} · {Math.floor(p.age_years)}y · {p.complexity_tier}
+                  </p>
+                </div>
+                {p.id === patientId && (
+                  <span className="mt-0.5 shrink-0 text-[#5b76fe]">✓</span>
+                )}
+              </button>
+            ))}
+            {filtered.length > 100 && (
+              <p className="px-4 py-2 text-center text-[11px] text-[#a5a8b5]">
+                {filtered.length - 100} more — type to narrow
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+// ───────────────────────────────────────────────────────────────────────────────
+
 export function Layout({ children }: LayoutProps) {
   const location = useLocation();
   const [searchParams] = useSearchParams();
@@ -376,31 +499,43 @@ export function Layout({ children }: LayoutProps) {
                 </p>
               </Link>
 
-              <nav className="flex min-w-0 items-center gap-1 rounded-xl border border-[#e9eaef] bg-white p-1">
-                <Link
-                  to={clinicalLanding}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors lg:text-sm ${
-                    !isAnalysis ? "bg-[#eef1ff] text-[#5b76fe]" : "text-[#667085] hover:text-[#1f2937]"
-                  }`}
-                >
-                  Clinical
-                </Link>
-                <Link
-                  to="/analysis"
-                  className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors lg:text-sm ${
-                    isAnalysis ? "bg-[#dff6ef] text-[#0f766e]" : "text-[#667085] hover:text-[#1f2937]"
-                  }`}
-                >
-                  Data Lab
-                </Link>
-              </nav>
+              <div className="flex items-center gap-2">
+                {!isAnalysis && (
+                  <PatientSelector
+                    patientId={patientId}
+                    onSelect={(id) => {
+                      const base = location.pathname.startsWith("/explorer") ? location.pathname : "/explorer";
+                      navigate(`${base}?patient=${id}`);
+                    }}
+                  />
+                )}
+
+                <nav className="flex items-center gap-1 rounded-xl border border-[#e9eaef] bg-white p-1">
+                  <Link
+                    to={clinicalLanding}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors lg:text-sm ${
+                      !isAnalysis ? "bg-[#eef1ff] text-[#5b76fe]" : "text-[#667085] hover:text-[#1f2937]"
+                    }`}
+                  >
+                    Clinical
+                  </Link>
+                  <Link
+                    to="/analysis"
+                    className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors lg:text-sm ${
+                      isAnalysis ? "bg-[#dff6ef] text-[#0f766e]" : "text-[#667085] hover:text-[#1f2937]"
+                    }`}
+                  >
+                    Data Lab
+                  </Link>
+                </nav>
+              </div>
             </div>
           </div>
         </header>
 
         <div className="flex h-[calc(100vh-72px)] flex-col overflow-hidden lg:flex-row">
           <aside
-            className={`relative flex max-h-[50vh] w-full shrink-0 flex-col overflow-hidden border-b border-r border-[#e9eaef] transition-all duration-200 lg:max-h-none lg:border-b-0 ${
+            className={`relative flex max-h-[50vh] w-full shrink-0 flex-col overflow-hidden border-b border-r border-[#e9eaef] transition-all duration-200 lg:max-h-full lg:border-b-0 ${
               sidebarCollapsed ? "lg:w-14" : "lg:w-72"
             } ${isAnalysis ? "bg-[#f7fffc]" : "bg-white"}`}
           >
@@ -430,7 +565,7 @@ export function Layout({ children }: LayoutProps) {
 
                 {/* Search + patient list (hidden when collapsed) */}
                 {!sidebarCollapsed && (
-                  <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                  <div className="flex flex-col" style={{ flex: "0 1 40%", minHeight: 0 }}>
                     <div className="shrink-0 border-b border-[#e9eaef] px-4 py-3">
                       <button
                         onClick={() => setPaletteOpen(true)}
@@ -447,8 +582,8 @@ export function Layout({ children }: LayoutProps) {
                   </div>
                 )}
 
-                {/* Nav links */}
-                <nav className={`shrink-0 overflow-y-auto border-t border-[#e9eaef] ${sidebarCollapsed ? "px-1 py-2" : "px-3 py-4"}`}>
+                {/* Nav links — always scrollable, takes remaining space */}
+                <nav className={`overflow-y-auto border-t border-[#e9eaef] ${sidebarCollapsed ? "flex-1 px-1 py-2" : "flex-1 px-3 py-4"}`}>
                   {CLINICAL_NAV_GROUPS.map((group, groupIndex) => {
                     const isAdvanced = group.advanced === true;
                     const isOpen = !isAdvanced || advancedOpen;

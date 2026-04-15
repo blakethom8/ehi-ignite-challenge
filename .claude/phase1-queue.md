@@ -88,7 +88,7 @@ Seeded from `docs/JUDGE-WALKTHROUGH.md §4 Prioritized Punch List`. The orchestr
 - **What to do:** the `2 meds` chip becomes a disclosure trigger. Expanded state lists drug name, dose, route, onset date, and a link to the raw FHIR MedicationRequest.
 
 ### P1-T07 · Fix landing-page CTA routing ambiguity
-- **Status:** Queued
+- **Status:** ✅ Resolved 2026-04-15 (no build required — already correct)
 - **Kind:** refiner
 - **Rubric target:** Cat 3 (40 pts) · +1 expected
 - **Judge quote:** "'Open Clinical Dashboard' and 'Explore the Data' both route to /explorer."
@@ -190,7 +190,7 @@ Seeded from `docs/JUDGE-WALKTHROUGH.md §4 Prioritized Punch List`. The orchestr
 ### 🟠 P1 — High-impact Data Lab deltas
 
 #### DL-T01 · Fix Coverage page first-paint placeholders
-- **Status:** Queued · **Kind:** builder
+- **Status:** ✅ Completed 2026-04-15 · commit `cabca5b` · **Kind:** builder
 - **Rubric target:** Cat 3 Interpretability (40 pts) · +1 expected
 - **Judge quote:** "A reviewer who skims the page for 5 seconds will see placeholders everywhere, conclude the page is broken, and leave."
 - **Context files:** `app/src/pages/Analysis/Coverage.tsx`, `api/routers/` (whichever endpoint serves coverage data), `docs/JUDGE-WALKTHROUGH-DATALAB.md` §2 Stop 6

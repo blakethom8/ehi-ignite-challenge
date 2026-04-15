@@ -55,6 +55,36 @@ Append-only. The phase1-orchestrator writes one entry per completed (or failed) 
 
 ---
 
+### P1-T03 — Consolidate Clinical sidebar into grouped navigation
+
+**Shipped:** 2026-04-15
+**Kind:** refiner-then-builder
+**Rubric target:** Cat 3 Interpretability & Ease of Use (40 pts) · +3 expected
+**Commit:** `48f82f0`
+**Files:**
+- `app/src/components/Layout.tsx` (+95 / −41) — `CLINICAL_NAV_LINKS` flat array replaced with `CLINICAL_NAV_GROUPS` structure; four groups rendered with labelled section headers; Advanced drawer (Patient Journey) collapsed by default
+
+**What it does:** Replaces the flat 14-item "Views" list with three labelled clinical sections plus a collapsed Advanced drawer:
+- **Pre-op Essentials:** Overview · Safety · Clearance · Anesthesia · Interactions
+- **Longitudinal:** Timeline · Care Journey · Conditions · Procedures · Immunizations
+- **Context & Data:** Assistant · Corpus · Distributions
+- **Advanced (collapsed):** Patient Journey
+
+Group headers use the existing `text-[10px] font-semibold uppercase tracking-wider text-[#a5a8b5]` class — no new CSS. The Advanced drawer renders as a `<button>` toggle with `ChevronDown`/`ChevronRight` icons. Collapsed-sidebar icon-only mode skips group headers and renders items in order.
+
+**Verification:**
+- **TypeScript strict check:** `npx tsc --noEmit` exit 0, no output · PASS
+- **Vite build:** `✓ 1860 modules transformed, built in 935ms — no errors` · PASS
+- **Live group-label check:** all four labels (`"Pre-op Essentials"`, `"Longitudinal"`, `"Context & Data"`, `"Advanced"`) confirmed present · PASS
+
+**Judge impact:** Closes the "15 items directly contradicts 5 facts in 30 seconds" finding from §4 P1 item 3. A judge doing surgical chart review sees "Pre-op Essentials" as the first group and lands directly on Safety, Clearance, Anesthesia, and Interactions without scanning past longitudinal history. Reduces the visual decision tree from 14 undifferentiated items to 3 primary clusters + 1 collapsed Advanced drawer.
+
+**Notes for the next cycle:**
+- Refiner self-eval estimated +2–3 pts (realistic, not the full +3 in isolation). The load bug fix (P1-T01) and sidebar grouping together close the majority of the Cat 3 gap.
+- No changes to the Analysis sidebar or any backend files.
+
+---
+
 ### DL-T02 — Surface the Data Lab from Clinical entry points
 
 **Shipped:** 2026-04-14

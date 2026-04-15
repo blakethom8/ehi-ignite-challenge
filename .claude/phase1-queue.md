@@ -50,7 +50,7 @@ Seeded from `docs/JUDGE-WALKTHROUGH.md §4 Prioritized Punch List`. The orchestr
 ## 🟠 P1 — High-impact rubric deltas
 
 ### P1-T03 · Consolidate the Clinical Workspace sidebar into three groups
-- **Status:** Queued (unblocked 2026-04-14)
+- **Status:** ✅ Completed 2026-04-15 · commit `48f82f0` · branch feature/phase1-submission
 - **Kind:** refiner-then-builder
 - **Rubric target:** Cat 3 Interpretability & Ease of Use (40 pts) · +3 expected
 - **Judge quote:** "15 items directly contradicts '5 facts in 30 seconds.'"

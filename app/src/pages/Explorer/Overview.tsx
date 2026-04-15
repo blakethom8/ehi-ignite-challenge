@@ -1,10 +1,9 @@
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useSearchParams, useNavigate, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { AlertCircle, AlertTriangle, AlertOctagon, CheckCircle, User, ChevronDown, ChevronRight, Pill, Heart, FlaskConical, Clock } from "lucide-react";
 import type { ReactNode } from "react";
 import { api } from "../../api/client";
-import { EmptyState } from "../../components/EmptyState";
 import { FhirViewer } from "../../components/FhirViewer";
 import type { PatientOverview, ResourceTypeCount, KeyLabsResponse, LabValue, LabHistoryPoint, LabAlertFlag, SafetyFlag, TimelineMonth } from "../../types";
 
@@ -1158,16 +1157,43 @@ export function ExplorerOverview() {
 
   if (!patientId) {
     return (
-      <EmptyState
-        icon={User}
-        title="Choose a patient to begin"
-        bullets={[
-          "Demographics, complexity tier, and data span",
-          "Full resource distribution across FHIR types",
-          "Conditions, medications, allergies, and immunizations",
-        ]}
-        stat="1,180 patients available"
-      />
+      <div className="flex flex-col items-center justify-center h-full text-center p-8">
+        <div
+          className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4"
+          style={{ backgroundColor: "#eef1ff" }}
+        >
+          <User size={28} style={{ color: "#5b76fe" }} />
+        </div>
+
+        <h2 className="text-lg font-semibold text-[#1c1c1e] mb-2">Choose a patient to begin</h2>
+
+        <ul className="text-sm text-[#555a6a] max-w-xs space-y-1.5 text-left list-none">
+          {[
+            "Demographics, complexity tier, and data span",
+            "Full resource distribution across FHIR types",
+            "Conditions, medications, allergies, and immunizations",
+          ].map((b) => (
+            <li key={b} className="flex items-start gap-2">
+              <span className="mt-0.5 w-1.5 h-1.5 rounded-full bg-[#5b76fe] shrink-0 inline-block" />
+              <span>{b}</span>
+            </li>
+          ))}
+        </ul>
+
+        {/* Flight School banner */}
+        <div className="mt-5 max-w-xs w-full rounded-xl border border-[#b2e8e0] bg-[#f0faf8] px-4 py-3 text-left">
+          <Link
+            to="/analysis/flight-school"
+            className="text-sm text-[#187574] hover:underline"
+          >
+            First time here? Take the 15-minute Flight School →
+          </Link>
+        </div>
+
+        <div className="mt-3 px-4 py-2 rounded-full bg-[#f5f6f8] border border-[#e9eaef]">
+          <span className="text-xs text-[#a5a8b5]">1,180 patients available</span>
+        </div>
+      </div>
     );
   }
 

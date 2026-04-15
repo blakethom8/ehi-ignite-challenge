@@ -15,6 +15,7 @@ RUN uv sync --frozen --no-dev
 COPY fhir_explorer/ ./fhir_explorer/
 COPY patient-journey/ ./patient-journey/
 COPY api/ ./api/
+COPY scripts/ ./scripts/
 COPY data/ ./data/
 
 EXPOSE 8000

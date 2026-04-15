@@ -52,3 +52,34 @@ Append-only. The phase1-orchestrator writes one entry per completed (or failed) 
 **Notes for the next cycle:**
 - The landing page uses a standalone header, not `Layout.tsx`. Any future task targeting "the header" needs to specify whether it means the Landing header or the Layout-shell header — they are separate components. Worth documenting in the next walkthrough pass.
 - The refiner did not invent work outside the brief when it noticed the landing-header gap — exactly the behavior we want. The honest self-eval ("partial, not full +5") is the pattern for future refiner reports.
+
+---
+
+### DL-T02 — Surface the Data Lab from Clinical entry points
+
+**Shipped:** 2026-04-14
+**Kind:** builder (orchestrator collapsed the refiner-then-builder pattern — phrasing decided in the brief)
+**Rubric target:** Cat 3 Interpretability (40) +2 · Cat 5 AI Innovation (+20) +2 · +4 expected total
+**Commit:** `278f844`
+**Files:**
+- `app/src/pages/Explorer/Safety.tsx` (+12 / −0) — "Why you can trust this · Methodology →" chip on each safety card with an active flag
+- `app/src/pages/Explorer/Assistant.tsx` (+15 / −1) — adjacent-line "See the methodology that built this context →" link rendered when `build_clinical_context` is in the trace
+- `app/src/pages/Explorer/Overview.tsx` (+50 / −13) — Flight School banner in the empty state ("First time here? Take the 15-minute Flight School →")
+
+**What it does:** Turns the Data Lab / Analysis section from a hidden rubric asset into a visible one. A judge walking only the Clinical side now hits three discoverability touch points that route into the existing Methodology and Flight School pages. This was flagged in `docs/JUDGE-WALKTHROUGH-DATALAB.md §4 DL-T02` as the single highest-ROI Data Lab task because no new content is authored — existing high-quality pages simply get surfaced.
+
+**Judge impact (from DATALAB walkthrough §6 Takeaway 3):** *"The best explainability content in the submission is invisible to a reviewer who only walks the Clinical side."* Not anymore. A Cat 5 scorer reviewing the Safety Panel can one-click into the Methodology page; a Cat 5 scorer reading an Assistant response sees an anchor link to the same page; a Cat 3 scorer landing on the Clinical empty state is directed to the 15-minute curriculum that pre-loads the product's vocabulary before they walk the clinical surfaces.
+
+**Change-2 implementation note (from builder):** The `ToolCallCard` component uses a `<button>` as its outermost element — wrapping a button in an `<a>` tag is invalid HTML. The builder took the documented adjacent-line fallback: a `<Link target="_blank" rel="noopener noreferrer">` rendered immediately after the `ToolCallsSection`, only when `build_clinical_context` is among the trace's tool calls. This is the correct call — forcing an anchor wrapper on the button would have been an HTML semantics bug.
+
+**Verification:**
+- **TypeScript strict check:** `npx tsc --noEmit` exit 0, no output
+- **Vite build:** `✓ 1860 modules transformed, built in 918ms — no errors`
+- **Safety Panel live check (orchestrator):** navigated to `/explorer/safety?patient=Shelly431_Corwin846_…`, `innerText` contains both "Why you can trust this" and "Methodology" on cards with active flags
+- **Overview empty-state live check:** navigated to `/explorer` with no patient, `innerText` contains both "Flight School" and "First time here"
+- **Assistant mount check:** navigated to `/explorer/assistant?patient=Shelly431_Corwin846_…`, page renders 69k characters of body content without error; adjacent-line link renders conditionally on tool-call presence (expected — only appears after an actual Assistant query is run)
+
+**Notes for the next cycle:**
+- The refiner agent was not invoked for this task. Collapsing refiner-then-builder into a single builder dispatch with orchestrator-decided copy is a valid pattern when the refiner pass is small (a few short phrases, known placements) and the implementation work is the dominant cost. Document this pattern in the orchestrator file next time the rules get edited.
+- `EmptyState` import removed from `Overview.tsx` as a consequence of the Change 3 edit — legitimate cleanup, not scope creep. Builder correctly flagged it in NOTES.
+- The Flight School banner's mint/teal palette (`#f0faf8` / `#b2e8e0` / `#187574`) matches the Data Lab theme already present in `TIER_STYLES`, reinforcing the visual bridge between the two modes without introducing new design tokens.

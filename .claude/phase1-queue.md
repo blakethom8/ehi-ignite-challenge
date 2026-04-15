@@ -198,7 +198,8 @@ Seeded from `docs/JUDGE-WALKTHROUGH.md §4 Prioritized Punch List`. The orchestr
 - **Smoke test:** `curl -sf http://127.0.0.1:8001/api/<coverage-endpoint>` returns 200 with `patients_profiled > 0` in the first paint payload, and the page never renders the literal string "Loading" in production.
 
 #### DL-T02 · Surface the Data Lab from Clinical entry points
-- **Status:** Queued · **Kind:** refiner-then-builder
+- **Status:** ✅ Completed 2026-04-14 · commit `278f844` · branch feature/phase1-submission
+- **Kind:** builder (orchestrator collapsed the refiner pass — phrasing baked into brief)
 - **Rubric target:** Cat 3 (40) +2 · Cat 5 AI Innovation (+20) +2 · +4 expected total
 - **Judge quote:** "The best explainability content in the submission is invisible to a reviewer who only walks the Clinical side."
 - **Context files:** `app/src/pages/Explorer/Safety.tsx`, `app/src/pages/Explorer/Assistant.tsx`, `app/src/pages/Explorer/Overview.tsx` (empty state when no patient), `docs/JUDGE-WALKTHROUGH-DATALAB.md` §6 Takeaway 3

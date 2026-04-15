@@ -335,7 +335,12 @@ export function Layout({ children }: LayoutProps) {
           <div className="flex h-full flex-col justify-center gap-2 px-4 lg:px-6">
             <div className="flex items-center justify-between gap-4">
               <Link to="/" className="min-w-0 group cursor-pointer no-underline">
-                <p className="text-xs font-semibold uppercase tracking-wider text-[#a5a8b5] group-hover:text-[#5b76fe] transition-colors">EHI Ignite</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-[#a5a8b5] group-hover:text-[#5b76fe] transition-colors">EHI Ignite</p>
+                  <span className="rounded px-1.5 py-0.5 text-[10px] font-medium leading-none text-[#555a6a] bg-[#f5f6f8] border border-[#e9eaef]">
+                    Synthetic data · Synthea R4
+                  </span>
+                </div>
                 <p className="truncate text-sm font-semibold text-[#1c1c1e] group-hover:text-[#5b76fe] transition-colors">
                   {isAnalysis ? "Data Analysis & Methodology Environment" : "Clinical Intelligence Workspace"}
                 </p>

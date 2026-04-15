@@ -100,6 +100,9 @@ export function Landing() {
               <ArrowRight size={16} />
             </button>
           </div>
+          <p className="mt-5 text-xs text-[#a5a8b5]">
+            No PHI · Synthetic Synthea R4 data · Local compute
+          </p>
         </div>
       </section>
 

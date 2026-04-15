@@ -48,24 +48,105 @@ def patient_id_from_path(path: Path) -> str:
     return path.stem
 
 
+# Module-level cache: bare UUID → canonical filename stem.
+# Populated lazily on first UUID-lookup miss; never cleared during process lifetime.
+_uuid_to_stem: dict[str, str] | None = None
+
+
+def _build_uuid_index() -> dict[str, str]:
+    """Build a map from FHIR Patient-resource id → canonical filename stem.
+
+    Two strategies, in preference order:
+    1. Read the corpus cache (fast, already has the mapping).
+    2. Scan each JSON file and extract the Patient resource id by reading
+       bundle entries until the first Patient resource is found (slower but
+       works without a corpus cache).
+    """
+    import json as _json
+
+    index: dict[str, str] = {}
+
+    # Strategy 1: use corpus cache (instant if fresh)
+    _CORPUS_CACHE = _REPO_ROOT / "fhir_explorer" / "catalog" / ".corpus_cache.json"
+    if _CORPUS_CACHE.exists():
+        try:
+            with open(_CORPUS_CACHE) as _f:
+                cached = _json.load(_f)
+            for p in cached.get("patients", []):
+                pid = p.get("patient_id", "").lower()
+                file_name = p.get("file_name", "")
+                if pid and file_name:
+                    stem = Path(file_name).stem
+                    index[pid] = stem
+            if index:
+                return index
+        except Exception:
+            pass  # Fall through to strategy 2
+
+    # Strategy 2: scan bundles for Patient resource id
+    for path in _DATA_DIR.glob("*.json"):
+        stem = path.stem
+        try:
+            with open(path) as _f:
+                bundle = _json.load(_f)
+            for entry in bundle.get("entry", []):
+                resource = entry.get("resource", {})
+                if resource.get("resourceType") == "Patient":
+                    pid = resource.get("id", "").lower()
+                    if pid:
+                        index[pid] = stem
+                    break  # Only need the first Patient entry
+        except Exception:
+            continue
+
+    return index
+
+
 def path_from_patient_id(patient_id: str) -> Path | None:
-    """Resolve a patient ID back to its file path."""
+    """Resolve a patient ID back to its file path.
+
+    Accepts two ID shapes:
+    1. Canonical filename stem (e.g. ``Shelly431_Corwin846_eec393be-…``) — fast
+       direct lookup.
+    2. Bare UUID (e.g. ``eec393be-2569-46db-a974-33d7c853d690``) — resolved
+       through the module-level UUID index, built once on first miss.
+    """
+    global _uuid_to_stem
+
+    # Shape 1: exact filename match
     candidate = _DATA_DIR / f"{patient_id}.json"
-    return candidate if candidate.exists() else None
+    if candidate.exists():
+        return candidate
+
+    # Shape 2: bare UUID — build index on first use then look up
+    if _uuid_to_stem is None:
+        _uuid_to_stem = _build_uuid_index()
+    stem = _uuid_to_stem.get(patient_id.lower())
+    if stem is None:
+        return None
+    resolved = _DATA_DIR / f"{stem}.json"
+    return resolved if resolved.exists() else None
 
 
 @lru_cache(maxsize=30)
-def _cached_load(patient_id: str) -> tuple[PatientRecord, PatientStats]:
-    """Parse bundle and compute stats. Result is cached per patient_id."""
-    path = _DATA_DIR / f"{patient_id}.json"
+def _cached_load(canonical_stem: str) -> tuple[PatientRecord, PatientStats]:
+    """Parse bundle and compute stats. Cached by canonical filename stem."""
+    path = _DATA_DIR / f"{canonical_stem}.json"
     record = parse_bundle(str(path))
     stats = compute_patient_stats(record)
     return record, stats
 
 
 def load_patient(patient_id: str) -> tuple[PatientRecord, PatientStats] | None:
-    """Load and parse a patient bundle by ID. Returns None if not found. Cached."""
+    """Load and parse a patient bundle by ID. Returns None if not found. Cached.
+
+    Accepts both the canonical filename stem and a bare resource UUID — both
+    resolve to the same ``_cached_load`` entry via the canonical stem so the
+    LRU cache is never double-populated for the same physical patient.
+    """
     path = path_from_patient_id(patient_id)
     if path is None:
         return None
-    return _cached_load(patient_id)
+    # Always use the canonical stem as the cache key so bare-UUID and
+    # filename-stem callers share the same cached entry.
+    return _cached_load(path.stem)

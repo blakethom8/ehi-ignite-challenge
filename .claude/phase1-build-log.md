@@ -27,3 +27,28 @@ Append-only. The phase1-orchestrator writes one entry per completed (or failed) 
 **Notes for the next cycle:**
 - The API preview server was stopped during the builder's edit cycle and had to be restarted by the orchestrator before the UI re-verify. Sub-agents that edit Python files may cause uvicorn reload flaps — if a future cycle sees 502s in the network panel, check `preview_list` first.
 - No changes required outside `api/core/loader.py`. `api/routers/patients.py` was not touched; the fix is purely additive in the loader.
+
+---
+
+### P1-T02 — Synthea R4 + no-PHI posture on header and landing
+
+**Shipped:** 2026-04-14
+**Kind:** refiner (first refiner dispatch of the Phase 1 loop)
+**Rubric target:** Cat 4 Privacy, Security & Compliance (15 pts) · +5 expected (partial — see self-eval)
+**Commit:** `feae7e5`
+**Files:**
+- `app/src/components/Layout.tsx` (+5 / −1) — persistent `Synthetic data · Synthea R4` chip in the top header
+- `app/src/pages/Landing.tsx` (+4 / −0) — `No PHI · Synthetic Synthea R4 data · Local compute` footnote under the hero CTAs
+
+**What it does:** Surfaces the submission's privacy posture as two always-visible, subordinate labels. The Layout-shell header chip renders on every `/explorer/*` and `/analysis/*` route (not `/`, which uses its own standalone header). The landing-page footnote renders directly below "Open Clinical Dashboard / Explore the Data". Both use middle-dot separators and design-system tokens — no new CSS, no marketing vocabulary.
+
+**Verification:**
+- **Landing (`/`, live preview re-verify):** `main.innerText` contains `"No PHI · Synthetic Synthea R4 data · Local compute"` on the line immediately following the two CTA buttons. PASS.
+- **Explorer (`/explorer`, live preview re-verify):** `header.innerText` = `"EHI IGNITE\n\nSynthetic data · Synthea R4\n\nClinical Intelligence Workspace\n\nClinical\nData Lab"`. The posture chip is in the persistent header, visible on the first paint of any Clinical or Data Lab route. PASS.
+- **Self-eval (from refiner):** "A panelist skimming explorer or any clinical view will see the 'Synthetic data · Synthea R4' chip within the first second — it is in the persistent header, top-left. The landing-page footnote lands before any scroll, directly under the primary CTA pair, and uses 'No PHI' and 'Synthetic' — the precise regulatory vocabulary a Cat 4 scorer looks for. The copy is dry and specific with no marketing vocabulary. These two changes plausibly recover most of the +5 Cat 4 delta, though full recovery of the category will also require a deeper HIPAA/compliance narrative — the header chip and footnote alone are a posture signal, not a compliance argument."
+
+**Judge impact:** closes the #1 "losses remembered" item for Cat 4 from `docs/JUDGE-WALKTHROUGH.md §2 Stop 1` — there is now a posture statement visible on every screen a judge will see. Closes the Cat 4 gap from 7 → ~11 (partial); remaining delta to the 14-point target needs a compliance page (not yet queued).
+
+**Notes for the next cycle:**
+- The landing page uses a standalone header, not `Layout.tsx`. Any future task targeting "the header" needs to specify whether it means the Landing header or the Layout-shell header — they are separate components. Worth documenting in the next walkthrough pass.
+- The refiner did not invent work outside the brief when it noticed the landing-header gap — exactly the behavior we want. The honest self-eval ("partial, not full +5") is the pattern for future refiner reports.

@@ -31,7 +31,7 @@ Seeded from `docs/JUDGE-WALKTHROUGH.md §4 Prioritized Punch List`. The orchestr
 - **Acceptance:** both the bare-UUID and filename-stem forms of a patient id return 200 on `/overview` and `/key-labs`.
 
 ### P1-T02 · Add "Synthetic data — Synthea R4" posture to the header + landing page
-- **Status:** Queued
+- **Status:** ✅ Completed 2026-04-14 · commit `feae7e5` · branch feature/phase1-submission
 - **Kind:** refiner
 - **Rubric target:** Cat 4 Privacy, Security, Compliance (15 pts) · +5 expected
 - **Judge quote:** "Nothing on-screen says 'this uses synthetic Synthea data, no PHI.' … a judge scoring Cat 4 has nothing to grab onto."

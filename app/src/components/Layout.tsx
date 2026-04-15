@@ -358,7 +358,7 @@ export function Layout({ children }: LayoutProps) {
 
         <div className="flex h-[calc(100vh-72px)] flex-col overflow-hidden lg:flex-row">
           <aside
-            className={`relative flex max-h-[50vh] w-full shrink-0 flex-col overflow-y-auto overflow-x-hidden border-b border-r border-[#e9eaef] transition-all duration-200 lg:max-h-none lg:border-b-0 ${
+            className={`relative flex max-h-[50vh] w-full shrink-0 flex-col overflow-hidden border-b border-r border-[#e9eaef] transition-all duration-200 lg:max-h-none lg:border-b-0 ${
               sidebarCollapsed ? "lg:w-14" : "lg:w-72"
             } ${isAnalysis ? "bg-[#f7fffc]" : "bg-white"}`}
           >
@@ -388,7 +388,7 @@ export function Layout({ children }: LayoutProps) {
 
                 {/* Search + patient list (hidden when collapsed) */}
                 {!sidebarCollapsed && (
-                  <>
+                  <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
                     <div className="shrink-0 border-b border-[#e9eaef] px-4 py-3">
                       <button
                         onClick={() => setPaletteOpen(true)}
@@ -402,11 +402,11 @@ export function Layout({ children }: LayoutProps) {
                     </div>
 
                     <PatientList selectedId={patientId} onSelect={handleSelectPatient} />
-                  </>
+                  </div>
                 )}
 
                 {/* Nav links */}
-                <nav className={`space-y-0.5 border-t border-[#e9eaef] ${sidebarCollapsed ? "px-1 py-2" : "px-3 py-4"}`}>
+                <nav className={`shrink-0 space-y-0.5 overflow-y-auto border-t border-[#e9eaef] ${sidebarCollapsed ? "px-1 py-2" : "px-3 py-4"}`}>
                   {!sidebarCollapsed && (
                     <p className="mb-2 px-2 text-xs font-medium uppercase tracking-wider text-[#a5a8b5]">Views</p>
                   )}

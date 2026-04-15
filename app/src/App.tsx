@@ -1,6 +1,7 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Layout } from "./components/Layout";
+import { Landing } from "./pages/Landing";
 import { ExplorerOverview } from "./pages/Explorer/Overview";
 import { ExplorerTimeline } from "./pages/Explorer/Timeline";
 import { ExplorerCorpus } from "./pages/Explorer/Corpus";
@@ -58,14 +59,16 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <Layout>
-          <Routes>
-            <Route path="/" element={<Navigate to="/explorer" replace />} />
-            {routes.map((route) => (
-              <Route key={route.path} path={route.path} element={route.element} />
-            ))}
-          </Routes>
-        </Layout>
+        <Routes>
+          <Route path="/" element={<Landing />} />
+          {routes.map((route) => (
+            <Route
+              key={route.path}
+              path={route.path}
+              element={<Layout>{route.element}</Layout>}
+            />
+          ))}
+        </Routes>
       </BrowserRouter>
     </QueryClientProvider>
   );

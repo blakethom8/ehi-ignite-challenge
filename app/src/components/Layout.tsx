@@ -334,12 +334,12 @@ export function Layout({ children }: LayoutProps) {
         >
           <div className="flex h-full flex-col justify-center gap-2 px-4 lg:px-6">
             <div className="flex items-center justify-between gap-4">
-              <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-wider text-[#a5a8b5]">EHI Ignite</p>
-                <p className="truncate text-sm font-semibold text-[#1c1c1e]">
+              <Link to="/" className="min-w-0 group cursor-pointer no-underline">
+                <p className="text-xs font-semibold uppercase tracking-wider text-[#a5a8b5] group-hover:text-[#5b76fe] transition-colors">EHI Ignite</p>
+                <p className="truncate text-sm font-semibold text-[#1c1c1e] group-hover:text-[#5b76fe] transition-colors">
                   {isAnalysis ? "Data Analysis & Methodology Environment" : "Clinical Intelligence Workspace"}
                 </p>
-              </div>
+              </Link>
 
               <nav className="flex min-w-0 items-center gap-1 rounded-xl border border-[#e9eaef] bg-white p-1">
                 <Link

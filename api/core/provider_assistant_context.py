@@ -76,6 +76,8 @@ def answer_with_context(
     question: str,
     history: list[dict[str, str]] | None = None,
     stance: str = "opinionated",
+    model_override: str | None = None,
+    max_tokens_override: int | None = None,
 ) -> AssistantResult:
     """
     Single-turn context-driven answer.
@@ -126,7 +128,8 @@ def answer_with_context(
     messages.append({"role": "user", "content": question})
 
     # Step 3: Single Claude API call
-    model = os.getenv("PROVIDER_ASSISTANT_MODEL", "claude-sonnet-4-5")
+    model = model_override or os.getenv("PROVIDER_ASSISTANT_MODEL", "claude-sonnet-4-5")
+    max_tokens = max_tokens_override or 1500
 
     with start_span(SpanKind.LLM, "claude_single_turn", input_data={
         "model": model,
@@ -141,7 +144,7 @@ def answer_with_context(
 
         response = client.messages.create(
             model=model,
-            max_tokens=1500,
+            max_tokens=max_tokens,
             system=system_prompt,
             messages=messages,
         )
@@ -171,6 +174,8 @@ def answer_with_context(
     facts_list, _ = _build_facts(patient_id)
     citations = _collect_citations(facts_list[:8], max_items=6)
 
+    history_count = len([t for t in (history or []) if t.get("content", "").strip()])
+
     return AssistantResult(
         answer=answer_text,
         confidence="high",  # Single-turn with full context is inherently high confidence
@@ -183,6 +188,13 @@ def answer_with_context(
             *[f"[Lab] {l}" for l in clinical_ctx.key_labs[:5]],
             *[f"[Condition] {c}" for c in clinical_ctx.active_conditions[:5]],
         ],
+        # Full transparency
+        system_prompt=system_prompt,
+        model_used=model,
+        mode_used="context-single-turn",
+        max_tokens_used=max_tokens,
+        context_token_estimate=clinical_ctx.total_tokens_estimate,
+        history_turns_sent=history_count,
     )
 
 

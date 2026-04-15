@@ -16,7 +16,32 @@ from api.models import (
     TraceDetail,
 )
 
+import os
+
 router = APIRouter(prefix="/assistant", tags=["assistant"])
+
+
+@router.get("/settings")
+def get_assistant_settings() -> dict:
+    """Return current assistant configuration and available options."""
+    return {
+        "current": {
+            "mode": os.getenv("PROVIDER_ASSISTANT_MODE", "deterministic"),
+            "model": os.getenv("PROVIDER_ASSISTANT_MODEL", "claude-sonnet-4-5"),
+            "max_tokens": 1500,
+        },
+        "available_modes": [
+            {"id": "deterministic", "label": "Deterministic", "description": "Rule-based, instant (<100ms), no LLM cost"},
+            {"id": "context", "label": "Context (Recommended)", "description": "Single Claude call with pre-built clinical context"},
+            {"id": "anthropic", "label": "Agent SDK", "description": "Multi-turn agentic loop with tool calls (slowest)"},
+        ],
+        "available_models": [
+            {"id": "claude-haiku-4-5", "label": "Haiku 4.5", "description": "Fastest, good for quick Q&A", "speed": "fast"},
+            {"id": "claude-sonnet-4-5", "label": "Sonnet 4.5", "description": "Balanced speed and quality", "speed": "medium"},
+            {"id": "claude-sonnet-4-6", "label": "Sonnet 4.6", "description": "Latest Sonnet, best quality/speed ratio", "speed": "medium"},
+            {"id": "claude-opus-4-5", "label": "Opus 4.5", "description": "Most capable, slowest", "speed": "slow"},
+        ],
+    }
 
 
 def _build_trace_detail() -> TraceDetail | None:
@@ -121,6 +146,9 @@ def provider_chat(payload: ProviderAssistantRequest) -> ProviderAssistantRespons
             question=payload.question,
             history=[turn.model_dump() for turn in payload.history],
             stance=payload.stance,
+            model_override=payload.model,
+            mode_override=payload.mode,
+            max_tokens_override=payload.max_tokens,
         )
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -130,21 +158,42 @@ def provider_chat(payload: ProviderAssistantRequest) -> ProviderAssistantRespons
     # Capture trace detail for transparency
     trace_detail = _build_trace_detail()
 
-    # For deterministic engine (no tracing spans), build a synthetic trace
-    # showing what facts/context the engine used
+    # If tracing didn't produce a trace, build one from the result's transparency fields
     if trace_detail is None:
-        trace_detail = TraceDetail(
-            trace_id="deterministic",
-            system_prompt_preview=(
-                f"Engine: deterministic (rule-based fact ranking)\n"
-                f"Patient: {payload.patient_id}\n"
-                f"Question: {payload.question}\n"
-                f"Stance: {payload.stance}\n\n"
-                f"The deterministic engine builds a fact corpus from the patient's FHIR bundle, "
-                f"ranks facts by keyword relevance to the question, and synthesizes a direct answer "
-                f"from the top-ranked facts. No LLM is involved."
-            ),
-        )
+        if result.system_prompt:
+            # LLM mode without tracing — use the result's captured system prompt
+            trace_detail = TraceDetail(
+                trace_id=f"{result.engine or 'unknown'}-{payload.patient_id[:8]}",
+                system_prompt_preview=result.system_prompt,
+            )
+        else:
+            # Deterministic engine — describe the approach
+            trace_detail = TraceDetail(
+                trace_id="deterministic",
+                system_prompt_preview=(
+                    f"Engine: deterministic (rule-based fact ranking)\n"
+                    f"Patient: {payload.patient_id}\n"
+                    f"Question: {payload.question}\n"
+                    f"Stance: {payload.stance}\n\n"
+                    f"The deterministic engine builds a fact corpus from the patient's FHIR bundle, "
+                    f"ranks facts by keyword relevance to the question, and synthesizes a direct answer "
+                    f"from the top-ranked facts. No LLM is involved."
+                ),
+            )
+
+    # Enrich trace with transparency metadata from the result (always available)
+    if result.system_prompt and not trace_detail.system_prompt_preview:
+        trace_detail.system_prompt_preview = result.system_prompt
+    if result.model_used:
+        trace_detail.model_used = result.model_used
+    if result.mode_used:
+        trace_detail.mode_used = result.mode_used
+    if result.max_tokens_used:
+        trace_detail.max_tokens_used = result.max_tokens_used
+    if result.context_token_estimate:
+        trace_detail.context_token_estimate = result.context_token_estimate
+    if result.history_turns_sent is not None:
+        trace_detail.history_turns_sent = result.history_turns_sent
 
     # Include retrieved facts from the engine
     if result.retrieved_facts:

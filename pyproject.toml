@@ -14,6 +14,7 @@ dependencies = [
     "claude-agent-sdk>=0.1.56",
     "python-dotenv>=1.0.0",
     "langfuse>=2.0.0",
+    "anthropic>=0.95.0",
 ]
 
 [dependency-groups]

@@ -48,6 +48,9 @@ def answer_provider_question(
     question: str,
     history: list[dict[str, str]] | None,
     stance: str,
+    model_override: str | None = None,
+    mode_override: str | None = None,
+    max_tokens_override: int | None = None,
 ) -> AssistantResult:
     """
     Unified provider-assistant entry point.
@@ -57,7 +60,7 @@ def answer_provider_question(
     - context (recommended) — clean context + single Claude call (~3-5s)
     - anthropic (alias: agent_sdk) — multi-turn agent loop (~15-30s)
     """
-    mode = _assistant_mode()
+    mode = (mode_override or "").strip().lower() or _assistant_mode()
     fallback_enabled = _env_bool("PROVIDER_ASSISTANT_FALLBACK_TO_DETERMINISTIC", True)
 
     # Context mode: single-turn Claude call with pre-built clinical context
@@ -70,6 +73,8 @@ def answer_provider_question(
                 question=question,
                 history=history,
                 stance=stance,
+                model_override=model_override,
+                max_tokens_override=max_tokens_override,
             )
             _record_trace_metadata(result)
             return result

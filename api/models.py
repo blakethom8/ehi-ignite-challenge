@@ -589,6 +589,10 @@ class ProviderAssistantRequest(BaseModel):
     question: str
     history: list[ProviderAssistantTurn] = Field(default_factory=list)
     stance: str = "opinionated"    # "opinionated" | "balanced"
+    # Per-request overrides (optional — falls back to env config)
+    model: str | None = None       # "claude-haiku-4-5" | "claude-sonnet-4-5" | "claude-opus-4-5"
+    mode: str | None = None        # "deterministic" | "context" | "anthropic"
+    max_tokens: int | None = None  # output token limit
 
 
 class ToolCallDetail(BaseModel):
@@ -608,6 +612,12 @@ class TraceDetail(BaseModel):
     tool_calls: list[ToolCallDetail] = []
     system_prompt_preview: str = ""   # system prompt the agent received
     retrieved_facts: list[str] = []   # actual fact texts used in the response
+    # Transparency metadata
+    model_used: str | None = None
+    mode_used: str | None = None
+    max_tokens_used: int | None = None
+    context_token_estimate: int | None = None
+    history_turns_sent: int | None = None
 
 
 class ProviderAssistantResponse(BaseModel):

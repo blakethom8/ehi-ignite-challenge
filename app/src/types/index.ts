@@ -451,6 +451,32 @@ export interface ProviderAssistantRequest {
   question: string;
   history?: ProviderAssistantTurn[];
   stance?: "opinionated" | "balanced";
+  model?: string;
+  mode?: string;
+  max_tokens?: number;
+}
+
+export interface AssistantModeOption {
+  id: string;
+  label: string;
+  description: string;
+}
+
+export interface AssistantModelOption {
+  id: string;
+  label: string;
+  description: string;
+  speed: "fast" | "medium" | "slow";
+}
+
+export interface AssistantSettings {
+  current: {
+    mode: string;
+    model: string;
+    max_tokens: number;
+  };
+  available_modes: AssistantModeOption[];
+  available_models: AssistantModelOption[];
 }
 
 export interface ToolCallDetail {
@@ -470,6 +496,12 @@ export interface TraceDetail {
   tool_calls: ToolCallDetail[];
   system_prompt_preview: string;
   retrieved_facts: string[];
+  // Transparency metadata
+  model_used: string | null;
+  mode_used: string | null;
+  max_tokens_used: number | null;
+  context_token_estimate: number | null;
+  history_turns_sent: number | null;
 }
 
 export interface ProviderAssistantResponse {

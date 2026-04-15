@@ -447,7 +447,7 @@ def build_clinical_context(patient_id: str) -> ClinicalContext:
         absences.append("- No allergies recorded")
     else:
         for allergy in record.allergies[:5]:
-            safety_flags.append(f"- ⚠️ **Allergy**: {allergy.substance} (criticality: {allergy.criticality or 'unknown'})")
+            safety_flags.append(f"- ⚠️ **Allergy**: {allergy.code.label()} (criticality: {allergy.criticality or 'unknown'})")
 
     return ClinicalContext(
         patient_summary=patient_summary,

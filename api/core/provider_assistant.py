@@ -82,6 +82,13 @@ class AssistantResult:
     follow_ups: list[str]
     engine: str = "deterministic"
     retrieved_facts: list[str] | None = None  # fact texts for transparency
+    # Full transparency fields — always populated regardless of tracing
+    system_prompt: str | None = None          # exact system prompt sent to LLM
+    model_used: str | None = None             # actual model ID
+    mode_used: str | None = None              # runtime mode
+    max_tokens_used: int | None = None        # output limit
+    context_token_estimate: int | None = None # approx input context tokens
+    history_turns_sent: int | None = None     # how many prior turns included
 
 
 def _tokenize(text: str) -> set[str]:

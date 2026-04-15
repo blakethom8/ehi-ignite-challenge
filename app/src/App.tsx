@@ -1,6 +1,8 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Layout } from "./components/Layout";
+import { ChatProvider } from "./context/ChatContext";
+import { ChatWidget } from "./components/ChatWidget";
 import { Landing } from "./pages/Landing";
 import { ExplorerOverview } from "./pages/Explorer/Overview";
 import { ExplorerTimeline } from "./pages/Explorer/Timeline";
@@ -59,16 +61,19 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Landing />} />
-          {routes.map((route) => (
-            <Route
-              key={route.path}
-              path={route.path}
-              element={<Layout>{route.element}</Layout>}
-            />
-          ))}
-        </Routes>
+        <ChatProvider>
+          <Routes>
+            <Route path="/" element={<Landing />} />
+            {routes.map((route) => (
+              <Route
+                key={route.path}
+                path={route.path}
+                element={<Layout>{route.element}</Layout>}
+              />
+            ))}
+          </Routes>
+          <ChatWidget />
+        </ChatProvider>
       </BrowserRouter>
     </QueryClientProvider>
   );

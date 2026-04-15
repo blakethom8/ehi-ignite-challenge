@@ -18,6 +18,7 @@ import type {
   ProviderAssistantResponse,
   CareJourneyResponse,
   ClassificationsResponse,
+  AssistantSettings,
 } from "../types";
 
 const http = axios.create({
@@ -93,6 +94,10 @@ export const api = {
   /** Provider-facing chart Q&A */
   chatProviderAssistant: (payload: ProviderAssistantRequest): Promise<ProviderAssistantResponse> =>
     http.post<ProviderAssistantResponse>("/assistant/chat", payload).then((r) => r.data),
+
+  /** Assistant settings — available modes, models, current config */
+  getAssistantSettings: (): Promise<AssistantSettings> =>
+    http.get<AssistantSettings>("/assistant/settings").then((r) => r.data),
 
   /** Patient classification categories */
   getClassifications: (): Promise<ClassificationsResponse> =>

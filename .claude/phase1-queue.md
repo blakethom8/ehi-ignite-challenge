@@ -11,7 +11,7 @@ Seeded from `docs/JUDGE-WALKTHROUGH.md §4 Prioritized Punch List`. The orchestr
 ## 🔴 P0 — Demo blockers
 
 ### P1-T01 · Fix patient-id contract mismatch
-- **Status:** Queued
+- **Status:** ✅ Completed 2026-04-14 · commit `31789ca` · branch feature/phase1-submission
 - **Kind:** builder
 - **Rubric target:** Cat 3 Interpretability & Ease of Use (40 pts) · +5 expected
 - **Judge quote:** "picking a patient from the sidebar and hitting 'Failed to load patient data.'"

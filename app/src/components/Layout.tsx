@@ -7,6 +7,8 @@ import {
   BarChart3,
   BookMarked,
   CalendarDays,
+  ChevronDown,
+  ChevronRight,
   ChevronsLeft,
   ChevronsRight,
   ClipboardCheck,
@@ -44,21 +46,48 @@ interface NavItem {
   description: string;
 }
 
-const CLINICAL_NAV_LINKS: NavItem[] = [
-  { to: "/explorer", label: "Overview", icon: Database, description: "Patient summary" },
-  { to: "/explorer/assistant", label: "Assistant", icon: MessageSquareText, description: "AI chart Q&A" },
-  { to: "/explorer/safety", label: "Safety", icon: ShieldAlert, description: "Pre-op risk flags" },
-  { to: "/explorer/interactions", label: "Interactions", icon: Zap, description: "Drug-drug interactions" },
-  { to: "/explorer/timeline", label: "Timeline", icon: CalendarDays, description: "Encounter history" },
-  { to: "/explorer/care-journey", label: "Care Journey", icon: Heart, description: "Visual care timeline" },
-  { to: "/explorer/conditions", label: "Conditions", icon: Activity, description: "Surgical risk ranking" },
-  { to: "/explorer/procedures", label: "Procedures", icon: Scissors, description: "Procedure history" },
-  { to: "/explorer/immunizations", label: "Immunizations", icon: Syringe, description: "Vaccination history" },
-  { to: "/explorer/clearance", label: "Clearance", icon: ClipboardCheck, description: "Pre-op readiness check" },
-  { to: "/explorer/anesthesia", label: "Anesthesia", icon: Stethoscope, description: "Anesthesia handoff card" },
-  { to: "/explorer/corpus", label: "Corpus", icon: BarChart3, description: "Population statistics" },
-  { to: "/explorer/distributions", label: "Distributions", icon: BarChart2, description: "Lab value distributions" },
-  { to: "/journey", label: "Patient Journey", icon: Activity, description: "Clinical briefing" },
+interface NavGroup {
+  label: string;
+  items: NavItem[];
+  advanced?: boolean;
+}
+
+const CLINICAL_NAV_GROUPS: NavGroup[] = [
+  {
+    label: "Pre-op Essentials",
+    items: [
+      { to: "/explorer", label: "Overview", icon: Database, description: "Patient summary" },
+      { to: "/explorer/safety", label: "Safety", icon: ShieldAlert, description: "Pre-op risk flags" },
+      { to: "/explorer/clearance", label: "Clearance", icon: ClipboardCheck, description: "Pre-op readiness check" },
+      { to: "/explorer/anesthesia", label: "Anesthesia", icon: Stethoscope, description: "Anesthesia handoff card" },
+      { to: "/explorer/interactions", label: "Interactions", icon: Zap, description: "Drug-drug interactions" },
+    ],
+  },
+  {
+    label: "Longitudinal",
+    items: [
+      { to: "/explorer/timeline", label: "Timeline", icon: CalendarDays, description: "Encounter history" },
+      { to: "/explorer/care-journey", label: "Care Journey", icon: Heart, description: "Visual care timeline" },
+      { to: "/explorer/conditions", label: "Conditions", icon: Activity, description: "Surgical risk ranking" },
+      { to: "/explorer/procedures", label: "Procedures", icon: Scissors, description: "Procedure history" },
+      { to: "/explorer/immunizations", label: "Immunizations", icon: Syringe, description: "Vaccination history" },
+    ],
+  },
+  {
+    label: "Context & Data",
+    items: [
+      { to: "/explorer/assistant", label: "Assistant", icon: MessageSquareText, description: "AI chart Q&A" },
+      { to: "/explorer/corpus", label: "Corpus", icon: BarChart3, description: "Population statistics" },
+      { to: "/explorer/distributions", label: "Distributions", icon: BarChart2, description: "Lab value distributions" },
+    ],
+  },
+  {
+    label: "Advanced",
+    advanced: true,
+    items: [
+      { to: "/journey", label: "Patient Journey", icon: Activity, description: "Clinical briefing" },
+    ],
+  },
 ];
 
 const ANALYSIS_NAV_LINKS: NavItem[] = [
@@ -283,6 +312,7 @@ export function Layout({ children }: LayoutProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
     try { return localStorage.getItem("ehi-sidebar-collapsed") === "true"; } catch { return false; }
   });
+  const [advancedOpen, setAdvancedOpen] = useState<boolean>(false);
   const toggleSidebar = useCallback(() => {
     setSidebarCollapsed((prev) => {
       const next = !prev;
@@ -418,32 +448,56 @@ export function Layout({ children }: LayoutProps) {
                 )}
 
                 {/* Nav links */}
-                <nav className={`shrink-0 space-y-0.5 overflow-y-auto border-t border-[#e9eaef] ${sidebarCollapsed ? "px-1 py-2" : "px-3 py-4"}`}>
-                  {!sidebarCollapsed && (
-                    <p className="mb-2 px-2 text-xs font-medium uppercase tracking-wider text-[#a5a8b5]">Views</p>
-                  )}
-                  {CLINICAL_NAV_LINKS.map(({ to, label, icon: Icon, description }) => (
-                    <NavLink
-                      key={to}
-                      to={withPatientQuery(to, patientId)}
-                      title={sidebarCollapsed ? label : undefined}
-                      className={({ isActive }) =>
-                        `flex items-center rounded-lg transition-colors ${
-                          sidebarCollapsed
-                            ? `justify-center p-2.5 ${isActive ? "bg-[#eef1ff] text-[#5b76fe]" : "text-[#555a6a] hover:bg-[#f5f6f8] hover:text-[#1c1c1e]"}`
-                            : `gap-3 px-3 py-2.5 text-sm ${isActive ? "bg-[#eef1ff] font-medium text-[#5b76fe]" : "text-[#555a6a] hover:bg-[#f5f6f8] hover:text-[#1c1c1e]"}`
-                        }`
-                      }
-                    >
-                      <Icon size={sidebarCollapsed ? 18 : 16} />
-                      {!sidebarCollapsed && (
-                        <div>
-                          <div>{label}</div>
-                          <div className="text-xs font-normal opacity-60">{description}</div>
-                        </div>
-                      )}
-                    </NavLink>
-                  ))}
+                <nav className={`shrink-0 overflow-y-auto border-t border-[#e9eaef] ${sidebarCollapsed ? "px-1 py-2" : "px-3 py-4"}`}>
+                  {CLINICAL_NAV_GROUPS.map((group, groupIndex) => {
+                    const isAdvanced = group.advanced === true;
+                    const isOpen = !isAdvanced || advancedOpen;
+                    return (
+                      <div key={group.label} className={groupIndex > 0 && !sidebarCollapsed ? "mt-3" : ""}>
+                        {!sidebarCollapsed && (
+                          isAdvanced ? (
+                            <button
+                              onClick={() => setAdvancedOpen((prev) => !prev)}
+                              className="mb-2 flex w-full items-center justify-between px-2 text-[10px] font-semibold uppercase tracking-wider text-[#a5a8b5] hover:text-[#555a6a] transition-colors"
+                            >
+                              <span>{group.label}</span>
+                              {advancedOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                            </button>
+                          ) : (
+                            <p className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-wider text-[#a5a8b5]">
+                              {group.label}
+                            </p>
+                          )
+                        )}
+                        {isOpen && (
+                          <div className="space-y-0.5">
+                            {group.items.map(({ to, label, icon: Icon, description }) => (
+                              <NavLink
+                                key={to}
+                                to={withPatientQuery(to, patientId)}
+                                title={sidebarCollapsed ? label : undefined}
+                                className={({ isActive }) =>
+                                  `flex items-center rounded-lg transition-colors ${
+                                    sidebarCollapsed
+                                      ? `justify-center p-2.5 ${isActive ? "bg-[#eef1ff] text-[#5b76fe]" : "text-[#555a6a] hover:bg-[#f5f6f8] hover:text-[#1c1c1e]"}`
+                                      : `gap-3 px-3 py-2.5 text-sm ${isActive ? "bg-[#eef1ff] font-medium text-[#5b76fe]" : "text-[#555a6a] hover:bg-[#f5f6f8] hover:text-[#1c1c1e]"}`
+                                  }`
+                                }
+                              >
+                                <Icon size={sidebarCollapsed ? 18 : 16} />
+                                {!sidebarCollapsed && (
+                                  <div>
+                                    <div>{label}</div>
+                                    <div className="text-xs font-normal opacity-60">{description}</div>
+                                  </div>
+                                )}
+                              </NavLink>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </nav>
               </>
             )}

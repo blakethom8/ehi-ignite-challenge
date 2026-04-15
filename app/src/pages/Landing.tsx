@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import {
   Activity,
   ShieldCheck,
@@ -6,10 +7,46 @@ import {
   MessageSquare,
   BarChart3,
   ArrowRight,
+  AlertTriangle,
+  CheckCircle,
+  ShieldAlert,
+  Heart,
+  FileText,
+  Pill,
+  Baby,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { api } from "../api/client";
+import type { ClassificationsResponse } from "../types";
+
+const CATEGORY_CONFIG: Record<
+  string,
+  { label: string; color: string; textColor: string; icon: LucideIcon }
+> = {
+  high_surgical_risk: { label: "High Surgical Risk", color: "#ffc6c6", textColor: "#600000", icon: AlertTriangle },
+  low_risk_routine: { label: "Low Risk / Routine", color: "#c3faf5", textColor: "#187574", icon: CheckCircle },
+  polypharmacy: { label: "Polypharmacy", color: "#ffe6cd", textColor: "#744000", icon: Pill },
+  potential_drug_interactions: { label: "Drug Interactions", color: "#ffc6c6", textColor: "#600000", icon: ShieldAlert },
+  pediatric: { label: "Pediatric", color: "#eef1ff", textColor: "#5b76fe", icon: Baby },
+  elderly_complex: { label: "Elderly Complex", color: "#ffe6cd", textColor: "#744000", icon: Heart },
+  chronic_disease_cascade: { label: "Chronic Disease Cascade", color: "#ffd8f4", textColor: "#7a1057", icon: Activity },
+  minimal_record: { label: "Minimal Record", color: "#f5f6f8", textColor: "#555a6a", icon: FileText },
+};
+
+function formatCategoryName(key: string): string {
+  return key
+    .split("_")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+}
 
 export function Landing() {
   const navigate = useNavigate();
+
+  const { data: classifications, isLoading: classificationsLoading } = useQuery<ClassificationsResponse>({
+    queryKey: ["classifications"],
+    queryFn: api.getClassifications,
+  });
 
   return (
     <div className="min-h-screen bg-white">
@@ -122,6 +159,99 @@ export function Landing() {
               </div>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* Featured Patients */}
+      <section className="border-t border-[#e9eaef] px-6 py-16">
+        <div className="mx-auto max-w-5xl">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-[#a5a8b5]">
+            Featured Patients
+          </p>
+          <h2 className="mb-3 text-2xl font-bold tracking-tight text-[#1c1c1e]">
+            Explore by clinical profile
+          </h2>
+          <p className="mb-10 max-w-2xl text-[#555a6a] leading-relaxed">
+            Curated examples from each classification category — pick a profile to jump
+            straight into a representative patient record.
+          </p>
+
+          {classificationsLoading ? (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="animate-pulse rounded-2xl border border-[#e9eaef] bg-white p-6"
+                >
+                  <div className="mb-4 h-10 w-10 rounded-xl bg-[#f0f1f4]" />
+                  <div className="mb-2 h-4 w-2/3 rounded bg-[#f0f1f4]" />
+                  <div className="mb-4 h-3 w-1/3 rounded bg-[#f0f1f4]" />
+                  <div className="space-y-2">
+                    <div className="h-3 w-full rounded bg-[#f0f1f4]" />
+                    <div className="h-3 w-5/6 rounded bg-[#f0f1f4]" />
+                    <div className="h-3 w-4/6 rounded bg-[#f0f1f4]" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : classifications ? (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {Object.entries(classifications.categories).map(([key, category]) => {
+                const config = CATEGORY_CONFIG[key];
+                const Icon = config?.icon ?? FileText;
+                const label = config?.label ?? formatCategoryName(key);
+                const color = config?.color ?? "#f5f6f8";
+                const textColor = config?.textColor ?? "#555a6a";
+                const ex = category.best_example;
+
+                return (
+                  <div
+                    key={key}
+                    className="group flex flex-col rounded-2xl border border-[#e9eaef] bg-white p-6 transition-all hover:border-[#5b76fe] hover:shadow-md"
+                  >
+                    {/* Icon + badge row */}
+                    <div className="mb-4 flex items-start justify-between">
+                      <div
+                        className="flex h-10 w-10 items-center justify-center rounded-xl"
+                        style={{ backgroundColor: color }}
+                      >
+                        <Icon size={18} style={{ color: textColor }} />
+                      </div>
+                      <span
+                        className="rounded-full px-2.5 py-0.5 text-xs font-medium"
+                        style={{ backgroundColor: color, color: textColor }}
+                      >
+                        {category.count} patients
+                      </span>
+                    </div>
+
+                    {/* Category name */}
+                    <h3 className="mb-3 text-sm font-semibold text-[#1c1c1e]">
+                      {label}
+                    </h3>
+
+                    {/* Best example patient */}
+                    <div className="mb-4 flex-1 space-y-1 text-xs text-[#555a6a]">
+                      <p className="font-medium text-[#1c1c1e]">
+                        {ex.name}, {ex.age}y
+                      </p>
+                      <p>{ex.total_resources} resources</p>
+                      <p>{ex.n_active_conditions} conditions</p>
+                      <p>{ex.n_active_medications} medications</p>
+                    </div>
+
+                    {/* Link */}
+                    <button
+                      onClick={() => navigate(`/explorer?patient=${ex.patient_id}`)}
+                      className="flex items-center gap-1 text-xs font-medium text-[#5b76fe] transition-all group-hover:gap-2"
+                    >
+                      View patient <ArrowRight size={12} />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
         </div>
       </section>
 

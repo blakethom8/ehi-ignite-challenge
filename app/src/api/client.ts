@@ -17,6 +17,7 @@ import type {
   ProviderAssistantRequest,
   ProviderAssistantResponse,
   CareJourneyResponse,
+  ClassificationsResponse,
 } from "../types";
 
 const http = axios.create({
@@ -92,4 +93,12 @@ export const api = {
   /** Provider-facing chart Q&A */
   chatProviderAssistant: (payload: ProviderAssistantRequest): Promise<ProviderAssistantResponse> =>
     http.post<ProviderAssistantResponse>("/assistant/chat", payload).then((r) => r.data),
+
+  /** Patient classification categories */
+  getClassifications: (): Promise<ClassificationsResponse> =>
+    http.get<ClassificationsResponse>("/classifications").then((r) => r.data),
+
+  /** Raw FHIR bundle JSON for a patient */
+  getRawFhir: (patientId: string): Promise<Record<string, unknown>> =>
+    http.get<Record<string, unknown>>(`/patients/${patientId}/fhir`).then((r) => r.data),
 };

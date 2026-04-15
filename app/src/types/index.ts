@@ -482,3 +482,33 @@ export interface ProviderAssistantResponse {
   follow_ups: string[];
   trace: TraceDetail | null;
 }
+
+// Patient classifications
+
+export interface ClassificationBestExample {
+  patient_id: string;
+  name: string;
+  age: number;
+  complexity_tier: string;
+  total_resources: number;
+  n_active_conditions: number;
+  n_active_medications: number;
+  drug_classes: string[];
+  risky_combos: string[];
+}
+
+export interface ClassificationCategory {
+  count: number;
+  best_example: ClassificationBestExample;
+  patient_ids: string[];
+}
+
+export interface ClassificationsResponse {
+  categories: Record<string, ClassificationCategory>;
+  population_stats: {
+    total_patients: number;
+    tier_distribution: Record<string, number>;
+    age_distribution: Record<string, number>;
+    med_count_distribution: Record<string, number>;
+  };
+}

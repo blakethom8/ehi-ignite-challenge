@@ -175,7 +175,12 @@ function PatientList({
           }`}
         >
           <StatusDot risk={risk} />
-          <span className="truncate">{patient.name}</span>
+          <div className="min-w-0 flex-1">
+            <span className="block truncate">{patient.name}</span>
+            <span className="block truncate text-[10px] leading-tight text-[#a5a8b5]">
+              {patient.total_resources} resources · {patient.active_condition_count} conditions · {patient.active_med_count} meds
+            </span>
+          </div>
         </button>
 
         <button

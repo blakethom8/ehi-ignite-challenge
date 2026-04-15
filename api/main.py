@@ -22,6 +22,7 @@ from api.routers import patients
 from api.routers import corpus
 from api.routers import assistant
 from api.routers import traces
+from api.routers import classifications
 
 app = FastAPI(
     title="EHI Ignite API",
@@ -58,6 +59,7 @@ app.include_router(patients.router, prefix="/api")
 app.include_router(corpus.router, prefix="/api")
 app.include_router(assistant.router, prefix="/api")
 app.include_router(traces.router, prefix="/api")
+app.include_router(classifications.router, prefix="/api")
 
 
 @app.get("/api/health")

@@ -5,6 +5,7 @@ import { AlertCircle, AlertTriangle, AlertOctagon, CheckCircle, User, ChevronDow
 import type { ReactNode } from "react";
 import { api } from "../../api/client";
 import { EmptyState } from "../../components/EmptyState";
+import { FhirViewer } from "../../components/FhirViewer";
 import type { PatientOverview, ResourceTypeCount, KeyLabsResponse, LabValue, LabHistoryPoint, LabAlertFlag, SafetyFlag, TimelineMonth } from "../../types";
 
 // ── helpers ────────────────────────────────────────────────────────────────
@@ -795,6 +796,7 @@ function OverviewSkeleton() {
 
 function OverviewContent({ overview, keyLabs, patientId }: { overview: PatientOverview; keyLabs: KeyLabsResponse | undefined; patientId: string }) {
   const tierLabel = overview.complexity_tier.replace("_", " ");
+  const [showFhir, setShowFhir] = useState(false);
 
   const { prefs, toggle } = useSectionPrefs({
     demographics: true,
@@ -827,13 +829,21 @@ function OverviewContent({ overview, keyLabs, patientId }: { overview: PatientOv
             )}
           </p>
         </div>
-        <span
-          className={`text-xs font-medium px-3 py-1 rounded-full capitalize ${
-            TIER_STYLES[overview.complexity_tier] ?? "bg-gray-100 text-gray-600"
-          }`}
-        >
-          {tierLabel} complexity · {overview.complexity_score.toFixed(0)}/100
-        </span>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowFhir(true)}
+            className="text-xs font-medium px-3 py-1 rounded-full border border-[#e9eaef] text-[#555a6a] hover:border-[#5b76fe] hover:text-[#5b76fe] transition-colors"
+          >
+            View Raw FHIR
+          </button>
+          <span
+            className={`text-xs font-medium px-3 py-1 rounded-full capitalize ${
+              TIER_STYLES[overview.complexity_tier] ?? "bg-gray-100 text-gray-600"
+            }`}
+          >
+            {tierLabel} complexity · {overview.complexity_score.toFixed(0)}/100
+          </span>
+        </div>
       </div>
 
       {/* Top metrics */}
@@ -1114,6 +1124,15 @@ function OverviewContent({ overview, keyLabs, patientId }: { overview: PatientOv
           <AlertCircle size={16} className="shrink-0 mt-0.5" />
           <span>{overview.parse_warning_count} parse warnings encountered for this bundle.</span>
         </div>
+      )}
+
+      {/* FHIR viewer modal */}
+      {showFhir && (
+        <FhirViewer
+          patientId={patientId}
+          patientName={overview.name}
+          onClose={() => setShowFhir(false)}
+        />
       )}
     </div>
   );

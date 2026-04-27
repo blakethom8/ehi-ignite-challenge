@@ -1,11 +1,10 @@
 import { useSearchParams, useNavigate, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
-import { AlertCircle, AlertTriangle, AlertOctagon, CheckCircle, User, ChevronDown, ChevronRight, Pill, Heart, FlaskConical, Clock } from "lucide-react";
+import { useState } from "react";
+import { AlertTriangle, AlertOctagon, CheckCircle, User, ChevronDown, ChevronRight, Pill, Heart, FlaskConical, Clock, Database } from "lucide-react";
 import type { ReactNode } from "react";
 import { api } from "../../api/client";
-import { FhirViewer } from "../../components/FhirViewer";
-import type { PatientOverview, ResourceTypeCount, KeyLabsResponse, LabValue, LabHistoryPoint, LabAlertFlag, SafetyFlag, TimelineMonth } from "../../types";
+import type { PatientOverview, KeyLabsResponse, LabValue, LabHistoryPoint, LabAlertFlag, SafetyFlag, TimelineMonth, TimelineResponse } from "../../types";
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -26,12 +25,6 @@ const TIER_STYLES: Record<string, string> = {
   moderate:      "bg-[#ffe6cd] text-[#744000]",
   complex:       "bg-[#ffc6c6] text-[#600000]",
   highly_complex:"bg-[#ffc6c6] text-[#600000]",
-};
-
-const CATEGORY_COLORS: Record<string, string> = {
-  Clinical:       "#5b76fe",
-  Billing:        "#f59e0b",
-  Administrative: "#9ca3af",
 };
 
 // ── section prefs hook ─────────────────────────────────────────────────────
@@ -99,65 +92,6 @@ function CollapsibleSection({
 }
 
 // ── sub-components ─────────────────────────────────────────────────────────
-
-function StatCard({
-  label, value, sub,
-}: { label: string; value: string | number; sub?: string }) {
-  return (
-    <div className="bg-white rounded-xl p-4 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
-      <p className="text-xs text-[#555a6a] uppercase tracking-wide mb-1">{label}</p>
-      <p className="text-2xl font-semibold text-[#1c1c1e]">{value}</p>
-      {sub && <p className="text-xs text-[#a5a8b5] mt-0.5">{sub}</p>}
-    </div>
-  );
-}
-
-
-function ResourceChart({ data }: { data: ResourceTypeCount[] }) {
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!ref.current || data.length === 0) return;
-
-    const byCategory = data.reduce<Record<string, { x: number[]; y: string[] }>>(
-      (acc, d) => {
-        if (!acc[d.category]) acc[d.category] = { x: [], y: [] };
-        acc[d.category].x.push(d.count);
-        acc[d.category].y.push(d.resource_type);
-        return acc;
-      },
-      {}
-    );
-
-    const traces = Object.entries(byCategory).map(([cat, vals]) => ({
-      type: "bar" as const,
-      orientation: "h" as const,
-      name: cat,
-      x: vals.x,
-      y: vals.y,
-      marker: { color: CATEGORY_COLORS[cat] ?? "#9ca3af" },
-    }));
-
-    const height = Math.max(250, data.length * 26);
-
-    import("plotly.js-dist-min").then((Plotly) => {
-      if (!ref.current) return;
-      Plotly.react(ref.current, traces, {
-        barmode: "stack",
-        height,
-        margin: { l: 180, r: 20, t: 10, b: 30 },
-        yaxis: { autorange: "reversed" as const, tickfont: { size: 12 } },
-        xaxis: { tickfont: { size: 11 } },
-        legend: { orientation: "h" as const, y: -0.08, x: 0 },
-        paper_bgcolor: "transparent",
-        plot_bgcolor: "transparent",
-        font: { family: "Noto Sans" },
-      }, { displayModeBar: false, responsive: true });
-    });
-  }, [data]);
-
-  return <div ref={ref} style={{ width: "100%" }} />;
-}
 
 // ── trend helpers ──────────────────────────────────────────────────────────
 
@@ -685,6 +619,68 @@ function PreOpDecisionCard({ patientId }: { patientId: string }) {
   );
 }
 
+function CareActivityStrip({ timeline }: { timeline: TimelineResponse | undefined }) {
+  if (!timeline || Object.keys(timeline.year_counts).length === 0) return null;
+
+  const yearEntries = Object.entries(timeline.year_counts)
+    .map(([year, count]) => ({ year, count }))
+    .sort((a, b) => Number(a.year) - Number(b.year));
+  const maxCount = Math.max(...yearEntries.map((entry) => entry.count), 1);
+  const recentEncounters = [...timeline.encounters]
+    .filter((encounter) => encounter.start)
+    .sort((a, b) => (b.start || "").localeCompare(a.start || ""))
+    .slice(0, 3);
+
+  return (
+    <div className="bg-white rounded-xl shadow-[rgb(224_226_232)_0px_0px_0px_1px] px-5 py-4">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <p className="text-sm font-semibold text-[#1c1c1e]">Care activity</p>
+          <p className="mt-1 text-xs text-[#6b7280]">
+            Encounter volume by year, useful for spotting concentrated episodes of care.
+          </p>
+        </div>
+        <Link
+          to={`/explorer/timeline?patient=${timeline.patient_id}`}
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#5b76fe] hover:underline"
+        >
+          Open encounter timeline
+          <ChevronRight size={13} />
+        </Link>
+      </div>
+
+      <div className="mt-4 flex items-end gap-1 overflow-x-auto pb-1">
+        {yearEntries.map((entry) => {
+          const height = 10 + (entry.count / maxCount) * 54;
+          return (
+            <div key={entry.year} className="flex min-w-[34px] flex-col items-center gap-1">
+              <div
+                className="w-5 rounded-t-md bg-[#5b76fe]"
+                style={{ height }}
+                title={`${entry.year}: ${entry.count} encounter${entry.count !== 1 ? "s" : ""}`}
+              />
+              <span className="text-[10px] text-[#a5a8b5]">{entry.year.slice(2)}</span>
+            </div>
+          );
+        })}
+      </div>
+
+      {recentEncounters.length > 0 && (
+        <div className="mt-4 grid gap-2 md:grid-cols-3">
+          {recentEncounters.map((encounter) => (
+            <div key={encounter.encounter_id} className="rounded-lg border border-[#e9eaef] bg-[#fafafa] px-3 py-2">
+              <p className="truncate text-xs font-semibold text-[#1c1c1e]">
+                {encounter.reason_display || encounter.encounter_type || encounter.class_code || "Encounter"}
+              </p>
+              <p className="mt-0.5 text-[11px] text-[#6b7280]">{fmt(encounter.start)}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Skeleton ───────────────────────────────────────────────────────────────
 
 function SkeletonRect({ className }: { className?: string }) {
@@ -793,14 +789,22 @@ function OverviewSkeleton() {
 
 // ── main component ─────────────────────────────────────────────────────────
 
-function OverviewContent({ overview, keyLabs, patientId }: { overview: PatientOverview; keyLabs: KeyLabsResponse | undefined; patientId: string }) {
+function OverviewContent({
+  overview,
+  keyLabs,
+  timeline,
+  patientId,
+}: {
+  overview: PatientOverview;
+  keyLabs: KeyLabsResponse | undefined;
+  timeline: TimelineResponse | undefined;
+  patientId: string;
+}) {
   const tierLabel = overview.complexity_tier.replace("_", " ");
-  const [showFhir, setShowFhir] = useState(false);
 
   const { prefs, toggle } = useSectionPrefs({
     demographics: true,
     dataSpan: true,
-    resources: true,
     conditions: true,
     medications: true,
     allergies: true,
@@ -829,12 +833,13 @@ function OverviewContent({ overview, keyLabs, patientId }: { overview: PatientOv
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowFhir(true)}
-            className="text-xs font-medium px-3 py-1 rounded-full border border-[#e9eaef] text-[#555a6a] hover:border-[#5b76fe] hover:text-[#5b76fe] transition-colors"
+          <Link
+            to={`/explorer/patient-data?patient=${patientId}`}
+            className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1 rounded-full border border-[#e9eaef] text-[#555a6a] hover:border-[#5b76fe] hover:text-[#5b76fe] transition-colors"
           >
-            View Raw FHIR
-          </button>
+            <Database size={12} />
+            FHIR data
+          </Link>
           <span
             className={`text-xs font-medium px-3 py-1 rounded-full capitalize ${
               TIER_STYLES[overview.complexity_tier] ?? "bg-gray-100 text-gray-600"
@@ -843,24 +848,6 @@ function OverviewContent({ overview, keyLabs, patientId }: { overview: PatientOv
             {tierLabel} complexity · {overview.complexity_score.toFixed(0)}/100
           </span>
         </div>
-      </div>
-
-      {/* Top metrics */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-        <StatCard label="Total Resources" value={overview.total_resources.toLocaleString()} />
-        <StatCard
-          label="Clinical"
-          value={overview.clinical_resource_count.toLocaleString()}
-          sub={`${(100 - overview.billing_pct).toFixed(0)}% of total`}
-        />
-        <StatCard
-          label="Billing"
-          value={overview.billing_resource_count.toLocaleString()}
-          sub={`${overview.billing_pct.toFixed(0)}% of total`}
-        />
-        <StatCard label="Encounters" value={overview.encounter_count} />
-        <StatCard label="Years of History" value={overview.years_of_history.toFixed(1)} />
-        <StatCard label="Unique Lab Types" value={overview.unique_loinc_count} />
       </div>
 
       {/* Demographics + Data span */}
@@ -923,18 +910,7 @@ function OverviewContent({ overview, keyLabs, patientId }: { overview: PatientOv
         </div>
       </div>
 
-      {/* Resource distribution */}
-      <CollapsibleSection
-        title="Resource Distribution"
-        sectionKey="resources"
-        isOpen={prefs.resources}
-        onToggle={() => toggle("resources")}
-        badge={overview.resource_type_counts.length}
-      >
-        <div className="px-5 py-4">
-          <ResourceChart data={overview.resource_type_counts} />
-        </div>
-      </CollapsibleSection>
+      <CareActivityStrip timeline={timeline} />
 
       {/* Conditions + Medications */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -1117,22 +1093,6 @@ function OverviewContent({ overview, keyLabs, patientId }: { overview: PatientOv
         </CollapsibleSection>
       )}
 
-      {/* Parse warnings */}
-      {overview.parse_warning_count > 0 && (
-        <div className="flex items-start gap-2 bg-[#ffe6cd] text-[#744000] rounded-xl p-4 text-sm">
-          <AlertCircle size={16} className="shrink-0 mt-0.5" />
-          <span>{overview.parse_warning_count} parse warnings encountered for this bundle.</span>
-        </div>
-      )}
-
-      {/* FHIR viewer modal */}
-      {showFhir && (
-        <FhirViewer
-          patientId={patientId}
-          patientName={overview.name}
-          onClose={() => setShowFhir(false)}
-        />
-      )}
     </div>
   );
 }
@@ -1152,6 +1112,12 @@ export function ExplorerOverview() {
   const { data: keyLabs } = useQuery({
     queryKey: ["key-labs", patientId],
     queryFn: () => api.getKeyLabs(patientId!),
+    enabled: !!patientId,
+  });
+
+  const { data: timeline } = useQuery({
+    queryKey: ["timeline", patientId],
+    queryFn: () => api.getTimeline(patientId!),
     enabled: !!patientId,
   });
 
@@ -1209,5 +1175,5 @@ export function ExplorerOverview() {
     );
   }
 
-  return <OverviewContent overview={data} keyLabs={keyLabs} patientId={patientId} />;
+  return <OverviewContent overview={data} keyLabs={keyLabs} timeline={timeline} patientId={patientId} />;
 }

@@ -8,33 +8,10 @@ import type {
   ProcedureMarker,
   DiagnosticReportItem,
 } from "../types";
+import { CONDITION_STATUS_COLORS, DRUG_CLASS_COLORS } from "./careJourneyColors";
 
-// ── Colors (exported for reuse in CareJourneyDetail) ────────────────────────
-
-export const DRUG_CLASS_COLORS: Record<string, string> = {
-  anticoagulants: "#e74c3c",
-  antiplatelets: "#c0392b",
-  ace_inhibitors: "#e67e22",
-  arbs: "#d35400",
-  jak_inhibitors: "#8e44ad",
-  immunosuppressants: "#9b59b6",
-  nsaids: "#f39c12",
-  opioids: "#dc2626",
-  anticonvulsants: "#3498db",
-  psych_medications: "#2ecc71",
-  stimulants: "#1abc9c",
-  diabetes_medications: "#34495e",
-};
 const DEFAULT_MED_COLOR = "#94a3b8";
-
-export const CONDITION_STATUS_COLORS: Record<string, string> = {
-  active: "#ef4444",
-  recurrence: "#f97316",
-  relapse: "#f97316",
-  resolved: "#cbd5e1",
-  inactive: "#cbd5e1",
-  remission: "#22c55e",
-};
+const CHART_TODAY_MS = Date.now();
 
 const ENCOUNTER_CLASS_COLORS: Record<string, string> = {
   EMER: "#ef4444",
@@ -471,7 +448,7 @@ function buildRows(data: CareJourneyResponse): GanttRow[] {
 
 interface Tick { ms: number; label: string; isMajor: boolean }
 
-function computeTicks(minMs: number, maxMs: number, _width: number): Tick[] {
+function computeTicks(minMs: number, maxMs: number): Tick[] {
   const rangeYears = (maxMs - minMs) / (365.25 * 24 * 3600 * 1000);
   const ticks: Tick[] = [];
 
@@ -654,7 +631,7 @@ export function CareJourneyChart({ data, dateRange, onDateRangeChange, onRowClic
       if (p.start) dates.push(new Date(p.start).getTime());
     }
     if (dates.length === 0) {
-      return [Date.now() - 5 * 365.25 * 24 * 3600 * 1000, Date.now()];
+      return [CHART_TODAY_MS - 5 * 365.25 * 24 * 3600 * 1000, CHART_TODAY_MS];
     }
     const min = Math.min(...dates);
     const max = Math.max(...dates);
@@ -675,6 +652,7 @@ export function CareJourneyChart({ data, dateRange, onDateRangeChange, onRowClic
   const containerRef = useRef<HTMLDivElement>(null);
   const svgContainerRef = useRef<HTMLDivElement>(null);
   const [svgWidth, setSvgWidth] = useState(600);
+  const [containerSize, setContainerSize] = useState({ width: 800, height: 600 });
 
   // Measure actual container width
   useEffect(() => {
@@ -690,21 +668,36 @@ export function CareJourneyChart({ data, dateRange, onDateRangeChange, onRowClic
     return () => ro.disconnect();
   }, []);
 
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const update = () => {
+      setContainerSize({
+        width: el.clientWidth || 800,
+        height: el.clientHeight || 600,
+      });
+    };
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    update();
+    return () => ro.disconnect();
+  }, []);
+
   // Scale function — returns pixel x within measured SVG width
   const timeToX = useCallback(
     (ms: number) => ((ms - viewMin) / (viewMax - viewMin)) * svgWidth,
     [viewMin, viewMax, svgWidth],
   );
 
-  const ticks = useMemo(() => computeTicks(viewMin, viewMax, svgWidth), [viewMin, viewMax]);
+  const ticks = useMemo(() => computeTicks(viewMin, viewMax), [viewMin, viewMax]);
   const totalH = visibleRows.length * ROW_H;
 
   return (
     <div ref={containerRef} className="relative">
       {/* ── Tooltip (smart positioning — flips when near edges) ────── */}
       {tooltip && (() => {
-        const containerW = containerRef.current?.clientWidth ?? 800;
-        const containerH = containerRef.current?.clientHeight ?? 600;
+        const containerW = containerSize.width;
+        const containerH = containerSize.height;
         const tipW = 240; // max-w-xs ≈ 20rem = 320px, but most are ~240
         const tipH = 80;
 
@@ -1014,7 +1007,7 @@ export function CareJourneyChart({ data, dateRange, onDateRangeChange, onRowClic
 
             {/* Today line */}
             {(() => {
-              const todayX = timeToX(Date.now());
+              const todayX = timeToX(CHART_TODAY_MS);
               if (todayX > 0 && todayX < svgWidth) {
                 return (
                   <line
@@ -1054,9 +1047,9 @@ function Minimap({ fullMin, fullMax, viewMin, viewMax, width, leftOffset, allRow
 
   const MINIMAP_H = 36;
   const fullRange = fullMax - fullMin;
-  if (fullRange <= 0) return null;
+  const safeFullRange = fullRange > 0 ? fullRange : 1;
 
-  const toX = (ms: number) => ((ms - fullMin) / fullRange) * width;
+  const toX = (ms: number) => ((ms - fullMin) / safeFullRange) * width;
   const selLeft = toX(viewMin);
   const selRight = toX(viewMax);
   const selWidth = Math.max(selRight - selLeft, 4);
@@ -1068,18 +1061,18 @@ function Minimap({ fullMin, fullMax, viewMin, viewMax, width, leftOffset, allRow
     for (const r of allRows) {
       if (r.dotMarkers) {
         for (const d of r.dotMarkers) {
-          const idx = Math.floor(((d.ms - fullMin) / fullRange) * BUCKETS);
+          const idx = Math.floor(((d.ms - fullMin) / safeFullRange) * BUCKETS);
           if (idx >= 0 && idx < BUCKETS) buckets[idx]++;
         }
       }
       if (r.startMs) {
-        const idx = Math.floor(((r.startMs - fullMin) / fullRange) * BUCKETS);
+        const idx = Math.floor(((r.startMs - fullMin) / safeFullRange) * BUCKETS);
         if (idx >= 0 && idx < BUCKETS) buckets[idx]++;
       }
     }
     const max = Math.max(...buckets, 1);
     return buckets.map((v) => v / max);
-  }, [allRows, fullMin, fullRange]);
+  }, [allRows, fullMin, safeFullRange]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent, handle: "left" | "right" | "center") => {
     e.preventDefault();
@@ -1094,7 +1087,7 @@ function Minimap({ fullMin, fullMax, viewMin, viewMax, width, leftOffset, allRow
       const el = minimapRef.current;
       if (!el) return;
       const rect = el.getBoundingClientRect();
-      const scale = fullRange / rect.width;
+      const scale = safeFullRange / rect.width;
       const dx = (e.clientX - dragStartRef.current.x) * scale;
       const { viewMin: startMin, viewMax: startMax } = dragStartRef.current;
 
@@ -1102,9 +1095,9 @@ function Minimap({ fullMin, fullMax, viewMin, viewMax, width, leftOffset, allRow
       let newMax = startMax;
 
       if (dragging === "left") {
-        newMin = Math.max(fullMin, Math.min(startMin + dx, startMax - fullRange * 0.01));
+        newMin = Math.max(fullMin, Math.min(startMin + dx, startMax - safeFullRange * 0.01));
       } else if (dragging === "right") {
-        newMax = Math.min(fullMax, Math.max(startMax + dx, startMin + fullRange * 0.01));
+        newMax = Math.min(fullMax, Math.max(startMax + dx, startMin + safeFullRange * 0.01));
       } else { // center — pan
         const span = startMax - startMin;
         newMin = startMin + dx;
@@ -1124,7 +1117,9 @@ function Minimap({ fullMin, fullMax, viewMin, viewMax, width, leftOffset, allRow
       window.removeEventListener("mousemove", handleMove);
       window.removeEventListener("mouseup", handleUp);
     };
-  }, [dragging, fullMin, fullMax, fullRange, onRangeChange]);
+  }, [dragging, fullMin, fullMax, safeFullRange, onRangeChange]);
+
+  if (fullRange <= 0) return null;
 
   return (
     <div

@@ -1,7 +1,7 @@
 import { X } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
-import { DRUG_CLASS_COLORS, CONDITION_STATUS_COLORS } from "./CareJourneyChart";
+import { CONDITION_STATUS_COLORS, DRUG_CLASS_COLORS } from "./careJourneyColors";
 import type { SelectedCareItem } from "./CareJourneyChart";
 import type {
   MedicationEpisodeItem,
@@ -10,6 +10,8 @@ import type {
   EncounterMarker,
   DiagnosticReportItem,
 } from "../types";
+
+const DETAIL_NOW_MS = Date.now();
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -81,7 +83,7 @@ function MedicationDetail({ med }: { med: MedicationEpisodeItem }) {
 function ConditionDetail({ cond }: { cond: ConditionEpisodeItem }) {
   const color = CONDITION_STATUS_COLORS[cond.clinical_status] || "#94a3b8";
   const startMs = cond.onset_date ? new Date(cond.onset_date).getTime() : null;
-  const endMs = cond.end_date ? new Date(cond.end_date).getTime() : Date.now();
+  const endMs = cond.end_date ? new Date(cond.end_date).getTime() : DETAIL_NOW_MS;
   const years = startMs ? (endMs - startMs) / (365.25 * 24 * 3600 * 1000) : null;
 
   return (

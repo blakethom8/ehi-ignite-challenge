@@ -3,6 +3,8 @@ import { useState } from "react";
 import { X, Search, ChevronDown, ChevronRight, Copy, Check } from "lucide-react";
 import { api } from "../api/client";
 
+const LOADING_BAR_WIDTHS = [72, 58, 86, 64, 78, 52, 91, 69, 83, 47, 76, 61, 88, 55, 80, 66, 93, 50, 74, 59];
+
 interface FhirViewerProps {
   patientId: string;
   patientName: string;
@@ -165,7 +167,7 @@ export function FhirViewer({ patientId, patientName, onClose }: FhirViewerProps)
           {isLoading ? (
             <div className="space-y-2">
               {Array.from({ length: 20 }).map((_, i) => (
-                <div key={i} className="h-4 animate-pulse rounded bg-[#e9eaef]" style={{ width: `${40 + Math.random() * 50}%` }} />
+                <div key={i} className="h-4 animate-pulse rounded bg-[#e9eaef]" style={{ width: `${LOADING_BAR_WIDTHS[i]}%` }} />
               ))}
             </div>
           ) : viewMode === "tree" && bundle ? (

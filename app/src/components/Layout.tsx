@@ -21,11 +21,13 @@ import {
   Scissors,
   Search,
   ShieldAlert,
+  SlidersHorizontal,
   Star,
   Stethoscope,
   Syringe,
   TestTubeDiagonal,
   UserRound,
+  X,
   Zap,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -142,14 +144,20 @@ function StatusDot({ risk }: { risk: PatientRiskSummary | undefined }) {
   return null;
 }
 
-function PatientList({
+function PatientPickerModal({
+  open,
   selectedId,
   onSelect,
+  onClose,
 }: {
+  open: boolean;
   selectedId: string | null;
   onSelect: (id: string) => void;
+  onClose: () => void;
 }) {
   const [filter, setFilter] = useState<FilterMode>("all");
+  const [search, setSearch] = useState("");
+  const [previewId, setPreviewId] = useState<string | null>(selectedId);
 
   const { data: patients = [], isLoading: patientsLoading } = useQuery({
     queryKey: ["patients"],
@@ -172,23 +180,36 @@ function PatientList({
 
   const riskLoading = filter !== "all" && riskQueryLoading;
 
-  let visiblePatients = patients;
+  let visiblePatients = patients.filter((patient) => {
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    return patient.name.toLowerCase().includes(q);
+  });
+
   if (!riskLoading && filter === "high_risk") {
-    visiblePatients = patients.filter((patient) => {
+    visiblePatients = visiblePatients.filter((patient) => {
       const risk = riskMap.get(patient.id);
       return risk?.complexity_tier === "complex" || risk?.complexity_tier === "highly_complex";
     });
   }
 
   if (!riskLoading && filter === "needs_review") {
-    visiblePatients = patients.filter((patient) => riskMap.get(patient.id)?.has_critical_flag === true);
+    visiblePatients = visiblePatients.filter((patient) => riskMap.get(patient.id)?.has_critical_flag === true);
   }
 
   const favorites = visiblePatients.filter((patient) => isFavorite(patient.id));
   const others = visiblePatients.filter((patient) => !isFavorite(patient.id));
+  const selectedPatient = patients.find((patient) => patient.id === selectedId);
+  const previewPatient = patients.find((patient) => patient.id === previewId) ?? selectedPatient ?? visiblePatients[0];
+  const previewRisk = previewPatient ? riskMap.get(previewPatient.id) : undefined;
+  const complexCount = patients.filter((patient) => (
+    patient.complexity_tier === "complex" || patient.complexity_tier === "highly_complex"
+  )).length;
+  const criticalCount = riskSummary.filter((patient) => patient.has_critical_flag).length;
 
   function renderRow(patient: PatientListItem) {
     const active = patient.id === selectedId;
+    const previewing = patient.id === previewPatient?.id;
     const favorited = isFavorite(patient.id);
     const risk = riskMap.get(patient.id);
 
@@ -196,13 +217,13 @@ function PatientList({
       <div
         key={patient.id}
         className={`group flex items-center gap-1 rounded-lg pr-1 transition-colors ${
-          active ? "bg-[#eef1ff]" : "hover:bg-[#f5f6f8]"
+          previewing ? "bg-[#eef1ff] shadow-[inset_3px_0_0_#5b76fe]" : "hover:bg-[#f5f6f8]"
         }`}
       >
         <button
-          onClick={() => onSelect(patient.id)}
+          onClick={() => setPreviewId(patient.id)}
           className={`flex flex-1 items-center gap-2 truncate px-3 py-2 text-left text-sm ${
-            active ? "font-medium text-[#5b76fe]" : "text-[#1c1c1e]"
+            previewing ? "font-medium text-[#5b76fe]" : "text-[#1c1c1e]"
           }`}
         >
           <StatusDot risk={risk} />
@@ -213,6 +234,12 @@ function PatientList({
             </span>
           </div>
         </button>
+
+        {active && (
+          <span className="shrink-0 rounded-full bg-white px-1.5 py-0.5 text-[10px] font-semibold text-[#5b76fe] shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+            Current
+          </span>
+        )}
 
         <button
           onClick={(event) => {
@@ -238,67 +265,180 @@ function PatientList({
     { key: "needs_review", label: "Needs Review" },
   ];
 
-  if (patientsLoading) {
-    return (
-      <div className="space-y-1 px-1">
-        {[1, 2, 3, 4].map((item) => (
-          <div key={item} className="h-8 animate-pulse rounded-lg bg-[#f5f6f8]" />
-        ))}
-      </div>
-    );
-  }
+  if (!open) return null;
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden">
-      <div className="shrink-0 px-3 pb-1 pt-2">
-        <div className="flex gap-1">
-          {FILTER_OPTIONS.map(({ key, label }) => (
-            <button
-              key={key}
-              onClick={() => setFilter(key)}
-              className={`flex-1 rounded-full px-2 py-1 text-xs transition-colors ${
-                filter === key ? "bg-[#eef1ff] font-medium text-[#5b76fe]" : "text-[#a5a8b5] hover:text-[#555a6a]"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-y-auto px-2 py-2">
-        {riskLoading && (
-          <div className="space-y-1">
-            {[1, 2, 3].map((item) => (
-              <div key={item} className="h-8 animate-pulse rounded-lg bg-[#f5f6f8]" />
-            ))}
-          </div>
-        )}
-
-        {!riskLoading && (
-          <>
-            {favorites.length > 0 && (
-              <>
-                <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wider text-[#a5a8b5]">
-                  Favorites
-                </p>
-                <div className="mb-3 space-y-0.5">{favorites.map(renderRow)}</div>
-                <div className="mb-3 border-t border-[#e9eaef]" />
-              </>
-            )}
-
-            <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wider text-[#a5a8b5]">
-              {filter === "all" ? "All Patients" : filter === "high_risk" ? "High Risk" : "Needs Review"}
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-[#0f172a]/25 px-4 py-6">
+      <div className="flex max-h-[88vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-[#e9eaef] px-5 py-4">
+          <div>
+            <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#5b76fe]">
+              <SlidersHorizontal size={13} />
+              Patient context setting
             </p>
-            <div className="space-y-0.5">{others.map(renderRow)}</div>
+            <h2 className="mt-1 text-xl font-semibold tracking-tight text-[#1c1c1e]">Advanced patient selection</h2>
+            <p className="mt-1 text-sm text-[#667085]">
+              Switch the single-patient context used across the clinical workspace.
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="rounded-lg p-2 text-[#667085] transition-colors hover:bg-[#f5f6f8] hover:text-[#1c1c1e]"
+            title="Close"
+          >
+            <X size={18} />
+          </button>
+        </div>
 
-            {visiblePatients.length === 0 && (
-              <p className="px-3 py-4 text-center text-sm text-[#a5a8b5]">
-                {filter === "all" ? "No patients available" : "No patients match this filter"}
-              </p>
-            )}
-          </>
-        )}
+        <div className="grid min-h-0 flex-1 gap-0 lg:grid-cols-[340px_1fr]">
+          <aside className="border-b border-[#e9eaef] bg-[#fafbff] p-4 lg:border-b-0 lg:border-r">
+            <div className="rounded-xl bg-white p-4 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-[#a5a8b5]">Preview patient</p>
+                  <p className="mt-2 text-base font-semibold text-[#1c1c1e]">
+                    {previewPatient ? previewPatient.name : "No patient selected"}
+                  </p>
+                </div>
+                {previewPatient?.id === selectedId && (
+                  <span className="rounded-full bg-[#eef1ff] px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-[#5b76fe]">
+                    Current
+                  </span>
+                )}
+              </div>
+
+              {previewPatient && (
+                <>
+                <p className="mt-1 text-sm text-[#667085]">
+                  {previewPatient.gender} · {Math.floor(previewPatient.age_years)} years · {previewPatient.complexity_score.toFixed(0)}/100 complexity
+                </p>
+                <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+                  <div className="rounded-lg bg-[#f5f6f8] p-2">
+                    <p className="text-[10px] uppercase tracking-wider text-[#a5a8b5]">Resources</p>
+                    <p className="font-semibold text-[#1c1c1e]">{previewPatient.total_resources.toLocaleString()}</p>
+                  </div>
+                  <div className="rounded-lg bg-[#f5f6f8] p-2">
+                    <p className="text-[10px] uppercase tracking-wider text-[#a5a8b5]">Tier</p>
+                    <p className="capitalize font-semibold text-[#1c1c1e]">{previewPatient.complexity_tier.replace("_", " ")}</p>
+                  </div>
+                  <div className="rounded-lg bg-[#f5f6f8] p-2">
+                    <p className="text-[10px] uppercase tracking-wider text-[#a5a8b5]">Conditions</p>
+                    <p className="font-semibold text-[#1c1c1e]">{previewPatient.active_condition_count}</p>
+                  </div>
+                  <div className="rounded-lg bg-[#f5f6f8] p-2">
+                    <p className="text-[10px] uppercase tracking-wider text-[#a5a8b5]">Meds</p>
+                    <p className="font-semibold text-[#1c1c1e]">{previewPatient.active_med_count}</p>
+                  </div>
+                  <div className="rounded-lg bg-[#f5f6f8] p-2">
+                    <p className="text-[10px] uppercase tracking-wider text-[#a5a8b5]">Encounters</p>
+                    <p className="font-semibold text-[#1c1c1e]">{previewPatient.encounter_count}</p>
+                  </div>
+                  <div className="rounded-lg bg-[#f5f6f8] p-2">
+                    <p className="text-[10px] uppercase tracking-wider text-[#a5a8b5]">Safety</p>
+                    <p className={`font-semibold ${previewRisk?.has_critical_flag ? "text-[#ef4444]" : "text-[#16a34a]"}`}>
+                      {previewRisk?.has_critical_flag ? "Flagged" : "No critical flag"}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => onSelect(previewPatient.id)}
+                  disabled={previewPatient.id === selectedId}
+                  className={`mt-4 w-full rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
+                    previewPatient.id === selectedId
+                      ? "cursor-default bg-[#f5f6f8] text-[#a5a8b5]"
+                      : "bg-[#5b76fe] text-white hover:bg-[#4f68e8]"
+                  }`}
+                >
+                  {previewPatient.id === selectedId ? "Using this patient" : "Use this patient"}
+                </button>
+                </>
+              )}
+            </div>
+
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <div className="rounded-xl bg-white p-3 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+                <p className="text-[10px] uppercase tracking-wider text-[#a5a8b5]">Patients</p>
+                <p className="text-xl font-semibold text-[#1c1c1e]">{patients.length.toLocaleString()}</p>
+              </div>
+              <div className="rounded-xl bg-white p-3 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+                <p className="text-[10px] uppercase tracking-wider text-[#a5a8b5]">Complex</p>
+                <p className="text-xl font-semibold text-[#1c1c1e]">{complexCount.toLocaleString()}</p>
+              </div>
+              <div className="rounded-xl bg-white p-3 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+                <p className="text-[10px] uppercase tracking-wider text-[#a5a8b5]">Critical</p>
+                <p className="text-xl font-semibold text-[#ef4444]">{riskQueryLoading ? "..." : criticalCount.toLocaleString()}</p>
+              </div>
+              <div className="rounded-xl bg-white p-3 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+                <p className="text-[10px] uppercase tracking-wider text-[#a5a8b5]">Shown</p>
+                <p className="text-xl font-semibold text-[#5b76fe]">{visiblePatients.length.toLocaleString()}</p>
+              </div>
+            </div>
+          </aside>
+
+          <div className="flex min-h-0 flex-col">
+            <div className="shrink-0 border-b border-[#e9eaef] p-4">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+                <div className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-[#e9eaef] bg-[#f5f6f8] px-3 py-2">
+                  <Search size={14} className="shrink-0 text-[#a5a8b5]" />
+                  <input
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                    placeholder="Search by patient name..."
+                    className="min-w-0 flex-1 bg-transparent text-sm text-[#1c1c1e] outline-none placeholder:text-[#a5a8b5]"
+                  />
+                </div>
+                <div className="flex gap-1 rounded-xl bg-[#f5f6f8] p-1">
+                  {FILTER_OPTIONS.map(({ key, label }) => (
+                    <button
+                      key={key}
+                      onClick={() => setFilter(key)}
+                      className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                        filter === key ? "bg-white text-[#5b76fe] shadow-sm" : "text-[#667085] hover:text-[#1c1c1e]"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto p-3">
+              {(patientsLoading || riskLoading) && (
+                <div className="space-y-2">
+                  {[1, 2, 3, 4, 5].map((item) => (
+                    <div key={item} className="h-12 animate-pulse rounded-lg bg-[#f5f6f8]" />
+                  ))}
+                </div>
+              )}
+
+              {!patientsLoading && !riskLoading && (
+                <>
+                  {favorites.length > 0 && (
+                    <>
+                      <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wider text-[#a5a8b5]">
+                        Favorites
+                      </p>
+                      <div className="mb-3 space-y-0.5">{favorites.map(renderRow)}</div>
+                      <div className="mb-3 border-t border-[#e9eaef]" />
+                    </>
+                  )}
+
+                  <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wider text-[#a5a8b5]">
+                    {filter === "all" ? "All Patients" : filter === "high_risk" ? "High Risk" : "Needs Review"}
+                  </p>
+                  <div className="space-y-0.5">{others.map(renderRow)}</div>
+
+                  {visiblePatients.length === 0 && (
+                    <p className="px-3 py-8 text-center text-sm text-[#a5a8b5]">
+                      {filter === "all" ? "No patients available" : "No patients match this filter"}
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -308,9 +448,11 @@ function PatientList({
 function PatientSelector({
   patientId,
   onSelect,
+  onAdvancedOpen,
 }: {
   patientId: string | null;
   onSelect: (id: string) => void;
+  onAdvancedOpen: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -418,6 +560,22 @@ function PatientSelector({
               </p>
             )}
           </div>
+          <div className="border-t border-[#e9eaef] p-2">
+            <button
+              onClick={() => {
+                setOpen(false);
+                setSearch("");
+                onAdvancedOpen();
+              }}
+              className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm font-medium text-[#5b76fe] transition-colors hover:bg-[#eef1ff]"
+            >
+              <span className="inline-flex items-center gap-2">
+                <SlidersHorizontal size={14} />
+                Advanced selection
+              </span>
+              <ChevronRight size={14} />
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -431,6 +589,7 @@ export function Layout({ children }: LayoutProps) {
   const patientId = searchParams.get("patient");
 
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [patientPickerOpen, setPatientPickerOpen] = useState(false);
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
     try { return localStorage.getItem("ehi-sidebar-collapsed") === "true"; } catch { return false; }
@@ -479,6 +638,16 @@ export function Layout({ children }: LayoutProps) {
   return (
     <>
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
+      <PatientPickerModal
+        key={patientId ?? "no-patient"}
+        open={patientPickerOpen}
+        selectedId={patientId}
+        onSelect={(id) => {
+          handleSelectPatient(id);
+          setPatientPickerOpen(false);
+        }}
+        onClose={() => setPatientPickerOpen(false)}
+      />
 
       <div className={`h-screen overflow-hidden ${isAnalysis ? "bg-[#edf7f5]" : "bg-[#f5f6f8]"}`}>
         <header
@@ -503,10 +672,8 @@ export function Layout({ children }: LayoutProps) {
                 {!isAnalysis && (
                   <PatientSelector
                     patientId={patientId}
-                    onSelect={(id) => {
-                      const base = location.pathname.startsWith("/explorer") ? location.pathname : "/explorer";
-                      navigate(`${base}?patient=${id}`);
-                    }}
+                    onSelect={handleSelectPatient}
+                    onAdvancedOpen={() => setPatientPickerOpen(true)}
                   />
                 )}
 
@@ -563,27 +730,8 @@ export function Layout({ children }: LayoutProps) {
                   )}
                 </div>
 
-                {/* Search + patient list (hidden when collapsed) */}
-                {!sidebarCollapsed && (
-                  <div className="flex flex-col" style={{ flex: "0 1 40%", minHeight: 0 }}>
-                    <div className="shrink-0 border-b border-[#e9eaef] px-4 py-3">
-                      <button
-                        onClick={() => setPaletteOpen(true)}
-                        className="flex w-full items-center gap-2 rounded-lg border border-[#e9eaef] bg-[#f5f6f8] px-3 py-2 text-sm text-[#a5a8b5] transition-colors hover:border-[#5b76fe] hover:text-[#555a6a]"
-                      >
-                        <span className="flex-1 text-left">Search patients…</span>
-                        <kbd className="shrink-0 rounded border border-[#e9eaef] bg-white px-1 py-0.5 font-mono text-[10px]">
-                          ⌘K
-                        </kbd>
-                      </button>
-                    </div>
-
-                    <PatientList selectedId={patientId} onSelect={handleSelectPatient} />
-                  </div>
-                )}
-
                 {/* Nav links — always scrollable, takes remaining space */}
-                <nav className={`overflow-y-auto border-t border-[#e9eaef] ${sidebarCollapsed ? "flex-1 px-1 py-2" : "flex-1 px-3 py-4"}`}>
+                <nav className={`flex-1 overflow-y-auto ${sidebarCollapsed ? "px-1 py-2" : "px-3 py-4"}`}>
                   {CLINICAL_NAV_GROUPS.map((group, groupIndex) => {
                     const isAdvanced = group.advanced === true;
                     const isOpen = !isAdvanced || advancedOpen;

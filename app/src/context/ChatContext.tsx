@@ -175,6 +175,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
 // ── Hook: per-patient handle ─────────────────────────────────────────────────
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useChatForPatient(patientId: string | null): PatientChatHandle {
   const ctx = useContext(ChatContext);
   if (!ctx) throw new Error("useChatForPatient must be used within a ChatProvider");
@@ -188,7 +189,7 @@ export function useChatForPatient(patientId: string | null): PatientChatHandle {
     (question: string) => {
       if (patientId) ctx.submitQuestion(patientId, question);
     },
-    [ctx.submitQuestion, patientId],
+    [ctx, patientId],
   );
 
   return {

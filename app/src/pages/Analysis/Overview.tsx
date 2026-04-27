@@ -69,26 +69,25 @@ export function AnalysisOverview() {
   return (
     <div className="mx-auto max-w-7xl px-6 py-8 lg:px-10">
       <section className="rounded-3xl border border-[#b7e6dc] bg-[linear-gradient(135deg,#f5fffc_0%,#e9fbf6_55%,#f0fff9_100%)] p-6 lg:p-8">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-          <div className="max-w-3xl">
-            <p className="inline-flex items-center gap-2 rounded-full bg-[#d8f5ee] px-3 py-1 text-xs font-semibold uppercase tracking-wider text-[#0f766e]">
-              <BookOpenText size={13} />
-              Data Review Environment
-            </p>
-            <h1 className="mt-3 text-3xl font-semibold tracking-tight text-[#0f172a] lg:text-4xl">
-              FHIR Data Definitions and Methodology
-            </h1>
-            <p className="mt-3 text-sm leading-6 text-[#35524d] lg:text-base">
-              This module is the public-facing tutorial surface for understanding what we ingest from FHIR,
-              how we interpret it, and which signals are safe to operationalize in clinical workflows.
-            </p>
-          </div>
-          <div className="rounded-2xl bg-white/80 p-4 shadow-[rgb(183_230_220)_0px_0px_0px_1px] lg:w-[290px]">
+        <div>
+          <p className="inline-flex items-center gap-2 rounded-full bg-[#d8f5ee] px-3 py-1 text-xs font-semibold uppercase tracking-wider text-[#0f766e]">
+            <BookOpenText size={13} />
+            Data Review Environment
+          </p>
+          <h1 className="mt-3 max-w-4xl text-3xl font-semibold tracking-tight text-[#0f172a] lg:text-4xl">
+            FHIR Data Definitions and Methodology
+          </h1>
+          <p className="mt-3 max-w-5xl text-sm leading-6 text-[#35524d] lg:text-base">
+            This module is the public-facing tutorial surface for understanding what we ingest from FHIR,
+            how we interpret it, and which signals are safe to operationalize in clinical workflows.
+          </p>
+
+          <div className="mt-5 border-t border-[#b7e6dc]/70 pt-4">
             <p className="text-xs font-semibold uppercase tracking-wider text-[#0f766e]">Learning goals</p>
-            <ul className="mt-2 space-y-2 text-sm text-[#35524d]">
+            <ul className="mt-3 grid gap-3 text-sm text-[#35524d] lg:grid-cols-3">
               {LEARNING_OBJECTIVES.map((item) => (
-                <li key={item} className="flex items-start gap-2">
-                  <span className="mt-1 h-1.5 w-1.5 rounded-full bg-[#0f766e]" />
+                <li key={item} className="flex items-start gap-2 rounded-xl bg-white/55 px-3 py-2 shadow-[rgb(183_230_220)_0px_0px_0px_1px]">
+                  <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#0f766e]" />
                   <span>{item}</span>
                 </li>
               ))}
@@ -97,7 +96,19 @@ export function AnalysisOverview() {
         </div>
       </section>
 
-      <section className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="mt-6">
+        <div className="mb-3 flex items-baseline justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-[#0f766e]">
+              Synthea R4 Corpus Snapshot
+            </p>
+            <p className="mt-1 text-sm text-[#55706c]">
+              Metrics below summarize the 1,180 synthetic patient bundles loaded for this submission.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {isLoading &&
           Array.from({ length: 4 }).map((_, idx) => (
             <div key={idx} className="h-[122px] animate-pulse rounded-2xl bg-white shadow-[rgb(224_226_232)_0px_0px_0px_1px]" />
@@ -127,6 +138,7 @@ export function AnalysisOverview() {
             />
           </>
         )}
+        </div>
       </section>
 
       <section className="mt-7 grid gap-5 lg:grid-cols-[1.05fr_1fr]">

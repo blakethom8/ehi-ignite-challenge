@@ -43,6 +43,8 @@ from api.models import (
     SafetyMedication,
     SafetyFlag,
     SafetyResponse,
+    SurgicalRiskComponent,
+    SurgicalRiskResponse,
     ImmunizationItem,
     ImmunizationResponse,
     RankedConditionItem,
@@ -150,6 +152,25 @@ PROTOCOL_NOTES: dict[str, str] = {
         "GLP-1 agonists (semaglutide): hold 1 week pre-op due to gastroparesis risk."
     ),
 }
+
+HIGH_RISK_CONDITION_CATEGORIES = {"CARDIAC", "PULMONARY"}
+MODERATE_RISK_CONDITION_CATEGORIES = {"RENAL", "HEPATIC", "HEMATOLOGIC", "VASCULAR"}
+REVIEW_RISK_CONDITION_CATEGORIES = {"METABOLIC", "NEUROLOGIC", "IMMUNOLOGIC", "ONCOLOGIC"}
+COAGULATION_LOINC_CODES = {"6301-6", "34714-6", "5902-2", "3173-2"}
+
+
+def _component_status(score: int, flagged: bool = False, review: bool = False) -> str:
+    if flagged:
+        return "FLAGGED"
+    if review or score > 0:
+        return "REVIEW"
+    return "CLEARED"
+
+
+def _limit_evidence(items: list[str], limit: int = 5) -> list[str]:
+    if len(items) <= limit:
+        return items
+    return items[:limit] + [f"+{len(items) - limit} more"]
 
 
 @router.get("", response_model=list[PatientListItem])
@@ -940,6 +961,240 @@ def patient_interactions(patient_id: str) -> InteractionResponse:
         major_count=sum(1 for r in results if r.severity == "major"),
         moderate_count=sum(1 for r in results if r.severity == "moderate"),
         has_interactions=len(results) > 0,
+    )
+
+
+@router.get("/{patient_id}/surgical-risk", response_model=SurgicalRiskResponse)
+def patient_surgical_risk(patient_id: str) -> SurgicalRiskResponse:
+    """
+    Deterministic surgical risk score for pre-op clearance review.
+
+    This is intentionally rules-based and transparent. It is not a prediction
+    model; it summarizes chart signals that should trigger surgeon/anesthesia
+    review before proceeding.
+    """
+    result = load_patient(patient_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"Patient not found: {patient_id}")
+
+    record, stats = result
+
+    raw_flags = _classifier.generate_safety_flags(record.medications)
+    active_flags = [f for f in raw_flags if f.status == "ACTIVE"]
+    historical_flags = [f for f in raw_flags if f.status == "HISTORICAL"]
+    active_critical = [f for f in active_flags if f.severity == "critical"]
+    active_warning = [f for f in active_flags if f.severity == "warning"]
+    historical_critical = [f for f in historical_flags if f.severity == "critical"]
+    historical_warning = [f for f in historical_flags if f.severity == "warning"]
+
+    if active_critical:
+        medication_score = 35
+    elif active_warning:
+        medication_score = 22
+    elif historical_critical:
+        medication_score = 10
+    elif historical_warning:
+        medication_score = 5
+    else:
+        medication_score = 0
+
+    medication_evidence: list[str] = []
+    for flag in [*active_critical, *active_warning, *historical_critical, *historical_warning]:
+        med_names = [
+            cm.medication.display
+            for cm in flag.medications
+            if cm.is_active or flag.status == "HISTORICAL"
+        ]
+        suffix = f": {', '.join(med_names[:3])}" if med_names else ""
+        medication_evidence.append(f"{flag.status.title()} {flag.label}{suffix}")
+
+    medication_component = SurgicalRiskComponent(
+        key="medications",
+        label="Medication holds",
+        score=medication_score,
+        max_score=35,
+        status=_component_status(
+            medication_score,
+            flagged=bool(active_critical),
+            review=bool(active_warning or historical_critical or historical_warning),
+        ),
+        rationale=(
+            "Active critical medication classes create a hold-level signal; "
+            "active warning classes or relevant historical exposure create review-level signals."
+        ),
+        evidence=_limit_evidence(medication_evidence),
+    )
+
+    ranked_conditions = [r for r in _condition_ranker.rank_all(stats.condition_catalog) if r.is_active]
+    high_conditions = [r for r in ranked_conditions if r.risk_category in HIGH_RISK_CONDITION_CATEGORIES]
+    moderate_conditions = [r for r in ranked_conditions if r.risk_category in MODERATE_RISK_CONDITION_CATEGORIES]
+    review_conditions = [r for r in ranked_conditions if r.risk_category in REVIEW_RISK_CONDITION_CATEGORIES]
+    condition_score = min(
+        30,
+        len(high_conditions) * 12 + len(moderate_conditions) * 8 + len(review_conditions) * 4,
+    )
+    condition_component = SurgicalRiskComponent(
+        key="conditions",
+        label="Active condition burden",
+        score=condition_score,
+        max_score=30,
+        status=_component_status(
+            condition_score,
+            flagged=bool(high_conditions),
+            review=bool(moderate_conditions or review_conditions),
+        ),
+        rationale=(
+            "Active cardiac or pulmonary conditions are hold-level; renal, hepatic, "
+            "hematologic, vascular, metabolic, neurologic, immunologic, and oncologic "
+            "conditions add review weight."
+        ),
+        evidence=_limit_evidence([
+            f"{r.risk_label}: {r.display}"
+            for r in [*high_conditions, *moderate_conditions, *review_conditions]
+        ]),
+    )
+
+    today = datetime.now().date()
+    lab_alerts = _compute_alert_flags(record, today)
+    critical_labs = [flag for flag in lab_alerts if flag.severity == "critical"]
+    warning_labs = [flag for flag in lab_alerts if flag.severity == "warning"]
+    has_coagulation_data = any(obs.loinc_code in COAGULATION_LOINC_CODES for obs in record.observations)
+    has_active_anticoagulant = any(flag.class_key == "anticoagulants" for flag in active_flags)
+
+    if critical_labs:
+        lab_score = 15
+    elif warning_labs:
+        lab_score = 10
+    elif has_active_anticoagulant and not has_coagulation_data:
+        lab_score = 8
+    else:
+        lab_score = 0
+
+    lab_evidence = [flag.message for flag in [*critical_labs, *warning_labs]]
+    if has_active_anticoagulant and not has_coagulation_data:
+        lab_evidence.append("Active anticoagulant with no INR/PT/PTT observation found in the FHIR bundle")
+
+    lab_component = SurgicalRiskComponent(
+        key="labs",
+        label="Lab readiness",
+        score=lab_score,
+        max_score=15,
+        status=_component_status(
+            lab_score,
+            flagged=bool(critical_labs),
+            review=bool(warning_labs or (has_active_anticoagulant and not has_coagulation_data)),
+        ),
+        rationale=(
+            "Recent critical lab alerts are hold-level. Warning alerts or missing "
+            "coagulation data for an active anticoagulant require review."
+        ),
+        evidence=_limit_evidence(lab_evidence),
+    )
+
+    high_allergies = [
+        allergy for allergy in record.allergies if (allergy.criticality or "").lower() == "high"
+    ]
+    med_allergies = [
+        allergy for allergy in record.allergies if "medication" in [c.lower() for c in allergy.categories]
+    ]
+    if high_allergies and med_allergies:
+        allergy_score = 10
+    elif high_allergies:
+        allergy_score = 6
+    elif record.allergies:
+        allergy_score = 4
+    else:
+        allergy_score = 0
+
+    allergy_component = SurgicalRiskComponent(
+        key="allergies",
+        label="Allergy criticality",
+        score=allergy_score,
+        max_score=10,
+        status=_component_status(
+            allergy_score,
+            flagged=bool(high_allergies and med_allergies),
+            review=bool(record.allergies),
+        ),
+        rationale=(
+            "High-criticality medication allergies are hold-level; other documented "
+            "allergies are review-level perioperative context."
+        ),
+        evidence=_limit_evidence([
+            f"{allergy.code.label() or 'Allergy'} ({allergy.criticality or 'unknown criticality'})"
+            for allergy in record.allergies
+        ]),
+    )
+
+    interactions = check_interactions([f.class_key for f in active_flags])
+    major_interactions = [
+        interaction
+        for interaction in interactions
+        if interaction.severity in {"contraindicated", "major"}
+    ]
+    moderate_interactions = [interaction for interaction in interactions if interaction.severity == "moderate"]
+    if major_interactions:
+        interaction_score = 10
+    elif moderate_interactions:
+        interaction_score = 6
+    else:
+        interaction_score = 0
+
+    interaction_component = SurgicalRiskComponent(
+        key="interactions",
+        label="Drug interaction screen",
+        score=interaction_score,
+        max_score=10,
+        status=_component_status(
+            interaction_score,
+            flagged=bool(major_interactions),
+            review=bool(moderate_interactions),
+        ),
+        rationale=(
+            "Known active drug-class interactions add hold or review weight based "
+            "on severity."
+        ),
+        evidence=_limit_evidence([
+            f"{interaction.drug_a} + {interaction.drug_b}: {interaction.clinical_effect}"
+            for interaction in [*major_interactions, *moderate_interactions]
+        ]),
+    )
+
+    components = [
+        medication_component,
+        condition_component,
+        lab_component,
+        allergy_component,
+        interaction_component,
+    ]
+    total_score = min(100, sum(component.score for component in components))
+
+    if total_score >= 50:
+        tier = "HIGH"
+        disposition = "HOLD"
+    elif total_score >= 25:
+        tier = "MODERATE"
+        disposition = "REVIEW"
+    else:
+        tier = "LOW"
+        disposition = "CLEARED"
+
+    return SurgicalRiskResponse(
+        patient_id=patient_id,
+        name=stats.name,
+        score=total_score,
+        max_score=100,
+        tier=tier,
+        disposition=disposition,
+        rule_version="preop-rules-v1",
+        components=components,
+        methodology_notes=[
+            "Score is deterministic and derived only from parsed FHIR bundle fields.",
+            "Medication holds contribute up to 35 points; active critical classes dominate this component.",
+            "Active surgical condition categories contribute up to 30 points using the static condition ranker.",
+            "Labs, allergies, and known drug-class interactions add readiness and anesthesia review signals.",
+            "This is a briefing and triage aid, not an autonomous clearance decision.",
+        ],
     )
 
 

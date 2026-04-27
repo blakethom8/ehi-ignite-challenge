@@ -303,6 +303,32 @@ class SafetyResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Surgical Risk Score (deterministic pre-op clearance method)
+# ---------------------------------------------------------------------------
+
+class SurgicalRiskComponent(BaseModel):
+    key: str
+    label: str
+    score: int
+    max_score: int
+    status: str       # "CLEARED" | "REVIEW" | "FLAGGED"
+    rationale: str
+    evidence: list[str]
+
+
+class SurgicalRiskResponse(BaseModel):
+    patient_id: str
+    name: str
+    score: int
+    max_score: int
+    tier: str         # "LOW" | "MODERATE" | "HIGH"
+    disposition: str  # "CLEARED" | "REVIEW" | "HOLD"
+    rule_version: str
+    components: list[SurgicalRiskComponent]
+    methodology_notes: list[str]
+
+
+# ---------------------------------------------------------------------------
 # Immunizations
 # ---------------------------------------------------------------------------
 

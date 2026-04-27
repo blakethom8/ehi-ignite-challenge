@@ -7,6 +7,7 @@ import type {
   KeyLabsResponse,
   CorpusStats,
   SafetyResponse,
+  SurgicalRiskResponse,
   ImmunizationResponse,
   ConditionAcuityResponse,
   PatientRiskSummary,
@@ -58,6 +59,10 @@ export const api = {
   /** Pre-op safety flags — drug class risk classification */
   getSafety: (patientId: string): Promise<SafetyResponse> =>
     http.get<SafetyResponse>(`/patients/${patientId}/safety`).then((r) => r.data),
+
+  /** Deterministic pre-op surgical risk score */
+  getSurgicalRisk: (patientId: string): Promise<SurgicalRiskResponse> =>
+    http.get<SurgicalRiskResponse>(`/patients/${patientId}/surgical-risk`).then((r) => r.data),
 
   /** Immunization history — all vaccines with dates */
   getImmunizations: (patientId: string): Promise<ImmunizationResponse> =>

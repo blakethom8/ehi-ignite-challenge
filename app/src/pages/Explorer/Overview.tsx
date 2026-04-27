@@ -622,14 +622,31 @@ function PreOpDecisionCard({ patientId }: { patientId: string }) {
 function CareActivityStrip({ timeline }: { timeline: TimelineResponse | undefined }) {
   if (!timeline || Object.keys(timeline.year_counts).length === 0) return null;
 
-  const yearEntries = Object.entries(timeline.year_counts)
-    .map(([year, count]) => ({ year, count }))
-    .sort((a, b) => Number(a.year) - Number(b.year));
-  const maxCount = Math.max(...yearEntries.map((entry) => entry.count), 1);
+  const yearsWithCounts = Object.entries(timeline.year_counts)
+    .map(([year, count]) => ({ year: Number(year), count }))
+    .sort((a, b) => a.year - b.year);
+  const firstYear = yearsWithCounts[0].year;
+  const lastYear = yearsWithCounts[yearsWithCounts.length - 1].year;
+  const countsByYear = new Map(yearsWithCounts.map((entry) => [entry.year, entry.count]));
+  const fullYearEntries = Array.from({ length: lastYear - firstYear + 1 }, (_, index) => {
+    const year = firstYear + index;
+    return { year, count: countsByYear.get(year) ?? 0 };
+  });
+  const maxCount = Math.max(...fullYearEntries.map((entry) => entry.count), 1);
+  const gapYears = fullYearEntries.filter((entry) => entry.count === 0).length;
+  const peakYear = fullYearEntries.reduce((best, entry) => (entry.count > best.count ? entry : best), fullYearEntries[0]);
   const recentEncounters = [...timeline.encounters]
     .filter((encounter) => encounter.start)
     .sort((a, b) => (b.start || "").localeCompare(a.start || ""))
     .slice(0, 3);
+  const recentByClass = recentEncounters.reduce<Record<string, number>>((acc, encounter) => {
+    const key = encounter.class_code || "Unknown";
+    acc[key] = (acc[key] ?? 0) + 1;
+    return acc;
+  }, {});
+  const recentClassSummary = Object.entries(recentByClass)
+    .map(([label, count]) => `${count} ${label}`)
+    .join(" / ");
 
   return (
     <div className="bg-white rounded-xl shadow-[rgb(224_226_232)_0px_0px_0px_1px] px-5 py-4">
@@ -637,7 +654,7 @@ function CareActivityStrip({ timeline }: { timeline: TimelineResponse | undefine
         <div>
           <p className="text-sm font-semibold text-[#1c1c1e]">Care activity</p>
           <p className="mt-1 text-xs text-[#6b7280]">
-            Encounter volume by year, useful for spotting concentrated episodes of care.
+            Full-year encounter volume from {firstYear} to {lastYear}; zero-height marks show gaps in care.
           </p>
         </div>
         <Link
@@ -649,30 +666,62 @@ function CareActivityStrip({ timeline }: { timeline: TimelineResponse | undefine
         </Link>
       </div>
 
-      <div className="mt-4 flex items-end gap-1 overflow-x-auto pb-1">
-        {yearEntries.map((entry) => {
-          const height = 10 + (entry.count / maxCount) * 54;
-          return (
-            <div key={entry.year} className="flex min-w-[34px] flex-col items-center gap-1">
-              <div
-                className="w-5 rounded-t-md bg-[#5b76fe]"
-                style={{ height }}
-                title={`${entry.year}: ${entry.count} encounter${entry.count !== 1 ? "s" : ""}`}
-              />
-              <span className="text-[10px] text-[#a5a8b5]">{entry.year.slice(2)}</span>
-            </div>
-          );
-        })}
+      <div className="mt-4 rounded-xl border border-[#e9eaef] bg-[#fafafa] px-3 py-3">
+        <div className="mb-3 flex flex-wrap gap-2 text-[11px] text-[#6b7280]">
+          <span className="rounded-full bg-white px-2.5 py-1">
+            Peak: {peakYear.year} ({peakYear.count} encounter{peakYear.count !== 1 ? "s" : ""})
+          </span>
+          <span className="rounded-full bg-white px-2.5 py-1">
+            Gap years: {gapYears}
+          </span>
+          {recentClassSummary && (
+            <span className="rounded-full bg-white px-2.5 py-1">
+              Recent mix: {recentClassSummary}
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-end gap-1 overflow-x-auto pb-1">
+          {fullYearEntries.map((entry) => {
+            const hasActivity = entry.count > 0;
+            const height = hasActivity ? 10 + (entry.count / maxCount) * 54 : 4;
+            const shouldLabel =
+              hasActivity ||
+              entry.year === firstYear ||
+              entry.year === lastYear ||
+              entry.year % 10 === 0;
+            return (
+              <div key={entry.year} className="flex min-w-[42px] flex-col items-center gap-1">
+                <div
+                  className={`w-5 rounded-t-md ${hasActivity ? "bg-[#5b76fe]" : "bg-[#d9dce5]"}`}
+                  style={{ height }}
+                  title={`${entry.year}: ${entry.count} encounter${entry.count !== 1 ? "s" : ""}`}
+                />
+                <span className={`text-[10px] ${shouldLabel ? "text-[#555a6a]" : "text-transparent"}`}>
+                  {shouldLabel ? entry.year : "0000"}
+                </span>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {recentEncounters.length > 0 && (
         <div className="mt-4 grid gap-2 md:grid-cols-3">
           {recentEncounters.map((encounter) => (
             <div key={encounter.encounter_id} className="rounded-lg border border-[#e9eaef] bg-[#fafafa] px-3 py-2">
-              <p className="truncate text-xs font-semibold text-[#1c1c1e]">
+              <div className="mb-1 flex items-center justify-between gap-2">
+                <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-[#5b76fe]">
+                  {encounter.class_code || "Unknown"}
+                </span>
+                <span className="text-[10px] text-[#a5a8b5]">{fmt(encounter.start)}</span>
+              </div>
+              <p className="line-clamp-2 text-xs font-semibold leading-5 text-[#1c1c1e]">
                 {encounter.reason_display || encounter.encounter_type || encounter.class_code || "Encounter"}
               </p>
-              <p className="mt-0.5 text-[11px] text-[#6b7280]">{fmt(encounter.start)}</p>
+              <p className="mt-1 text-[11px] text-[#6b7280]">
+                {encounter.linked_observation_count} labs/vitals · {encounter.linked_condition_count} conditions · {encounter.linked_procedure_count} procedures
+              </p>
             </div>
           ))}
         </div>

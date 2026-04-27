@@ -237,6 +237,28 @@ export interface SafetyResponse {
   historical_flag_count: number;
 }
 
+export interface SurgicalRiskComponent {
+  key: string;
+  label: string;
+  score: number;
+  max_score: number;
+  status: "CLEARED" | "REVIEW" | "FLAGGED";
+  rationale: string;
+  evidence: string[];
+}
+
+export interface SurgicalRiskResponse {
+  patient_id: string;
+  name: string;
+  score: number;
+  max_score: number;
+  tier: "LOW" | "MODERATE" | "HIGH";
+  disposition: "CLEARED" | "REVIEW" | "HOLD";
+  rule_version: string;
+  components: SurgicalRiskComponent[];
+  methodology_notes: string[];
+}
+
 export interface ImmunizationItem {
   imm_id: string;
   display: string;

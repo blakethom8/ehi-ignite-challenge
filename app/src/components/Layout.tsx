@@ -758,6 +758,7 @@ export function Layout({ children }: LayoutProps) {
                               <NavLink
                                 key={to}
                                 to={withPatientQuery(to, patientId)}
+                                end={to === "/explorer"}
                                 title={sidebarCollapsed ? label : undefined}
                                 className={({ isActive }) =>
                                   `flex items-center rounded-lg transition-colors ${
@@ -836,6 +837,7 @@ export function Layout({ children }: LayoutProps) {
                     <NavLink
                       key={to}
                       to={to}
+                      end={to === "/analysis"}
                       title={sidebarCollapsed ? label : undefined}
                       className={({ isActive }) =>
                         `flex items-center rounded-lg transition-colors ${

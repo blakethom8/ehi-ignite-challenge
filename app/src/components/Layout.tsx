@@ -619,7 +619,10 @@ export function Layout({ children }: LayoutProps) {
 
   const handleSelectPatient = (id: string) => {
     // Use navigate (like landing page cards) to ensure reliable routing
-    const base = location.pathname.startsWith("/explorer") ? location.pathname : "/explorer";
+    const base =
+      location.pathname.startsWith("/explorer") || location.pathname.startsWith("/journey")
+        ? location.pathname
+        : "/explorer";
     navigate(`${base}?patient=${id}`);
   };
 

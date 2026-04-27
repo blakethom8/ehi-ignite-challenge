@@ -18,7 +18,7 @@ import { ExplorerDistributions } from "./pages/Explorer/Distributions";
 import { ExplorerInteractions } from "./pages/Explorer/Interactions";
 import { ExplorerAssistant } from "./pages/Explorer/Assistant";
 import { ExplorerCareJourney } from "./pages/Explorer/CareJourney";
-import { JourneyPlaceholder } from "./pages/Journey/Placeholder";
+import { PatientJourney } from "./pages/Journey/PatientJourney";
 import { AnalysisOverview } from "./pages/Analysis/Overview";
 import { AnalysisMethodology } from "./pages/Analysis/Methodology";
 import { AnalysisDefinitions } from "./pages/Analysis/Definitions";
@@ -50,7 +50,7 @@ export default function App() {
     { path: "/explorer/distributions", element: <ExplorerDistributions /> },
     { path: "/explorer/interactions", element: <ExplorerInteractions /> },
     { path: "/explorer/assistant", element: <ExplorerAssistant /> },
-    { path: "/journey", element: <JourneyPlaceholder /> },
+    { path: "/journey", element: <PatientJourney /> },
     { path: "/analysis", element: <AnalysisOverview /> },
     { path: "/analysis/fhir-primer", element: <AnalysisFhirPrimer /> },
     { path: "/analysis/methodology", element: <AnalysisMethodology /> },

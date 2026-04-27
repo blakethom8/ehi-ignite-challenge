@@ -81,6 +81,7 @@ const CLINICAL_NAV_GROUPS: NavGroup[] = [
     label: "Context & Data",
     items: [
       { to: "/explorer/assistant", label: "Assistant", icon: MessageSquareText, description: "AI chart Q&A" },
+      { to: "/explorer/patient-data", label: "FHIR Data", icon: FileJson2, description: "Patient bundle metrics" },
       { to: "/explorer/corpus", label: "Corpus", icon: BarChart3, description: "Population statistics" },
       { to: "/explorer/distributions", label: "Distributions", icon: BarChart2, description: "Lab value distributions" },
     ],

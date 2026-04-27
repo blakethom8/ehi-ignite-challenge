@@ -1,4 +1,4 @@
-# CLAUDE.md — EHI Ignite Challenge Project Guide
+# AGENTS.md — EHI Ignite Challenge Project Guide
 
 > Read this file first. It tells you what this project is, how it's structured, what data is available, and what's already been built so you don't duplicate work.
 
@@ -40,7 +40,7 @@ Keep implementation code, tests, repo-specific docs, deployment config, and gene
 ```
 ehi-ignite-challenge/
 │
-├── CLAUDE.md                              ← you are here
+├── AGENTS.md                              ← you are here
 ├── README.md
 │
 ├── api/                                   ← FastAPI backend (PRIMARY — build here)
@@ -51,7 +51,7 @@ ehi-ignite-challenge/
 │   └── core/                             ← clinical intelligence modules
 │       ├── tracing.py                     ← LLM observability (traces, spans, SQLite, Langfuse)
 │       ├── provider_assistant_service.py  ← mode selector (agent-sdk / deterministic)
-│       ├── provider_assistant_agent_sdk.py ← Claude Agent SDK runtime (instrumented)
+│       ├── provider_assistant_agent_sdk.py ← Codex Agent SDK runtime (instrumented)
 │       ├── provider_assistant.py          ← deterministic fact ranking + evidence retrieval
 │       ├── sof_tools.py                   ← run_sql MCP tool: SELECT-only gate + read-only runner
 │       ├── sof_materialize.py             ← FastAPI startup hook — rebuilds data/sof.db on mtime gate
@@ -181,7 +181,7 @@ stats = compute_patient_stats(record)
 ### Backend (`api/`)
 - **Python 3.13**, FastAPI, uvicorn
 - Imports from `fhir_explorer.parser` for all FHIR parsing
-- Anthropic SDK (Claude Haiku for batch enrichment, Sonnet for NL search)
+- Anthropic SDK (Codex Haiku for batch enrichment, Sonnet for NL search)
 - Run: `uv run uvicorn api.main:app --reload --port 8000`
 
 ### Frontend (`app/`)
@@ -212,7 +212,7 @@ stats = compute_patient_stats(record)
 3. **Explorer views** (React ports of fhir_explorer): Overview → Timeline → Encounter Hub → Field Profiler → Corpus
 4. **Patient Journey views**: Safety Panel → Medication Timeline → Conditions
 5. **Context engineering pipeline**: `temporal.py` → `batch_enrichment.py` → `context_builder.py`
-6. **NL Search**: streaming Claude Q&A with citations
+6. **NL Search**: streaming Codex Q&A with citations
 7. **Deployment**: Docker Compose → Hetzner
 
 **Current focus: Steps 1–3 (Explorer)**

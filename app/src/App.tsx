@@ -21,6 +21,8 @@ import { ExplorerCareJourney } from "./pages/Explorer/CareJourney";
 import { ExplorerPatientData } from "./pages/Explorer/PatientData";
 import { ExplorerHistory } from "./pages/Explorer/History";
 import { PatientJourney } from "./pages/Journey/PatientJourney";
+import { ClinicalTrials } from "./pages/Modules/ClinicalTrials";
+import { MedicationAccess } from "./pages/Modules/MedicationAccess";
 import { AnalysisOverview } from "./pages/Analysis/Overview";
 import { AnalysisMethodology } from "./pages/Analysis/Methodology";
 import { AnalysisDefinitions } from "./pages/Analysis/Definitions";
@@ -55,6 +57,8 @@ export default function App() {
     { path: "/explorer/assistant", element: <ExplorerAssistant /> },
     { path: "/explorer/patient-data", element: <ExplorerPatientData /> },
     { path: "/journey", element: <PatientJourney /> },
+    { path: "/trials", element: <ClinicalTrials /> },
+    { path: "/medication-access", element: <MedicationAccess /> },
     { path: "/analysis", element: <AnalysisOverview /> },
     { path: "/analysis/fhir-primer", element: <AnalysisFhirPrimer /> },
     { path: "/analysis/methodology", element: <AnalysisMethodology /> },

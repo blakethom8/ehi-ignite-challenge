@@ -38,7 +38,7 @@ interface LayoutProps {
 }
 
 type FilterMode = "all" | "high_risk" | "needs_review";
-type AppEnvironment = "preop" | "trials" | "medication" | "analysis";
+type AppEnvironment = "record" | "preop" | "trials" | "medication" | "analysis";
 
 interface NavItem {
   to: string;
@@ -66,15 +66,6 @@ const CLINICAL_NAV_GROUPS: NavGroup[] = [
       { to: "/explorer/assistant", label: "Evidence", icon: MessageSquareText, description: "AI chart Q&A" },
     ],
   },
-  {
-    label: "Patient Record",
-    items: [
-      { to: "/explorer", label: "Overview", icon: Database, description: "Clinical summary" },
-      { to: "/explorer/history", label: "History", icon: CalendarDays, description: "Tables and timelines" },
-      { to: "/explorer/care-journey", label: "Care Journey", icon: Heart, description: "Visual care timeline" },
-      { to: "/explorer/patient-data", label: "FHIR Data", icon: FileJson2, description: "Patient bundle metrics" },
-    ],
-  },
 ];
 
 const PATIENT_RECORD_NAV_ITEMS: NavItem[] = [
@@ -84,16 +75,19 @@ const PATIENT_RECORD_NAV_ITEMS: NavItem[] = [
   { to: "/explorer/patient-data", label: "FHIR Data", icon: FileJson2, description: "Patient bundle metrics" },
 ];
 
+const PATIENT_RECORD_NAV_GROUPS: NavGroup[] = [
+  {
+    label: "Patient Record",
+    items: PATIENT_RECORD_NAV_ITEMS,
+  },
+];
+
 const TRIALS_NAV_GROUPS: NavGroup[] = [
   {
     label: "Clinical Trials",
     items: [
       { to: "/trials", label: "Trial Match", icon: Search, description: "Eligibility research brief" },
     ],
-  },
-  {
-    label: "Patient Record",
-    items: PATIENT_RECORD_NAV_ITEMS,
   },
 ];
 
@@ -103,10 +97,6 @@ const MEDICATION_ACCESS_NAV_GROUPS: NavGroup[] = [
     items: [
       { to: "/medication-access", label: "Cost Brief", icon: Pill, description: "Affordability workflow" },
     ],
-  },
-  {
-    label: "Patient Record",
-    items: PATIENT_RECORD_NAV_ITEMS,
   },
 ];
 
@@ -153,16 +143,37 @@ function getEnvironment(pathname: string): AppEnvironment {
   if (pathname.startsWith("/analysis")) return "analysis";
   if (pathname.startsWith("/trials")) return "trials";
   if (pathname.startsWith("/medication-access")) return "medication";
+  if (
+    pathname === "/journey" ||
+    pathname.startsWith("/explorer/safety") ||
+    pathname.startsWith("/explorer/clearance") ||
+    pathname.startsWith("/explorer/conditions") ||
+    pathname.startsWith("/explorer/anesthesia") ||
+    pathname.startsWith("/explorer/interactions") ||
+    pathname.startsWith("/explorer/assistant")
+  ) {
+    return "preop";
+  }
+  if (pathname.startsWith("/explorer")) return "record";
   return "preop";
 }
 
 function getClinicalNavGroups(environment: AppEnvironment): NavGroup[] {
+  if (environment === "record") return PATIENT_RECORD_NAV_GROUPS;
   if (environment === "trials") return TRIALS_NAV_GROUPS;
   if (environment === "medication") return MEDICATION_ACCESS_NAV_GROUPS;
   return CLINICAL_NAV_GROUPS;
 }
 
 function getWorkspaceCopy(environment: AppEnvironment): { title: string; sidebarTitle: string; subtitle: string; icon: LucideIcon } {
+  if (environment === "record") {
+    return {
+      title: "Patient Record Workspace",
+      sidebarTitle: "Patient Record",
+      subtitle: "Overview, longitudinal history, and source data",
+      icon: Database,
+    };
+  }
   if (environment === "trials") {
     return {
       title: "Clinical Trials Workspace",
@@ -679,6 +690,7 @@ export function Layout({ children }: LayoutProps) {
   });
 
   const moduleLinks: { key: AppEnvironment; label: string; to: string }[] = [
+    { key: "record", label: "Patient Record", to: withPatientQuery("/explorer", patientId) },
     { key: "preop", label: "Pre-Op", to: withPatientQuery("/journey", patientId) },
     { key: "trials", label: "Trials", to: withPatientQuery("/trials", patientId) },
     { key: "medication", label: "Medication Access", to: withPatientQuery("/medication-access", patientId) },

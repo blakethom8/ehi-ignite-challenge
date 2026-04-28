@@ -1,7 +1,7 @@
 import { useSearchParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { AlertTriangle, User, ChevronDown, ChevronRight, Clock, Database, MessageSquareText } from "lucide-react";
+import { AlertTriangle, User, ChevronDown, ChevronRight, Clock, Database } from "lucide-react";
 import type { ReactNode } from "react";
 import { api } from "../../api/client";
 import type { PatientOverview, KeyLabsResponse, LabValue, LabHistoryPoint, LabAlertFlag, TimelineMonth, TimelineResponse } from "../../types";
@@ -668,32 +668,6 @@ function OverviewContent({
 
   return (
     <div className="p-6 space-y-6">
-      <section className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-        <div className="rounded-xl bg-white p-5 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
-          <p className="inline-flex items-center gap-2 rounded-full bg-[#eef1ff] px-3 py-1 text-xs font-semibold uppercase tracking-wider text-[#5b76fe]">
-            <Database size={13} />
-            Patient record
-          </p>
-          <h2 className="mt-3 text-lg font-semibold text-[#1c1c1e]">Read this as the longitudinal source of truth</h2>
-          <p className="mt-2 text-sm leading-6 text-[#667085]">
-            This view is for orienting around the patient record itself: demographics, longitudinal history,
-            active conditions, current medications, allergies, immunizations, labs, and FHIR source coverage.
-            Workflow-specific decisions live in the dedicated modules.
-          </p>
-        </div>
-        <div className="rounded-xl bg-white p-5 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
-          <p className="inline-flex items-center gap-2 rounded-full bg-[#f5f6f8] px-3 py-1 text-xs font-semibold uppercase tracking-wider text-[#667085]">
-            <MessageSquareText size={13} />
-            Future record agent
-          </p>
-          <p className="mt-3 text-sm leading-6 text-[#667085]">
-            The Patient Record agent should answer neutral chart questions and cite the source record. Pre-Op,
-            Trials, and Medication Access should each use separate agent harnesses with their own goals, tools,
-            and safety posture.
-          </p>
-        </div>
-      </section>
-
       <section className="space-y-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>

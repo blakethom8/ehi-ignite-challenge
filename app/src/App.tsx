@@ -21,6 +21,8 @@ import { ExplorerCareJourney } from "./pages/Explorer/CareJourney";
 import { ExplorerPatientData } from "./pages/Explorer/PatientData";
 import { ExplorerHistory } from "./pages/Explorer/History";
 import { PatientJourney } from "./pages/Journey/PatientJourney";
+import { PatientRecordOverview } from "./pages/Modules/PatientRecordOverview";
+import { PreOpOverview } from "./pages/Modules/PreOpOverview";
 import { ClinicalTrials } from "./pages/Modules/ClinicalTrials";
 import { MedicationAccess } from "./pages/Modules/MedicationAccess";
 import { AnalysisOverview } from "./pages/Analysis/Overview";
@@ -41,6 +43,7 @@ const queryClient = new QueryClient({
 
 export default function App() {
   const routes = [
+    { path: "/record", element: <PatientRecordOverview /> },
     { path: "/explorer", element: <ExplorerOverview /> },
     { path: "/explorer/timeline", element: <ExplorerTimeline /> },
     { path: "/explorer/history", element: <ExplorerHistory /> },
@@ -56,6 +59,7 @@ export default function App() {
     { path: "/explorer/interactions", element: <ExplorerInteractions /> },
     { path: "/explorer/assistant", element: <ExplorerAssistant /> },
     { path: "/explorer/patient-data", element: <ExplorerPatientData /> },
+    { path: "/preop", element: <PreOpOverview /> },
     { path: "/journey", element: <PatientJourney /> },
     { path: "/trials", element: <ClinicalTrials /> },
     { path: "/medication-access", element: <MedicationAccess /> },

@@ -8,7 +8,6 @@ import {
   CalendarClock,
   CheckCircle,
   HeartPulse,
-  MessageSquareText,
   Pill,
   Stethoscope,
   TestTube2,
@@ -220,40 +219,6 @@ function FactRail({ overview, care }: { overview: PatientOverview; care: CareJou
   );
 }
 
-function ModuleGuidance() {
-  return (
-    <section className="grid gap-4 lg:grid-cols-3">
-      <div className="rounded-2xl border border-[#e9eaef] bg-white p-5">
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#5b76fe]">Purpose</p>
-        <h2 className="mt-2 text-base font-semibold text-[#111827]">Use this as the surgical briefing layer</h2>
-        <p className="mt-2 text-sm leading-6 text-[#64748b]">
-          Start here when the question is whether anything in the chart changes pre-op readiness, anesthesia handoff,
-          medication holds, or day-of-surgery coordination.
-        </p>
-      </div>
-      <div className="rounded-2xl border border-[#e9eaef] bg-white p-5">
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#5b76fe]">How to read it</p>
-        <h2 className="mt-2 text-base font-semibold text-[#111827]">Move from disposition to evidence</h2>
-        <p className="mt-2 text-sm leading-6 text-[#64748b]">
-          Read the hold/review label first, then inspect critical meds, comorbidities, labs, anesthesia notes,
-          and the recent care evidence underneath.
-        </p>
-      </div>
-      <div className="rounded-2xl border border-[#e9eaef] bg-white p-5">
-        <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-[#5b76fe]">
-          <MessageSquareText size={13} />
-          Future agent
-        </p>
-        <h2 className="mt-2 text-base font-semibold text-[#111827]">Pre-Op AI chart assistant</h2>
-        <p className="mt-2 text-sm leading-6 text-[#64748b]">
-          This module should get its own agent harness focused on surgical risk questions, medication hold logic,
-          anesthesia-ready summaries, and cited chart evidence.
-        </p>
-      </div>
-    </section>
-  );
-}
-
 function RiskHero({ risk, overview }: { risk: SurgicalRiskResponse; overview: PatientOverview }) {
   const tone = riskTone(risk);
   const colors = toneConfig[tone];
@@ -425,8 +390,6 @@ export function PatientJourney() {
 
   return (
     <main className="mx-auto max-w-6xl space-y-5 p-8">
-      <ModuleGuidance />
-
       <section className="space-y-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#5b76fe]">Patient briefing</p>

@@ -57,7 +57,8 @@ const CLINICAL_NAV_GROUPS: NavGroup[] = [
   {
     label: "Pre-Op Support",
     items: [
-      { to: "/journey", label: "Overview", icon: Activity, description: "Module guide and surgical brief" },
+      { to: "/preop", label: "Overview", icon: Activity, description: "Module guide" },
+      { to: "/journey", label: "Patient Briefing", icon: ClipboardCheck, description: "Surgical disposition" },
       { to: "/explorer/clearance", label: "Clearance", icon: ClipboardCheck, description: "Pre-op readiness check" },
       { to: "/explorer/safety", label: "Medication Holds", icon: ShieldAlert, description: "Pre-op risk flags" },
       { to: "/explorer/conditions", label: "Conditions", icon: Activity, description: "Surgical risk ranking" },
@@ -69,7 +70,8 @@ const CLINICAL_NAV_GROUPS: NavGroup[] = [
 ];
 
 const PATIENT_RECORD_NAV_ITEMS: NavItem[] = [
-  { to: "/explorer", label: "Overview", icon: Database, description: "Clinical summary" },
+  { to: "/record", label: "Overview", icon: Database, description: "Module guide" },
+  { to: "/explorer", label: "Patient Summary", icon: UserRound, description: "Clinical summary" },
   { to: "/explorer/history", label: "History", icon: CalendarDays, description: "Tables and timelines" },
   { to: "/explorer/care-journey", label: "Care Journey", icon: Heart, description: "Visual care timeline" },
   { to: "/explorer/patient-data", label: "FHIR Data", icon: FileJson2, description: "Patient bundle metrics" },
@@ -144,6 +146,7 @@ function getEnvironment(pathname: string): AppEnvironment {
   if (pathname.startsWith("/trials")) return "trials";
   if (pathname.startsWith("/medication-access")) return "medication";
   if (
+    pathname.startsWith("/preop") ||
     pathname === "/journey" ||
     pathname.startsWith("/explorer/safety") ||
     pathname.startsWith("/explorer/clearance") ||
@@ -154,7 +157,7 @@ function getEnvironment(pathname: string): AppEnvironment {
   ) {
     return "preop";
   }
-  if (pathname.startsWith("/explorer")) return "record";
+  if (pathname.startsWith("/record") || pathname.startsWith("/explorer")) return "record";
   return "preop";
 }
 
@@ -690,8 +693,8 @@ export function Layout({ children }: LayoutProps) {
   });
 
   const moduleLinks: { key: AppEnvironment; label: string; to: string }[] = [
-    { key: "record", label: "Patient Record", to: withPatientQuery("/explorer", patientId) },
-    { key: "preop", label: "Pre-Op", to: withPatientQuery("/journey", patientId) },
+    { key: "record", label: "Patient Record", to: withPatientQuery("/record", patientId) },
+    { key: "preop", label: "Pre-Op", to: withPatientQuery("/preop", patientId) },
     { key: "trials", label: "Trials", to: withPatientQuery("/trials", patientId) },
     { key: "medication", label: "Medication Access", to: withPatientQuery("/medication-access", patientId) },
     { key: "analysis", label: "Data Lab", to: "/analysis" },
@@ -703,6 +706,8 @@ export function Layout({ children }: LayoutProps) {
     // Use navigate (like landing page cards) to ensure reliable routing
     const base =
       location.pathname.startsWith("/explorer") ||
+      location.pathname.startsWith("/record") ||
+      location.pathname.startsWith("/preop") ||
       location.pathname.startsWith("/journey") ||
       location.pathname.startsWith("/trials") ||
       location.pathname.startsWith("/medication-access")

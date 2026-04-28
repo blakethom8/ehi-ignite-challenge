@@ -1,0 +1,1034 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>EHI Ignite Clinical Intelligence Mood Board</title>
+  <style>
+    :root {
+      --ink: #151821;
+      --ink-2: #303645;
+      --muted: #657184;
+      --faint: #9aa3b2;
+      --line: #dfe4ec;
+      --line-2: #edf1f6;
+      --paper: #ffffff;
+      --wash: #f4f7fb;
+      --wash-blue: #f1f5ff;
+      --blue: #4968f5;
+      --blue-dark: #2740b8;
+      --teal: #0f766e;
+      --teal-wash: #e8f7f3;
+      --green: #168a4a;
+      --green-wash: #e9f8ef;
+      --amber: #b7791f;
+      --amber-wash: #fff5df;
+      --red: #b42318;
+      --red-wash: #fff0ee;
+      --purple: #5b4fd6;
+      --purple-wash: #f0efff;
+      --shadow-ring: 0 0 0 1px rgba(30, 41, 59, 0.09);
+      --shadow-soft: 0 18px 50px rgba(18, 27, 43, 0.08);
+      --radius: 10px;
+      --radius-lg: 16px;
+      --mono: "SFMono-Regular", "Roboto Mono", "Cascadia Code", monospace;
+      --sans: "Inter", "Noto Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --display: "Roobert PRO", "Inter", "Aptos Display", ui-sans-serif, system-ui, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background:
+        linear-gradient(180deg, rgba(244, 247, 251, 0.94), rgba(255, 255, 255, 0.98) 360px),
+        radial-gradient(circle at 15% 5%, rgba(73, 104, 245, 0.10), transparent 26%),
+        var(--wash);
+      color: var(--ink);
+      font-family: var(--sans);
+      line-height: 1.45;
+      letter-spacing: 0;
+    }
+
+    a { color: inherit; }
+
+    .page {
+      width: min(1440px, calc(100% - 48px));
+      margin: 0 auto;
+      padding: 32px 0 64px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      padding: 14px 0 28px;
+    }
+
+    .brandmark {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 260px;
+    }
+
+    .logo {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      background: var(--ink);
+      color: white;
+      display: grid;
+      place-items: center;
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .brand-title {
+      margin: 0;
+      font-family: var(--display);
+      font-size: 15px;
+      font-weight: 720;
+    }
+
+    .brand-subtitle {
+      margin: 1px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .top-pills {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border-radius: 999px;
+      padding: 6px 10px;
+      background: white;
+      color: var(--muted);
+      box-shadow: var(--shadow-ring);
+      font-size: 12px;
+      font-weight: 650;
+      white-space: nowrap;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 430px;
+      gap: 24px;
+      align-items: stretch;
+      margin-bottom: 24px;
+    }
+
+    .hero-panel,
+    .panel {
+      background: rgba(255, 255, 255, 0.92);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-ring), var(--shadow-soft);
+    }
+
+    .hero-panel {
+      padding: 34px;
+      min-height: 310px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      width: fit-content;
+      border-radius: 999px;
+      background: var(--wash-blue);
+      color: var(--blue);
+      padding: 6px 10px;
+      font-size: 11px;
+      font-weight: 760;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    h1, h2, h3, p { margin-top: 0; }
+
+    h1 {
+      max-width: 760px;
+      margin: 22px 0 18px;
+      font-family: var(--display);
+      font-size: clamp(36px, 5vw, 64px);
+      line-height: 0.98;
+      letter-spacing: 0;
+      font-weight: 780;
+    }
+
+    .hero-copy {
+      max-width: 760px;
+      color: var(--ink-2);
+      font-size: 18px;
+      line-height: 1.55;
+    }
+
+    .hero-principles {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 26px;
+    }
+
+    .principle {
+      border-radius: 12px;
+      background: #f8fafc;
+      box-shadow: var(--shadow-ring);
+      padding: 12px;
+      min-height: 82px;
+    }
+
+    .principle strong {
+      display: block;
+      font-size: 13px;
+      margin-bottom: 4px;
+    }
+
+    .principle span {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .hero-side {
+      padding: 18px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .mini-shell {
+      border-radius: 14px;
+      background: #f8fafc;
+      box-shadow: var(--shadow-ring);
+      overflow: hidden;
+    }
+
+    .mini-shell-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px;
+      border-bottom: 1px solid var(--line-2);
+      background: white;
+    }
+
+    .mini-nav {
+      display: flex;
+      gap: 6px;
+      padding: 8px;
+      border-radius: 10px;
+      background: #f4f6fa;
+    }
+
+    .mini-nav span {
+      border-radius: 8px;
+      padding: 5px 8px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .mini-nav .active {
+      color: var(--blue);
+      background: white;
+      box-shadow: var(--shadow-ring);
+    }
+
+    .mini-body {
+      display: grid;
+      grid-template-columns: 116px 1fr;
+      min-height: 188px;
+    }
+
+    .mini-side {
+      border-right: 1px solid var(--line-2);
+      background: white;
+      padding: 10px;
+    }
+
+    .mini-link {
+      display: grid;
+      grid-template-columns: 18px 1fr;
+      gap: 8px;
+      align-items: center;
+      border-radius: 8px;
+      padding: 8px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 650;
+    }
+
+    .mini-link.active {
+      background: var(--wash-blue);
+      color: var(--blue);
+    }
+
+    .mini-content {
+      padding: 14px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .dense-row {
+      display: grid;
+      grid-template-columns: 1fr 72px 72px;
+      align-items: center;
+      gap: 8px;
+      min-height: 28px;
+      border-bottom: 1px solid var(--line-2);
+      font-size: 11px;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--green);
+      display: inline-block;
+      margin-right: 6px;
+    }
+
+    .status-dot.red { background: var(--red); }
+    .status-dot.amber { background: var(--amber); }
+
+    .section-grid {
+      display: grid;
+      grid-template-columns: 280px minmax(0, 1fr);
+      gap: 24px;
+      margin-top: 24px;
+      align-items: start;
+    }
+
+    .section-label {
+      position: sticky;
+      top: 18px;
+      padding: 18px 0;
+    }
+
+    .section-label .kicker {
+      margin-bottom: 10px;
+      color: var(--blue);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+    }
+
+    .section-label h2 {
+      margin: 0 0 10px;
+      font-family: var(--display);
+      font-size: 28px;
+      line-height: 1.08;
+      letter-spacing: 0;
+    }
+
+    .section-label p {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.55;
+    }
+
+    .panel {
+      padding: 20px;
+      box-shadow: var(--shadow-ring);
+    }
+
+    .palette {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .swatch {
+      min-height: 146px;
+      border-radius: 14px;
+      overflow: hidden;
+      background: white;
+      box-shadow: var(--shadow-ring);
+    }
+
+    .swatch-color { height: 76px; }
+
+    .swatch-meta {
+      padding: 11px;
+    }
+
+    .swatch-meta strong {
+      display: block;
+      font-size: 12px;
+      margin-bottom: 3px;
+    }
+
+    .swatch-meta code {
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 11px;
+    }
+
+    .module-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .module-card {
+      border-radius: 14px;
+      background: white;
+      box-shadow: var(--shadow-ring);
+      padding: 16px;
+      border-top: 4px solid var(--blue);
+      min-height: 178px;
+    }
+
+    .module-card.record { border-color: var(--blue); }
+    .module-card.preop { border-color: var(--red); }
+    .module-card.trials { border-color: var(--purple); }
+    .module-card.access { border-color: var(--green); }
+
+    .module-card h3 {
+      margin: 12px 0 6px;
+      font-size: 15px;
+    }
+
+    .module-card p {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+      margin-bottom: 12px;
+    }
+
+    .module-chip {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 5px 8px;
+      background: #f8fafc;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 720;
+    }
+
+    .icon-box {
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      display: grid;
+      place-items: center;
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 800;
+      background: var(--wash-blue);
+      color: var(--blue);
+    }
+
+    .icon-box.red { background: var(--red-wash); color: var(--red); }
+    .icon-box.green { background: var(--green-wash); color: var(--green); }
+    .icon-box.purple { background: var(--purple-wash); color: var(--purple); }
+
+    .type-grid {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 16px;
+    }
+
+    .type-sample {
+      border-radius: 14px;
+      background: white;
+      box-shadow: var(--shadow-ring);
+      padding: 18px;
+    }
+
+    .display-sample {
+      font-family: var(--display);
+      font-size: clamp(34px, 4vw, 52px);
+      line-height: 1.02;
+      letter-spacing: 0;
+      font-weight: 780;
+    }
+
+    .body-sample {
+      color: var(--ink-2);
+      font-size: 15px;
+      line-height: 1.65;
+    }
+
+    .micro-sample {
+      color: var(--blue);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+    }
+
+    .component-board {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 16px;
+    }
+
+    .clinical-wire {
+      background: #f8fafc;
+      border-radius: 16px;
+      box-shadow: var(--shadow-ring);
+      overflow: hidden;
+    }
+
+    .wire-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px;
+      background: white;
+      border-bottom: 1px solid var(--line-2);
+    }
+
+    .wire-title {
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .wire-subtitle {
+      color: var(--muted);
+      font-size: 11px;
+      margin-top: 2px;
+    }
+
+    .wire-body {
+      padding: 14px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .risk-banner {
+      border-radius: 12px;
+      background: var(--red-wash);
+      color: var(--red);
+      border: 1px solid rgba(180, 35, 24, 0.22);
+      padding: 12px;
+      display: grid;
+      grid-template-columns: 34px 1fr auto;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .risk-banner strong {
+      font-size: 13px;
+    }
+
+    .risk-banner span {
+      color: #7a271a;
+      font-size: 11px;
+    }
+
+    .btn {
+      border: 0;
+      border-radius: 8px;
+      padding: 8px 10px;
+      background: var(--blue);
+      color: white;
+      font-size: 12px;
+      font-weight: 760;
+    }
+
+    .table-card {
+      border-radius: 12px;
+      background: white;
+      box-shadow: var(--shadow-ring);
+      overflow: hidden;
+    }
+
+    .table-row {
+      display: grid;
+      grid-template-columns: 1.2fr 0.7fr 0.7fr 0.5fr;
+      gap: 10px;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line-2);
+      font-size: 12px;
+      align-items: center;
+    }
+
+    .table-row.header {
+      color: var(--faint);
+      font-size: 10px;
+      font-weight: 820;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      background: #fbfcfe;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      width: fit-content;
+      border-radius: 999px;
+      padding: 4px 8px;
+      font-size: 11px;
+      font-weight: 760;
+      background: var(--wash-blue);
+      color: var(--blue);
+      white-space: nowrap;
+    }
+
+    .tag.red { background: var(--red-wash); color: var(--red); }
+    .tag.amber { background: var(--amber-wash); color: var(--amber); }
+    .tag.green { background: var(--green-wash); color: var(--green); }
+
+    .agent-panel {
+      border-radius: 16px;
+      background: #101827;
+      color: #e5edf8;
+      padding: 16px;
+      min-height: 100%;
+    }
+
+    .agent-panel h3 {
+      color: white;
+      font-size: 16px;
+      margin-bottom: 6px;
+    }
+
+    .agent-panel p {
+      color: #aebbd0;
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .prompt-chip {
+      border-radius: 10px;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.10);
+      padding: 10px;
+      color: #d9e5f5;
+      font-size: 12px;
+      margin-top: 10px;
+    }
+
+    .density-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .density-card {
+      border-radius: 14px;
+      background: white;
+      box-shadow: var(--shadow-ring);
+      padding: 14px;
+    }
+
+    .density-card h3 {
+      margin-bottom: 6px;
+      font-size: 14px;
+    }
+
+    .density-card p {
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 12px;
+    }
+
+    .metric-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--line-2);
+      font-size: 12px;
+    }
+
+    .metric-row:last-child { border-bottom: 0; }
+    .metric-row span { color: var(--muted); }
+    .metric-row strong { color: var(--ink); }
+
+    .rules {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .rule-list {
+      border-radius: 14px;
+      background: white;
+      box-shadow: var(--shadow-ring);
+      padding: 16px;
+    }
+
+    .rule-list h3 {
+      font-size: 15px;
+      margin-bottom: 10px;
+    }
+
+    .rule-list ul {
+      margin: 0;
+      padding-left: 18px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.7;
+    }
+
+    .footer {
+      margin-top: 36px;
+      padding: 22px;
+      border-radius: 16px;
+      background: var(--ink);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+    }
+
+    .footer p {
+      color: #c9d3e3;
+      margin: 0;
+      font-size: 13px;
+    }
+
+    @media (max-width: 1100px) {
+      .hero,
+      .section-grid,
+      .component-board,
+      .type-grid {
+        grid-template-columns: 1fr;
+      }
+      .section-label {
+        position: static;
+        padding-bottom: 0;
+      }
+      .palette,
+      .module-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .hero-principles,
+      .density-grid,
+      .rules {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    @media (max-width: 720px) {
+      .page {
+        width: min(100% - 24px, 1440px);
+        padding-top: 18px;
+      }
+      .topbar,
+      .footer {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+      .hero-panel {
+        padding: 22px;
+      }
+      .hero-principles,
+      .palette,
+      .module-grid,
+      .density-grid,
+      .rules {
+        grid-template-columns: 1fr;
+      }
+      .mini-body {
+        grid-template-columns: 1fr;
+      }
+      .mini-side {
+        border-right: 0;
+        border-bottom: 1px solid var(--line-2);
+      }
+      .table-row {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="topbar">
+      <div class="brandmark">
+        <div class="logo">EHI</div>
+        <div>
+          <p class="brand-title">Clinical Intelligence Mood Board</p>
+          <p class="brand-subtitle">Dense, legible, professional FHIR-powered healthcare tooling</p>
+        </div>
+      </div>
+      <div class="top-pills">
+        <span class="pill">Business-grade</span>
+        <span class="pill">Evidence-backed</span>
+        <span class="pill">High-density</span>
+        <span class="pill">Clinician-first</span>
+      </div>
+    </header>
+
+    <section class="hero">
+      <div class="hero-panel">
+        <div>
+          <span class="eyebrow">Design North Star</span>
+          <h1>The right five facts in thirty seconds.</h1>
+          <p class="hero-copy">
+            The product should feel like a specialist briefing room: calm, precise, compact, and evidence-backed.
+            It should avoid generic SaaS dashboards and instead prioritize scan speed, hierarchy, trust, and business polish.
+          </p>
+        </div>
+        <div class="hero-principles">
+          <div class="principle"><strong>Dense</strong><span>Fit more chart signal without crowding or tiny text.</span></div>
+          <div class="principle"><strong>Legible</strong><span>Strong spacing, clear sections, readable clinical facts.</span></div>
+          <div class="principle"><strong>Trustworthy</strong><span>Evidence, sources, dates, and method labels visible.</span></div>
+          <div class="principle"><strong>Professional</strong><span>Quiet confidence, restrained color, no generic flash.</span></div>
+        </div>
+      </div>
+
+      <aside class="hero-panel hero-side">
+        <div class="mini-shell">
+          <div class="mini-shell-header">
+            <div>
+              <div class="wire-title">Patient Record Workspace</div>
+              <div class="wire-subtitle">Synthetic data · Synthea R4</div>
+            </div>
+            <div class="mini-nav">
+              <span class="active">Record</span><span>Pre-Op</span><span>Trials</span><span>Access</span>
+            </div>
+          </div>
+          <div class="mini-body">
+            <div class="mini-side">
+              <div class="mini-link active"><span>DB</span><span>Summary</span></div>
+              <div class="mini-link"><span>TL</span><span>History</span></div>
+              <div class="mini-link"><span>AI</span><span>Agent</span></div>
+            </div>
+            <div class="mini-content">
+              <div class="dense-row"><strong>Active meds</strong><span>8</span><span><i class="status-dot amber"></i>Review</span></div>
+              <div class="dense-row"><strong>Conditions</strong><span>12</span><span><i class="status-dot red"></i>2 high</span></div>
+              <div class="dense-row"><strong>Recent labs</strong><span>4</span><span><i class="status-dot"></i>Current</span></div>
+              <div class="dense-row"><strong>Encounters</strong><span>46</span><span>2019</span></div>
+              <div class="dense-row"><strong>Sources</strong><span>FHIR R4</span><span>527k</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="risk-banner">
+          <div class="icon-box red">!</div>
+          <div><strong>Clinical review required</strong><br><span>Medication hold, cardiac history, and lab recency require review.</span></div>
+          <button class="btn">Open</button>
+        </div>
+      </aside>
+    </section>
+
+    <section class="section-grid">
+      <div class="section-label">
+        <div class="kicker">01 Color System</div>
+        <h2>Clinical color with restraint.</h2>
+        <p>Use color to carry meaning, not decoration. Keep the base neutral and reserve saturated colors for actions, module identity, and clinical status.</p>
+      </div>
+      <div class="panel">
+        <div class="palette">
+          <div class="swatch"><div class="swatch-color" style="background:#151821"></div><div class="swatch-meta"><strong>Ink</strong><code>#151821</code></div></div>
+          <div class="swatch"><div class="swatch-color" style="background:#4968f5"></div><div class="swatch-meta"><strong>Action Blue</strong><code>#4968f5</code></div></div>
+          <div class="swatch"><div class="swatch-color" style="background:#0f766e"></div><div class="swatch-meta"><strong>Data Teal</strong><code>#0f766e</code></div></div>
+          <div class="swatch"><div class="swatch-color" style="background:#168a4a"></div><div class="swatch-meta"><strong>Access Green</strong><code>#168a4a</code></div></div>
+          <div class="swatch"><div class="swatch-color" style="background:#b7791f"></div><div class="swatch-meta"><strong>Warning Amber</strong><code>#b7791f</code></div></div>
+          <div class="swatch"><div class="swatch-color" style="background:#b42318"></div><div class="swatch-meta"><strong>Clinical Red</strong><code>#b42318</code></div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section-grid">
+      <div class="section-label">
+        <div class="kicker">02 Module Identity</div>
+        <h2>One platform, distinct workflows.</h2>
+        <p>Each module should have a distinct accent and agent posture while retaining the same professional shell and record context.</p>
+      </div>
+      <div class="module-grid">
+        <article class="module-card record">
+          <div class="icon-box">DB</div>
+          <h3>Patient Record</h3>
+          <p>Neutral longitudinal source of truth. Lowest interpretive posture; highest citation density.</p>
+          <span class="module-chip">Blue · neutral record agent</span>
+        </article>
+        <article class="module-card preop">
+          <div class="icon-box red">OR</div>
+          <h3>Pre-Op Support</h3>
+          <p>Surgical briefing, holds, clearance, anesthesia handoff, and risk evidence.</p>
+          <span class="module-chip">Red/amber · action agent</span>
+        </article>
+        <article class="module-card trials">
+          <div class="icon-box purple">TR</div>
+          <h3>Clinical Trials</h3>
+          <p>Eligibility-oriented research, web search, criteria parsing, and candidate ranking.</p>
+          <span class="module-chip">Indigo · research agent</span>
+        </article>
+        <article class="module-card access">
+          <div class="icon-box green">$</div>
+          <h3>Medication Access</h3>
+          <p>Drug normalization, price comparison, support programs, and affordability planning.</p>
+          <span class="module-chip">Green · access agent</span>
+        </article>
+      </div>
+    </section>
+
+    <section class="section-grid">
+      <div class="section-label">
+        <div class="kicker">03 Type And Density</div>
+        <h2>Compact without becoming cramped.</h2>
+        <p>Use expressive display type only for module overviews. Clinical workspaces should use smaller, tighter headings and table-like rhythm.</p>
+      </div>
+      <div class="type-grid">
+        <div class="type-sample">
+          <div class="micro-sample">Module Overview</div>
+          <div class="display-sample">Clinical intelligence for surgical review.</div>
+          <p class="body-sample">Large type is reserved for module-purpose pages, not every patient-specific panel.</p>
+        </div>
+        <div class="type-sample">
+          <div class="micro-sample">Patient Summary</div>
+          <h3 style="font-size:22px;margin:8px 0 10px">Louis204 Wiza601</h3>
+          <div class="metric-row"><span>Age / sex</span><strong>89 / Male</strong></div>
+          <div class="metric-row"><span>Record span</span><strong>81.5 years</strong></div>
+          <div class="metric-row"><span>Active meds</span><strong>8</strong></div>
+          <div class="metric-row"><span>Conditions</span><strong>12 active</strong></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section-grid">
+      <div class="section-label">
+        <div class="kicker">04 Clinical Components</div>
+        <h2>Make the product feel operational.</h2>
+        <p>Panels should feel like they are built for repeated use under time pressure: evidence cards, source rows, status banners, and dense tables.</p>
+      </div>
+      <div class="component-board">
+        <div class="clinical-wire">
+          <div class="wire-header">
+            <div>
+              <div class="wire-title">Patient Briefing</div>
+              <div class="wire-subtitle">Pre-op disposition · generated from FHIR evidence</div>
+            </div>
+            <span class="tag red">Hold review</span>
+          </div>
+          <div class="wire-body">
+            <div class="risk-banner">
+              <div class="icon-box red">RX</div>
+              <div><strong>Medication hold plan required</strong><br><span>Active anticoagulant class and cardiac history require pre-op review.</span></div>
+              <button class="btn">Evidence</button>
+            </div>
+            <div class="table-card">
+              <div class="table-row header"><span>Signal</span><span>Status</span><span>Evidence</span><span>Date</span></div>
+              <div class="table-row"><span>Warfarin sodium</span><span><span class="tag red">Critical</span></span><span>MedicationRequest</span><span>2019</span></div>
+              <div class="table-row"><span>Chronic ischemic heart disease</span><span><span class="tag amber">Review</span></span><span>Condition</span><span>2016</span></div>
+              <div class="table-row"><span>Hemoglobin</span><span><span class="tag green">Current</span></span><span>Observation</span><span>2018</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="agent-panel">
+          <h3>Agent Panel Direction</h3>
+          <p>Each module should have a dedicated agent with scoped tools, prompt, and citations. The UI should make the agent role obvious.</p>
+          <div class="prompt-chip">Patient Record Agent: answer neutral chart questions with source citations.</div>
+          <div class="prompt-chip">Pre-Op Agent: reason about holds, anesthesia handoff, and clearance gaps.</div>
+          <div class="prompt-chip">Trials Agent: search registries, parse criteria, rank candidate studies.</div>
+          <div class="prompt-chip">Access Agent: find pricing, support programs, and eligibility requirements.</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section-grid">
+      <div class="section-label">
+        <div class="kicker">05 Information Packing</div>
+        <h2>Max facts, minimum noise.</h2>
+        <p>The product should feel more like a clinical cockpit than a marketing page. Use rails, compact tables, and hierarchy to preserve legibility.</p>
+      </div>
+      <div class="density-grid">
+        <div class="density-card">
+          <h3>Fact Rail</h3>
+          <p>Five to seven essential facts. No decorative numbers.</p>
+          <div class="metric-row"><span>Age / sex</span><strong>89 / M</strong></div>
+          <div class="metric-row"><span>Active meds</span><strong>8</strong></div>
+          <div class="metric-row"><span>Recent labs</span><strong>4 current</strong></div>
+          <div class="metric-row"><span>Encounters</span><strong>46</strong></div>
+        </div>
+        <div class="density-card">
+          <h3>Evidence List</h3>
+          <p>Small rows, strong labels, date/source visible.</p>
+          <div class="metric-row"><span>Condition</span><strong>Cardiac</strong></div>
+          <div class="metric-row"><span>Medication</span><strong>Anticoagulant</strong></div>
+          <div class="metric-row"><span>Observation</span><strong>Hb 17.0</strong></div>
+          <div class="metric-row"><span>Source</span><strong>FHIR R4</strong></div>
+        </div>
+        <div class="density-card">
+          <h3>Timeline Strip</h3>
+          <p>Show gaps, peaks, and recent event mix.</p>
+          <div style="display:grid;grid-template-columns:repeat(22,1fr);gap:2px;align-items:end;height:70px;margin-top:12px">
+            <span style="height:4px;background:#dfe4ec;border-radius:2px"></span>
+            <span style="height:8px;background:#dfe4ec;border-radius:2px"></span>
+            <span style="height:28px;background:#4968f5;border-radius:2px"></span>
+            <span style="height:4px;background:#dfe4ec;border-radius:2px"></span>
+            <span style="height:4px;background:#dfe4ec;border-radius:2px"></span>
+            <span style="height:42px;background:#4968f5;border-radius:2px"></span>
+            <span style="height:4px;background:#dfe4ec;border-radius:2px"></span>
+            <span style="height:8px;background:#dfe4ec;border-radius:2px"></span>
+            <span style="height:64px;background:#4968f5;border-radius:2px"></span>
+            <span style="height:20px;background:#4968f5;border-radius:2px"></span>
+            <span style="height:4px;background:#dfe4ec;border-radius:2px"></span>
+            <span style="height:4px;background:#dfe4ec;border-radius:2px"></span>
+            <span style="height:12px;background:#dfe4ec;border-radius:2px"></span>
+            <span style="height:30px;background:#4968f5;border-radius:2px"></span>
+            <span style="height:4px;background:#dfe4ec;border-radius:2px"></span>
+            <span style="height:4px;background:#dfe4ec;border-radius:2px"></span>
+            <span style="height:18px;background:#4968f5;border-radius:2px"></span>
+            <span style="height:46px;background:#4968f5;border-radius:2px"></span>
+            <span style="height:4px;background:#dfe4ec;border-radius:2px"></span>
+            <span style="height:8px;background:#dfe4ec;border-radius:2px"></span>
+            <span style="height:22px;background:#4968f5;border-radius:2px"></span>
+            <span style="height:38px;background:#4968f5;border-radius:2px"></span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section-grid">
+      <div class="section-label">
+        <div class="kicker">06 Rules</div>
+        <h2>Guardrails for the redesign pass.</h2>
+        <p>These are implementation rules to keep the UI from drifting back into generic cards and gray dashboards.</p>
+      </div>
+      <div class="rules">
+        <div class="rule-list">
+          <h3>Do</h3>
+          <ul>
+            <li>Use module overview pages for orientation and patient pages for data.</li>
+            <li>Keep patient-specific pages compact, row-based, and evidence-forward.</li>
+            <li>Show source type, date, and confidence when making assertions.</li>
+            <li>Use color only for status, module identity, and actions.</li>
+            <li>Prefer structured panels over repeated generic cards.</li>
+          </ul>
+        </div>
+        <div class="rule-list">
+          <h3>Avoid</h3>
+          <ul>
+            <li>Oversized decorative cards inside clinical workspaces.</li>
+            <li>Gray-on-gray dashboards with no clinical hierarchy.</li>
+            <li>Marketing-style hero sections on operational pages.</li>
+            <li>Mixing module instructions and patient findings on one page.</li>
+            <li>Using the same agent UI without clarifying the module role.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <div>
+        <strong>Design direction summary</strong>
+        <p>Professional clinical intelligence: compact, trusted, evidence-backed, and built for high-speed specialist review.</p>
+      </div>
+      <span class="pill">Next: apply to shell, sidebars, patient summary, and module overview pages</span>
+    </footer>
+  </div>
+</body>
+</html>

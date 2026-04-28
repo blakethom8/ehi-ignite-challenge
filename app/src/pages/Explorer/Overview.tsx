@@ -635,6 +635,9 @@ function CareActivityStrip({ timeline }: { timeline: TimelineResponse | undefine
   const maxCount = Math.max(...fullYearEntries.map((entry) => entry.count), 1);
   const gapYears = fullYearEntries.filter((entry) => entry.count === 0).length;
   const peakYear = fullYearEntries.reduce((best, entry) => (entry.count > best.count ? entry : best), fullYearEntries[0]);
+  const activeYearSummary = yearsWithCounts
+    .map((entry) => `${entry.year} (${entry.count})`)
+    .join(", ");
   const recentEncounters = [...timeline.encounters]
     .filter((encounter) => encounter.start)
     .sort((a, b) => (b.start || "").localeCompare(a.start || ""))
@@ -654,7 +657,7 @@ function CareActivityStrip({ timeline }: { timeline: TimelineResponse | undefine
         <div>
           <p className="text-sm font-semibold text-[#1c1c1e]">Care activity</p>
           <p className="mt-1 text-xs text-[#6b7280]">
-            Full-year encounter volume from {firstYear} to {lastYear}; zero-height marks show gaps in care.
+            Compact full-range view from {firstYear} to {lastYear}; gray ticks show years without encounters.
           </p>
         </div>
         <Link
@@ -681,28 +684,33 @@ function CareActivityStrip({ timeline }: { timeline: TimelineResponse | undefine
           )}
         </div>
 
-        <div className="flex items-end gap-1 overflow-x-auto pb-1">
+        <div
+          className="grid items-end gap-px"
+          style={{ gridTemplateColumns: `repeat(${fullYearEntries.length}, minmax(0, 1fr))` }}
+        >
           {fullYearEntries.map((entry) => {
             const hasActivity = entry.count > 0;
             const height = hasActivity ? 10 + (entry.count / maxCount) * 54 : 4;
-            const shouldLabel =
-              hasActivity ||
-              entry.year === firstYear ||
-              entry.year === lastYear ||
-              entry.year % 10 === 0;
             return (
-              <div key={entry.year} className="flex min-w-[42px] flex-col items-center gap-1">
+              <div key={entry.year} className="flex min-w-0 flex-col items-center gap-1">
                 <div
-                  className={`w-5 rounded-t-md ${hasActivity ? "bg-[#5b76fe]" : "bg-[#d9dce5]"}`}
+                  className={`w-full max-w-[12px] rounded-t-sm ${hasActivity ? "bg-[#5b76fe]" : "bg-[#d9dce5]"}`}
                   style={{ height }}
                   title={`${entry.year}: ${entry.count} encounter${entry.count !== 1 ? "s" : ""}`}
                 />
-                <span className={`text-[10px] ${shouldLabel ? "text-[#555a6a]" : "text-transparent"}`}>
-                  {shouldLabel ? entry.year : "0000"}
-                </span>
               </div>
             );
           })}
+        </div>
+
+        <div className="mt-2 flex justify-between text-[10px] text-[#6b7280]">
+          <span>{firstYear}</span>
+          <span>{Math.floor((firstYear + lastYear) / 2)}</span>
+          <span>{lastYear}</span>
+        </div>
+
+        <div className="mt-3 rounded-lg bg-white px-3 py-2 text-[11px] leading-5 text-[#6b7280]">
+          <span className="font-semibold text-[#555a6a]">Active years:</span> {activeYearSummary}
         </div>
       </div>
 

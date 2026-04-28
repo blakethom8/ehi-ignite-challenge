@@ -300,6 +300,12 @@ function ChangeArrow({ dir }: { dir: "up" | "down" | "stable" }) {
   return <span className="text-[#9ca3af]">→</span>;
 }
 
+function dateSortValue(value: string | null): number {
+  if (!value) return Number.NEGATIVE_INFINITY;
+  const timestamp = new Date(value).getTime();
+  return Number.isNaN(timestamp) ? Number.NEGATIVE_INFINITY : timestamp;
+}
+
 function LabHistoryTimeline({ keyLabs }: { keyLabs: KeyLabsResponse }) {
   const [openMonth, setOpenMonth] = useState<string | null>(null);
 
@@ -858,6 +864,12 @@ function OverviewContent({
   patientId: string;
 }) {
   const tierLabel = overview.complexity_tier.replace("_", " ");
+  const sortedConditions = [...overview.conditions].sort(
+    (a, b) => dateSortValue(b.onset_dt) - dateSortValue(a.onset_dt)
+  );
+  const sortedMedications = [...overview.medications].sort(
+    (a, b) => dateSortValue(b.authored_on) - dateSortValue(a.authored_on)
+  );
 
   const { prefs, toggle } = useSectionPrefs({
     demographics: true,
@@ -979,7 +991,7 @@ function OverviewContent({
           badge={`${overview.active_condition_count} active · ${overview.resolved_condition_count} resolved`}
         >
           <div className="px-5 py-4">
-            {overview.conditions.length === 0 ? (
+            {sortedConditions.length === 0 ? (
               <p className="text-sm text-[#a5a8b5]">No conditions recorded.</p>
             ) : (
               <div className="overflow-auto max-h-80">
@@ -992,7 +1004,7 @@ function OverviewContent({
                     </tr>
                   </thead>
                   <tbody>
-                    {overview.conditions.map((c) => (
+                    {sortedConditions.map((c) => (
                       <tr key={c.condition_id} className="border-b border-[#f5f6f8] hover:bg-[#f9fafb]">
                         <td className="py-1.5 pr-3">
                           <span
@@ -1024,7 +1036,7 @@ function OverviewContent({
           badge={`${overview.active_med_count} active · ${overview.total_med_count} total`}
         >
           <div className="px-5 py-4">
-            {overview.medications.length === 0 ? (
+            {sortedMedications.length === 0 ? (
               <p className="text-sm text-[#a5a8b5]">No medications recorded.</p>
             ) : (
               <div className="overflow-auto max-h-80">
@@ -1037,7 +1049,7 @@ function OverviewContent({
                     </tr>
                   </thead>
                   <tbody>
-                    {overview.medications.map((m) => (
+                    {sortedMedications.map((m) => (
                       <tr key={m.med_id} className="border-b border-[#f5f6f8] hover:bg-[#f9fafb]">
                         <td className="py-1.5 pr-3">
                           <span

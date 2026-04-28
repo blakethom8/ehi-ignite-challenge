@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, ClipboardCheck, FileText, Search, Share2, Target, UserRound } from "lucide-react";
+import { ArrowRight, ClipboardCheck, FileText, MessageSquareText, Search, Share2, Target, UserRound } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { api } from "../../api/client";
 import { EmptyState } from "../../components/EmptyState";
@@ -131,6 +131,24 @@ export function ClinicalTrials() {
       <div className="grid gap-4 lg:grid-cols-3">
         <TrialWorkflowCard
           icon={Search}
+          label="How to read this module"
+          body="Start with the patient traits and high-signal conditions, then use them as constraints for focused trial discovery."
+        />
+        <TrialWorkflowCard
+          icon={ClipboardCheck}
+          label="Eligibility interpretation"
+          body="Treat matches as a screened research brief: inclusion terms to verify, exclusions to rule out, and evidence that supports follow-up."
+        />
+        <TrialWorkflowCard
+          icon={MessageSquareText}
+          label="Future trials agent"
+          body="This module should use a dedicated agent harness for registry search, criteria parsing, trial ranking, and source-linked rationale."
+        />
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-3">
+        <TrialWorkflowCard
+          icon={Search}
           label="Search strategy"
           body="Use diagnosis, age, geography, and timeline context to generate targeted trial queries instead of broad keyword searches."
         />
@@ -154,10 +172,10 @@ export function ClinicalTrials() {
               <p className="mt-1 text-sm text-[#667085]">Condition context that should shape the first-pass trial search.</p>
             </div>
             <Link
-              to={`/explorer/conditions?patient=${patientId}`}
+              to={`/explorer?patient=${patientId}`}
               className="inline-flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-semibold text-[#5b76fe] hover:bg-[#eef1ff]"
             >
-              Conditions
+              Patient record
               <ArrowRight size={14} />
             </Link>
           </div>

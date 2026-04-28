@@ -57,13 +57,13 @@ const CLINICAL_NAV_GROUPS: NavGroup[] = [
   {
     label: "Pre-Op Support",
     items: [
-      { to: "/journey", label: "Briefing", icon: Activity, description: "30-second surgical brief" },
+      { to: "/journey", label: "Overview", icon: Activity, description: "Module guide and surgical brief" },
       { to: "/explorer/clearance", label: "Clearance", icon: ClipboardCheck, description: "Pre-op readiness check" },
       { to: "/explorer/safety", label: "Medication Holds", icon: ShieldAlert, description: "Pre-op risk flags" },
       { to: "/explorer/conditions", label: "Conditions", icon: Activity, description: "Surgical risk ranking" },
       { to: "/explorer/anesthesia", label: "Anesthesia", icon: Stethoscope, description: "Anesthesia handoff card" },
       { to: "/explorer/interactions", label: "Interactions", icon: Zap, description: "Drug-drug interactions" },
-      { to: "/explorer/assistant", label: "Evidence", icon: MessageSquareText, description: "AI chart Q&A" },
+      { to: "/explorer/assistant", label: "AI Chart", icon: MessageSquareText, description: "Pre-op chart Q&A" },
     ],
   },
 ];
@@ -86,7 +86,7 @@ const TRIALS_NAV_GROUPS: NavGroup[] = [
   {
     label: "Clinical Trials",
     items: [
-      { to: "/trials", label: "Trial Match", icon: Search, description: "Eligibility research brief" },
+      { to: "/trials", label: "Overview", icon: Search, description: "Trial matching guide" },
     ],
   },
 ];
@@ -95,7 +95,7 @@ const MEDICATION_ACCESS_NAV_GROUPS: NavGroup[] = [
   {
     label: "Medication Access",
     items: [
-      { to: "/medication-access", label: "Cost Brief", icon: Pill, description: "Affordability workflow" },
+      { to: "/medication-access", label: "Overview", icon: Pill, description: "Affordability guide" },
     ],
   },
 ];

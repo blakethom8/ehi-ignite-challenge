@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, DollarSign, HeartHandshake, Pill, Search, Store, UserRound } from "lucide-react";
+import { ArrowRight, DollarSign, HeartHandshake, MessageSquareText, Pill, Search, Store, UserRound } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { api } from "../../api/client";
 import { EmptyState } from "../../components/EmptyState";
@@ -128,6 +128,24 @@ export function MedicationAccess() {
       <div className="grid gap-4 lg:grid-cols-3">
         <AccessCard
           icon={DollarSign}
+          label="How to read this module"
+          body="Start with active therapies, then separate clinical medication context from affordability research and support options."
+        />
+        <AccessCard
+          icon={HeartHandshake}
+          label="Decision guidance"
+          body="Use the output as an access plan: price paths, assistance requirements, likely friction, and items needing clinician or pharmacy verification."
+        />
+        <AccessCard
+          icon={MessageSquareText}
+          label="Future access agent"
+          body="This module should use a dedicated agent harness for drug normalization, price/source search, assistance programs, and cited recommendations."
+        />
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-3">
+        <AccessCard
+          icon={DollarSign}
           label="Price comparison"
           body="Compare retail, discount, mail-order, and membership pharmacy prices for active medications."
         />
@@ -151,10 +169,10 @@ export function MedicationAccess() {
               <p className="mt-1 text-sm text-[#667085]">The affordability workflow begins with current therapies from the FHIR record.</p>
             </div>
             <Link
-              to={`/explorer/safety?patient=${patientId}`}
+              to={`/explorer?patient=${patientId}`}
               className="inline-flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-semibold text-[#5b76fe] hover:bg-[#eef1ff]"
             >
-              Med holds
+              Patient record
               <ArrowRight size={14} />
             </Link>
           </div>

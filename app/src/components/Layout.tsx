@@ -3,8 +3,6 @@ import { Link, NavLink, useLocation, useNavigate, useSearchParams } from "react-
 import { useQuery } from "@tanstack/react-query";
 import {
   Activity,
-  BarChart2,
-  BarChart3,
   BookMarked,
   CalendarDays,
   ChevronDown,
@@ -18,6 +16,7 @@ import {
   Heart,
   Layers3,
   MessageSquareText,
+  Pill,
   Search,
   ShieldAlert,
   SlidersHorizontal,
@@ -39,7 +38,7 @@ interface LayoutProps {
 }
 
 type FilterMode = "all" | "high_risk" | "needs_review";
-type AppEnvironment = "clinical" | "analysis";
+type AppEnvironment = "record" | "preop" | "trials" | "medication" | "analysis";
 
 interface NavItem {
   to: string;
@@ -56,37 +55,49 @@ interface NavGroup {
 
 const CLINICAL_NAV_GROUPS: NavGroup[] = [
   {
-    label: "Pre-op Essentials",
+    label: "Pre-Op Support",
     items: [
-      { to: "/explorer", label: "Overview", icon: Database, description: "Patient summary" },
-      { to: "/explorer/safety", label: "Safety", icon: ShieldAlert, description: "Pre-op risk flags" },
+      { to: "/preop", label: "Overview", icon: Activity, description: "Module guide" },
+      { to: "/journey", label: "Patient Briefing", icon: ClipboardCheck, description: "Surgical disposition" },
       { to: "/explorer/clearance", label: "Clearance", icon: ClipboardCheck, description: "Pre-op readiness check" },
+      { to: "/explorer/safety", label: "Medication Holds", icon: ShieldAlert, description: "Pre-op risk flags" },
       { to: "/explorer/conditions", label: "Conditions", icon: Activity, description: "Surgical risk ranking" },
       { to: "/explorer/anesthesia", label: "Anesthesia", icon: Stethoscope, description: "Anesthesia handoff card" },
       { to: "/explorer/interactions", label: "Interactions", icon: Zap, description: "Drug-drug interactions" },
+      { to: "/explorer/assistant", label: "AI Chart", icon: MessageSquareText, description: "Pre-op chart Q&A" },
     ],
   },
+];
+
+const PATIENT_RECORD_NAV_ITEMS: NavItem[] = [
+  { to: "/record", label: "Overview", icon: Database, description: "Module guide" },
+  { to: "/explorer", label: "Patient Summary", icon: UserRound, description: "Clinical summary" },
+  { to: "/explorer/history", label: "History", icon: CalendarDays, description: "Tables and timelines" },
+  { to: "/explorer/care-journey", label: "Care Journey", icon: Heart, description: "Visual care timeline" },
+  { to: "/explorer/patient-data", label: "FHIR Data", icon: FileJson2, description: "Patient bundle metrics" },
+];
+
+const PATIENT_RECORD_NAV_GROUPS: NavGroup[] = [
   {
-    label: "Longitudinal",
+    label: "Patient Record",
+    items: PATIENT_RECORD_NAV_ITEMS,
+  },
+];
+
+const TRIALS_NAV_GROUPS: NavGroup[] = [
+  {
+    label: "Clinical Trials",
     items: [
-      { to: "/explorer/history", label: "History", icon: CalendarDays, description: "Tables and timelines" },
-      { to: "/explorer/care-journey", label: "Care Journey", icon: Heart, description: "Visual care timeline" },
+      { to: "/trials", label: "Overview", icon: Search, description: "Trial matching guide" },
     ],
   },
+];
+
+const MEDICATION_ACCESS_NAV_GROUPS: NavGroup[] = [
   {
-    label: "Context & Data",
+    label: "Medication Access",
     items: [
-      { to: "/explorer/assistant", label: "Assistant", icon: MessageSquareText, description: "AI chart Q&A" },
-      { to: "/explorer/patient-data", label: "FHIR Data", icon: FileJson2, description: "Patient bundle metrics" },
-      { to: "/explorer/corpus", label: "Corpus", icon: BarChart3, description: "Population statistics" },
-      { to: "/explorer/distributions", label: "Distributions", icon: BarChart2, description: "Lab value distributions" },
-    ],
-  },
-  {
-    label: "Advanced",
-    advanced: true,
-    items: [
-      { to: "/journey", label: "Patient Journey", icon: Activity, description: "Clinical briefing" },
+      { to: "/medication-access", label: "Overview", icon: Pill, description: "Affordability guide" },
     ],
   },
 ];
@@ -128,6 +139,74 @@ const ANALYSIS_NAV_LINKS: NavItem[] = [
 function withPatientQuery(path: string, patientId: string | null): string {
   if (!patientId) return path;
   return `${path}?patient=${patientId}`;
+}
+
+function getEnvironment(pathname: string): AppEnvironment {
+  if (pathname.startsWith("/analysis")) return "analysis";
+  if (pathname.startsWith("/trials")) return "trials";
+  if (pathname.startsWith("/medication-access")) return "medication";
+  if (
+    pathname.startsWith("/preop") ||
+    pathname === "/journey" ||
+    pathname.startsWith("/explorer/safety") ||
+    pathname.startsWith("/explorer/clearance") ||
+    pathname.startsWith("/explorer/conditions") ||
+    pathname.startsWith("/explorer/anesthesia") ||
+    pathname.startsWith("/explorer/interactions") ||
+    pathname.startsWith("/explorer/assistant")
+  ) {
+    return "preop";
+  }
+  if (pathname.startsWith("/record") || pathname.startsWith("/explorer")) return "record";
+  return "preop";
+}
+
+function getClinicalNavGroups(environment: AppEnvironment): NavGroup[] {
+  if (environment === "record") return PATIENT_RECORD_NAV_GROUPS;
+  if (environment === "trials") return TRIALS_NAV_GROUPS;
+  if (environment === "medication") return MEDICATION_ACCESS_NAV_GROUPS;
+  return CLINICAL_NAV_GROUPS;
+}
+
+function getWorkspaceCopy(environment: AppEnvironment): { title: string; sidebarTitle: string; subtitle: string; icon: LucideIcon } {
+  if (environment === "record") {
+    return {
+      title: "Patient Record Workspace",
+      sidebarTitle: "Patient Record",
+      subtitle: "Overview, longitudinal history, and source data",
+      icon: Database,
+    };
+  }
+  if (environment === "trials") {
+    return {
+      title: "Clinical Trials Workspace",
+      sidebarTitle: "Clinical Trials",
+      subtitle: "Eligibility research and shareable patient packet",
+      icon: Search,
+    };
+  }
+  if (environment === "medication") {
+    return {
+      title: "Medication Access Workspace",
+      sidebarTitle: "Medication Access",
+      subtitle: "Cost, assistance, and affordability research",
+      icon: Pill,
+    };
+  }
+  if (environment === "analysis") {
+    return {
+      title: "Data Analysis & Methodology Environment",
+      sidebarTitle: "Data Lab",
+      subtitle: "Definitions, methodology, and reliability evidence",
+      icon: BookMarked,
+    };
+  }
+  return {
+    title: "Pre-Op Support Workspace",
+    sidebarTitle: "Pre-Op Support",
+    subtitle: "Surgical briefing, risk review, and chart evidence",
+    icon: Activity,
+  };
 }
 
 function StatusDot({ risk }: { risk: PatientRiskSummary | undefined }) {
@@ -600,8 +679,11 @@ export function Layout({ children }: LayoutProps) {
     });
   }, []);
 
-  const environment: AppEnvironment = location.pathname.startsWith("/analysis") ? "analysis" : "clinical";
+  const environment: AppEnvironment = getEnvironment(location.pathname);
   const isAnalysis = environment === "analysis";
+  const clinicalNavGroups = getClinicalNavGroups(environment);
+  const workspace = getWorkspaceCopy(environment);
+  const WorkspaceIcon = workspace.icon;
 
   const { data: corpusStats } = useQuery({
     queryKey: ["corpus-stats"],
@@ -610,14 +692,25 @@ export function Layout({ children }: LayoutProps) {
     enabled: isAnalysis,
   });
 
-  const clinicalLanding = withPatientQuery("/explorer", patientId);
+  const moduleLinks: { key: AppEnvironment; label: string; to: string }[] = [
+    { key: "record", label: "Patient Record", to: withPatientQuery("/record", patientId) },
+    { key: "preop", label: "Pre-Op", to: withPatientQuery("/preop", patientId) },
+    { key: "trials", label: "Trials", to: withPatientQuery("/trials", patientId) },
+    { key: "medication", label: "Medication Access", to: withPatientQuery("/medication-access", patientId) },
+    { key: "analysis", label: "Data Lab", to: "/analysis" },
+  ];
 
   const navigate = useNavigate();
 
   const handleSelectPatient = (id: string) => {
     // Use navigate (like landing page cards) to ensure reliable routing
     const base =
-      location.pathname.startsWith("/explorer") || location.pathname.startsWith("/journey")
+      location.pathname.startsWith("/explorer") ||
+      location.pathname.startsWith("/record") ||
+      location.pathname.startsWith("/preop") ||
+      location.pathname.startsWith("/journey") ||
+      location.pathname.startsWith("/trials") ||
+      location.pathname.startsWith("/medication-access")
         ? location.pathname
         : "/explorer";
     navigate(`${base}?patient=${id}`);
@@ -664,7 +757,7 @@ export function Layout({ children }: LayoutProps) {
                   </span>
                 </div>
                 <p className="truncate text-sm font-semibold text-[#1c1c1e] group-hover:text-[#5b76fe] transition-colors">
-                  {isAnalysis ? "Data Analysis & Methodology Environment" : "Clinical Intelligence Workspace"}
+                  {workspace.title}
                 </p>
               </Link>
 
@@ -678,22 +771,21 @@ export function Layout({ children }: LayoutProps) {
                 )}
 
                 <nav className="flex items-center gap-1 rounded-xl border border-[#e9eaef] bg-white p-1">
-                  <Link
-                    to={clinicalLanding}
-                    className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors lg:text-sm ${
-                      !isAnalysis ? "bg-[#eef1ff] text-[#5b76fe]" : "text-[#667085] hover:text-[#1f2937]"
-                    }`}
-                  >
-                    Clinical
-                  </Link>
-                  <Link
-                    to="/analysis"
-                    className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors lg:text-sm ${
-                      isAnalysis ? "bg-[#dff6ef] text-[#0f766e]" : "text-[#667085] hover:text-[#1f2937]"
-                    }`}
-                  >
-                    Data Lab
-                  </Link>
+                  {moduleLinks.map((link) => {
+                    const active = environment === link.key;
+                    const activeClass = link.key === "analysis" ? "bg-[#dff6ef] text-[#0f766e]" : "bg-[#eef1ff] text-[#5b76fe]";
+                    return (
+                      <Link
+                        key={link.key}
+                        to={link.to}
+                        className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors lg:text-sm ${
+                          active ? activeClass : "text-[#667085] hover:text-[#1f2937]"
+                        }`}
+                      >
+                        {link.label}
+                      </Link>
+                    );
+                  })}
                 </nav>
               </div>
             </div>
@@ -712,9 +804,9 @@ export function Layout({ children }: LayoutProps) {
                 <div className="shrink-0 border-b border-[#e9eaef] px-2 pb-3 pt-4 lg:px-3">
                   <div className="flex items-center justify-between">
                     <div className={`flex items-center gap-2 ${sidebarCollapsed ? "justify-center w-full" : ""}`}>
-                      <Activity size={18} className="shrink-0 text-[#5b76fe]" />
+                      <WorkspaceIcon size={18} className="shrink-0 text-[#5b76fe]" />
                       {!sidebarCollapsed && (
-                        <span className="text-sm font-semibold tracking-tight text-[#1c1c1e]">Clinical Workspace</span>
+                        <span className="text-sm font-semibold tracking-tight text-[#1c1c1e]">{workspace.sidebarTitle}</span>
                       )}
                     </div>
                     <button
@@ -726,13 +818,13 @@ export function Layout({ children }: LayoutProps) {
                     </button>
                   </div>
                   {!sidebarCollapsed && (
-                    <p className="mt-1 text-xs text-[#a5a8b5]">Patient-level safety and chart review</p>
+                    <p className="mt-1 text-xs text-[#a5a8b5]">{workspace.subtitle}</p>
                   )}
                 </div>
 
                 {/* Nav links — always scrollable, takes remaining space */}
                 <nav className={`flex-1 overflow-y-auto ${sidebarCollapsed ? "px-1 py-2" : "px-3 py-4"}`}>
-                  {CLINICAL_NAV_GROUPS.map((group, groupIndex) => {
+                  {clinicalNavGroups.map((group, groupIndex) => {
                     const isAdvanced = group.advanced === true;
                     const isOpen = !isAdvanced || advancedOpen;
                     return (

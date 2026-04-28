@@ -1,10 +1,10 @@
-import { useSearchParams, useNavigate, Link } from "react-router-dom";
+import { useSearchParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { AlertTriangle, AlertOctagon, CheckCircle, User, ChevronDown, ChevronRight, Pill, Heart, FlaskConical, Clock, Database } from "lucide-react";
+import { AlertTriangle, User, ChevronDown, ChevronRight, Clock, Database } from "lucide-react";
 import type { ReactNode } from "react";
 import { api } from "../../api/client";
-import type { PatientOverview, KeyLabsResponse, LabValue, LabHistoryPoint, LabAlertFlag, SafetyFlag, TimelineMonth, TimelineResponse } from "../../types";
+import type { PatientOverview, KeyLabsResponse, LabValue, LabHistoryPoint, LabAlertFlag, TimelineMonth, TimelineResponse } from "../../types";
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -410,221 +410,6 @@ function LabHistoryTimeline({ keyLabs }: { keyLabs: KeyLabsResponse }) {
   );
 }
 
-// ── Pre-Op Decision Card ────────────────────────────────────────────────────
-
-type DomainStatus = "CLEARED" | "FLAGGED" | "REVIEW";
-
-// Inline domain logic (same rules as Clearance.tsx — do not import from there)
-
-function preOpMedStatus(flags: SafetyFlag[]): { status: DomainStatus; topConcern: string | null } {
-  const activeFlags = flags.filter((f) => f.status === "ACTIVE");
-  const criticalActive = activeFlags.filter((f) => f.severity === "critical");
-  const reviewActive = activeFlags.filter((f) => f.severity !== "critical");
-
-  if (criticalActive.length > 0) {
-    return { status: "FLAGGED", topConcern: criticalActive[0].label };
-  }
-  if (reviewActive.length > 0) {
-    return { status: "REVIEW", topConcern: reviewActive[0].label };
-  }
-  return { status: "CLEARED", topConcern: null };
-}
-
-function preOpConditionStatus(
-  ranked_active: { display: string; risk_category: string }[]
-): { status: DomainStatus; topConcern: string | null } {
-  const cardiac = ranked_active.filter((c) => c.risk_category === "CARDIAC");
-  const pulmonary = ranked_active.filter((c) => c.risk_category === "PULMONARY");
-  const metabolic = ranked_active.filter((c) => c.risk_category === "METABOLIC");
-
-  if (cardiac.length > 0 || pulmonary.length > 0) {
-    const first = [...cardiac, ...pulmonary][0];
-    return { status: "FLAGGED", topConcern: first.display };
-  }
-  if (metabolic.length > 0) {
-    return { status: "REVIEW", topConcern: metabolic[0].display };
-  }
-  return { status: "CLEARED", topConcern: null };
-}
-
-function preOpLabStatus(panels: Record<string, LabValue[]>): { status: DomainStatus; topConcern: string | null } {
-  const entries = Object.entries(panels);
-  if (entries.length === 0 || entries.every(([, vals]) => vals.length === 0)) {
-    return { status: "REVIEW", topConcern: "No lab panel data available" };
-  }
-  return { status: "CLEARED", topConcern: null };
-}
-
-function overallPreOpStatus(statuses: DomainStatus[]): DomainStatus {
-  if (statuses.includes("FLAGGED")) return "FLAGGED";
-  if (statuses.includes("REVIEW")) return "REVIEW";
-  return "CLEARED";
-}
-
-const STATUS_CONFIG = {
-  FLAGGED: {
-    bg: "#fef2f2",
-    border: "#ef4444",
-    text: "#991b1b",
-    badgeBg: "#ef4444",
-    label: "FLAGGED",
-    Icon: AlertOctagon,
-    overallLabel: "Surgery Hold — Review Required",
-  },
-  REVIEW: {
-    bg: "#fffbeb",
-    border: "#f59e0b",
-    text: "#92400e",
-    badgeBg: "#f59e0b",
-    label: "REVIEW",
-    Icon: AlertTriangle,
-    overallLabel: "Pre-Op Review Incomplete",
-  },
-  CLEARED: {
-    bg: "#f0fdf4",
-    border: "#22c55e",
-    text: "#166534",
-    badgeBg: "#22c55e",
-    label: "CLEARED",
-    Icon: CheckCircle,
-    overallLabel: "Pre-Op Clearance Complete",
-  },
-} as const;
-
-function DomainChip({
-  icon: Icon,
-  label,
-  status,
-}: {
-  icon: React.ComponentType<{ size?: number; className?: string; style?: React.CSSProperties }>;
-  label: string;
-  status: DomainStatus;
-}) {
-  const cfg = STATUS_CONFIG[status];
-  return (
-    <div
-      className="flex items-center gap-2 px-3 py-2 rounded-lg border text-sm"
-      style={{ backgroundColor: cfg.bg, borderColor: cfg.border }}
-    >
-      <Icon size={14} style={{ color: cfg.text }} className="shrink-0" />
-      <span className="font-medium" style={{ color: cfg.text }}>{label}</span>
-      <span
-        className="ml-1 text-[10px] font-bold uppercase text-white px-1.5 py-0.5 rounded-full"
-        style={{ backgroundColor: cfg.badgeBg }}
-      >
-        {cfg.label}
-      </span>
-    </div>
-  );
-}
-
-function PreOpDecisionCard({ patientId }: { patientId: string }) {
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-
-  const safetyQ = useQuery({
-    queryKey: ["safety", patientId],
-    queryFn: () => api.getSafety(patientId),
-    enabled: !!patientId,
-  });
-
-  const conditionsQ = useQuery({
-    queryKey: ["conditionAcuity", patientId],
-    queryFn: () => api.getConditionAcuity(patientId),
-    enabled: !!patientId,
-  });
-
-  const labsQ = useQuery({
-    queryKey: ["keyLabs", patientId],
-    queryFn: () => api.getKeyLabs(patientId),
-    enabled: !!patientId,
-  });
-
-  const isLoading = safetyQ.isLoading || conditionsQ.isLoading || labsQ.isLoading;
-
-  if (isLoading) {
-    return (
-      <div className="animate-pulse space-y-2 mb-2">
-        <div className="h-12 bg-[#f0f1f5] rounded-xl" />
-        <div className="h-10 bg-[#f0f1f5] rounded-xl" />
-      </div>
-    );
-  }
-
-  if (!safetyQ.data || !conditionsQ.data || !labsQ.data) {
-    return null;
-  }
-
-  const patientParam = searchParams.get("patient") ?? patientId;
-
-  const medResult = preOpMedStatus(safetyQ.data.flags);
-  const condResult = preOpConditionStatus(conditionsQ.data.ranked_active);
-  const labResult = preOpLabStatus(labsQ.data.panels);
-
-  const overall = overallPreOpStatus([medResult.status, condResult.status, labResult.status]);
-  const overallCfg = STATUS_CONFIG[overall];
-  const OverallIcon = overallCfg.Icon;
-
-  // Pick the top concern to surface
-  const topConcern =
-    medResult.status === "FLAGGED"
-      ? `${medResult.topConcern} — active medication hold required`
-      : condResult.status === "FLAGGED"
-      ? condResult.topConcern
-      : medResult.status === "REVIEW"
-      ? `${medResult.topConcern} — requires pre-op review`
-      : condResult.status === "REVIEW"
-      ? condResult.topConcern
-      : labResult.status === "REVIEW"
-      ? labResult.topConcern
-      : "No surgical risk flags identified";
-
-  return (
-    <div
-      className="rounded-xl border-l-4 overflow-hidden"
-      style={{ backgroundColor: overallCfg.bg, borderLeftColor: overallCfg.border, borderTopColor: overallCfg.border, borderRightColor: overallCfg.border, borderBottomColor: overallCfg.border, borderWidth: 1, borderLeftWidth: 4 }}
-    >
-      {/* Overall status bar */}
-      <div className="flex items-center gap-3 px-5 py-3 border-b" style={{ borderBottomColor: overallCfg.border + "33" }}>
-        <OverallIcon size={18} style={{ color: overallCfg.text }} className="shrink-0" />
-        <span className="font-semibold text-sm" style={{ color: overallCfg.text }}>
-          {overallCfg.overallLabel}
-        </span>
-      </div>
-
-      {/* Domain chips + actions row */}
-      <div className="px-5 py-3 flex flex-wrap items-center gap-2">
-        <DomainChip icon={Pill} label="Medications" status={medResult.status} />
-        <DomainChip icon={Heart} label="Conditions" status={condResult.status} />
-        <DomainChip icon={FlaskConical} label="Labs" status={labResult.status} />
-
-        {/* Spacer + action buttons */}
-        <div className="ml-auto flex items-center gap-2 shrink-0">
-          <button
-            onClick={() => navigate(`/explorer/clearance?patient=${patientParam}`)}
-            className="text-xs font-medium px-3 py-1.5 rounded-lg border border-[#e9eaef] bg-white text-[#555a6a] hover:bg-[#f5f6f8] transition-colors"
-          >
-            → Clearance
-          </button>
-          <button
-            onClick={() => navigate(`/explorer/safety?patient=${patientParam}`)}
-            className="text-xs font-medium px-3 py-1.5 rounded-lg border border-[#e9eaef] bg-white text-[#555a6a] hover:bg-[#f5f6f8] transition-colors"
-          >
-            → Safety
-          </button>
-        </div>
-      </div>
-
-      {/* Top concern line */}
-      <div className="px-5 pb-3">
-        <p className="text-xs" style={{ color: overallCfg.text, opacity: 0.85 }}>
-          <span className="font-medium">Top concern:</span> {topConcern}
-        </p>
-      </div>
-    </div>
-  );
-}
-
 function CareActivityStrip({ timeline }: { timeline: TimelineResponse | undefined }) {
   if (!timeline || Object.keys(timeline.year_counts).length === 0) return null;
 
@@ -883,44 +668,42 @@ function OverviewContent({
 
   return (
     <div className="p-6 space-y-6">
-      {/* Pre-Op Decision Card — first thing a surgeon sees */}
-      <PreOpDecisionCard patientId={patientId} />
-
-      {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-[#1c1c1e]">{overview.name}</h1>
-          <p className="text-sm text-[#555a6a] mt-0.5">
-            {overview.gender.charAt(0).toUpperCase() + overview.gender.slice(1)} ·{" "}
-            {overview.age_years.toFixed(0)} years old ·{" "}
-            {overview.city && overview.state ? `${overview.city}, ${overview.state}` : "Location unknown"}
-            {overview.is_deceased && (
-              <span className="ml-2 text-xs bg-[#ffc6c6] text-[#600000] px-2 py-0.5 rounded-full">
-                Deceased
-              </span>
-            )}
-          </p>
+      <section className="space-y-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-[#5b76fe]">Patient summary</p>
+            <h1 className="mt-1 text-2xl font-semibold text-[#1c1c1e]">{overview.name}</h1>
+            <p className="text-sm text-[#555a6a] mt-0.5">
+              {overview.gender.charAt(0).toUpperCase() + overview.gender.slice(1)} ·{" "}
+              {overview.age_years.toFixed(0)} years old ·{" "}
+              {overview.city && overview.state ? `${overview.city}, ${overview.state}` : "Location unknown"}
+              {overview.is_deceased && (
+                <span className="ml-2 text-xs bg-[#ffc6c6] text-[#600000] px-2 py-0.5 rounded-full">
+                  Deceased
+                </span>
+              )}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Link
+              to={`/explorer/patient-data?patient=${patientId}`}
+              className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1 rounded-full border border-[#e9eaef] text-[#555a6a] hover:border-[#5b76fe] hover:text-[#5b76fe] transition-colors"
+            >
+              <Database size={12} />
+              FHIR data
+            </Link>
+            <span
+              className={`text-xs font-medium px-3 py-1 rounded-full capitalize ${
+                TIER_STYLES[overview.complexity_tier] ?? "bg-gray-100 text-gray-600"
+              }`}
+            >
+              {tierLabel} complexity · {overview.complexity_score.toFixed(0)}/100
+            </span>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Link
-            to={`/explorer/patient-data?patient=${patientId}`}
-            className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1 rounded-full border border-[#e9eaef] text-[#555a6a] hover:border-[#5b76fe] hover:text-[#5b76fe] transition-colors"
-          >
-            <Database size={12} />
-            FHIR data
-          </Link>
-          <span
-            className={`text-xs font-medium px-3 py-1 rounded-full capitalize ${
-              TIER_STYLES[overview.complexity_tier] ?? "bg-gray-100 text-gray-600"
-            }`}
-          >
-            {tierLabel} complexity · {overview.complexity_score.toFixed(0)}/100
-          </span>
-        </div>
-      </div>
 
-      {/* Demographics + Data span */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Demographics + Data span */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2">
           <CollapsibleSection
             title="Demographics"
@@ -977,7 +760,8 @@ function OverviewContent({
             </div>
           </CollapsibleSection>
         </div>
-      </div>
+        </div>
+      </section>
 
       <CareActivityStrip timeline={timeline} />
 

@@ -72,7 +72,7 @@ export function AnalysisOverview() {
         <div>
           <p className="inline-flex items-center gap-2 rounded-full bg-[#d8f5ee] px-3 py-1 text-xs font-semibold uppercase tracking-wider text-[#0f766e]">
             <BookOpenText size={13} />
-            Data Review Environment
+            Module Overview
           </p>
           <h1 className="mt-3 max-w-4xl text-3xl font-semibold tracking-tight text-[#0f172a] lg:text-4xl">
             FHIR Data Definitions and Methodology

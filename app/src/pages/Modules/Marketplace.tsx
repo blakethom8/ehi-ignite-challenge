@@ -151,7 +151,7 @@ export function Marketplace() {
           <div className="max-w-3xl">
             <p className="inline-flex items-center gap-2 rounded-full bg-[#eef1ff] px-3 py-1 text-xs font-semibold uppercase tracking-wider text-[#5b76fe]">
               <Store size={13} />
-              Module marketplace
+              Module Overview
             </p>
             <h1 className="mt-5 text-3xl font-semibold tracking-tight text-[#1c1c1e] lg:text-4xl">
               External opportunities powered by the FHIR Chart

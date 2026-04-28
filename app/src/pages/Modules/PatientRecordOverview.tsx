@@ -148,7 +148,7 @@ export function PatientRecordOverview() {
           <div className="max-w-3xl">
             <p className="inline-flex items-center gap-2 rounded-full bg-[#eef1ff] px-3 py-1 text-xs font-semibold uppercase tracking-wider text-[#5b76fe]">
               <Database size={13} />
-              Patient-owned FHIR Chart
+          Module Overview
             </p>
             <h1 className="mt-5 text-3xl font-semibold tracking-tight text-[#1c1c1e] lg:text-4xl">
               {overview ? `${overview.name}'s FHIR Chart` : "The patient-owned FHIR Chart"}

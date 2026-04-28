@@ -8,6 +8,7 @@ import { Landing } from "./pages/Landing";
 import { PlatformArchitecture } from "./pages/PlatformArchitecture";
 import { PatientRecordPool } from "./pages/PatientRecordPool";
 import { GuidedTour } from "./pages/GuidedTour";
+import { PlatformEntry } from "./pages/PlatformEntry";
 import { ExplorerOverview } from "./pages/Explorer/Overview";
 import { ExplorerTimeline } from "./pages/Explorer/Timeline";
 import { ExplorerCorpus } from "./pages/Explorer/Corpus";
@@ -51,6 +52,7 @@ const queryClient = new QueryClient({
 
 export default function App() {
   const routes = [
+    { path: "/platform", element: <PlatformEntry /> },
     { path: "/charts", element: <PatientRecordOverview /> },
     { path: "/record", element: <PatientRecordOverview /> },
     { path: "/aggregate", element: <DataAggregator /> },

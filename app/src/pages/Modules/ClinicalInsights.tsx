@@ -61,14 +61,15 @@ export function ClinicalInsights() {
       <section className="rounded-3xl bg-white p-6 shadow-[rgb(224_226_232)_0px_0px_0px_1px] lg:p-8">
         <p className="inline-flex items-center gap-2 rounded-full bg-[#fff1df] px-3 py-1 text-xs font-semibold uppercase tracking-wider text-[#9a5a16]">
           <Activity size={13} />
-          Clinical insights market
+          Module Overview
         </p>
         <h1 className="mt-5 max-w-4xl text-3xl font-semibold tracking-tight text-[#1c1c1e] lg:text-4xl">
-          Private modules for understanding and acting on the patient chart
+          Private modules for understanding the patient chart
         </h1>
         <p className="mt-3 max-w-4xl text-base leading-7 text-[#667085]">
-          These modules stay inside the PHI-controlled workspace. They use the FHIR Chart to create briefs, review queues,
-          care summaries, and cited answers without sending patient data into an external marketplace flow.
+          This is the Clinical Insights overview. These modules stay inside the PHI-controlled workspace and use the
+          FHIR Chart to create briefs, review queues, care summaries, and cited answers without sending patient data
+          into an external marketplace flow.
         </p>
       </section>
 

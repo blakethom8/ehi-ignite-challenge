@@ -6,7 +6,6 @@ import {
   Database,
   FileText,
   GitBranch,
-  HelpCircle,
   Sparkles,
   Trophy,
 } from "lucide-react";
@@ -15,7 +14,7 @@ const platformCards = [
   {
     title: "Open the Platform",
     body: "Start in the working app shell with Data Aggregator, FHIR Charts, Clinical Insights, Marketplace, and Internal Tools.",
-    to: "/aggregate",
+    to: "/platform",
     action: "Enter platform",
     icon: GitBranch,
     primary: true,
@@ -58,13 +57,6 @@ const contextCards = [
     action: "Open Data Lab",
     icon: ClipboardCheck,
   },
-  {
-    title: "What is FHIR?",
-    body: "A plain-language primer on the health data exchange format behind the platform.",
-    to: "/analysis/fhir-primer",
-    action: "Read primer",
-    icon: HelpCircle,
-  },
 ];
 
 export function Landing() {
@@ -79,7 +71,7 @@ export function Landing() {
             <p className="text-base font-semibold text-[#1c1c1e]">Application overview</p>
           </Link>
           <Link
-            to="/aggregate"
+            to="/platform"
             className="hidden items-center gap-2 rounded-xl bg-[#5b76fe] px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#445ee8] sm:inline-flex"
           >
             Enter platform
@@ -99,9 +91,23 @@ export function Landing() {
                 Turn scattered patient records into useful clinical workflows.
               </h1>
             </div>
-            <p className="max-w-2xl text-base leading-7 text-[#63708a]">
-              The platform pulls patient data from many places, cleans it into a patient-owned FHIR Chart, then lets that chart power focused modules: pre-op review, clinical understanding, trial matching, medication access, sharing, and internal data review.
-            </p>
+            <div className="max-w-2xl">
+              <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center">
+                <p className="text-sm font-semibold text-[#526075]">
+                  New to FHIR data format?
+                </p>
+                <Link
+                  to="/analysis/fhir-primer"
+                  className="inline-flex w-fit items-center gap-1 text-sm font-semibold text-[#5b76fe] transition-all hover:gap-2 hover:text-[#445ee8]"
+                >
+                  Read the plain-language primer
+                  <ArrowRight size={14} />
+                </Link>
+              </div>
+              <p className="text-base leading-7 text-[#63708a]">
+                The platform pulls patient data from many places, cleans it into a patient-owned FHIR Chart, then lets that chart power focused modules: pre-op review, clinical understanding, trial matching, medication access, sharing, and internal data review.
+              </p>
+            </div>
           </div>
 
           <div className="mt-8 grid gap-4 lg:grid-cols-3">
@@ -154,7 +160,7 @@ export function Landing() {
               </div>
             </section>
 
-            <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <section className="grid gap-4 sm:grid-cols-3">
               {contextCards.map((card) => {
                 const Icon = card.icon;
                 return (

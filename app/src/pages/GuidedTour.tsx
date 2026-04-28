@@ -45,7 +45,7 @@ export function GuidedTour() {
             <p className="text-base font-semibold text-[#1c1c1e]">Guided tour</p>
           </Link>
           <Link
-            to="/aggregate"
+            to="/platform"
             className="inline-flex items-center gap-2 rounded-xl bg-[#5b76fe] px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#445ee8]"
           >
             Enter platform
@@ -145,7 +145,7 @@ export function GuidedTour() {
             </div>
             <div className="flex flex-col gap-2 sm:flex-row">
               <Link
-                to="/aggregate"
+                to="/platform"
                 className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#5b76fe] px-5 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#445ee8]"
               >
                 Open platform

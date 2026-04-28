@@ -41,7 +41,7 @@ export function DataCatalog() {
       <section className="rounded-3xl bg-white p-6 shadow-[rgb(213_235_229)_0px_0px_0px_1px] lg:p-8">
         <p className="inline-flex items-center gap-2 rounded-full bg-[#dff6ef] px-3 py-1 text-xs font-semibold uppercase tracking-wider text-[#0f766e]">
           <Archive size={13} />
-          Internal data catalog
+          Module Overview
         </p>
         <h1 className="mt-5 text-3xl font-semibold tracking-tight text-[#0f172a] lg:text-4xl">
           Platform contracts for module builders

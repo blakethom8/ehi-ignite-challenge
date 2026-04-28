@@ -694,41 +694,42 @@ function OverviewContent({
         </div>
       </section>
 
-      {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-[#1c1c1e]">{overview.name}</h1>
-          <p className="text-sm text-[#555a6a] mt-0.5">
-            {overview.gender.charAt(0).toUpperCase() + overview.gender.slice(1)} ·{" "}
-            {overview.age_years.toFixed(0)} years old ·{" "}
-            {overview.city && overview.state ? `${overview.city}, ${overview.state}` : "Location unknown"}
-            {overview.is_deceased && (
-              <span className="ml-2 text-xs bg-[#ffc6c6] text-[#600000] px-2 py-0.5 rounded-full">
-                Deceased
-              </span>
-            )}
-          </p>
+      <section className="space-y-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-[#5b76fe]">Patient summary</p>
+            <h1 className="mt-1 text-2xl font-semibold text-[#1c1c1e]">{overview.name}</h1>
+            <p className="text-sm text-[#555a6a] mt-0.5">
+              {overview.gender.charAt(0).toUpperCase() + overview.gender.slice(1)} ·{" "}
+              {overview.age_years.toFixed(0)} years old ·{" "}
+              {overview.city && overview.state ? `${overview.city}, ${overview.state}` : "Location unknown"}
+              {overview.is_deceased && (
+                <span className="ml-2 text-xs bg-[#ffc6c6] text-[#600000] px-2 py-0.5 rounded-full">
+                  Deceased
+                </span>
+              )}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Link
+              to={`/explorer/patient-data?patient=${patientId}`}
+              className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1 rounded-full border border-[#e9eaef] text-[#555a6a] hover:border-[#5b76fe] hover:text-[#5b76fe] transition-colors"
+            >
+              <Database size={12} />
+              FHIR data
+            </Link>
+            <span
+              className={`text-xs font-medium px-3 py-1 rounded-full capitalize ${
+                TIER_STYLES[overview.complexity_tier] ?? "bg-gray-100 text-gray-600"
+              }`}
+            >
+              {tierLabel} complexity · {overview.complexity_score.toFixed(0)}/100
+            </span>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Link
-            to={`/explorer/patient-data?patient=${patientId}`}
-            className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1 rounded-full border border-[#e9eaef] text-[#555a6a] hover:border-[#5b76fe] hover:text-[#5b76fe] transition-colors"
-          >
-            <Database size={12} />
-            FHIR data
-          </Link>
-          <span
-            className={`text-xs font-medium px-3 py-1 rounded-full capitalize ${
-              TIER_STYLES[overview.complexity_tier] ?? "bg-gray-100 text-gray-600"
-            }`}
-          >
-            {tierLabel} complexity · {overview.complexity_score.toFixed(0)}/100
-          </span>
-        </div>
-      </div>
 
-      {/* Demographics + Data span */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Demographics + Data span */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2">
           <CollapsibleSection
             title="Demographics"
@@ -785,7 +786,8 @@ function OverviewContent({
             </div>
           </CollapsibleSection>
         </div>
-      </div>
+        </div>
+      </section>
 
       <CareActivityStrip timeline={timeline} />
 

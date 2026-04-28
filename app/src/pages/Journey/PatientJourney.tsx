@@ -275,7 +275,7 @@ function RiskHero({ risk, overview }: { risk: SurgicalRiskResponse; overview: Pa
             <HeartPulse size={14} />
             30-second surgical briefing
           </div>
-          <h1 className="text-3xl font-semibold leading-tight text-[#111827]">{overview.name}</h1>
+          <h1 className="text-3xl font-semibold leading-tight text-[#111827]">Surgical disposition</h1>
           <p className="mt-2 text-base leading-7 text-[#334155]">
             {fmtPatientAge(overview.age_years)} {overview.gender} with {overview.active_condition_count} active
             conditions, {overview.active_med_count} active medications, and{" "}
@@ -425,9 +425,19 @@ export function PatientJourney() {
 
   return (
     <main className="mx-auto max-w-6xl space-y-5 p-8">
-      <RiskHero risk={risk} overview={overview} />
       <ModuleGuidance />
-      <FactRail overview={overview} care={care} />
+
+      <section className="space-y-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#5b76fe]">Patient briefing</p>
+          <h2 className="mt-1 text-2xl font-semibold text-[#111827]">{overview.name}</h2>
+          <p className="mt-1 text-sm text-[#64748b]">
+            Patient-specific pre-op disposition, evidence, and action items generated from this FHIR record.
+          </p>
+        </div>
+        <RiskHero risk={risk} overview={overview} />
+        <FactRail overview={overview} care={care} />
+      </section>
 
       <section className="grid gap-4 lg:grid-cols-3">
         <BriefCard

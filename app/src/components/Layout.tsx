@@ -353,12 +353,14 @@ function PatientPickerModal({
     queryKey: ["patients"],
     queryFn: api.listPatients,
     staleTime: Infinity,
+    enabled: open,
   });
 
   const { data: riskSummary = [], isLoading: riskQueryLoading } = useQuery({
     queryKey: ["risk-summary"],
     queryFn: api.getRiskSummary,
     staleTime: 5 * 60 * 1000,
+    enabled: open,
   });
 
   const riskMap = useMemo(

@@ -8,6 +8,7 @@ import json
 import sys as _sys
 from collections import defaultdict
 from datetime import date, datetime
+from functools import lru_cache
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
@@ -175,6 +176,11 @@ def _limit_evidence(items: list[str], limit: int = 5) -> list[str]:
 
 @router.get("", response_model=list[PatientListItem])
 def list_patients() -> list[PatientListItem]:
+    return _cached_patient_list()
+
+
+@lru_cache(maxsize=1)
+def _cached_patient_list() -> list[PatientListItem]:
     """
     Return a lightweight list of all patients with pre-computed stats.
     Uses the corpus cache (instant if already built, ~5-10s first time).
@@ -219,6 +225,11 @@ def list_patients() -> list[PatientListItem]:
 
 @router.get("/risk-summary", response_model=PatientRiskSummaryResponse)
 def patient_risk_summary() -> PatientRiskSummaryResponse:
+    return _cached_patient_risk_summary()
+
+
+@lru_cache(maxsize=1)
+def _cached_patient_risk_summary() -> PatientRiskSummaryResponse:
     """
     Return all patients enriched with risk tier and critical safety flags.
 

@@ -40,6 +40,10 @@ def _materialize_sof_db() -> None:
     never raises (see ``sof_materialize.materialize_from_env``).
     """
     materialize_from_env()
+    # The first app interaction needs /api/patients. Build that lightweight
+    # index during startup so production users do not pay the corpus-cache
+    # rebuild cost on the first page load after deploy.
+    patients.list_patients()
 
 app.add_middleware(
     CORSMiddleware,

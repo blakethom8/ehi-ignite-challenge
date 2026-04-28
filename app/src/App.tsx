@@ -5,6 +5,9 @@ import { Layout } from "./components/Layout";
 import { ChatProvider } from "./context/ChatContext";
 import { ChatWidget } from "./components/ChatWidget";
 import { Landing } from "./pages/Landing";
+import { PlatformArchitecture } from "./pages/PlatformArchitecture";
+import { PatientRecordPool } from "./pages/PatientRecordPool";
+import { GuidedTour } from "./pages/GuidedTour";
 import { ExplorerOverview } from "./pages/Explorer/Overview";
 import { ExplorerTimeline } from "./pages/Explorer/Timeline";
 import { ExplorerCorpus } from "./pages/Explorer/Corpus";
@@ -25,6 +28,11 @@ import { PatientRecordOverview } from "./pages/Modules/PatientRecordOverview";
 import { PreOpOverview } from "./pages/Modules/PreOpOverview";
 import { ClinicalTrials } from "./pages/Modules/ClinicalTrials";
 import { MedicationAccess } from "./pages/Modules/MedicationAccess";
+import { Marketplace } from "./pages/Modules/Marketplace";
+import { DataSharing } from "./pages/Modules/DataSharing";
+import { DataCatalog } from "./pages/Modules/DataCatalog";
+import { DataAggregator } from "./pages/Modules/DataAggregator";
+import { ClinicalInsights } from "./pages/Modules/ClinicalInsights";
 import { AnalysisOverview } from "./pages/Analysis/Overview";
 import { AnalysisMethodology } from "./pages/Analysis/Methodology";
 import { AnalysisDefinitions } from "./pages/Analysis/Definitions";
@@ -43,7 +51,11 @@ const queryClient = new QueryClient({
 
 export default function App() {
   const routes = [
+    { path: "/charts", element: <PatientRecordOverview /> },
     { path: "/record", element: <PatientRecordOverview /> },
+    { path: "/aggregate", element: <DataAggregator /> },
+    { path: "/clinical-insights", element: <ClinicalInsights /> },
+    { path: "/marketplace", element: <Marketplace /> },
     { path: "/explorer", element: <ExplorerOverview /> },
     { path: "/explorer/timeline", element: <ExplorerTimeline /> },
     { path: "/explorer/history", element: <ExplorerHistory /> },
@@ -63,12 +75,15 @@ export default function App() {
     { path: "/journey", element: <PatientJourney /> },
     { path: "/trials", element: <ClinicalTrials /> },
     { path: "/medication-access", element: <MedicationAccess /> },
+    { path: "/sharing", element: <DataSharing /> },
+    { path: "/second-opinion", element: <DataSharing /> },
     { path: "/analysis", element: <AnalysisOverview /> },
     { path: "/analysis/fhir-primer", element: <AnalysisFhirPrimer /> },
     { path: "/analysis/methodology", element: <AnalysisMethodology /> },
     { path: "/analysis/definitions", element: <AnalysisDefinitions /> },
     { path: "/analysis/coverage", element: <AnalysisCoverage /> },
     { path: "/analysis/flight-school", element: <AnalysisFlightSchool /> },
+    { path: "/catalog", element: <DataCatalog /> },
   ];
 
   return (
@@ -78,6 +93,9 @@ export default function App() {
           <ChatProvider>
             <Routes>
               <Route path="/" element={<Landing />} />
+              <Route path="/architecture" element={<PlatformArchitecture />} />
+              <Route path="/records-pool" element={<PatientRecordPool />} />
+              <Route path="/guided-tour" element={<GuidedTour />} />
               {routes.map((route) => (
                 <Route
                   key={route.path}

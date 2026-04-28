@@ -3,6 +3,7 @@ import { Link, NavLink, useLocation, useNavigate, useSearchParams } from "react-
 import { useQuery } from "@tanstack/react-query";
 import {
   Activity,
+  Archive,
   BookMarked,
   CalendarDays,
   ChevronDown,
@@ -11,6 +12,7 @@ import {
   ChevronsRight,
   ClipboardCheck,
   Database,
+  DatabaseZap,
   FileJson2,
   GraduationCap,
   Heart,
@@ -18,9 +20,11 @@ import {
   MessageSquareText,
   Pill,
   Search,
+  Share2,
   ShieldAlert,
   SlidersHorizontal,
   Star,
+  Store,
   Stethoscope,
   TestTubeDiagonal,
   UserRound,
@@ -38,7 +42,8 @@ interface LayoutProps {
 }
 
 type FilterMode = "all" | "high_risk" | "needs_review";
-type AppEnvironment = "record" | "preop" | "trials" | "medication" | "analysis";
+type AppEnvironment = "record" | "aggregator" | "clinical" | "marketplace" | "preop" | "trials" | "medication" | "sharing" | "analysis" | "catalog";
+type TopArea = "record" | "aggregator" | "clinical" | "marketplace" | "internal";
 
 interface NavItem {
   to: string;
@@ -55,9 +60,9 @@ interface NavGroup {
 
 const CLINICAL_NAV_GROUPS: NavGroup[] = [
   {
-    label: "Pre-Op Support",
+    label: "Clinical Insight Modules",
     items: [
-      { to: "/preop", label: "Overview", icon: Activity, description: "Module guide" },
+      { to: "/preop", label: "Pre-Op Support", icon: Activity, description: "Module guide" },
       { to: "/journey", label: "Patient Briefing", icon: ClipboardCheck, description: "Surgical disposition" },
       { to: "/explorer/clearance", label: "Clearance", icon: ClipboardCheck, description: "Pre-op readiness check" },
       { to: "/explorer/safety", label: "Medication Holds", icon: ShieldAlert, description: "Pre-op risk flags" },
@@ -70,17 +75,27 @@ const CLINICAL_NAV_GROUPS: NavGroup[] = [
 ];
 
 const PATIENT_RECORD_NAV_ITEMS: NavItem[] = [
-  { to: "/record", label: "Overview", icon: Database, description: "Module guide" },
-  { to: "/explorer", label: "Patient Summary", icon: UserRound, description: "Clinical summary" },
+  { to: "/charts", label: "Chart Home", icon: Database, description: "Record intelligence" },
+  { to: "/explorer", label: "Clinical Snapshot", icon: UserRound, description: "Patient summary" },
   { to: "/explorer/history", label: "History", icon: CalendarDays, description: "Tables and timelines" },
   { to: "/explorer/care-journey", label: "Care Journey", icon: Heart, description: "Visual care timeline" },
-  { to: "/explorer/patient-data", label: "FHIR Data", icon: FileJson2, description: "Patient bundle metrics" },
+  { to: "/explorer/patient-data", label: "FHIR Sources", icon: FileJson2, description: "Bundle metrics" },
 ];
 
 const PATIENT_RECORD_NAV_GROUPS: NavGroup[] = [
   {
-    label: "Patient Record",
+    label: "FHIR Charts",
     items: PATIENT_RECORD_NAV_ITEMS,
+  },
+];
+
+const DATA_AGGREGATOR_NAV_GROUPS: NavGroup[] = [
+  {
+    label: "Data Aggregator",
+    items: [
+      { to: "/aggregate", label: "Walkthrough", icon: DatabaseZap, description: "Patient collection guide" },
+      { to: "/charts", label: "FHIR Chart", icon: Database, description: "Published chart" },
+    ],
   },
 ];
 
@@ -98,6 +113,30 @@ const MEDICATION_ACCESS_NAV_GROUPS: NavGroup[] = [
     label: "Medication Access",
     items: [
       { to: "/medication-access", label: "Overview", icon: Pill, description: "Affordability guide" },
+    ],
+  },
+];
+
+const MARKETPLACE_NAV_GROUPS: NavGroup[] = [
+  {
+    label: "Featured Marketplaces",
+    items: [
+      { to: "/marketplace", label: "Featured", icon: Store, description: "Module directory" },
+      { to: "/trials", label: "Trial Match", icon: Search, description: "External opportunity" },
+      { to: "/medication-access", label: "Med Access", icon: Pill, description: "Affordability workflow" },
+      { to: "/sharing", label: "Grants & Research", icon: Share2, description: "Packet-based concepts" },
+      { to: "/second-opinion", label: "Second Opinion", icon: MessageSquareText, description: "Specialist marketplace" },
+    ],
+  },
+];
+
+const SHARING_NAV_GROUPS: NavGroup[] = [
+  {
+    label: "Sharing",
+    items: [
+      { to: "/sharing", label: "Packet Builder", icon: Share2, description: "Scope and recipients" },
+      { to: "/second-opinion", label: "Second Opinion", icon: MessageSquareText, description: "Specialist review packet" },
+      { to: "/charts", label: "FHIR Chart", icon: Database, description: "Source patient chart" },
     ],
   },
 ];
@@ -136,13 +175,24 @@ const ANALYSIS_NAV_LINKS: NavItem[] = [
   },
 ];
 
+const INTERNAL_NAV_LINKS: NavItem[] = [
+  { to: "/analysis", label: "Data Lab", icon: BookMarked, description: "FHIR education and methodology" },
+  { to: "/catalog", label: "Data Catalog", icon: Archive, description: "Platform contracts and schemas" },
+  ...ANALYSIS_NAV_LINKS.filter((item) => item.to !== "/analysis"),
+];
+
 function withPatientQuery(path: string, patientId: string | null): string {
   if (!patientId) return path;
   return `${path}?patient=${patientId}`;
 }
 
 function getEnvironment(pathname: string): AppEnvironment {
+  if (pathname.startsWith("/catalog")) return "catalog";
   if (pathname.startsWith("/analysis")) return "analysis";
+  if (pathname.startsWith("/aggregate")) return "aggregator";
+  if (pathname.startsWith("/clinical-insights")) return "clinical";
+  if (pathname.startsWith("/marketplace")) return "marketplace";
+  if (pathname.startsWith("/sharing") || pathname.startsWith("/second-opinion")) return "sharing";
   if (pathname.startsWith("/trials")) return "trials";
   if (pathname.startsWith("/medication-access")) return "medication";
   if (
@@ -157,12 +207,15 @@ function getEnvironment(pathname: string): AppEnvironment {
   ) {
     return "preop";
   }
-  if (pathname.startsWith("/record") || pathname.startsWith("/explorer")) return "record";
+  if (pathname.startsWith("/charts") || pathname.startsWith("/record") || pathname.startsWith("/explorer")) return "record";
   return "preop";
 }
 
 function getClinicalNavGroups(environment: AppEnvironment): NavGroup[] {
   if (environment === "record") return PATIENT_RECORD_NAV_GROUPS;
+  if (environment === "aggregator") return DATA_AGGREGATOR_NAV_GROUPS;
+  if (environment === "marketplace") return MARKETPLACE_NAV_GROUPS;
+  if (environment === "sharing") return SHARING_NAV_GROUPS;
   if (environment === "trials") return TRIALS_NAV_GROUPS;
   if (environment === "medication") return MEDICATION_ACCESS_NAV_GROUPS;
   return CLINICAL_NAV_GROUPS;
@@ -171,10 +224,34 @@ function getClinicalNavGroups(environment: AppEnvironment): NavGroup[] {
 function getWorkspaceCopy(environment: AppEnvironment): { title: string; sidebarTitle: string; subtitle: string; icon: LucideIcon } {
   if (environment === "record") {
     return {
-      title: "Patient Record Workspace",
-      sidebarTitle: "Patient Record",
-      subtitle: "Overview, longitudinal history, and source data",
+      title: "FHIR Charts",
+      sidebarTitle: "FHIR Charts",
+      subtitle: "Patient-owned chart intelligence and source evidence",
       icon: Database,
+    };
+  }
+  if (environment === "marketplace") {
+    return {
+      title: "Module Marketplace",
+      sidebarTitle: "Marketplace",
+      subtitle: "External modules built on the FHIR Chart",
+      icon: Store,
+    };
+  }
+  if (environment === "aggregator") {
+    return {
+      title: "Data Aggregator",
+      sidebarTitle: "Data Aggregator",
+      subtitle: "Guided collection, cleaning, and chart publishing",
+      icon: DatabaseZap,
+    };
+  }
+  if (environment === "clinical") {
+    return {
+      title: "Clinical Insights",
+      sidebarTitle: "Clinical Insights",
+      subtitle: "Private chart-review modules and clinical agents",
+      icon: Activity,
     };
   }
   if (environment === "trials") {
@@ -201,12 +278,38 @@ function getWorkspaceCopy(environment: AppEnvironment): { title: string; sidebar
       icon: BookMarked,
     };
   }
+  if (environment === "catalog") {
+    return {
+      title: "Internal Data Catalog",
+      sidebarTitle: "Data Catalog",
+      subtitle: "Platform contracts, schemas, and module inputs",
+      icon: Archive,
+    };
+  }
+  if (environment === "sharing") {
+    return {
+      title: "Data Sharing Workspace",
+      sidebarTitle: "Data Sharing",
+      subtitle: "Evidence packets, recipients, and second opinions",
+      icon: Share2,
+    };
+  }
   return {
     title: "Pre-Op Support Workspace",
     sidebarTitle: "Pre-Op Support",
     subtitle: "Surgical briefing, risk review, and chart evidence",
     icon: Activity,
   };
+}
+
+function getTopArea(environment: AppEnvironment): TopArea {
+  if (environment === "record") return "record";
+  if (environment === "aggregator") return "aggregator";
+  if (environment === "analysis" || environment === "catalog") return "internal";
+  if (environment === "marketplace" || environment === "trials" || environment === "medication" || environment === "sharing") {
+    return "marketplace";
+  }
+  return "clinical";
 }
 
 function StatusDot({ risk }: { risk: PatientRiskSummary | undefined }) {
@@ -681,24 +784,168 @@ export function Layout({ children }: LayoutProps) {
 
   const environment: AppEnvironment = getEnvironment(location.pathname);
   const isAnalysis = environment === "analysis";
+  const isInternal = environment === "analysis" || environment === "catalog";
   const clinicalNavGroups = getClinicalNavGroups(environment);
   const workspace = getWorkspaceCopy(environment);
   const WorkspaceIcon = workspace.icon;
+  const topArea = getTopArea(environment);
+  const headerHeight = 126;
+  const sidebarTone =
+    topArea === "clinical"
+      ? {
+          icon: "text-[#9a5a16]",
+          active: "bg-[#fff1df] font-medium text-[#9a5a16]",
+          activeCollapsed: "bg-[#fff1df] text-[#9a5a16]",
+          group: "text-[#9a5a16]",
+          hover: "hover:bg-[#fff8f1] hover:text-[#1c1c1e]",
+        }
+      : topArea === "record"
+        ? {
+            icon: "text-[#0f766e]",
+            active: "bg-[#e7fbf7] font-medium text-[#0f766e]",
+            activeCollapsed: "bg-[#e7fbf7] text-[#0f766e]",
+            group: "text-[#0f766e]",
+            hover: "hover:bg-[#f4fffc] hover:text-[#1c1c1e]",
+          }
+        : {
+            icon: "text-[#5b76fe]",
+            active: "bg-[#eef1ff] font-medium text-[#5b76fe]",
+            activeCollapsed: "bg-[#eef1ff] text-[#5b76fe]",
+            group: "text-[#5b76fe]",
+            hover: "hover:bg-[#f5f6f8] hover:text-[#1c1c1e]",
+          };
 
   const { data: corpusStats } = useQuery({
     queryKey: ["corpus-stats"],
     queryFn: api.getCorpusStats,
     staleTime: Infinity,
-    enabled: isAnalysis,
+    enabled: isInternal,
   });
 
-  const moduleLinks: { key: AppEnvironment; label: string; to: string }[] = [
-    { key: "record", label: "Patient Record", to: withPatientQuery("/record", patientId) },
-    { key: "preop", label: "Pre-Op", to: withPatientQuery("/preop", patientId) },
-    { key: "trials", label: "Trials", to: withPatientQuery("/trials", patientId) },
-    { key: "medication", label: "Medication Access", to: withPatientQuery("/medication-access", patientId) },
-    { key: "analysis", label: "Data Lab", to: "/analysis" },
+  const topLinks: { key: TopArea; label: string; to: string }[] = [
+    { key: "aggregator", label: "Data Aggregator", to: withPatientQuery("/aggregate", patientId) },
+    { key: "record", label: "FHIR Charts", to: withPatientQuery("/charts", patientId) },
+    { key: "clinical", label: "Clinical Insights", to: withPatientQuery("/clinical-insights", patientId) },
+    { key: "marketplace", label: "Marketplace", to: withPatientQuery("/marketplace", patientId) },
+    { key: "internal", label: "Internal Tools", to: "/analysis" },
   ];
+
+  const marketplaceLinks: { key: AppEnvironment | "grants" | "research" | "secondOpinion"; label: string; to: string }[] = [
+    { key: "marketplace", label: "Featured", to: withPatientQuery("/marketplace", patientId) },
+    { key: "trials", label: "Trial Match", to: withPatientQuery("/trials", patientId) },
+    { key: "medication", label: "Med Access", to: withPatientQuery("/medication-access", patientId) },
+    { key: "grants", label: "Grants", to: withPatientQuery("/sharing", patientId) },
+    { key: "research", label: "Research", to: withPatientQuery("/sharing", patientId) },
+    { key: "sharing", label: "Sharing", to: withPatientQuery("/sharing", patientId) },
+    { key: "secondOpinion", label: "Second Opinion", to: withPatientQuery("/second-opinion", patientId) },
+  ];
+
+  const chartLinks: { key: string; label: string; to: string }[] = [
+    { key: "chartHome", label: "Chart Home", to: withPatientQuery("/charts", patientId) },
+    { key: "snapshot", label: "Clinical Snapshot", to: withPatientQuery("/explorer", patientId) },
+    { key: "history", label: "History", to: withPatientQuery("/explorer/history", patientId) },
+    { key: "journey", label: "Care Journey", to: withPatientQuery("/explorer/care-journey", patientId) },
+    { key: "sources", label: "FHIR Sources", to: withPatientQuery("/explorer/patient-data", patientId) },
+  ];
+
+  const aggregatorLinks: { key: string; label: string; to: string }[] = [
+    { key: "walkthrough", label: "Walkthrough", to: withPatientQuery("/aggregate", patientId) },
+    { key: "portalSources", label: "Portal Sources", to: withPatientQuery("/aggregate", patientId) },
+    { key: "cleaningQueue", label: "Cleaning Queue", to: withPatientQuery("/aggregate", patientId) },
+    { key: "publishedChart", label: "Published Chart", to: withPatientQuery("/charts", patientId) },
+  ];
+
+  const clinicalInsightLinks: { key: AppEnvironment | "profile" | "qa" | "caregiver"; label: string; to: string }[] = [
+    { key: "clinical", label: "Overview", to: withPatientQuery("/clinical-insights", patientId) },
+    { key: "preop", label: "Pre-Op Support", to: withPatientQuery("/preop", patientId) },
+    { key: "profile", label: "Patient Briefing", to: withPatientQuery("/journey", patientId) },
+    { key: "qa", label: "Chart Q&A", to: withPatientQuery("/explorer/assistant", patientId) },
+    { key: "caregiver", label: "Medication Holds", to: withPatientQuery("/explorer/safety", patientId) },
+  ];
+
+  const internalToolLinks: { key: string; label: string; to: string }[] = [
+    { key: "dataLab", label: "Data Lab", to: "/analysis" },
+    { key: "catalog", label: "Data Catalog", to: "/catalog" },
+    { key: "primer", label: "FHIR Primer", to: "/analysis/fhir-primer" },
+    { key: "methodology", label: "Methodology", to: "/analysis/methodology" },
+    { key: "coverage", label: "Coverage", to: "/analysis/coverage" },
+  ];
+
+  const subnav =
+    topArea === "aggregator"
+      ? {
+          label: "Data aggregation",
+          links: aggregatorLinks,
+          tone: "blue",
+        }
+      : topArea === "record"
+        ? {
+            label: "FHIR chart views",
+            links: chartLinks,
+            tone: "teal",
+          }
+        : topArea === "clinical"
+          ? {
+              label: "Private clinical insights",
+              links: clinicalInsightLinks,
+              tone: "amber",
+            }
+          : topArea === "internal"
+            ? {
+                label: "Internal tools",
+                links: internalToolLinks,
+                tone: "green",
+              }
+            : {
+                label: "Marketplace modules",
+                links: marketplaceLinks,
+                tone: "blue",
+              };
+
+  const subnavTone =
+    subnav.tone === "amber"
+      ? {
+          wrap: "border-[#f6dfc9] bg-[#fff8f1]",
+          label: "text-[#9a5a16]",
+          active: "bg-white text-[#9a5a16] shadow-sm",
+        }
+      : subnav.tone === "teal" || subnav.tone === "green"
+        ? {
+            wrap: "border-[#cdeee9] bg-[#f4fffc]",
+            label: "text-[#0f766e]",
+            active: "bg-white text-[#0f766e] shadow-sm",
+          }
+        : {
+            wrap: "border-[#dfe4ff] bg-[#f7f8ff]",
+            label: "text-[#5b76fe]",
+            active: "bg-white text-[#5b76fe] shadow-sm",
+          };
+
+  const isSubnavActive = (key: string): boolean => {
+    if (key === "marketplace") return location.pathname.startsWith("/marketplace");
+    if (key === "trials") return location.pathname.startsWith("/trials");
+    if (key === "medication") return location.pathname.startsWith("/medication-access");
+    if (key === "sharing" || key === "grants" || key === "research") return location.pathname.startsWith("/sharing");
+    if (key === "secondOpinion") return location.pathname.startsWith("/second-opinion");
+    if (key === "chartHome") return location.pathname.startsWith("/charts") || location.pathname.startsWith("/record");
+    if (key === "snapshot") return location.pathname === "/explorer";
+    if (key === "history") return location.pathname.startsWith("/explorer/history");
+    if (key === "journey") return location.pathname.startsWith("/explorer/care-journey");
+    if (key === "sources") return location.pathname.startsWith("/explorer/patient-data");
+    if (key === "walkthrough") return location.pathname.startsWith("/aggregate");
+    if (key === "publishedChart") return location.pathname.startsWith("/charts");
+    if (key === "clinical") return location.pathname.startsWith("/clinical-insights");
+    if (key === "preop") return location.pathname.startsWith("/preop");
+    if (key === "profile") return location.pathname === "/journey";
+    if (key === "qa") return location.pathname.startsWith("/explorer/assistant");
+    if (key === "caregiver") return location.pathname.startsWith("/explorer/safety");
+    if (key === "dataLab") return location.pathname === "/analysis";
+    if (key === "catalog") return location.pathname.startsWith("/catalog");
+    if (key === "primer") return location.pathname.startsWith("/analysis/fhir-primer");
+    if (key === "methodology") return location.pathname.startsWith("/analysis/methodology");
+    if (key === "coverage") return location.pathname.startsWith("/analysis/coverage");
+    return false;
+  };
 
   const navigate = useNavigate();
 
@@ -707,12 +954,18 @@ export function Layout({ children }: LayoutProps) {
     const base =
       location.pathname.startsWith("/explorer") ||
       location.pathname.startsWith("/record") ||
+      location.pathname.startsWith("/charts") ||
+      location.pathname.startsWith("/aggregate") ||
+      location.pathname.startsWith("/clinical-insights") ||
       location.pathname.startsWith("/preop") ||
       location.pathname.startsWith("/journey") ||
       location.pathname.startsWith("/trials") ||
-      location.pathname.startsWith("/medication-access")
+      location.pathname.startsWith("/medication-access") ||
+      location.pathname.startsWith("/marketplace") ||
+      location.pathname.startsWith("/sharing") ||
+      location.pathname.startsWith("/second-opinion")
         ? location.pathname
-        : "/explorer";
+        : "/charts";
     navigate(`${base}?patient=${id}`);
   };
 
@@ -742,18 +995,18 @@ export function Layout({ children }: LayoutProps) {
         onClose={() => setPatientPickerOpen(false)}
       />
 
-      <div className={`h-screen overflow-hidden ${isAnalysis ? "bg-[#edf7f5]" : "bg-[#f5f6f8]"}`}>
+      <div className={`h-screen overflow-hidden ${isInternal ? "bg-[#edf7f5]" : "bg-[#f5f6f8]"}`}>
         <header
-          className={`border-b border-[#e9eaef] ${isAnalysis ? "bg-[#f7fffc]" : "bg-white"}`}
-          style={{ height: 72 }}
+          className={`border-b border-[#e9eaef] ${isInternal ? "bg-[#f7fffc]" : "bg-white"}`}
+          style={{ height: headerHeight }}
         >
           <div className="flex h-full flex-col justify-center gap-2 px-4 lg:px-6">
             <div className="flex items-center justify-between gap-4">
               <Link to="/" className="min-w-0 group cursor-pointer no-underline">
                 <div className="flex items-center gap-2">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-[#a5a8b5] group-hover:text-[#5b76fe] transition-colors">EHI Ignite</p>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-[#a5a8b5] group-hover:text-[#5b76fe] transition-colors">EHI Exchange Platform</p>
                   <span className="rounded px-1.5 py-0.5 text-[10px] font-medium leading-none text-[#555a6a] bg-[#f5f6f8] border border-[#e9eaef]">
-                    Synthetic data · Synthea R4
+                    Aggregate once · Activate anywhere
                   </span>
                 </div>
                 <p className="truncate text-sm font-semibold text-[#1c1c1e] group-hover:text-[#5b76fe] transition-colors">
@@ -761,8 +1014,8 @@ export function Layout({ children }: LayoutProps) {
                 </p>
               </Link>
 
-              <div className="flex items-center gap-2">
-                {!isAnalysis && (
+              <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
+                {!isInternal && (
                   <PatientSelector
                     patientId={patientId}
                     onSelect={handleSelectPatient}
@@ -770,15 +1023,15 @@ export function Layout({ children }: LayoutProps) {
                   />
                 )}
 
-                <nav className="flex items-center gap-1 rounded-xl border border-[#e9eaef] bg-white p-1">
-                  {moduleLinks.map((link) => {
-                    const active = environment === link.key;
-                    const activeClass = link.key === "analysis" ? "bg-[#dff6ef] text-[#0f766e]" : "bg-[#eef1ff] text-[#5b76fe]";
+                <nav className="flex min-w-0 max-w-[820px] items-center gap-1 overflow-x-auto rounded-xl border border-[#e9eaef] bg-white p-1">
+                  {topLinks.map((link) => {
+                    const active = topArea === link.key;
+                    const activeClass = link.key === "internal" ? "bg-[#dff6ef] text-[#0f766e]" : "bg-[#eef1ff] text-[#5b76fe]";
                     return (
                       <Link
                         key={link.key}
                         to={link.to}
-                        className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors lg:text-sm ${
+                        className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors lg:text-sm ${
                           active ? activeClass : "text-[#667085] hover:text-[#1f2937]"
                         }`}
                       >
@@ -789,22 +1042,44 @@ export function Layout({ children }: LayoutProps) {
                 </nav>
               </div>
             </div>
+
+            <div className={`flex min-w-0 items-center gap-2 rounded-xl border px-2 py-1.5 ${subnavTone.wrap}`}>
+              <span className={`hidden shrink-0 px-2 text-[10px] font-semibold uppercase tracking-wider md:inline ${subnavTone.label}`}>
+                {subnav.label}
+              </span>
+              <nav className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
+                {subnav.links.map((link) => {
+                  const active = isSubnavActive(String(link.key));
+                  return (
+                    <Link
+                      key={link.key}
+                      to={link.to}
+                      className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+                        active ? subnavTone.active : "text-[#667085] hover:bg-white/70 hover:text-[#1f2937]"
+                      }`}
+                    >
+                      {link.label}
+                    </Link>
+                  );
+                })}
+              </nav>
+            </div>
           </div>
         </header>
 
-        <div className="flex h-[calc(100vh-72px)] flex-col overflow-hidden lg:flex-row">
+        <div className="flex flex-col overflow-hidden lg:flex-row" style={{ height: `calc(100vh - ${headerHeight}px)` }}>
           <aside
             className={`relative flex max-h-[50vh] w-full shrink-0 flex-col overflow-hidden border-b border-r border-[#e9eaef] transition-all duration-200 lg:max-h-full lg:border-b-0 ${
               sidebarCollapsed ? "lg:w-14" : "lg:w-72"
-            } ${isAnalysis ? "bg-[#f7fffc]" : "bg-white"}`}
+            } ${isInternal ? "bg-[#f7fffc]" : "bg-white"}`}
           >
-            {!isAnalysis && (
+            {!isInternal && (
               <>
                 {/* Workspace header + collapse toggle */}
                 <div className="shrink-0 border-b border-[#e9eaef] px-2 pb-3 pt-4 lg:px-3">
                   <div className="flex items-center justify-between">
                     <div className={`flex items-center gap-2 ${sidebarCollapsed ? "justify-center w-full" : ""}`}>
-                      <WorkspaceIcon size={18} className="shrink-0 text-[#5b76fe]" />
+                      <WorkspaceIcon size={18} className={`shrink-0 ${sidebarTone.icon}`} />
                       {!sidebarCollapsed && (
                         <span className="text-sm font-semibold tracking-tight text-[#1c1c1e]">{workspace.sidebarTitle}</span>
                       )}
@@ -839,7 +1114,7 @@ export function Layout({ children }: LayoutProps) {
                               {advancedOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                             </button>
                           ) : (
-                            <p className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-wider text-[#a5a8b5]">
+                            <p className={`mb-2 px-2 text-[10px] font-semibold uppercase tracking-wider ${sidebarTone.group}`}>
                               {group.label}
                             </p>
                           )
@@ -855,8 +1130,8 @@ export function Layout({ children }: LayoutProps) {
                                 className={({ isActive }) =>
                                   `flex items-center rounded-lg transition-colors ${
                                     sidebarCollapsed
-                                      ? `justify-center p-2.5 ${isActive ? "bg-[#eef1ff] text-[#5b76fe]" : "text-[#555a6a] hover:bg-[#f5f6f8] hover:text-[#1c1c1e]"}`
-                                      : `gap-3 px-3 py-2.5 text-sm ${isActive ? "bg-[#eef1ff] font-medium text-[#5b76fe]" : "text-[#555a6a] hover:bg-[#f5f6f8] hover:text-[#1c1c1e]"}`
+                                      ? `justify-center p-2.5 ${isActive ? sidebarTone.activeCollapsed : `text-[#555a6a] ${sidebarTone.hover}`}`
+                                      : `gap-3 px-3 py-2.5 text-sm ${isActive ? sidebarTone.active : `text-[#555a6a] ${sidebarTone.hover}`}`
                                   }`
                                 }
                               >
@@ -878,14 +1153,14 @@ export function Layout({ children }: LayoutProps) {
               </>
             )}
 
-            {isAnalysis && (
+            {isInternal && (
               <>
                 <div className="shrink-0 border-b border-[#d5ebe5] px-2 pb-3 pt-4 lg:px-3">
                   <div className="flex items-center justify-between">
                     <div className={`flex items-center gap-2 ${sidebarCollapsed ? "justify-center w-full" : ""}`}>
-                      <BookMarked size={18} className="shrink-0 text-[#0f766e]" />
+                      <WorkspaceIcon size={18} className="shrink-0 text-[#0f766e]" />
                       {!sidebarCollapsed && (
-                        <span className="text-sm font-semibold tracking-tight text-[#0f172a]">Data Lab</span>
+                        <span className="text-sm font-semibold tracking-tight text-[#0f172a]">{workspace.sidebarTitle}</span>
                       )}
                     </div>
                     <button
@@ -897,7 +1172,7 @@ export function Layout({ children }: LayoutProps) {
                     </button>
                   </div>
                   {!sidebarCollapsed && (
-                    <p className="mt-1 text-xs text-[#55706c]">Definitions, methodology, and reliability evidence</p>
+                    <p className="mt-1 text-xs text-[#55706c]">{workspace.subtitle}</p>
                   )}
                 </div>
 
@@ -925,7 +1200,7 @@ export function Layout({ children }: LayoutProps) {
                   {!sidebarCollapsed && (
                     <p className="mb-2 px-2 text-xs font-medium uppercase tracking-wider text-[#55706c]">Data Views</p>
                   )}
-                  {ANALYSIS_NAV_LINKS.map(({ to, label, icon: Icon, description }) => (
+                  {INTERNAL_NAV_LINKS.map(({ to, label, icon: Icon, description }) => (
                     <NavLink
                       key={to}
                       to={to}
@@ -961,7 +1236,7 @@ export function Layout({ children }: LayoutProps) {
             )}
           </aside>
 
-          <main className={`flex-1 overflow-y-auto px-4 py-3 ${isAnalysis ? "bg-[#edf7f5]" : "bg-[#f5f6f8]"}`}>
+          <main className={`flex-1 overflow-y-auto px-4 py-3 ${isInternal ? "bg-[#edf7f5]" : "bg-[#f5f6f8]"}`}>
             {children}
           </main>
         </div>

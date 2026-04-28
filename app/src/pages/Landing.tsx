@@ -1,368 +1,198 @@
-import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 import {
-  Activity,
-  ShieldCheck,
-  Clock,
-  MessageSquare,
-  BarChart3,
   ArrowRight,
-  AlertTriangle,
-  CheckCircle,
-  ShieldAlert,
-  Heart,
+  Boxes,
+  ClipboardCheck,
+  Database,
   FileText,
-  Pill,
-  Baby,
+  GitBranch,
+  HelpCircle,
+  Sparkles,
+  Trophy,
 } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
-import { api } from "../api/client";
-import type { ClassificationsResponse } from "../types";
 
-const CATEGORY_CONFIG: Record<
-  string,
-  { label: string; color: string; textColor: string; icon: LucideIcon }
-> = {
-  high_surgical_risk: { label: "High Surgical Risk", color: "#ffc6c6", textColor: "#600000", icon: AlertTriangle },
-  low_risk_routine: { label: "Low Risk / Routine", color: "#c3faf5", textColor: "#187574", icon: CheckCircle },
-  polypharmacy: { label: "Polypharmacy", color: "#ffe6cd", textColor: "#744000", icon: Pill },
-  potential_drug_interactions: { label: "Drug Interactions", color: "#ffc6c6", textColor: "#600000", icon: ShieldAlert },
-  pediatric: { label: "Pediatric", color: "#eef1ff", textColor: "#5b76fe", icon: Baby },
-  elderly_complex: { label: "Elderly Complex", color: "#ffe6cd", textColor: "#744000", icon: Heart },
-  chronic_disease_cascade: { label: "Chronic Disease Cascade", color: "#ffd8f4", textColor: "#7a1057", icon: Activity },
-  minimal_record: { label: "Minimal Record", color: "#f5f6f8", textColor: "#555a6a", icon: FileText },
-};
+const platformCards = [
+  {
+    title: "Open the Platform",
+    body: "Start in the working app shell with Data Aggregator, FHIR Charts, Clinical Insights, Marketplace, and Internal Tools.",
+    to: "/aggregate",
+    action: "Enter platform",
+    icon: GitBranch,
+    primary: true,
+  },
+  {
+    title: "Start Here: Guided Tour",
+    body: "Learn what the platform is supposed to show before jumping into the working app screens.",
+    to: "/guided-tour",
+    action: "Start learning",
+    icon: Sparkles,
+  },
+  {
+    title: "Pool of Patient Records",
+    body: "Browse synthetic patients and use one to walk through chart collection, cleaning, and downstream use cases.",
+    to: "/records-pool",
+    action: "Browse records",
+    icon: Database,
+  },
+];
 
-function formatCategoryName(key: string): string {
-  return key
-    .split("_")
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(" ");
-}
+const contextCards = [
+  {
+    title: "System Architecture",
+    body: "How scattered sources flow into Data Aggregator, FHIR Charts, private insights, marketplace modules, sharing, and internal tools.",
+    to: "/architecture",
+    action: "View architecture",
+    icon: Boxes,
+  },
+  {
+    title: "Product Direction",
+    body: "The product direction is a patient-owned data layer with focused clinical and marketplace modules built on top.",
+    to: "/clinical-insights",
+    action: "View modules",
+    icon: Sparkles,
+  },
+  {
+    title: "Data Lab",
+    body: "The internal explanation layer for FHIR quality, field coverage, trust boundaries, and module contracts.",
+    to: "/analysis",
+    action: "Open Data Lab",
+    icon: ClipboardCheck,
+  },
+  {
+    title: "What is FHIR?",
+    body: "A plain-language primer on the health data exchange format behind the platform.",
+    to: "/analysis/fhir-primer",
+    action: "Read primer",
+    icon: HelpCircle,
+  },
+];
 
 export function Landing() {
-  const navigate = useNavigate();
-
-  const { data: classifications, isLoading: classificationsLoading } = useQuery<ClassificationsResponse>({
-    queryKey: ["classifications"],
-    queryFn: api.getClassifications,
-  });
-
   return (
-    <div className="min-h-screen bg-white">
-      {/* Header */}
-      <header className="border-b border-[#e9eaef] bg-white px-6 py-4">
-        <div className="mx-auto flex max-w-5xl items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Activity size={20} className="text-[#5b76fe]" />
-            <span className="text-lg font-semibold tracking-tight text-[#1c1c1e]">
-              EHI Ignite
-            </span>
-          </div>
-          <a
-            href="https://github.com/blakethom8/ehi-ignite-challenge"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sm text-[#555a6a] hover:text-[#1c1c1e]"
+    <div className="min-h-screen bg-[#f5f6f8] text-[#1c1c1e]">
+      <header className="border-b border-[#e1e4eb] bg-white px-6 py-4">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-6">
+          <Link to="/" className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#9aa1b2]">
+              EHI Exchange Platform
+            </p>
+            <p className="text-base font-semibold text-[#1c1c1e]">Application overview</p>
+          </Link>
+          <Link
+            to="/aggregate"
+            className="hidden items-center gap-2 rounded-xl bg-[#5b76fe] px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#445ee8] sm:inline-flex"
           >
-            GitHub
-          </a>
+            Enter platform
+            <ArrowRight size={15} />
+          </Link>
         </div>
       </header>
 
-      {/* Hero */}
-      <section className="px-6 py-16 lg:py-24">
-        <div className="mx-auto max-w-3xl text-center">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-[#5b76fe]">
-            HHS EHI Ignite Challenge
-          </p>
-          <h1 className="mb-4 text-3xl font-bold tracking-tight text-[#1c1c1e] lg:text-5xl">
-            The right 5 facts in 30 seconds
-          </h1>
-          <p className="mx-auto mb-10 max-w-xl text-lg leading-relaxed text-[#555a6a]">
-            Clinicians reviewing a chart before surgery don't need 5,000 FHIR resources.
-            They need medication risks, active conditions, and safety flags — surfaced
-            instantly from the patient's complete electronic health record.
-          </p>
-          <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <button
-              onClick={() => navigate("/explorer")}
-              className="flex items-center gap-2 rounded-xl bg-[#5b76fe] px-6 py-3 text-sm font-medium text-white shadow-sm transition-colors hover:bg-[#2a41b6]"
-            >
-              Open Clinical Dashboard
-              <ArrowRight size={16} />
-            </button>
-            <button
-              onClick={() => navigate("/analysis")}
-              className="flex items-center gap-2 rounded-xl border border-[#e9eaef] bg-white px-6 py-3 text-sm font-medium text-[#555a6a] shadow-sm transition-colors hover:border-[#5b76fe] hover:text-[#5b76fe]"
-            >
-              Explore the Data
-              <ArrowRight size={16} />
-            </button>
-          </div>
-          <p className="mt-5 text-xs text-[#a5a8b5]">
-            No PHI · Synthetic Synthea R4 data · Local compute
-          </p>
-        </div>
-      </section>
-
-      {/* Use Case */}
-      <section className="border-t border-[#e9eaef] bg-[#fafbfc] px-6 py-16">
-        <div className="mx-auto max-w-4xl">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-[#a5a8b5]">
-            Use Case
-          </p>
-          <h2 className="mb-3 text-2xl font-bold tracking-tight text-[#1c1c1e]">
-            Pre-operative chart review
-          </h2>
-          <p className="mb-10 max-w-2xl text-[#555a6a] leading-relaxed">
-            A surgeon has 60 seconds between cases to review the next patient's chart.
-            The EHR export is thousands of records deep. This tool extracts the
-            clinically relevant signal — medication risks, drug interactions, active
-            problem list, and lab trends — so the surgeon walks into the OR informed,
-            not overwhelmed.
-          </p>
-
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {[
-              {
-                icon: ShieldCheck,
-                title: "Safety Panel",
-                desc: "Drug class risk flags, allergy criticality, and interaction checks — the pre-op essentials.",
-                color: "#ffc6c6",
-                textColor: "#600000",
-              },
-              {
-                icon: Clock,
-                title: "Care Journey",
-                desc: "Medication episodes, condition arcs, and encounters on an interactive Gantt timeline.",
-                color: "#c3faf5",
-                textColor: "#187574",
-              },
-              {
-                icon: MessageSquare,
-                title: "Provider Assistant",
-                desc: "Ask questions about the patient's chart. Claude answers with evidence-backed citations.",
-                color: "#eef1ff",
-                textColor: "#5b76fe",
-              },
-            ].map(({ icon: Icon, title, desc, color, textColor }) => (
-              <div
-                key={title}
-                className="rounded-2xl border border-[#e9eaef] bg-white p-6"
-              >
-                <div
-                  className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl"
-                  style={{ backgroundColor: color }}
-                >
-                  <Icon size={18} style={{ color: textColor }} />
-                </div>
-                <h3 className="mb-1 text-sm font-semibold text-[#1c1c1e]">{title}</h3>
-                <p className="text-sm leading-relaxed text-[#555a6a]">{desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Featured Patients */}
-      <section className="border-t border-[#e9eaef] px-6 py-16">
-        <div className="mx-auto max-w-5xl">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-[#a5a8b5]">
-            Featured Patients
-          </p>
-          <h2 className="mb-3 text-2xl font-bold tracking-tight text-[#1c1c1e]">
-            Explore by clinical profile
-          </h2>
-          <p className="mb-10 max-w-2xl text-[#555a6a] leading-relaxed">
-            Curated examples from each classification category — pick a profile to jump
-            straight into a representative patient record.
-          </p>
-
-          {classificationsLoading ? (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {Array.from({ length: 8 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="animate-pulse rounded-2xl border border-[#e9eaef] bg-white p-6"
-                >
-                  <div className="mb-4 h-10 w-10 rounded-xl bg-[#f0f1f4]" />
-                  <div className="mb-2 h-4 w-2/3 rounded bg-[#f0f1f4]" />
-                  <div className="mb-4 h-3 w-1/3 rounded bg-[#f0f1f4]" />
-                  <div className="space-y-2">
-                    <div className="h-3 w-full rounded bg-[#f0f1f4]" />
-                    <div className="h-3 w-5/6 rounded bg-[#f0f1f4]" />
-                    <div className="h-3 w-4/6 rounded bg-[#f0f1f4]" />
-                  </div>
-                </div>
-              ))}
+      <main className="px-6 py-8">
+        <section className="mx-auto max-w-7xl">
+          <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-end">
+            <div>
+              <p className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-[#5b76fe]">
+                EHI Ignite concept
+              </p>
+              <h1 className="max-w-4xl text-4xl font-semibold tracking-tight text-[#18191f] lg:text-6xl">
+                Turn scattered patient records into useful clinical workflows.
+              </h1>
             </div>
-          ) : classifications ? (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {Object.entries(classifications.categories).map(([key, category]) => {
-                const config = CATEGORY_CONFIG[key];
-                const Icon = config?.icon ?? FileText;
-                const label = config?.label ?? formatCategoryName(key);
-                const color = config?.color ?? "#f5f6f8";
-                const textColor = config?.textColor ?? "#555a6a";
-                const ex = category.best_example;
+            <p className="max-w-2xl text-base leading-7 text-[#63708a]">
+              The platform pulls patient data from many places, cleans it into a patient-owned FHIR Chart, then lets that chart power focused modules: pre-op review, clinical understanding, trial matching, medication access, sharing, and internal data review.
+            </p>
+          </div>
 
-                return (
-                  <div
-                    key={key}
-                    className="group flex flex-col rounded-2xl border border-[#e9eaef] bg-white p-6 transition-all hover:border-[#5b76fe] hover:shadow-md"
-                  >
-                    {/* Icon + badge row */}
-                    <div className="mb-4 flex items-start justify-between">
-                      <div
-                        className="flex h-10 w-10 items-center justify-center rounded-xl"
-                        style={{ backgroundColor: color }}
-                      >
-                        <Icon size={18} style={{ color: textColor }} />
-                      </div>
-                      <span
-                        className="rounded-full px-2.5 py-0.5 text-xs font-medium"
-                        style={{ backgroundColor: color, color: textColor }}
-                      >
-                        {category.count} patients
-                      </span>
-                    </div>
-
-                    {/* Category name */}
-                    <h3 className="mb-3 text-sm font-semibold text-[#1c1c1e]">
-                      {label}
-                    </h3>
-
-                    {/* Best example patient */}
-                    <div className="mb-4 flex-1 space-y-1 text-xs text-[#555a6a]">
-                      <p className="font-medium text-[#1c1c1e]">
-                        {ex.name}, {ex.age}y
-                      </p>
-                      <p>{ex.total_resources} resources</p>
-                      <p>{ex.n_active_conditions} conditions</p>
-                      <p>{ex.n_active_medications} medications</p>
-                    </div>
-
-                    {/* Link */}
-                    <button
-                      onClick={() => navigate(`/explorer?patient=${ex.patient_id}`)}
-                      className="flex items-center gap-1 text-xs font-medium text-[#5b76fe] transition-all group-hover:gap-2"
-                    >
-                      View patient <ArrowRight size={12} />
-                    </button>
+          <div className="mt-8 grid gap-4 lg:grid-cols-3">
+            {platformCards.map((card) => {
+              const Icon = card.icon;
+              return (
+                <Link
+                  key={card.title}
+                  to={card.to}
+                  className={`group rounded-[24px] border p-6 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${
+                    card.primary
+                      ? "border-[#cfd7ff] bg-[#f3f5ff]"
+                      : "border-[#e1e6ef] bg-white"
+                  }`}
+                >
+                  <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-white text-[#5b76fe] shadow-sm">
+                    <Icon size={22} />
                   </div>
+                  <h2 className="text-xl font-semibold">{card.title}</h2>
+                  <p className="mt-2 min-h-[78px] text-sm leading-6 text-[#667289]">{card.body}</p>
+                  <span className="mt-5 inline-flex items-center gap-1 text-sm font-semibold text-[#5b76fe] transition-all group-hover:gap-2">
+                    {card.action}
+                    <ArrowRight size={14} />
+                  </span>
+                </Link>
+              );
+            })}
+          </div>
+
+          <div className="mt-6 grid gap-6 lg:grid-cols-[0.85fr_1.15fr]">
+            <section className="rounded-[24px] border border-[#e1e6ef] bg-white p-6 shadow-sm">
+              <div className="mb-5 flex items-center gap-2">
+                <Trophy size={18} className="text-[#5b76fe]" />
+                <h2 className="text-lg font-semibold">EHI Ignite Challenge</h2>
+              </div>
+              <p className="text-sm leading-6 text-[#667289]">
+                This project is built for the EHI Ignite Challenge: transforming electronic health information into actionable insights. The pitch is not another patient portal or generic FHIR browser. It is a platform for turning raw, scattered records into the right workflow-specific actions.
+              </p>
+              <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                {[
+                  ["Problem", "Records are fragmented and hard to parse quickly."],
+                  ["Layer", "The FHIR Chart is the cleaned, source-aware patient record."],
+                  ["Value", "Modules turn chart facts into clinical and patient actions."],
+                ].map(([title, body]) => (
+                  <div key={title} className="rounded-2xl border border-[#e4e8f0] bg-[#fbfcff] p-4">
+                    <h3 className="text-sm font-semibold">{title}</h3>
+                    <p className="mt-1 text-xs leading-5 text-[#667289]">{body}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              {contextCards.map((card) => {
+                const Icon = card.icon;
+                return (
+                  <Link
+                    key={card.title}
+                    to={card.to}
+                    className="group rounded-[24px] border border-[#e1e6ef] bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-[#cfd7ff] hover:shadow-md"
+                  >
+                    <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-[#eef1ff] text-[#5b76fe]">
+                      <Icon size={20} />
+                    </div>
+                    <h2 className="font-semibold">{card.title}</h2>
+                    <p className="mt-2 min-h-[96px] text-sm leading-6 text-[#667289]">{card.body}</p>
+                    <span className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-[#5b76fe] transition-all group-hover:gap-2">
+                      {card.action}
+                      <ArrowRight size={14} />
+                    </span>
+                  </Link>
                 );
               })}
-            </div>
-          ) : null}
-        </div>
-      </section>
+            </section>
+          </div>
 
-      {/* Two paths */}
-      <section className="border-t border-[#e9eaef] px-6 py-16">
-        <div className="mx-auto grid max-w-4xl gap-6 lg:grid-cols-2">
-          <button
-            onClick={() => navigate("/explorer")}
-            className="group cursor-pointer rounded-2xl border border-[#e9eaef] bg-white p-8 text-left transition-all hover:border-[#5b76fe] hover:shadow-md"
-          >
-            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-[#eef1ff]">
-              <Activity size={22} className="text-[#5b76fe]" />
-            </div>
-            <h3 className="mb-2 text-lg font-bold text-[#1c1c1e]">
-              Clinical Dashboard
-            </h3>
-            <p className="mb-4 text-sm leading-relaxed text-[#555a6a]">
-              Select a patient and explore their complete health record through
-              clinical views — safety flags, medication timeline, condition acuity,
-              lab trends, and AI-powered chart Q&A.
-            </p>
-            <span className="flex items-center gap-1 text-sm font-medium text-[#5b76fe] transition-all group-hover:gap-2">
-              Open dashboard <ArrowRight size={14} />
-            </span>
-          </button>
-
-          <button
-            onClick={() => navigate("/analysis")}
-            className="group cursor-pointer rounded-2xl border border-[#e9eaef] bg-white p-8 text-left transition-all hover:border-[#00b473] hover:shadow-md"
-          >
-            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-[#e6f9f0]">
-              <BarChart3 size={22} className="text-[#00b473]" />
-            </div>
-            <h3 className="mb-2 text-lg font-bold text-[#1c1c1e]">
-              Data Lab
-            </h3>
-            <p className="mb-4 text-sm leading-relaxed text-[#555a6a]">
-              Explore the underlying data — corpus statistics across 1,180 synthetic
-              patients, field coverage profiling, observation distributions, FHIR
-              format deep dive, and data methodology.
-            </p>
-            <span className="flex items-center gap-1 text-sm font-medium text-[#00b473] transition-all group-hover:gap-2">
-              Explore data <ArrowRight size={14} />
-            </span>
-          </button>
-        </div>
-      </section>
-
-      {/* How it works */}
-      <section className="border-t border-[#e9eaef] bg-[#fafbfc] px-6 py-16">
-        <div className="mx-auto max-w-4xl">
-          <h2 className="mb-8 text-2xl font-bold tracking-tight text-[#1c1c1e]">
-            How it works
-          </h2>
-          <div className="grid gap-6 sm:grid-cols-3">
-            {[
-              {
-                step: "1",
-                title: "FHIR bundles in",
-                desc: "1,180 Synthea R4 patient bundles are parsed and loaded. Each contains conditions, medications, labs, encounters, and procedures.",
-              },
-              {
-                step: "2",
-                title: "SQL-on-FHIR warehouse",
-                desc: "ViewDefinitions transform raw FHIR resources into queryable SQLite tables — enriched with drug classifications, episode detection, and derived views.",
-              },
-              {
-                step: "3",
-                title: "Clinical intelligence out",
-                desc: "Structured views surface safety flags, risk tiers, and medication timelines. The AI assistant answers free-text questions grounded in the patient's actual record.",
-              },
-            ].map(({ step, title, desc }) => (
-              <div key={step}>
-                <div className="mb-3 flex h-8 w-8 items-center justify-center rounded-full bg-[#5b76fe] text-sm font-bold text-white">
-                  {step}
+          <div className="mt-6 rounded-[24px] border border-[#c9f0e7] bg-[#effbf8] p-6">
+            <div className="grid gap-4 lg:grid-cols-[0.75fr_1.25fr] lg:items-center">
+              <div>
+                <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-white text-[#008f7a] shadow-sm">
+                  <FileText size={20} />
                 </div>
-                <h3 className="mb-1 text-sm font-semibold text-[#1c1c1e]">{title}</h3>
-                <p className="text-sm leading-relaxed text-[#555a6a]">{desc}</p>
+                <h2 className="text-xl font-semibold">Where formal walkthroughs should live</h2>
               </div>
-            ))}
+              <p className="text-sm leading-6 text-[#486274]">
+                The home page should stay simple. More guided flows belong in separate walkthrough surfaces, especially the Pool of Patient Records, where a reviewer can select a synthetic patient and see how data collection, cleaning, FHIR Chart creation, and downstream modules fit together.
+              </p>
+            </div>
           </div>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="border-t border-[#e9eaef] px-6 py-8">
-        <div className="mx-auto flex max-w-4xl flex-col items-center justify-between gap-2 text-xs text-[#a5a8b5] sm:flex-row">
-          <span>Built for the HHS EHI Ignite Challenge 2026</span>
-          <div className="flex gap-4">
-            <a
-              href="https://ehignitechallenge.org/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-[#555a6a]"
-            >
-              Competition site
-            </a>
-            <a
-              href="https://github.com/blakethom8/ehi-ignite-challenge"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-[#555a6a]"
-            >
-              Source code
-            </a>
-          </div>
-        </div>
-      </footer>
+        </section>
+      </main>
     </div>
   );
 }

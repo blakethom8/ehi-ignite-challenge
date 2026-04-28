@@ -22,16 +22,32 @@ import type {
   ClassificationsResponse,
   AssistantSettings,
 } from "../types";
+import { mockPatients } from "./mockData";
 
 const http = axios.create({
   baseURL: "/api",
   headers: { "Content-Type": "application/json" },
 });
 
+const useMockData = import.meta.env.VITE_USE_MOCK_DATA === "true";
+
+async function getOrMock<T>(request: Promise<T>, fallback: T): Promise<T> {
+  if (useMockData) return fallback;
+  try {
+    return await request;
+  } catch (error) {
+    if (import.meta.env.DEV) {
+      console.warn("API unavailable; using frontend mock data for this request.", error);
+      return fallback;
+    }
+    throw error;
+  }
+}
+
 export const api = {
   /** Lightweight patient list — names only, no bundle loading */
   listPatients: (): Promise<PatientListItem[]> =>
-    http.get<PatientListItem[]>("/patients").then((r) => r.data),
+    getOrMock(http.get<PatientListItem[]>("/patients").then((r) => r.data), mockPatients),
 
   /** Full patient overview — loads and parses the FHIR bundle */
   getOverview: (patientId: string): Promise<PatientOverview> =>

@@ -191,6 +191,16 @@ stats = compute_patient_stats(record)
 - React Query for API state management
 - Run: `cd app && npm run dev` (runs on :5173)
 
+### Frontend mock-data mode
+
+For frontend-only layout and UX work, it is acceptable to use the mock-data fallback in `app/src/api/mockData.ts` so the React app remains usable when FastAPI is not running. Set `VITE_USE_MOCK_DATA=true` when you intentionally want mock mode.
+
+Keep this boundary explicit:
+- Mock data is for shell design, navigation, copy, and visual polish.
+- Real API data is required before committing behavior that depends on patient selection, FHIR-derived counts, clinical summaries, safety flags, or module outputs.
+- The default integration path is still FastAPI on `http://127.0.0.1:8000` through the Vite `/api` proxy.
+- Do not add scattered demo records inside React components. Put frontend mock records in `app/src/api/mockData.ts` and include a short comment explaining why the mock exists and what it is allowed to support.
+
 ### Deployment
 - **Production:** https://ehi.healthcaredataai.com (Hetzner 2 — 5.78.148.70)
 - Docker Compose + nginx + Let's Encrypt SSL

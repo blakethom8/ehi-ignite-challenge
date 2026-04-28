@@ -1,0 +1,1180 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>EHI Ignite Platform Wireframes</title>
+  <style>
+    :root {
+      --ink: #1c1c1e;
+      --slate: #555a6a;
+      --muted: #7a8091;
+      --line: #dfe2ea;
+      --soft-line: #eef0f5;
+      --canvas: #f7f8fb;
+      --white: #ffffff;
+      --blue: #5b76fe;
+      --blue-dark: #2a41b6;
+      --teal: #c3faf5;
+      --teal-ink: #187574;
+      --coral: #ffc6c6;
+      --coral-ink: #600000;
+      --orange: #ffe6cd;
+      --orange-ink: #794900;
+      --rose: #ffd8f4;
+      --green: #00b473;
+      --yellow: #fff2b8;
+      --shadow-ring: rgb(224, 226, 232) 0 0 0 1px;
+      --radius: 8px;
+      --font-display: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --font-body: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--canvas);
+      color: var(--ink);
+      font-family: var(--font-body);
+      line-height: 1.45;
+    }
+
+    button, input, select {
+      font: inherit;
+    }
+
+    .app {
+      min-height: 100vh;
+      display: grid;
+      grid-template-rows: auto 1fr;
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: rgba(255, 255, 255, 0.96);
+      border-bottom: 1px solid var(--line);
+      backdrop-filter: blur(14px);
+    }
+
+    .topbar-inner {
+      max-width: 1480px;
+      margin: 0 auto;
+      padding: 12px 24px;
+      display: grid;
+      grid-template-columns: minmax(220px, 280px) 1fr auto;
+      gap: 18px;
+      align-items: center;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .brand-mark {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      color: var(--white);
+      background: var(--blue);
+      font-weight: 800;
+      box-shadow: var(--shadow-ring);
+    }
+
+    .brand-title {
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: 15px;
+      line-height: 1.05;
+      white-space: nowrap;
+    }
+
+    .brand-subtitle {
+      color: var(--muted);
+      font-size: 11px;
+      margin-top: 2px;
+      white-space: nowrap;
+    }
+
+    .module-strip {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      overflow-x: auto;
+      padding: 2px;
+    }
+
+    .module-tab {
+      border: 1px solid var(--line);
+      background: var(--white);
+      color: var(--slate);
+      border-radius: var(--radius);
+      padding: 8px 10px;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      white-space: nowrap;
+      min-height: 38px;
+    }
+
+    .module-tab.active {
+      background: var(--ink);
+      color: var(--white);
+      border-color: var(--ink);
+    }
+
+    .module-tab.internal {
+      border-style: dashed;
+    }
+
+    .module-icon {
+      width: 18px;
+      height: 18px;
+      border-radius: 6px;
+      display: grid;
+      place-items: center;
+      font-size: 11px;
+      font-weight: 800;
+      color: var(--ink);
+      background: var(--teal);
+    }
+
+    .module-tab.active .module-icon {
+      color: var(--ink);
+      background: var(--yellow);
+    }
+
+    .account {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .search {
+      width: 220px;
+      border: 1px solid var(--line);
+      background: var(--white);
+      border-radius: var(--radius);
+      padding: 9px 12px;
+      color: var(--slate);
+    }
+
+    .avatar {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      color: var(--white);
+      background: var(--ink);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .layout {
+      max-width: 1480px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 24px;
+      display: grid;
+      grid-template-columns: 256px minmax(0, 1fr);
+      gap: 20px;
+    }
+
+    .sidebar {
+      align-self: start;
+      position: sticky;
+      top: 82px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .panel,
+    .card,
+    .screen {
+      background: var(--white);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-ring);
+    }
+
+    .patient-card {
+      padding: 16px;
+    }
+
+    .eyebrow {
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1;
+      text-transform: uppercase;
+      font-weight: 800;
+    }
+
+    .patient-name {
+      margin: 8px 0 2px;
+      font-size: 20px;
+      font-weight: 850;
+      font-family: var(--font-display);
+    }
+
+    .small {
+      color: var(--slate);
+      font-size: 13px;
+    }
+
+    .progress {
+      height: 8px;
+      border-radius: 999px;
+      background: #edf0f6;
+      overflow: hidden;
+      margin-top: 14px;
+    }
+
+    .progress span {
+      display: block;
+      height: 100%;
+      width: 78%;
+      background: var(--green);
+    }
+
+    .nav-card {
+      padding: 8px;
+    }
+
+    .nav-item {
+      width: 100%;
+      border: 0;
+      background: transparent;
+      border-radius: var(--radius);
+      padding: 10px;
+      display: grid;
+      grid-template-columns: 28px 1fr auto;
+      gap: 9px;
+      align-items: center;
+      text-align: left;
+      color: var(--slate);
+    }
+
+    .nav-item.active {
+      background: #f0f3ff;
+      color: var(--blue-dark);
+    }
+
+    .nav-item span:first-child {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      background: #eef0f5;
+      display: grid;
+      place-items: center;
+      color: var(--ink);
+      font-weight: 800;
+      font-size: 12px;
+    }
+
+    .nav-item.active span:first-child {
+      background: var(--blue);
+      color: var(--white);
+    }
+
+    .workspace {
+      display: grid;
+      gap: 22px;
+    }
+
+    .screen {
+      overflow: hidden;
+    }
+
+    .screen-header {
+      padding: 22px 24px;
+      border-bottom: 1px solid var(--soft-line);
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 18px;
+      align-items: start;
+    }
+
+    h1, h2, h3, p {
+      margin-top: 0;
+    }
+
+    h1 {
+      margin-bottom: 6px;
+      font-family: var(--font-display);
+      font-size: 30px;
+      line-height: 1.15;
+      letter-spacing: 0;
+    }
+
+    h2 {
+      margin-bottom: 8px;
+      font-family: var(--font-display);
+      font-size: 21px;
+      line-height: 1.2;
+      letter-spacing: 0;
+    }
+
+    h3 {
+      margin-bottom: 6px;
+      font-family: var(--font-display);
+      font-size: 16px;
+      line-height: 1.25;
+      letter-spacing: 0;
+    }
+
+    p {
+      margin-bottom: 0;
+      color: var(--slate);
+    }
+
+    .actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .btn {
+      border-radius: var(--radius);
+      border: 1px solid var(--line);
+      background: var(--white);
+      color: var(--ink);
+      min-height: 36px;
+      padding: 8px 12px;
+      font-weight: 750;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      white-space: nowrap;
+    }
+
+    .btn.primary {
+      background: var(--blue);
+      border-color: var(--blue);
+      color: var(--white);
+    }
+
+    .screen-body {
+      padding: 24px;
+      display: grid;
+      gap: 20px;
+    }
+
+    .grid-4 {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .stat {
+      padding: 14px;
+      border-radius: var(--radius);
+      background: #fafbfe;
+      border: 1px solid var(--soft-line);
+    }
+
+    .stat-value {
+      font-size: 22px;
+      font-weight: 850;
+      margin: 5px 0 2px;
+      font-family: var(--font-display);
+    }
+
+    .stat-note {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(130px, 1fr));
+      gap: 10px;
+    }
+
+    .flow-step {
+      position: relative;
+      min-height: 146px;
+      padding: 14px;
+      border-radius: var(--radius);
+      border: 1px solid var(--line);
+      background: var(--white);
+    }
+
+    .flow-step:not(:last-child)::after {
+      content: "";
+      position: absolute;
+      top: 34px;
+      right: -10px;
+      width: 10px;
+      height: 1px;
+      background: var(--line);
+    }
+
+    .step-number {
+      width: 26px;
+      height: 26px;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      background: var(--ink);
+      color: var(--white);
+      font-weight: 850;
+      font-size: 12px;
+      margin-bottom: 10px;
+    }
+
+    .tag-row {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      border-radius: 999px;
+      padding: 4px 8px;
+      font-size: 11px;
+      font-weight: 800;
+      background: #eef0f5;
+      color: var(--slate);
+      white-space: nowrap;
+    }
+
+    .pill.green {
+      background: rgba(0, 180, 115, 0.13);
+      color: #007e52;
+    }
+
+    .pill.blue {
+      background: #edf0ff;
+      color: var(--blue-dark);
+    }
+
+    .pill.orange {
+      background: var(--orange);
+      color: var(--orange-ink);
+    }
+
+    .pill.red {
+      background: var(--coral);
+      color: var(--coral-ink);
+    }
+
+    .pill.teal {
+      background: var(--teal);
+      color: var(--teal-ink);
+    }
+
+    .module-card {
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--white);
+      display: grid;
+      min-height: 206px;
+      align-content: start;
+      gap: 12px;
+    }
+
+    .module-card.featured {
+      border-color: #bdc8ff;
+      background: #f7f8ff;
+    }
+
+    .module-card.internal {
+      border-style: dashed;
+      background: #fafbfe;
+    }
+
+    .card-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: start;
+    }
+
+    .module-logo {
+      width: 38px;
+      height: 38px;
+      border-radius: var(--radius);
+      display: grid;
+      place-items: center;
+      font-weight: 900;
+      background: var(--teal);
+      color: var(--teal-ink);
+    }
+
+    .module-logo.rose { background: var(--rose); color: #6b2257; }
+    .module-logo.orange { background: var(--orange); color: var(--orange-ink); }
+    .module-logo.blue { background: #e3e8ff; color: var(--blue-dark); }
+    .module-logo.coral { background: var(--coral); color: var(--coral-ink); }
+
+    .module-title {
+      font-weight: 850;
+      font-size: 17px;
+      margin-bottom: 4px;
+    }
+
+    .module-desc {
+      font-size: 13px;
+      color: var(--slate);
+    }
+
+    .checklist {
+      display: grid;
+      gap: 8px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .checklist li {
+      display: grid;
+      grid-template-columns: 20px 1fr auto;
+      gap: 8px;
+      align-items: start;
+      font-size: 13px;
+      color: var(--slate);
+      padding: 8px 0;
+      border-bottom: 1px solid var(--soft-line);
+    }
+
+    .checklist li:last-child {
+      border-bottom: 0;
+    }
+
+    .dot {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: var(--teal);
+      color: var(--teal-ink);
+      font-weight: 900;
+      font-size: 10px;
+    }
+
+    .table {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr 1fr 1.4fr auto;
+      gap: 12px;
+      padding: 12px 14px;
+      align-items: center;
+      border-bottom: 1px solid var(--soft-line);
+      font-size: 13px;
+    }
+
+    .row.header {
+      background: #fafbfe;
+      color: var(--muted);
+      font-weight: 850;
+      font-size: 11px;
+      text-transform: uppercase;
+    }
+
+    .row:last-child {
+      border-bottom: 0;
+    }
+
+    .source-card {
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      display: grid;
+      gap: 10px;
+    }
+
+    .source-title {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: center;
+      font-weight: 850;
+    }
+
+    .mini-bars {
+      display: grid;
+      gap: 7px;
+    }
+
+    .bar {
+      display: grid;
+      grid-template-columns: 96px 1fr 42px;
+      gap: 8px;
+      align-items: center;
+      font-size: 12px;
+      color: var(--slate);
+    }
+
+    .bar-track {
+      height: 7px;
+      background: #edf0f6;
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .bar-track span {
+      display: block;
+      height: 100%;
+      background: var(--blue);
+    }
+
+    .split {
+      display: grid;
+      grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+      gap: 16px;
+    }
+
+    .timeline {
+      display: grid;
+      gap: 10px;
+      padding-left: 11px;
+      border-left: 2px solid var(--line);
+    }
+
+    .event {
+      position: relative;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--white);
+    }
+
+    .event::before {
+      content: "";
+      position: absolute;
+      left: -18px;
+      top: 14px;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--blue);
+      box-shadow: 0 0 0 4px var(--white);
+    }
+
+    .event strong {
+      display: block;
+      font-size: 13px;
+      margin-bottom: 2px;
+    }
+
+    .rule-box {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 14px;
+      background: #fbfcff;
+      display: grid;
+      gap: 10px;
+    }
+
+    .code {
+      border-radius: var(--radius);
+      background: #202433;
+      color: #f7f8fb;
+      padding: 12px;
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 12px;
+      overflow-x: auto;
+      white-space: pre;
+    }
+
+    .callout {
+      border-radius: var(--radius);
+      padding: 14px;
+      background: var(--teal);
+      color: var(--teal-ink);
+      display: grid;
+      gap: 6px;
+    }
+
+    .callout.warning {
+      background: var(--orange);
+      color: var(--orange-ink);
+    }
+
+    .section-label {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: -4px;
+    }
+
+    .section-label::after {
+      content: "";
+      height: 1px;
+      background: var(--line);
+      flex: 1;
+    }
+
+    @media (max-width: 1120px) {
+      .topbar-inner {
+        grid-template-columns: 1fr;
+      }
+
+      .account {
+        display: none;
+      }
+
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar {
+        position: static;
+      }
+
+      .grid-4,
+      .grid-3,
+      .grid-2,
+      .split,
+      .flow {
+        grid-template-columns: 1fr;
+      }
+
+      .flow-step::after {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="topbar-inner">
+        <div class="brand">
+          <div class="brand-mark">EHI</div>
+          <div>
+            <div class="brand-title">EHI Exchange Platform</div>
+            <div class="brand-subtitle">Aggregate once. Activate anywhere.</div>
+          </div>
+        </div>
+
+        <nav class="module-strip" aria-label="Top module marketplace navigation">
+          <button class="module-tab active"><span class="module-icon">A</span> Aggregation</button>
+          <button class="module-tab"><span class="module-icon">M</span> Module Marketplace</button>
+          <button class="module-tab"><span class="module-icon">P</span> Pre-Op Support</button>
+          <button class="module-tab"><span class="module-icon">T</span> Trial Match</button>
+          <button class="module-tab"><span class="module-icon">S</span> Second Opinion</button>
+          <button class="module-tab"><span class="module-icon">D</span> Data Sharing</button>
+          <button class="module-tab internal"><span class="module-icon">L</span> Data Lab</button>
+          <button class="module-tab internal"><span class="module-icon">C</span> Data Catalog</button>
+        </nav>
+
+        <div class="account">
+          <input class="search" value="Search patient, module, source" aria-label="Search" />
+          <div class="avatar">BT</div>
+        </div>
+      </div>
+    </header>
+
+    <main class="layout">
+      <aside class="sidebar">
+        <section class="patient-card panel">
+          <div class="eyebrow">Unified Record</div>
+          <div class="patient-name">Maya Thompson</div>
+          <div class="small">42F · 5 connected sources · consent active</div>
+          <div class="progress"><span></span></div>
+          <div class="tag-row">
+            <span class="pill green">Clean dataset 78%</span>
+            <span class="pill blue">R4 FHIR</span>
+          </div>
+        </section>
+
+        <section class="nav-card panel">
+          <button class="nav-item active"><span>1</span><strong>Onboarding</strong><small>Connect records</small></button>
+          <button class="nav-item"><span>2</span><strong>Unified Record</strong><small>Patient source of truth</small></button>
+          <button class="nav-item"><span>3</span><strong>Marketplace</strong><small>Use the data</small></button>
+          <button class="nav-item"><span>4</span><strong>Sharing</strong><small>Export packets</small></button>
+          <button class="nav-item"><span>5</span><strong>Internal Tools</strong><small>Data Lab/catalog</small></button>
+        </section>
+
+        <section class="patient-card panel">
+          <div class="eyebrow">Product Boundary</div>
+          <p class="small">Aggregation creates the clean, source-aware patient dataset. Modules consume that dataset. Data Lab explains FHIR and internal quality findings.</p>
+        </section>
+      </aside>
+
+      <section class="workspace">
+        <article class="screen">
+          <div class="screen-header">
+            <div>
+              <div class="eyebrow">Screen 1 · Patient Onboarding</div>
+              <h1>Connect records and build a clean patient dataset</h1>
+              <p>The patient-facing path is about aggregation, cleaning, source provenance, and consent. Marketplace modules come after the dataset is ready.</p>
+            </div>
+            <div class="actions">
+              <button class="btn">Upload FHIR</button>
+              <button class="btn">Connect portal</button>
+              <button class="btn primary">Continue cleanup</button>
+            </div>
+          </div>
+
+          <div class="screen-body">
+            <div class="grid-4">
+              <div class="stat">
+                <div class="eyebrow">Sources</div>
+                <div class="stat-value">5</div>
+                <div class="stat-note">2 hospitals · 2 clinics · 1 payer</div>
+              </div>
+              <div class="stat">
+                <div class="eyebrow">FHIR Resources</div>
+                <div class="stat-value">4,812</div>
+                <div class="stat-note">R4 bundles and bulk exports</div>
+              </div>
+              <div class="stat">
+                <div class="eyebrow">Reconciled Facts</div>
+                <div class="stat-value">1,284</div>
+                <div class="stat-note">deduped clinical facts</div>
+              </div>
+              <div class="stat">
+                <div class="eyebrow">Review Needed</div>
+                <div class="stat-value">17</div>
+                <div class="stat-note">conflicts or sparse fields</div>
+              </div>
+            </div>
+
+            <div class="flow">
+              <div class="flow-step">
+                <div class="step-number">1</div>
+                <h3>Connect</h3>
+                <p class="small">FHIR bundles, patient portal exports, payer files, and future Bulk FHIR endpoints.</p>
+                <div class="tag-row"><span class="pill blue">FHIR R4</span><span class="pill">PDF future</span></div>
+              </div>
+              <div class="flow-step">
+                <div class="step-number">2</div>
+                <h3>Normalize</h3>
+                <p class="small">Project raw FHIR into canonical tables using ViewDefinitions and parser fields.</p>
+                <div class="tag-row"><span class="pill teal">SQL-on-FHIR</span></div>
+              </div>
+              <div class="flow-step">
+                <div class="step-number">3</div>
+                <h3>Reconcile</h3>
+                <p class="small">Match duplicate problems, medication courses, encounters, and labs across systems.</p>
+                <div class="tag-row"><span class="pill orange">17 reviews</span></div>
+              </div>
+              <div class="flow-step">
+                <div class="step-number">4</div>
+                <h3>Package</h3>
+                <p class="small">Create a source-aware longitudinal dataset with evidence links and trust metadata.</p>
+                <div class="tag-row"><span class="pill green">Ready</span></div>
+              </div>
+              <div class="flow-step">
+                <div class="step-number">5</div>
+                <h3>Activate</h3>
+                <p class="small">Send the unified patient record into marketplace modules selected by the patient or care team.</p>
+                <div class="tag-row"><span class="pill blue">6 modules</span></div>
+              </div>
+            </div>
+
+            <div class="grid-3">
+              <div class="source-card">
+                <div class="source-title">Northside Hospital <span class="pill green">Verified</span></div>
+                <div class="mini-bars">
+                  <div class="bar"><span>Conditions</span><div class="bar-track"><span style="width: 92%"></span></div><strong>92%</strong></div>
+                  <div class="bar"><span>Meds</span><div class="bar-track"><span style="width: 80%"></span></div><strong>80%</strong></div>
+                  <div class="bar"><span>Labs</span><div class="bar-track"><span style="width: 96%"></span></div><strong>96%</strong></div>
+                </div>
+              </div>
+              <div class="source-card">
+                <div class="source-title">Valley Endocrine <span class="pill orange">Needs review</span></div>
+                <div class="mini-bars">
+                  <div class="bar"><span>Conditions</span><div class="bar-track"><span style="width: 86%"></span></div><strong>86%</strong></div>
+                  <div class="bar"><span>Meds</span><div class="bar-track"><span style="width: 62%"></span></div><strong>62%</strong></div>
+                  <div class="bar"><span>Labs</span><div class="bar-track"><span style="width: 91%"></span></div><strong>91%</strong></div>
+                </div>
+              </div>
+              <div class="source-card">
+                <div class="source-title">Payer History <span class="pill blue">Claims</span></div>
+                <div class="mini-bars">
+                  <div class="bar"><span>Visits</span><div class="bar-track"><span style="width: 88%"></span></div><strong>88%</strong></div>
+                  <div class="bar"><span>Rx fills</span><div class="bar-track"><span style="width: 76%"></span></div><strong>76%</strong></div>
+                  <div class="bar"><span>Costs</span><div class="bar-track"><span style="width: 70%"></span></div><strong>70%</strong></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="screen">
+          <div class="screen-header">
+            <div>
+              <div class="eyebrow">Screen 2 · Unified Patient Record</div>
+              <h1>A unified record with provenance and trust boundaries</h1>
+              <p>This is the platform-owned layer. It is not a specialty module; it is the reusable substrate that every module consumes.</p>
+            </div>
+            <div class="actions">
+              <button class="btn">View source map</button>
+              <button class="btn primary">Unlock modules</button>
+            </div>
+          </div>
+
+          <div class="screen-body">
+            <div class="split">
+              <div class="card" style="padding:16px;">
+                <h2>Longitudinal Record</h2>
+                <div class="timeline">
+                  <div class="event"><strong>Active medication episode created</strong><span class="small">Metformin · active · 3 source rows · 2 systems</span></div>
+                  <div class="event"><strong>Condition conflict flagged</strong><span class="small">Asthma active in Hospital A, resolved in Clinic B</span></div>
+                  <div class="event"><strong>Latest A1c selected</strong><span class="small">8.1% · 2026-03-12 · Valley Endocrine</span></div>
+                  <div class="event"><strong>Encounter timeline merged</strong><span class="small">42 encounters · 5 institutions · 7 years</span></div>
+                </div>
+              </div>
+
+              <div class="card" style="padding:16px;">
+                <h2>Reusable Data Objects</h2>
+                <div class="table">
+                  <div class="row header"><span>Object</span><span>Source</span><span>Trust</span><span>Used by</span><span>Status</span></div>
+                  <div class="row"><strong>Active Conditions</strong><span>Condition</span><span>A/B</span><span>Pre-op, trials, second opinion</span><span class="pill green">Ready</span></div>
+                  <div class="row"><strong>Medication Episodes</strong><span>MedicationRequest</span><span>B</span><span>Pre-op, access, second opinion</span><span class="pill green">Ready</span></div>
+                  <div class="row"><strong>Latest Labs</strong><span>Observation</span><span>A/B</span><span>Pre-op, trials</span><span class="pill green">Ready</span></div>
+                  <div class="row"><strong>Source Conflicts</strong><span>All resources</span><span>C</span><span>Second opinion, review</span><span class="pill orange">Review</span></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="callout">
+              <h3>Platform principle</h3>
+              <p>FHIR remains the exchange layer. The unified patient record is our aggregation layer. Marketplace modules should not re-parse raw FHIR; they request normalized objects with evidence and trust metadata.</p>
+            </div>
+          </div>
+        </article>
+
+        <article class="screen">
+          <div class="screen-header">
+            <div>
+              <div class="eyebrow">Screen 3 · Module Marketplace</div>
+              <h1>Choose what to do with the clean patient dataset</h1>
+              <p>Each module is a workflow-specific rule pack and user experience. The marketplace prevents one giant universal rule set.</p>
+            </div>
+            <div class="actions">
+              <button class="btn">Review permissions</button>
+              <button class="btn primary">Install module</button>
+            </div>
+          </div>
+
+          <div class="screen-body">
+            <div class="grid-3">
+              <div class="module-card featured">
+                <div class="card-top"><div class="module-logo coral">P</div><span class="pill green">Installed</span></div>
+                <div><div class="module-title">Pre-Op Support</div><p class="module-desc">Medication holds, active risk factors, latest labs, and surgical readiness briefing.</p></div>
+                <div class="tag-row"><span class="pill">Conditions</span><span class="pill">Meds</span><span class="pill">Labs</span></div>
+                <button class="btn primary">Open</button>
+              </div>
+
+              <div class="module-card">
+                <div class="card-top"><div class="module-logo rose">T</div><span class="pill blue">Preview</span></div>
+                <div><div class="module-title">Clinical Trial Match</div><p class="module-desc">Maps active problems, labs, meds, age, and exclusions to trial eligibility.</p></div>
+                <div class="tag-row"><span class="pill">LOINC</span><span class="pill">SNOMED</span><span class="pill">Eligibility</span></div>
+                <button class="btn">View requirements</button>
+              </div>
+
+              <div class="module-card">
+                <div class="card-top"><div class="module-logo orange">A</div><span class="pill blue">Partner</span></div>
+                <div><div class="module-title">Medication Access</div><p class="module-desc">Turns payer history, formulary data, and active therapy into prior-auth support.</p></div>
+                <div class="tag-row"><span class="pill">Claims</span><span class="pill">Rx</span><span class="pill">Coverage</span></div>
+                <button class="btn">Request access</button>
+              </div>
+
+              <div class="module-card">
+                <div class="card-top"><div class="module-logo blue">S</div><span class="pill orange">Concept</span></div>
+                <div><div class="module-title">Specialist Second Opinion</div><p class="module-desc">Packages the unified patient record, evidence, source conflicts, and questions for expert review.</p></div>
+                <div class="tag-row"><span class="pill">Export packet</span><span class="pill">Review queue</span></div>
+                <button class="btn">Prototype flow</button>
+              </div>
+
+              <div class="module-card internal">
+                <div class="card-top"><div class="module-logo">L</div><span class="pill">Internal</span></div>
+                <div><div class="module-title">Data Lab</div><p class="module-desc">Teaches what is inside FHIR data, field coverage, variability, and extraction methodology.</p></div>
+                <div class="tag-row"><span class="pill">Education</span><span class="pill">QA</span></div>
+                <button class="btn">Open internal</button>
+              </div>
+
+              <div class="module-card internal">
+                <div class="card-top"><div class="module-logo">C</div><span class="pill">Internal</span></div>
+                <div><div class="module-title">Data Catalog</div><p class="module-desc">Developer-facing schema, tables, source fields, transformations, and rule dependencies.</p></div>
+                <div class="tag-row"><span class="pill">Schemas</span><span class="pill">Rules</span></div>
+                <button class="btn">View catalog</button>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="screen">
+          <div class="screen-header">
+            <div>
+              <div class="eyebrow">Screen 4 · Module Detail</div>
+              <h1>Every module declares its data needs and rules</h1>
+              <p>Marketplace modules should be inspectable before they run. This makes external module authors possible without losing trust.</p>
+            </div>
+            <div class="actions">
+              <button class="btn">Audit rules</button>
+              <button class="btn primary">Run on dataset</button>
+            </div>
+          </div>
+
+          <div class="screen-body">
+            <div class="grid-2">
+              <div class="card" style="padding:16px;">
+                <h2>Pre-Op Support Manifest</h2>
+                <ul class="checklist">
+                  <li><span class="dot">✓</span><span><strong>Requires active conditions</strong><br />SNOMED code, clinical status, onset date</span><span class="pill green">Available</span></li>
+                  <li><span class="dot">✓</span><span><strong>Requires medication episodes</strong><br />RxNorm, latest status, start/end dates, drug class</span><span class="pill green">Available</span></li>
+                  <li><span class="dot">✓</span><span><strong>Requires latest labs</strong><br />LOINC, effective date, numeric value, unit</span><span class="pill green">Available</span></li>
+                  <li><span class="dot">!</span><span><strong>Needs allergy criticality</strong><br />Synthea source is sparse; render review-required state</span><span class="pill orange">Partial</span></li>
+                </ul>
+              </div>
+
+              <div class="rule-box">
+                <h2>Rule Pack Preview</h2>
+                <div class="code">module: pre_op_support
+version: 0.3
+inputs:
+  - active_conditions
+  - medication_episodes
+  - observation_latest
+signals:
+  - active_high_risk_medication
+  - recent_abnormal_lab
+  - condition_specific_risk
+trust_boundary:
+  absence_statement: searched_resources_only</div>
+                <div class="callout warning">
+                  <h3>Rule explosion control</h3>
+                  <p>Rules live inside modules. The platform only enforces input contracts, evidence links, provenance, and review states.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="screen">
+          <div class="screen-header">
+            <div>
+              <div class="eyebrow">Screen 5 · Data Sharing</div>
+              <h1>Create a second-opinion packet without losing provenance</h1>
+              <p>Sharing is a platform workflow: choose scope, package normalized facts, include evidence, and preserve source boundaries.</p>
+            </div>
+            <div class="actions">
+              <button class="btn">Preview packet</button>
+              <button class="btn primary">Share securely</button>
+            </div>
+          </div>
+
+          <div class="screen-body">
+            <div class="grid-3">
+              <div class="source-card">
+                <div class="source-title">Packet Scope <span class="pill blue">Second opinion</span></div>
+                <ul class="checklist">
+                  <li><span class="dot">✓</span><span>Clinical summary</span><span></span></li>
+                  <li><span class="dot">✓</span><span>Active meds and episodes</span><span></span></li>
+                  <li><span class="dot">✓</span><span>Latest key labs</span><span></span></li>
+                  <li><span class="dot">✓</span><span>Source conflicts</span><span></span></li>
+                </ul>
+              </div>
+
+              <div class="source-card">
+                <div class="source-title">Recipients <span class="pill green">2 selected</span></div>
+                <ul class="checklist">
+                  <li><span class="dot">✓</span><span>Neurosurgery reviewer</span><span class="pill">7 days</span></li>
+                  <li><span class="dot">✓</span><span>Patient primary care</span><span class="pill">30 days</span></li>
+                  <li><span class="dot">+</span><span>Add specialist marketplace reviewer</span><span></span></li>
+                </ul>
+              </div>
+
+              <div class="source-card">
+                <div class="source-title">Export Formats <span class="pill orange">Draft</span></div>
+                <ul class="checklist">
+                  <li><span class="dot">✓</span><span>Human-readable brief</span><span></span></li>
+                  <li><span class="dot">✓</span><span>Evidence packet JSON</span><span></span></li>
+                  <li><span class="dot">✓</span><span>FHIR document bundle</span><span></span></li>
+                  <li><span class="dot">!</span><span>Module output schema</span><span class="pill orange">Define</span></li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="screen">
+          <div class="screen-header">
+            <div>
+              <div class="eyebrow">Screen 6 · Internal Data Lab & Catalog</div>
+              <h1>Separate internal understanding from patient-facing value</h1>
+              <p>Data Lab and Data Catalog are still important, but they support development, trust, and judge transparency rather than being the main user journey.</p>
+            </div>
+            <div class="actions">
+              <button class="btn">Open Data Lab</button>
+              <button class="btn">Open Catalog</button>
+            </div>
+          </div>
+
+          <div class="screen-body">
+            <div class="grid-2">
+              <div class="card" style="padding:16px;">
+                <div class="section-label"><div class="eyebrow">Data Lab</div></div>
+                <h2>Understand what FHIR gives us</h2>
+                <p>Educational and validation surface for FHIR resources, coverage, missing fields, implementation variability, and extraction methodology.</p>
+                <div class="tag-row">
+                  <span class="pill">FHIR primer</span>
+                  <span class="pill">Coverage</span>
+                  <span class="pill">Variability</span>
+                  <span class="pill">Methodology</span>
+                </div>
+              </div>
+
+              <div class="card" style="padding:16px;">
+                <div class="section-label"><div class="eyebrow">Data Catalog</div></div>
+                <h2>Understand what the platform exposes</h2>
+                <p>Internal schema catalog for normalized objects, SQL-on-FHIR tables, derived views, rule dependencies, and module input contracts.</p>
+                <div class="tag-row">
+                  <span class="pill">Schemas</span>
+                  <span class="pill">ViewDefinitions</span>
+                  <span class="pill">Rule packs</span>
+                  <span class="pill">Evidence model</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="table">
+              <div class="row header"><span>Platform contract</span><span>Owned by</span><span>Consumer</span><span>Purpose</span><span>Status</span></div>
+              <div class="row"><strong>Aggregated Patient Dataset</strong><span>Platform</span><span>All modules</span><span>Source-aware clean record</span><span class="pill green">Core</span></div>
+              <div class="row"><strong>Evidence Packet</strong><span>Platform</span><span>Sharing + modules</span><span>Trace every output to sources</span><span class="pill orange">Define</span></div>
+              <div class="row"><strong>Module Manifest</strong><span>Marketplace</span><span>Platform</span><span>Declare data needs and rules</span><span class="pill orange">Define</span></div>
+              <div class="row"><strong>Rule Pack</strong><span>Module author</span><span>Runtime</span><span>Workflow-specific guidance</span><span class="pill blue">Prototype</span></div>
+            </div>
+          </div>
+        </article>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

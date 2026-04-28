@@ -135,6 +135,23 @@ export interface ProcedureDetail {
   reason_display: string;
 }
 
+export interface ProcedureItem {
+  procedure_id: string;
+  display: string;
+  status: string;
+  performed_start: string | null;
+  performed_end: string | null;
+  reason_display: string;
+  body_site: string;
+}
+
+export interface ProceduresResponse {
+  patient_id: string;
+  name: string;
+  total_count: number;
+  procedures: ProcedureItem[];
+}
+
 export interface MedicationDetail {
   med_id: string;
   display: string;

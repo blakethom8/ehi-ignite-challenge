@@ -15,6 +15,7 @@ import type {
   InteractionResponse,
   FieldCoverageResponse,
   AllergyCriticalityBreakdown,
+  ProceduresResponse,
   ProviderAssistantRequest,
   ProviderAssistantResponse,
   CareJourneyResponse,
@@ -95,6 +96,10 @@ export const api = {
   /** Care journey — medication episodes, conditions, encounters for Gantt timeline */
   getCareJourney: (patientId: string): Promise<CareJourneyResponse> =>
     http.get<CareJourneyResponse>(`/patients/${patientId}/care-journey`).then((r) => r.data),
+
+  /** Procedure history */
+  getProcedures: (patientId: string): Promise<ProceduresResponse> =>
+    http.get<ProceduresResponse>(`/patients/${patientId}/procedures`).then((r) => r.data),
 
   /** Provider-facing chart Q&A */
   chatProviderAssistant: (payload: ProviderAssistantRequest): Promise<ProviderAssistantResponse> =>

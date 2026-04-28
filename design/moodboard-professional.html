@@ -1,0 +1,888 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>EHI Ignite Professional UI Direction</title>
+  <style>
+    :root {
+      --text: #111827;
+      --text-2: #374151;
+      --muted: #6b7280;
+      --muted-2: #9ca3af;
+      --border: #d9dee7;
+      --border-light: #edf0f5;
+      --surface: #ffffff;
+      --surface-2: #f7f9fc;
+      --surface-3: #f1f4f8;
+      --blue: #2f5fcb;
+      --blue-2: #153e8a;
+      --teal: #0f766e;
+      --green: #16794c;
+      --amber: #9a6700;
+      --red: #a61b1b;
+      --slate: #334155;
+      --font: Inter, "Noto Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --mono: "SFMono-Regular", "Roboto Mono", "Cascadia Code", monospace;
+      --ring: 0 0 0 1px rgba(17, 24, 39, 0.09);
+      --shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      color: var(--text);
+      background: #eef2f7;
+      font-family: var(--font);
+      line-height: 1.45;
+      letter-spacing: 0;
+    }
+
+    .page {
+      width: min(1380px, calc(100% - 40px));
+      margin: 0 auto;
+      padding: 24px 0 56px;
+    }
+
+    .bar {
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      padding: 0 16px;
+      margin-bottom: 16px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .mark {
+      width: 30px;
+      height: 30px;
+      border-radius: 4px;
+      background: var(--slate);
+      color: white;
+      display: grid;
+      place-items: center;
+      font-size: 11px;
+      font-weight: 700;
+      font-family: var(--mono);
+    }
+
+    .brand strong {
+      display: block;
+      font-size: 14px;
+    }
+
+    .brand span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .meta {
+      display: flex;
+      gap: 14px;
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: 1.08fr 0.92fr;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+    }
+
+    .intro {
+      padding: 28px;
+      min-height: 300px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .label {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 14px 0 12px;
+      max-width: 760px;
+      font-size: clamp(34px, 4vw, 56px);
+      line-height: 1.04;
+      font-weight: 760;
+      letter-spacing: 0;
+    }
+
+    h2 {
+      margin: 0 0 8px;
+      font-size: 24px;
+      line-height: 1.2;
+      font-weight: 720;
+      letter-spacing: 0;
+    }
+
+    h3 {
+      margin: 0 0 8px;
+      font-size: 15px;
+      font-weight: 720;
+    }
+
+    p {
+      margin: 0;
+      color: var(--text-2);
+    }
+
+    .intro-copy {
+      max-width: 780px;
+      color: var(--text-2);
+      font-size: 17px;
+      line-height: 1.56;
+    }
+
+    .principles {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      border-top: 1px solid var(--border-light);
+      margin-top: 28px;
+      padding-top: 18px;
+      gap: 16px;
+    }
+
+    .principle {
+      min-height: 72px;
+    }
+
+    .principle strong {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 13px;
+    }
+
+    .principle span {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .app-preview {
+      padding: 14px;
+    }
+
+    .preview-shell {
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      min-height: 300px;
+    }
+
+    .preview-header {
+      height: 46px;
+      border-bottom: 1px solid var(--border);
+      background: white;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 12px;
+    }
+
+    .preview-tabs {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      border: 1px solid var(--border);
+      background: var(--surface-3);
+      padding: 2px;
+    }
+
+    .preview-tabs span {
+      padding: 5px 9px;
+      font-size: 11px;
+      color: var(--muted);
+      font-weight: 650;
+    }
+
+    .preview-tabs .active {
+      color: var(--blue);
+      background: white;
+      box-shadow: var(--ring);
+    }
+
+    .preview-body {
+      display: grid;
+      grid-template-columns: 150px 1fr;
+      min-height: 252px;
+    }
+
+    .preview-side {
+      border-right: 1px solid var(--border);
+      background: white;
+      padding: 10px;
+    }
+
+    .nav-row {
+      display: grid;
+      grid-template-columns: 18px 1fr;
+      gap: 8px;
+      align-items: center;
+      min-height: 34px;
+      padding: 6px 8px;
+      border-left: 3px solid transparent;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 650;
+    }
+
+    .nav-row.active {
+      border-color: var(--blue);
+      background: #eef4ff;
+      color: var(--blue-2);
+    }
+
+    .preview-main {
+      padding: 12px;
+    }
+
+    .decision {
+      border: 1px solid rgba(166, 27, 27, 0.28);
+      background: #fff4f2;
+      color: var(--red);
+      padding: 10px 12px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .decision strong,
+    .decision span {
+      display: block;
+    }
+
+    .decision strong {
+      font-size: 13px;
+    }
+
+    .decision span {
+      color: #7f1d1d;
+      font-size: 11px;
+      margin-top: 2px;
+    }
+
+    .btn {
+      border: 1px solid var(--blue);
+      background: var(--blue);
+      color: white;
+      padding: 7px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      border-radius: 4px;
+    }
+
+    .data-table {
+      border: 1px solid var(--border);
+      background: white;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1.2fr 0.7fr 0.7fr 0.55fr;
+      gap: 10px;
+      align-items: center;
+      min-height: 34px;
+      border-bottom: 1px solid var(--border-light);
+      padding: 7px 10px;
+      font-size: 12px;
+    }
+
+    .row:last-child { border-bottom: 0; }
+
+    .row.head {
+      background: #fafbfc;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .status {
+      display: inline-flex;
+      width: fit-content;
+      align-items: center;
+      border: 1px solid var(--border);
+      background: #f8fafc;
+      color: var(--text-2);
+      padding: 3px 7px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .status.red {
+      border-color: rgba(166, 27, 27, 0.28);
+      background: #fff4f2;
+      color: var(--red);
+    }
+
+    .status.amber {
+      border-color: rgba(154, 103, 0, 0.30);
+      background: #fff8e7;
+      color: var(--amber);
+    }
+
+    .status.green {
+      border-color: rgba(22, 121, 76, 0.25);
+      background: #eefaf3;
+      color: var(--green);
+    }
+
+    .section {
+      display: grid;
+      grid-template-columns: 260px 1fr;
+      gap: 16px;
+      margin-top: 16px;
+    }
+
+    .section-title {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 18px;
+      min-height: 180px;
+    }
+
+    .section-title .label {
+      margin-bottom: 10px;
+    }
+
+    .section-title p {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .content {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 16px;
+    }
+
+    .color-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 10px;
+    }
+
+    .swatch {
+      border: 1px solid var(--border);
+      background: white;
+      min-height: 128px;
+    }
+
+    .swatch-color {
+      height: 70px;
+      border-bottom: 1px solid var(--border-light);
+    }
+
+    .swatch-body {
+      padding: 10px;
+    }
+
+    .swatch-body strong {
+      display: block;
+      font-size: 12px;
+      margin-bottom: 3px;
+    }
+
+    .swatch-body code {
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 11px;
+    }
+
+    .module-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+    }
+
+    .module {
+      border: 1px solid var(--border);
+      border-top: 4px solid var(--blue);
+      padding: 14px;
+      min-height: 155px;
+      background: white;
+    }
+
+    .module.preop { border-top-color: var(--red); }
+    .module.trials { border-top-color: var(--teal); }
+    .module.access { border-top-color: var(--green); }
+
+    .module-code {
+      font-family: var(--mono);
+      color: var(--muted);
+      font-size: 11px;
+      margin-bottom: 14px;
+    }
+
+    .module p {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.55;
+    }
+
+    .type-grid {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 12px;
+    }
+
+    .type-card {
+      border: 1px solid var(--border);
+      background: white;
+      padding: 16px;
+    }
+
+    .type-display {
+      font-size: 38px;
+      font-weight: 760;
+      line-height: 1.08;
+      margin: 8px 0 12px;
+    }
+
+    .type-body {
+      color: var(--text-2);
+      font-size: 15px;
+      line-height: 1.65;
+    }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+
+    .metric {
+      border: 1px solid var(--border);
+      background: white;
+      padding: 12px;
+      min-height: 78px;
+    }
+
+    .metric span {
+      color: var(--muted);
+      display: block;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .metric strong {
+      display: block;
+      margin-top: 6px;
+      font-size: 24px;
+      line-height: 1;
+    }
+
+    .layout-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .layout-card {
+      border: 1px solid var(--border);
+      background: white;
+      padding: 14px;
+    }
+
+    .layout-card p {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.55;
+      margin-bottom: 10px;
+    }
+
+    .mini-lines {
+      display: grid;
+      gap: 5px;
+    }
+
+    .line {
+      height: 9px;
+      background: var(--surface-3);
+    }
+
+    .line.dark { background: #cbd5e1; }
+    .line.blue { background: #c7d8ff; }
+
+    .agent-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+    }
+
+    .agent {
+      border: 1px solid var(--border);
+      background: white;
+      padding: 14px;
+      min-height: 150px;
+    }
+
+    .agent h3 {
+      font-size: 14px;
+      margin-bottom: 6px;
+    }
+
+    .agent p {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.55;
+    }
+
+    .rules {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .rules ul {
+      margin: 0;
+      padding-left: 18px;
+      color: var(--text-2);
+      font-size: 13px;
+      line-height: 1.8;
+    }
+
+    .footer {
+      margin-top: 16px;
+      border: 1px solid var(--border);
+      background: #172033;
+      color: white;
+      padding: 18px;
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+    }
+
+    .footer p {
+      color: #cbd5e1;
+      font-size: 13px;
+      margin-top: 4px;
+    }
+
+    @media (max-width: 1100px) {
+      .hero,
+      .section,
+      .type-grid,
+      .layout-grid {
+        grid-template-columns: 1fr;
+      }
+      .color-grid,
+      .module-grid,
+      .agent-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      .principles,
+      .metric-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    @media (max-width: 720px) {
+      .page { width: min(100% - 24px, 1380px); }
+      .bar,
+      .footer {
+        height: auto;
+        align-items: flex-start;
+        flex-direction: column;
+        padding: 14px;
+      }
+      .meta { flex-wrap: wrap; }
+      .preview-body,
+      .color-grid,
+      .module-grid,
+      .agent-grid,
+      .principles,
+      .metric-grid,
+      .rules {
+        grid-template-columns: 1fr;
+      }
+      .preview-side { border-right: 0; border-bottom: 1px solid var(--border); }
+      .row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="bar">
+      <div class="brand">
+        <div class="mark">EHI</div>
+        <div>
+          <strong>Professional UI Direction</strong>
+          <span>Clinical intelligence application design board</span>
+        </div>
+      </div>
+      <div class="meta">
+        <span>Version 02</span>
+        <span>Enterprise clinical</span>
+        <span>Dense operational UI</span>
+      </div>
+    </header>
+
+    <section class="hero">
+      <div class="panel intro">
+        <div>
+          <div class="label">Design objective</div>
+          <h1>Make it feel credible before it feels clever.</h1>
+          <p class="intro-copy">
+            The product should look like professional clinical operations software: direct, restrained,
+            information-dense, and built for repeated use. It should avoid decorative styling, oversized
+            cards, playful labels, and visual effects that make the application feel speculative.
+          </p>
+        </div>
+        <div class="principles">
+          <div class="principle"><strong>Plain</strong><span>Use direct labels and obvious structure.</span></div>
+          <div class="principle"><strong>Dense</strong><span>Show many facts without reducing readability.</span></div>
+          <div class="principle"><strong>Stable</strong><span>No layout drama; no ornamental motion.</span></div>
+          <div class="principle"><strong>Trusted</strong><span>Source, date, and status are always visible.</span></div>
+        </div>
+      </div>
+
+      <div class="panel app-preview">
+        <div class="preview-shell">
+          <div class="preview-header">
+            <div>
+              <strong style="font-size:13px">Pre-Op Support Workspace</strong>
+              <div style="font-size:11px;color:var(--muted)">Synthetic data · Synthea R4</div>
+            </div>
+            <div class="preview-tabs">
+              <span>Record</span><span class="active">Pre-Op</span><span>Trials</span><span>Access</span>
+            </div>
+          </div>
+          <div class="preview-body">
+            <aside class="preview-side">
+              <div class="nav-row active"><span>01</span><span>Briefing</span></div>
+              <div class="nav-row"><span>02</span><span>Clearance</span></div>
+              <div class="nav-row"><span>03</span><span>Holds</span></div>
+              <div class="nav-row"><span>04</span><span>Anesthesia</span></div>
+              <div class="nav-row"><span>05</span><span>AI Chart</span></div>
+            </aside>
+            <section class="preview-main">
+              <div class="decision">
+                <div><strong>Hold review required</strong><span>Active anticoagulant and cardiac history require review.</span></div>
+                <button class="btn">Evidence</button>
+              </div>
+              <div class="data-table">
+                <div class="row head"><span>Signal</span><span>Status</span><span>Source</span><span>Date</span></div>
+                <div class="row"><span>Warfarin sodium</span><span><span class="status red">Critical</span></span><span>Medication</span><span>2019</span></div>
+                <div class="row"><span>Chronic ischemic heart disease</span><span><span class="status amber">Review</span></span><span>Condition</span><span>2016</span></div>
+                <div class="row"><span>Hemoglobin</span><span><span class="status green">Current</span></span><span>Observation</span><span>2018</span></div>
+                <div class="row"><span>Recent encounter mix</span><span><span class="status">Context</span></span><span>Encounter</span><span>2019</span></div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <aside class="section-title">
+        <div class="label">01 Palette</div>
+        <h2>Restricted clinical color.</h2>
+        <p>Use fewer colors. The base UI should be white, slate, and blue. Red, amber, and green are reserved for clinical meaning.</p>
+      </aside>
+      <div class="content">
+        <div class="color-grid">
+          <div class="swatch"><div class="swatch-color" style="background:#111827"></div><div class="swatch-body"><strong>Text</strong><code>#111827</code></div></div>
+          <div class="swatch"><div class="swatch-color" style="background:#374151"></div><div class="swatch-body"><strong>Secondary</strong><code>#374151</code></div></div>
+          <div class="swatch"><div class="swatch-color" style="background:#f7f9fc"></div><div class="swatch-body"><strong>Background</strong><code>#f7f9fc</code></div></div>
+          <div class="swatch"><div class="swatch-color" style="background:#2f5fcb"></div><div class="swatch-body"><strong>Action</strong><code>#2f5fcb</code></div></div>
+          <div class="swatch"><div class="swatch-color" style="background:#a61b1b"></div><div class="swatch-body"><strong>Critical</strong><code>#a61b1b</code></div></div>
+          <div class="swatch"><div class="swatch-color" style="background:#9a6700"></div><div class="swatch-body"><strong>Review</strong><code>#9a6700</code></div></div>
+          <div class="swatch"><div class="swatch-color" style="background:#16794c"></div><div class="swatch-body"><strong>Clear</strong><code>#16794c</code></div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <aside class="section-title">
+        <div class="label">02 Modules</div>
+        <h2>Independent workflows.</h2>
+        <p>Each module gets a plain overview page and separate patient-specific pages. Do not combine orientation and findings.</p>
+      </aside>
+      <div class="content module-grid">
+        <article class="module">
+          <div class="module-code">RECORD</div>
+          <h3>Patient Record</h3>
+          <p>Neutral chart source. Summary, history, care journey, FHIR data. Lowest interpretation.</p>
+        </article>
+        <article class="module preop">
+          <div class="module-code">PREOP</div>
+          <h3>Pre-Op Support</h3>
+          <p>Surgical readiness, medication holds, anesthesia handoff, clearance, cited evidence.</p>
+        </article>
+        <article class="module trials">
+          <div class="module-code">TRIALS</div>
+          <h3>Clinical Trials</h3>
+          <p>Eligibility search, criteria parsing, patient packet, source-linked trial rationale.</p>
+        </article>
+        <article class="module access">
+          <div class="module-code">ACCESS</div>
+          <h3>Medication Access</h3>
+          <p>Price research, support programs, manufacturer assistance, pharmacy options.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <aside class="section-title">
+        <div class="label">03 Typography</div>
+        <h2>Functional hierarchy.</h2>
+        <p>No novelty typography. Use strong weights, predictable sizing, and labels that help scanning.</p>
+      </aside>
+      <div class="content type-grid">
+        <div class="type-card">
+          <div class="label">Module page</div>
+          <div class="type-display">Pre-Op Support</div>
+          <p class="type-body">Module pages explain purpose, scope, available views, and what the agent is responsible for. They do not show patient findings.</p>
+        </div>
+        <div class="type-card">
+          <div class="label">Patient page</div>
+          <h3 style="font-size:22px;margin-top:8px">Patient Briefing</h3>
+          <div class="metric-grid" style="grid-template-columns:1fr 1fr;margin-top:14px">
+            <div class="metric"><span>Status</span><strong>Hold</strong></div>
+            <div class="metric"><span>Evidence</span><strong>7</strong></div>
+            <div class="metric"><span>Meds</span><strong>8</strong></div>
+            <div class="metric"><span>Labs</span><strong>4</strong></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <aside class="section-title">
+        <div class="label">04 Density</div>
+        <h2>Business-like information packing.</h2>
+        <p>The app should feel efficient: compact fact rails, sortable tables, source rows, and short evidence summaries.</p>
+      </aside>
+      <div class="content">
+        <div class="metric-grid">
+          <div class="metric"><span>Age / sex</span><strong>89 / M</strong></div>
+          <div class="metric"><span>Active meds</span><strong>8</strong></div>
+          <div class="metric"><span>Conditions</span><strong>12</strong></div>
+          <div class="metric"><span>Encounters</span><strong>46</strong></div>
+        </div>
+        <div class="data-table" style="margin-top:12px">
+          <div class="row head"><span>Evidence</span><span>Interpretation</span><span>Source</span><span>Date</span></div>
+          <div class="row"><span>Warfarin sodium</span><span><span class="status red">Hold review</span></span><span>MedicationRequest</span><span>2019</span></div>
+          <div class="row"><span>Cardiac diagnosis</span><span><span class="status amber">Anesthesia note</span></span><span>Condition</span><span>2016</span></div>
+          <div class="row"><span>Hemoglobin panel</span><span><span class="status green">Recent enough</span></span><span>Observation</span><span>2018</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <aside class="section-title">
+        <div class="label">05 Layout patterns</div>
+        <h2>Plain structural decisions.</h2>
+        <p>Favor navigation clarity and stable panes over visual flourish. These are the patterns to apply first.</p>
+      </aside>
+      <div class="content layout-grid">
+        <div class="layout-card">
+          <h3>Module Overview</h3>
+          <p>Static orientation, workflow scope, included pages, agent role, and trust boundaries.</p>
+          <div class="mini-lines">
+            <div class="line dark" style="width:38%"></div>
+            <div class="line" style="width:92%"></div>
+            <div class="line" style="width:88%"></div>
+            <div class="line blue" style="width:52%"></div>
+          </div>
+        </div>
+        <div class="layout-card">
+          <h3>Patient-Specific Page</h3>
+          <p>Patient header, fact rail, status summary, evidence table, source details, agent panel.</p>
+          <div class="mini-lines">
+            <div class="line dark" style="width:30%"></div>
+            <div class="line blue" style="width:100%"></div>
+            <div class="line" style="width:92%"></div>
+            <div class="line" style="width:84%"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <aside class="section-title">
+        <div class="label">06 Agents</div>
+        <h2>Agent roles should be explicit.</h2>
+        <p>Separate agent harnesses should feel like separate professional tools, not one generic chat box reused everywhere.</p>
+      </aside>
+      <div class="content agent-grid">
+        <div class="agent"><h3>Record Agent</h3><p>Neutral chart questions. Cites FHIR resources. Avoids workflow-specific recommendations.</p></div>
+        <div class="agent"><h3>Pre-Op Agent</h3><p>Surgical risk, medication holds, clearance gaps, anesthesia handoff, evidence summaries.</p></div>
+        <div class="agent"><h3>Trials Agent</h3><p>Searches registries, reads criteria, ranks matches, identifies exclusions to verify.</p></div>
+        <div class="agent"><h3>Access Agent</h3><p>Drug normalization, pricing, manufacturer support, affordability plan, source links.</p></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <aside class="section-title">
+        <div class="label">07 Rules</div>
+        <h2>What to do next.</h2>
+        <p>Use this as a practical checklist for the redesign pass.</p>
+      </aside>
+      <div class="content rules">
+        <div>
+          <h3>Use</h3>
+          <ul>
+            <li>Flat enterprise panels with borders, not decorative cards.</li>
+            <li>Short section labels and obvious navigation terms.</li>
+            <li>Dense tables and fact rails for patient pages.</li>
+            <li>Reserved color for clinical state and module identity.</li>
+            <li>Visible source type, date, and confidence where possible.</li>
+          </ul>
+        </div>
+        <div>
+          <h3>Avoid</h3>
+          <ul>
+            <li>Playful pills, cute icons, and marketing copy.</li>
+            <li>Huge empty panels on operational pages.</li>
+            <li>Mixing overview instructions with patient findings.</li>
+            <li>Soft pastel overuse that lowers perceived seriousness.</li>
+            <li>Generic dashboard metrics without clinical purpose.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <div>
+        <strong>Recommended direction</strong>
+        <p>More boring, more credible: enterprise clinical operations with dense, sourced, patient-specific views.</p>
+      </div>
+      <div style="font-size:12px;color:#cbd5e1">Next pass: app shell, module overview pages, patient summary, pre-op briefing</div>
+    </footer>
+  </main>
+</body>
+</html>

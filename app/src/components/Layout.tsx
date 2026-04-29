@@ -63,6 +63,7 @@ const CLINICAL_INSIGHTS_NAV_GROUPS: NavGroup[] = [
     label: "Clinical Insights",
     items: [
       { to: "/clinical-insights", label: "Module Overview", icon: Activity, description: "Private chart modules" },
+      { to: "/explorer/assistant", label: "Chart Q&A", icon: MessageSquareText, description: "Chart-grounded answers" },
       {
         to: "/preop",
         label: "Pre-Op Support",
@@ -75,7 +76,6 @@ const CLINICAL_INSIGHTS_NAV_GROUPS: NavGroup[] = [
           { to: "/explorer/anesthesia", label: "Anesthesia Handoff", icon: Stethoscope, description: "Perioperative handoff" },
         ],
       },
-      { to: "/explorer/assistant", label: "Chart Q&A", icon: MessageSquareText, description: "Chart-grounded answers" },
     ],
   },
 ];
@@ -100,7 +100,9 @@ const DATA_AGGREGATOR_NAV_GROUPS: NavGroup[] = [
     label: "Data Aggregator",
     items: [
       { to: "/aggregate", label: "Module Overview", icon: DatabaseZap, description: "Patient collection guide" },
-      { to: "/charts", label: "FHIR Chart", icon: Database, description: "Published chart" },
+      { to: "/aggregate/sources", label: "Source Inventory", icon: FileJson2, description: "Portal and file checklist" },
+      { to: "/aggregate/cleaning", label: "Cleaning Queue", icon: SlidersHorizontal, description: "Normalization workbench" },
+      { to: "/aggregate/publish", label: "Publish Readiness", icon: ClipboardCheck, description: "Chart activation gates" },
     ],
   },
 ];
@@ -198,10 +200,15 @@ function getEnvironment(pathname: string): AppEnvironment {
   if (pathname.startsWith("/analysis")) return "analysis";
   if (pathname.startsWith("/aggregate")) return "aggregator";
   if (pathname.startsWith("/clinical-insights")) return "clinical";
-  if (pathname.startsWith("/marketplace")) return "marketplace";
-  if (pathname.startsWith("/sharing") || pathname.startsWith("/second-opinion")) return "sharing";
-  if (pathname.startsWith("/trials")) return "trials";
-  if (pathname.startsWith("/medication-access")) return "medication";
+  if (
+    pathname.startsWith("/marketplace") ||
+    pathname.startsWith("/sharing") ||
+    pathname.startsWith("/second-opinion") ||
+    pathname.startsWith("/trials") ||
+    pathname.startsWith("/medication-access")
+  ) {
+    return "marketplace";
+  }
   if (pathname.startsWith("/preop")) return "clinical";
   if (pathname === "/journey") return "clinical";
   if (pathname.startsWith("/explorer/safety")) return "clinical";
@@ -865,15 +872,15 @@ export function Layout({ children }: LayoutProps) {
 
   const aggregatorLinks: { key: string; label: string; to: string }[] = [
     { key: "walkthrough", label: "Module Overview", to: withPatientQuery("/aggregate", patientId) },
-    { key: "portalSources", label: "Portal Sources", to: withPatientQuery("/aggregate", patientId) },
-    { key: "cleaningQueue", label: "Cleaning Queue", to: withPatientQuery("/aggregate", patientId) },
-    { key: "publishedChart", label: "Published Chart", to: withPatientQuery("/charts", patientId) },
+    { key: "sourceInventory", label: "Source Inventory", to: withPatientQuery("/aggregate/sources", patientId) },
+    { key: "cleaningQueue", label: "Cleaning Queue", to: withPatientQuery("/aggregate/cleaning", patientId) },
+    { key: "publishReadiness", label: "Publish Readiness", to: withPatientQuery("/aggregate/publish", patientId) },
   ];
 
   const clinicalInsightLinks: { key: AppEnvironment | "preop" | "qa"; label: string; to: string }[] = [
     { key: "clinical", label: "Module Overview", to: withPatientQuery("/clinical-insights", patientId) },
-    { key: "preop", label: "Pre-Op Support", to: withPatientQuery("/preop", patientId) },
     { key: "qa", label: "Chart Q&A", to: withPatientQuery("/explorer/assistant", patientId) },
+    { key: "preop", label: "Pre-Op Support", to: withPatientQuery("/preop", patientId) },
   ];
 
   const internalToolLinks: { key: string; label: string; to: string }[] = [
@@ -947,8 +954,10 @@ export function Layout({ children }: LayoutProps) {
     if (key === "history") return location.pathname.startsWith("/explorer/history");
     if (key === "journey") return location.pathname.startsWith("/explorer/care-journey");
     if (key === "sources") return location.pathname.startsWith("/explorer/patient-data");
-    if (key === "walkthrough") return location.pathname.startsWith("/aggregate");
-    if (key === "publishedChart") return location.pathname.startsWith("/charts");
+    if (key === "walkthrough") return location.pathname === "/aggregate";
+    if (key === "sourceInventory") return location.pathname.startsWith("/aggregate/sources");
+    if (key === "cleaningQueue") return location.pathname.startsWith("/aggregate/cleaning");
+    if (key === "publishReadiness") return location.pathname.startsWith("/aggregate/publish");
     if (key === "clinical") return location.pathname.startsWith("/clinical-insights");
     if (key === "preop") {
       return (

@@ -1,7 +1,7 @@
 import { useSearchParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { AlertTriangle, User, ChevronDown, ChevronRight, Clock, Database } from "lucide-react";
+import { AlertTriangle, Building2, User, ChevronDown, ChevronRight, Clock, Database, Stethoscope } from "lucide-react";
 import type { ReactNode } from "react";
 import { api } from "../../api/client";
 import type { PatientOverview, KeyLabsResponse, LabValue, LabHistoryPoint, LabAlertFlag, TimelineMonth, TimelineResponse } from "../../types";
@@ -529,6 +529,87 @@ function CareActivityStrip({ timeline }: { timeline: TimelineResponse | undefine
   );
 }
 
+function classSummary(counts: Record<string, number>): string {
+  const parts = Object.entries(counts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([label, count]) => `${label || "Unknown"} ${count}`);
+  return parts.length > 0 ? parts.join(" / ") : "No class data";
+}
+
+function CareNetworkPanel({ overview }: { overview: PatientOverview }) {
+  const providers = overview.care_team ?? [];
+  const sites = overview.sites_of_service ?? [];
+
+  if (providers.length === 0 && sites.length === 0) {
+    return (
+      <div className="px-5 py-4 text-sm text-[#667085]">
+        Provider and organization fields were not populated in this patient's encounter resources.
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid gap-4 px-5 py-4 lg:grid-cols-2">
+      <div>
+        <div className="mb-3 flex items-center gap-2">
+          <Stethoscope size={15} className="text-[#5b76fe]" />
+          <h3 className="text-sm font-semibold text-[#1c1c1e]">Provider history</h3>
+        </div>
+        <div className="space-y-2">
+          {providers.slice(0, 6).map((provider) => (
+            <div key={provider.name} className="rounded-lg border border-[#e9eaef] bg-[#fafafa] px-3 py-2">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-[#1c1c1e]">{provider.name}</p>
+                  <p className="mt-0.5 truncate text-xs text-[#667085]">
+                    {provider.organizations.join(", ") || "Organization unknown"}
+                  </p>
+                </div>
+                <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-[#5b76fe]">
+                  {provider.encounter_count}
+                </span>
+              </div>
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[11px] text-[#667085]">
+                <span>{classSummary(provider.class_breakdown)}</span>
+                <span>Last {fmt(provider.latest_encounter_dt)}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <div className="mb-3 flex items-center gap-2">
+          <Building2 size={15} className="text-[#0f766e]" />
+          <h3 className="text-sm font-semibold text-[#1c1c1e]">Sites of service</h3>
+        </div>
+        <div className="space-y-2">
+          {sites.slice(0, 6).map((site) => (
+            <div key={site.name} className="rounded-lg border border-[#e9eaef] bg-[#fafafa] px-3 py-2">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-[#1c1c1e]">{site.name}</p>
+                  <p className="mt-0.5 text-xs text-[#667085]">
+                    {site.provider_count} provider{site.provider_count !== 1 ? "s" : ""} documented
+                  </p>
+                </div>
+                <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-[#0f766e]">
+                  {site.encounter_count}
+                </span>
+              </div>
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[11px] text-[#667085]">
+                <span>{classSummary(site.class_breakdown)}</span>
+                <span>Last {fmt(site.latest_encounter_dt)}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Skeleton ───────────────────────────────────────────────────────────────
 
 function SkeletonRect({ className }: { className?: string }) {
@@ -659,6 +740,7 @@ function OverviewContent({
   const { prefs, toggle } = useSectionPrefs({
     demographics: true,
     dataSpan: true,
+    careNetwork: true,
     conditions: true,
     medications: true,
     allergies: true,
@@ -857,6 +939,16 @@ function OverviewContent({
           </div>
         </CollapsibleSection>
       </div>
+
+      <CollapsibleSection
+        title="Providers & Sites of Service"
+        sectionKey="careNetwork"
+        isOpen={prefs.careNetwork}
+        onToggle={() => toggle("careNetwork")}
+        badge={`${(overview.care_team ?? []).length} providers · ${(overview.sites_of_service ?? []).length} sites`}
+      >
+        <CareNetworkPanel overview={overview} />
+      </CollapsibleSection>
 
       {/* Allergies + Immunizations */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

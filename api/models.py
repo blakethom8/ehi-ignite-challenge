@@ -64,6 +64,22 @@ class EncounterTypeSummary(BaseModel):
     count: int
 
 
+class CareTeamSummaryItem(BaseModel):
+    name: str
+    organizations: list[str]
+    encounter_count: int
+    latest_encounter_dt: datetime | None
+    class_breakdown: dict[str, int]
+
+
+class SiteOfServiceSummaryItem(BaseModel):
+    name: str
+    provider_count: int
+    encounter_count: int
+    latest_encounter_dt: datetime | None
+    class_breakdown: dict[str, int]
+
+
 class PatientOverview(BaseModel):
     # Identity
     id: str
@@ -118,6 +134,8 @@ class PatientOverview(BaseModel):
     encounter_class_breakdown: dict[str, int]
     encounter_type_breakdown: list[EncounterTypeSummary]
     avg_resources_per_encounter: float
+    care_team: list[CareTeamSummaryItem]
+    sites_of_service: list[SiteOfServiceSummaryItem]
 
     # Allergies
     allergy_count: int

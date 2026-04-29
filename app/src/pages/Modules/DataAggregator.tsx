@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { ArrowRight, CheckCircle2, ClipboardList, DatabaseZap, FileCheck2, KeyRound, RotateCw, ShieldCheck } from "lucide-react";
 
 const steps = [
@@ -29,7 +29,47 @@ const steps = [
   },
 ];
 
+const moduleCopy = {
+  overview: {
+    badge: "Module Overview",
+    title: "Guide patients from scattered portals to a usable FHIR Chart",
+    body:
+      "This is the future onboarding layer. It helps patients collect records from multiple sources, then runs the post-process cleaning that turns scattered exports into the chart used everywhere else in the platform.",
+  },
+  sources: {
+    badge: "Source Inventory",
+    title: "Track where the patient has records before aggregation starts",
+    body:
+      "This submodule should become the checklist of portals, clinics, labs, pharmacies, payer files, uploaded documents, and missing source systems that may contain useful EHI.",
+  },
+  cleaning: {
+    badge: "Cleaning Queue",
+    title: "Review normalization gaps before facts become chart intelligence",
+    body:
+      "This submodule should surface duplicate medications, conflicting dates, sparse fields, uncoded facts, unknown providers, and records that need human confirmation before downstream use.",
+  },
+  publish: {
+    badge: "Publish Readiness",
+    title: "Confirm the chart is ready for clinical and marketplace modules",
+    body:
+      "This submodule should become the activation checklist for provenance coverage, unresolved conflicts, source recency, patient consent, and module-specific readiness checks.",
+  },
+};
+
 export function DataAggregator() {
+  const location = useLocation();
+  const [params] = useSearchParams();
+  const patientId = params.get("patient");
+  const activeKey: keyof typeof moduleCopy = location.pathname.includes("/sources")
+    ? "sources"
+    : location.pathname.includes("/cleaning")
+      ? "cleaning"
+      : location.pathname.includes("/publish")
+        ? "publish"
+        : "overview";
+  const copy = moduleCopy[activeKey];
+  const chartHref = patientId ? `/charts?patient=${patientId}` : "/charts";
+
   return (
     <main className="mx-auto max-w-7xl space-y-5 p-4 lg:p-6">
       <section className="rounded-3xl bg-white p-6 shadow-[rgb(224_226_232)_0px_0px_0px_1px] lg:p-8">
@@ -37,14 +77,13 @@ export function DataAggregator() {
           <div className="max-w-3xl">
             <p className="inline-flex items-center gap-2 rounded-full bg-[#eef1ff] px-3 py-1 text-xs font-semibold uppercase tracking-wider text-[#5b76fe]">
               <DatabaseZap size={13} />
-              Module Overview
+              {copy.badge}
             </p>
             <h1 className="mt-5 text-3xl font-semibold tracking-tight text-[#1c1c1e] lg:text-4xl">
-              Guide patients from scattered portals to a usable FHIR Chart
+              {copy.title}
             </h1>
             <p className="mt-3 max-w-4xl text-base leading-7 text-[#667085]">
-              This is the future onboarding layer. It helps patients collect records from multiple sources, then runs the
-              post-process cleaning that turns scattered exports into the chart used everywhere else in the platform.
+              {copy.body}
             </p>
           </div>
           <div className="rounded-2xl bg-[#f7f8ff] p-4 shadow-[rgb(224_226_232)_0px_0px_0px_1px] lg:min-w-[280px]">
@@ -116,7 +155,7 @@ export function DataAggregator() {
             workspace, then into FHIR Charts, Clinical Insights, Marketplace, and Internal Tools. This page keeps the first
             version concrete while leaving room for that richer navigation prototype.
           </p>
-          <Link to="/charts" className="mt-5 inline-flex items-center gap-1 text-sm font-semibold text-[#0f766e]">
+          <Link to={chartHref} className="mt-5 inline-flex items-center gap-1 text-sm font-semibold text-[#0f766e]">
             View resulting FHIR Chart
             <ArrowRight size={14} />
           </Link>

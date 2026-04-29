@@ -41,6 +41,22 @@ export interface EncounterTypeSummary {
   count: number;
 }
 
+export interface CareTeamSummaryItem {
+  name: string;
+  organizations: string[];
+  encounter_count: number;
+  latest_encounter_dt: string | null;
+  class_breakdown: Record<string, number>;
+}
+
+export interface SiteOfServiceSummaryItem {
+  name: string;
+  provider_count: number;
+  encounter_count: number;
+  latest_encounter_dt: string | null;
+  class_breakdown: Record<string, number>;
+}
+
 export interface PatientOverview {
   id: string;
   name: string;
@@ -78,6 +94,8 @@ export interface PatientOverview {
   encounter_class_breakdown: Record<string, number>;
   encounter_type_breakdown: EncounterTypeSummary[];
   avg_resources_per_encounter: number;
+  care_team: CareTeamSummaryItem[];
+  sites_of_service: SiteOfServiceSummaryItem[];
   allergy_count: number;
   allergy_labels: string[];
   immunization_count: number;

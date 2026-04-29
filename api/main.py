@@ -4,6 +4,7 @@ EHI Ignite Challenge — FastAPI backend.
 Run: uv run uvicorn api.main:app --reload --port 8000
 """
 
+import os
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -15,6 +16,7 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env", override=False)
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from api.core.sof_materialize import materialize_from_env
 from api.middleware.tracing import TracingMiddleware
@@ -24,11 +26,24 @@ from api.routers import assistant
 from api.routers import traces
 from api.routers import classifications
 
+_ENVIRONMENT = os.getenv("ENVIRONMENT", "development").strip().lower()
+_IS_PRODUCTION = _ENVIRONMENT in {"prod", "production"}
+
 app = FastAPI(
     title="EHI Ignite API",
     description="Clinical intelligence layer over FHIR patient data",
     version="0.1.0",
+    docs_url=None if _IS_PRODUCTION else "/docs",
+    redoc_url=None if _IS_PRODUCTION else "/redoc",
+    openapi_url=None if _IS_PRODUCTION else "/openapi.json",
 )
+
+
+def _csv_env(name: str, default: list[str]) -> list[str]:
+    raw = os.getenv(name)
+    if not raw:
+        return default
+    return [item.strip() for item in raw.split(",") if item.strip()]
 
 
 @app.on_event("startup")
@@ -46,15 +61,31 @@ def _materialize_sof_db() -> None:
     patients.list_patients()
 
 app.add_middleware(
+    TrustedHostMiddleware,
+    allowed_hosts=_csv_env(
+        "ALLOWED_HOSTS",
+        [
+            "ehi.healthcaredataai.com",
+            "localhost",
+            "127.0.0.1",
+            "testserver",
+        ],
+    ),
+)
+
+app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://localhost:3000",
-        "https://ehi.healthcaredataai.com",
-    ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=_csv_env(
+        "CORS_ALLOWED_ORIGINS",
+        [
+            "http://localhost:5173",
+            "http://localhost:3000",
+            "https://ehi.healthcaredataai.com",
+        ],
+    ),
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Accept", "Authorization", "Content-Type"],
 )
 
 app.add_middleware(TracingMiddleware)

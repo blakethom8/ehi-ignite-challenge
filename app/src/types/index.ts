@@ -514,6 +514,8 @@ export interface AssistantSettings {
     model: string;
     max_tokens: number;
   };
+  client_overrides_enabled: boolean;
+  max_tokens_limit: number;
   available_modes: AssistantModeOption[];
   available_models: AssistantModelOption[];
 }

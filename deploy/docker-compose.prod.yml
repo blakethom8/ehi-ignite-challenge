@@ -7,6 +7,12 @@ services:
     environment:
       - ENVIRONMENT=production
       - SOF_AUTO_MATERIALIZE=true
+      - PROVIDER_ASSISTANT_MODE=context
+      - TRACES_API_ENABLED=false
+      - PROVIDER_ASSISTANT_ALLOW_CLIENT_OVERRIDES=false
+      - PROVIDER_ASSISTANT_MAX_RESPONSE_TOKENS=2000
+      - CORS_ALLOWED_ORIGINS=https://ehi.healthcaredataai.com
+      - ALLOWED_HOSTS=ehi.healthcaredataai.com
     volumes:
       - ../data:/app/data
     restart: unless-stopped

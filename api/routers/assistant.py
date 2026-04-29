@@ -21,6 +21,27 @@ import os
 router = APIRouter(prefix="/assistant", tags=["assistant"])
 
 
+def _env_bool(name: str, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _client_overrides_enabled() -> bool:
+    default = os.getenv("ENVIRONMENT", "development").strip().lower() not in {"prod", "production"}
+    return _env_bool("PROVIDER_ASSISTANT_ALLOW_CLIENT_OVERRIDES", default)
+
+
+def _max_response_tokens() -> int:
+    raw = os.getenv("PROVIDER_ASSISTANT_MAX_RESPONSE_TOKENS", "2000")
+    try:
+        value = int(raw)
+    except ValueError:
+        return 2000
+    return min(max(value, 128), 4000)
+
+
 @router.get("/settings")
 def get_assistant_settings() -> dict:
     """Return current assistant configuration and available options."""
@@ -30,6 +51,8 @@ def get_assistant_settings() -> dict:
             "model": os.getenv("PROVIDER_ASSISTANT_MODEL", "claude-sonnet-4-5"),
             "max_tokens": 1500,
         },
+        "client_overrides_enabled": _client_overrides_enabled(),
+        "max_tokens_limit": _max_response_tokens(),
         "available_modes": [
             {"id": "deterministic", "label": "Deterministic", "description": "Rule-based, instant (<100ms), no LLM cost"},
             {"id": "context", "label": "Context (Recommended)", "description": "Single Claude call with pre-built clinical context"},

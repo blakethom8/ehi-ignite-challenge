@@ -35,6 +35,12 @@ const DEFAULT_SETTINGS: AgentSettings = {
   maxTokens: 1500,
 };
 
+function clampMaxTokens(value: unknown): number {
+  const parsed = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(parsed)) return DEFAULT_SETTINGS.maxTokens;
+  return Math.min(Math.max(Math.round(parsed), 300), 4000);
+}
+
 interface ChatContextInner {
   messagesByPatient: Record<string, ChatMessage[]>;
   stance: "opinionated" | "balanced";
@@ -69,15 +75,19 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   const [agentSettings, setAgentSettings] = useState<AgentSettings>(() => {
     try {
       const saved = localStorage.getItem("ehi-agent-settings");
-      if (saved) return { ...DEFAULT_SETTINGS, ...JSON.parse(saved) };
+      if (saved) {
+        const parsed = { ...DEFAULT_SETTINGS, ...JSON.parse(saved) };
+        return { ...parsed, maxTokens: clampMaxTokens(parsed.maxTokens) };
+      }
     } catch { /* noop */ }
     return DEFAULT_SETTINGS;
   });
   const [messagesByPatient, setMessagesByPatient] = useState<Record<string, ChatMessage[]>>({});
 
   const updateSettings = useCallback((next: AgentSettings) => {
-    setAgentSettings(next);
-    try { localStorage.setItem("ehi-agent-settings", JSON.stringify(next)); } catch { /* noop */ }
+    const normalized = { ...next, maxTokens: clampMaxTokens(next.maxTokens) };
+    setAgentSettings(normalized);
+    try { localStorage.setItem("ehi-agent-settings", JSON.stringify(normalized)); } catch { /* noop */ }
   }, []);
 
   const mutation = useMutation({

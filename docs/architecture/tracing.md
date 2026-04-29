@@ -146,7 +146,8 @@ All configuration is in `.env` (loaded via `python-dotenv` in `api/main.py`):
 ```bash
 # --- Tracing / Observability ---
 TRACING_ENABLED=true              # Master switch (default: false)
-TRACES_API_ENABLED=true           # Enable /api/traces/* endpoints (default follows TRACING_ENABLED)
+TRACES_API_ENABLED=false          # Enable /api/traces/* endpoints (default: false)
+TRACES_API_TOKEN=...              # Required for /api/traces/* in production
 
 # Langfuse (optional — for production dashboards)
 # LANGFUSE_PUBLIC_KEY=pk_...
@@ -154,7 +155,7 @@ TRACES_API_ENABLED=true           # Enable /api/traces/* endpoints (default foll
 # LANGFUSE_HOST=https://cloud.langfuse.com
 ```
 
-When `TRACING_ENABLED=false` (the default), the tracing system has **zero overhead** — context managers yield `None` and no-op immediately.
+When `TRACING_ENABLED=false` (the default), the tracing system has **zero overhead** — context managers yield `None` and no-op immediately. Keep `TRACES_API_ENABLED=false` on public deployments unless the route is protected with `TRACES_API_TOKEN` and only used from trusted admin clients.
 
 ---
 

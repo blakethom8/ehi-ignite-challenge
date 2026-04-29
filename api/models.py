@@ -10,7 +10,9 @@ contract stable independent of internal parsing model changes.
 from __future__ import annotations
 
 from datetime import datetime
-from pydantic import BaseModel, Field
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 # ---------------------------------------------------------------------------
@@ -598,8 +600,18 @@ class CareJourneyResponse(BaseModel):
 
 
 class ProviderAssistantTurn(BaseModel):
-    role: str    # "user" | "assistant"
-    content: str
+    model_config = ConfigDict(extra="forbid")
+
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, max_length=8000)
+
+    @field_validator("content")
+    @classmethod
+    def _content_not_blank(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("content is required")
+        return stripped
 
 
 class ProviderAssistantCitation(BaseModel):
@@ -611,14 +623,38 @@ class ProviderAssistantCitation(BaseModel):
 
 
 class ProviderAssistantRequest(BaseModel):
-    patient_id: str
-    question: str
-    history: list[ProviderAssistantTurn] = Field(default_factory=list)
-    stance: str = "opinionated"    # "opinionated" | "balanced"
+    model_config = ConfigDict(extra="forbid")
+
+    patient_id: str = Field(min_length=1, max_length=200)
+    question: str = Field(min_length=1, max_length=4000)
+    history: list[ProviderAssistantTurn] = Field(default_factory=list, max_length=12)
+    stance: Literal["opinionated", "balanced"] = "opinionated"
     # Per-request overrides (optional — falls back to env config)
-    model: str | None = None       # "claude-haiku-4-5" | "claude-sonnet-4-5" | "claude-opus-4-5"
-    mode: str | None = None        # "deterministic" | "context" | "anthropic"
-    max_tokens: int | None = None  # output token limit
+    model: Literal[
+        "claude-haiku-4-5",
+        "claude-sonnet-4-5",
+        "claude-sonnet-4-6",
+        "claude-opus-4-5",
+    ] | None = None
+    mode: Literal[
+        "deterministic",
+        "context",
+        "context_single_turn",
+        "single_turn",
+        "anthropic",
+        "anthropic_agent",
+        "agent_sdk",
+        "anthropic_sdk",
+    ] | None = None
+    max_tokens: int | None = Field(default=None, ge=128, le=4000)
+
+    @field_validator("question")
+    @classmethod
+    def _question_not_blank(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("question is required")
+        return stripped
 
 
 class ToolCallDetail(BaseModel):

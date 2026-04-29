@@ -38,6 +38,20 @@ def _env_bool(name: str, default: bool) -> bool:
     return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _client_overrides_enabled() -> bool:
+    default = os.getenv("ENVIRONMENT", "development").strip().lower() not in {"prod", "production"}
+    return _env_bool("PROVIDER_ASSISTANT_ALLOW_CLIENT_OVERRIDES", default)
+
+
+def _max_response_tokens() -> int:
+    raw = os.getenv("PROVIDER_ASSISTANT_MAX_RESPONSE_TOKENS", "2000")
+    try:
+        value = int(raw)
+    except ValueError:
+        return 2000
+    return min(max(value, 128), 4000)
+
+
 def _assistant_mode() -> str:
     return os.getenv("PROVIDER_ASSISTANT_MODE", "deterministic").strip().lower()
 
@@ -60,6 +74,13 @@ def answer_provider_question(
     - context (recommended) — clean context + single Claude call (~3-5s)
     - anthropic (alias: agent_sdk) — multi-turn agent loop (~15-30s)
     """
+    if not _client_overrides_enabled():
+        model_override = None
+        mode_override = None
+        max_tokens_override = None
+    elif max_tokens_override is not None:
+        max_tokens_override = min(max_tokens_override, _max_response_tokens())
+
     mode = (mode_override or "").strip().lower() or _assistant_mode()
     fallback_enabled = _env_bool("PROVIDER_ASSISTANT_FALLBACK_TO_DETERMINISTIC", True)
 

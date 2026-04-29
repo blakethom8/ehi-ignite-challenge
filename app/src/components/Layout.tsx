@@ -981,10 +981,6 @@ export function Layout({ children }: LayoutProps) {
     location.pathname.startsWith("/explorer/safety") ||
     location.pathname.startsWith("/explorer/anesthesia");
 
-  useEffect(() => {
-    if (isPreOpModulePath) setPreOpOpen(true);
-  }, [isPreOpModulePath]);
-
   const navigate = useNavigate();
 
   const handleSelectPatient = (id: string) => {
@@ -1170,7 +1166,7 @@ export function Layout({ children }: LayoutProps) {
                             {group.items.map(({ to, label, icon: Icon, description, children }) => {
                               const hasChildren = Boolean(children?.length);
                               const childActive = children?.some((child) => isPathActive(child.to)) ?? false;
-                              const expanded = hasChildren && !sidebarCollapsed && (preOpOpen || childActive);
+                              const expanded = hasChildren && !sidebarCollapsed && (preOpOpen || childActive || (to === "/preop" && isPreOpModulePath));
 
                               return (
                                 <div key={to}>

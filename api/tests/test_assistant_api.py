@@ -73,6 +73,25 @@ class ProviderAssistantApiTests(unittest.TestCase):
         self.assertIsInstance(body["citations"], list)
         self.assertIsInstance(body["follow_ups"], list)
 
+    def test_assistant_chat_rejects_invalid_client_overrides(self) -> None:
+        payload = {
+            **self._payload(),
+            "mode": "unbounded",
+            "model": "claude-opus-enterprise",
+            "max_tokens": 100_000,
+        }
+
+        response = self.client.post("/api/assistant/chat", json=payload)
+
+        self.assertEqual(response.status_code, 422)
+
+    def test_assistant_chat_rejects_oversized_question(self) -> None:
+        payload = self._payload("x" * 4001)
+
+        response = self.client.post("/api/assistant/chat", json=payload)
+
+        self.assertEqual(response.status_code, 422)
+
     def test_assistant_chat_anthropic_missing_key_falls_back(self) -> None:
         with patched_env(
             {

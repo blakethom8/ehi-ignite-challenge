@@ -35,6 +35,8 @@ export function AgentSettingsPanel({
   const activeMode = settings.mode || config?.current.mode || "context";
   const activeModelLabel = config?.available_models.find((m) => m.id === activeModel)?.label || activeModel;
   const activeModeLabel = config?.available_modes.find((m) => m.id === activeMode)?.label || activeMode;
+  const overridesEnabled = config?.client_overrides_enabled ?? true;
+  const maxTokensLimit = config?.max_tokens_limit ?? 4000;
 
   if (!open) {
     return (
@@ -70,6 +72,11 @@ export function AgentSettingsPanel({
 
       {/* Model selector */}
       <div>
+        {!overridesEnabled && (
+          <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800">
+            Production uses server-managed model settings for cost control.
+          </div>
+        )}
         <label className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
           Model
         </label>
@@ -78,11 +85,12 @@ export function AgentSettingsPanel({
             <button
               key={model.id}
               onClick={() => onUpdate({ ...settings, model: model.id })}
+              disabled={!overridesEnabled}
               className={`flex items-center gap-2.5 w-full rounded-lg px-3 py-2 text-left transition-colors ${
                 activeModel === model.id
                   ? "bg-blue-50 ring-1 ring-blue-200"
                   : "hover:bg-slate-50"
-              }`}
+              } ${!overridesEnabled ? "cursor-not-allowed opacity-60" : ""}`}
             >
               {SPEED_ICONS[model.speed] || <Gauge size={12} />}
               <div className="flex-1 min-w-0">
@@ -109,11 +117,12 @@ export function AgentSettingsPanel({
             <button
               key={mode.id}
               onClick={() => onUpdate({ ...settings, mode: mode.id })}
+              disabled={!overridesEnabled}
               className={`flex items-center gap-2.5 w-full rounded-lg px-3 py-2 text-left transition-colors ${
                 activeMode === mode.id
                   ? "bg-blue-50 ring-1 ring-blue-200"
                   : "hover:bg-slate-50"
-              }`}
+              } ${!overridesEnabled ? "cursor-not-allowed opacity-60" : ""}`}
             >
               {MODE_ICONS[mode.id] || <Cpu size={12} />}
               <div className="flex-1 min-w-0">
@@ -139,10 +148,11 @@ export function AgentSettingsPanel({
           <input
             type="range"
             min={300}
-            max={4000}
+            max={maxTokensLimit}
             step={100}
-            value={settings.maxTokens}
+            value={Math.min(settings.maxTokens, maxTokensLimit)}
             onChange={(e) => onUpdate({ ...settings, maxTokens: Number(e.target.value) })}
+            disabled={!overridesEnabled}
             className="flex-1 h-1.5 rounded-full appearance-none bg-slate-200 accent-blue-500"
           />
           <span className="text-[11px] font-medium text-slate-700 w-16 text-right">
@@ -158,6 +168,7 @@ export function AgentSettingsPanel({
       {/* Reset */}
       <button
         onClick={() => onUpdate({ model: "", mode: "", maxTokens: 1500 })}
+        disabled={!overridesEnabled}
         className="w-full rounded-lg border border-slate-200 py-1.5 text-[11px] text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition-colors"
       >
         Reset to server defaults

@@ -62,7 +62,7 @@ const CLINICAL_INSIGHTS_NAV_GROUPS: NavGroup[] = [
   {
     label: "Clinical Insights",
     items: [
-      { to: "/clinical-insights", label: "Module Overview", icon: Activity, description: "Private chart modules" },
+      { to: "/clinical-insights", label: "Module Inventory", icon: Activity, description: "Private chart modules" },
       { to: "/explorer/assistant", label: "Chart Q&A", icon: MessageSquareText, description: "Chart-grounded answers" },
       {
         to: "/preop",
@@ -102,6 +102,7 @@ const DATA_AGGREGATOR_NAV_GROUPS: NavGroup[] = [
       { to: "/aggregate", label: "Module Overview", icon: DatabaseZap, description: "Patient collection guide" },
       { to: "/aggregate/sources", label: "Source Inventory", icon: FileJson2, description: "Portal and file checklist" },
       { to: "/aggregate/cleaning", label: "Cleaning Queue", icon: SlidersHorizontal, description: "Normalization workbench" },
+      { to: "/aggregate/context", label: "Patient Context", icon: MessageSquareText, description: "Guided patient intake" },
       { to: "/aggregate/publish", label: "Publish Readiness", icon: ClipboardCheck, description: "Chart activation gates" },
     ],
   },
@@ -129,10 +130,12 @@ const MARKETPLACE_NAV_GROUPS: NavGroup[] = [
   {
     label: "Featured Marketplaces",
     items: [
-      { to: "/marketplace", label: "Module Overview", icon: Store, description: "Marketplace overview" },
+      { to: "/marketplace", label: "Module Inventory", icon: Store, description: "Marketplace catalog" },
       { to: "/trials", label: "Trial Match", icon: Search, description: "External opportunity" },
       { to: "/medication-access", label: "Med Access", icon: Pill, description: "Affordability workflow" },
-      { to: "/sharing", label: "Grants & Research", icon: Share2, description: "Packet-based concepts" },
+      { to: "/payer-check", label: "Payer Check", icon: ShieldAlert, description: "Coverage workflow" },
+      { to: "/grants", label: "Grant Finder", icon: Share2, description: "Support programs" },
+      { to: "/research-opportunities", label: "Research", icon: BookMarked, description: "Registries and studies" },
       { to: "/second-opinion", label: "Second Opinion", icon: MessageSquareText, description: "Specialist marketplace" },
     ],
   },
@@ -205,7 +208,10 @@ function getEnvironment(pathname: string): AppEnvironment {
     pathname.startsWith("/sharing") ||
     pathname.startsWith("/second-opinion") ||
     pathname.startsWith("/trials") ||
-    pathname.startsWith("/medication-access")
+    pathname.startsWith("/medication-access") ||
+    pathname.startsWith("/grants") ||
+    pathname.startsWith("/research-opportunities") ||
+    pathname.startsWith("/payer-check")
   ) {
     return "marketplace";
   }
@@ -228,6 +234,17 @@ function getClinicalNavGroups(environment: AppEnvironment): NavGroup[] {
   if (environment === "trials") return TRIALS_NAV_GROUPS;
   if (environment === "medication") return MEDICATION_ACCESS_NAV_GROUPS;
   return CLINICAL_INSIGHTS_NAV_GROUPS;
+}
+
+function shouldMatchSidebarLinkExactly(path: string): boolean {
+  return [
+    "/aggregate",
+    "/charts",
+    "/clinical-insights",
+    "/marketplace",
+    "/analysis",
+    "/explorer",
+  ].includes(path);
 }
 
 function getWorkspaceCopy(environment: AppEnvironment): { title: string; sidebarTitle: string; subtitle: string; icon: LucideIcon } {
@@ -852,12 +869,13 @@ export function Layout({ children }: LayoutProps) {
     { key: "internal", label: "Internal Tools", to: "/analysis" },
   ];
 
-  const marketplaceLinks: { key: AppEnvironment | "grants" | "research" | "secondOpinion"; label: string; to: string }[] = [
-    { key: "marketplace", label: "Module Overview", to: withPatientQuery("/marketplace", patientId) },
+  const marketplaceLinks: { key: AppEnvironment | "grants" | "research" | "payer" | "secondOpinion"; label: string; to: string }[] = [
+    { key: "marketplace", label: "Module Inventory", to: withPatientQuery("/marketplace", patientId) },
     { key: "trials", label: "Trial Match", to: withPatientQuery("/trials", patientId) },
     { key: "medication", label: "Med Access", to: withPatientQuery("/medication-access", patientId) },
-    { key: "grants", label: "Grants", to: withPatientQuery("/sharing", patientId) },
-    { key: "research", label: "Research", to: withPatientQuery("/sharing", patientId) },
+    { key: "payer", label: "Payer Check", to: withPatientQuery("/payer-check", patientId) },
+    { key: "grants", label: "Grants", to: withPatientQuery("/grants", patientId) },
+    { key: "research", label: "Research", to: withPatientQuery("/research-opportunities", patientId) },
     { key: "sharing", label: "Sharing", to: withPatientQuery("/sharing", patientId) },
     { key: "secondOpinion", label: "Second Opinion", to: withPatientQuery("/second-opinion", patientId) },
   ];
@@ -874,11 +892,12 @@ export function Layout({ children }: LayoutProps) {
     { key: "walkthrough", label: "Module Overview", to: withPatientQuery("/aggregate", patientId) },
     { key: "sourceInventory", label: "Source Inventory", to: withPatientQuery("/aggregate/sources", patientId) },
     { key: "cleaningQueue", label: "Cleaning Queue", to: withPatientQuery("/aggregate/cleaning", patientId) },
+    { key: "patientContext", label: "Patient Context", to: withPatientQuery("/aggregate/context", patientId) },
     { key: "publishReadiness", label: "Publish Readiness", to: withPatientQuery("/aggregate/publish", patientId) },
   ];
 
   const clinicalInsightLinks: { key: AppEnvironment | "preop" | "qa"; label: string; to: string }[] = [
-    { key: "clinical", label: "Module Overview", to: withPatientQuery("/clinical-insights", patientId) },
+    { key: "clinical", label: "Module Inventory", to: withPatientQuery("/clinical-insights", patientId) },
     { key: "qa", label: "Chart Q&A", to: withPatientQuery("/explorer/assistant", patientId) },
     { key: "preop", label: "Pre-Op Support", to: withPatientQuery("/preop", patientId) },
   ];
@@ -947,16 +966,20 @@ export function Layout({ children }: LayoutProps) {
     if (key === "marketplace") return location.pathname.startsWith("/marketplace");
     if (key === "trials") return location.pathname.startsWith("/trials");
     if (key === "medication") return location.pathname.startsWith("/medication-access");
-    if (key === "sharing" || key === "grants" || key === "research") return location.pathname.startsWith("/sharing");
+    if (key === "payer") return location.pathname.startsWith("/payer-check");
+    if (key === "grants") return location.pathname.startsWith("/grants");
+    if (key === "research") return location.pathname.startsWith("/research-opportunities");
+    if (key === "sharing") return location.pathname.startsWith("/sharing");
     if (key === "secondOpinion") return location.pathname.startsWith("/second-opinion");
     if (key === "chartHome") return location.pathname.startsWith("/charts") || location.pathname.startsWith("/record");
     if (key === "snapshot") return location.pathname === "/explorer";
     if (key === "history") return location.pathname.startsWith("/explorer/history");
     if (key === "journey") return location.pathname.startsWith("/explorer/care-journey");
     if (key === "sources") return location.pathname.startsWith("/explorer/patient-data");
-    if (key === "walkthrough") return location.pathname === "/aggregate";
+    if (key === "walkthrough") return location.pathname === "/aggregate" || location.pathname.startsWith("/aggregate/methodology");
     if (key === "sourceInventory") return location.pathname.startsWith("/aggregate/sources");
     if (key === "cleaningQueue") return location.pathname.startsWith("/aggregate/cleaning");
+    if (key === "patientContext") return location.pathname.startsWith("/aggregate/context");
     if (key === "publishReadiness") return location.pathname.startsWith("/aggregate/publish");
     if (key === "clinical") return location.pathname.startsWith("/clinical-insights");
     if (key === "preop") {
@@ -1006,7 +1029,10 @@ export function Layout({ children }: LayoutProps) {
       location.pathname.startsWith("/medication-access") ||
       location.pathname.startsWith("/marketplace") ||
       location.pathname.startsWith("/sharing") ||
-      location.pathname.startsWith("/second-opinion")
+      location.pathname.startsWith("/second-opinion") ||
+      location.pathname.startsWith("/grants") ||
+      location.pathname.startsWith("/research-opportunities") ||
+      location.pathname.startsWith("/payer-check")
         ? location.pathname
         : location.pathname.startsWith("/platform")
           ? "/explorer"
@@ -1182,7 +1208,7 @@ export function Layout({ children }: LayoutProps) {
                                   <div className="flex items-stretch gap-1">
                                     <NavLink
                                       to={withPatientQuery(to, patientId)}
-                                      end={to === "/explorer"}
+                                      end={shouldMatchSidebarLinkExactly(to)}
                                       title={sidebarCollapsed ? label : undefined}
                                       className={({ isActive }) =>
                                         `flex min-w-0 flex-1 items-center rounded-lg transition-colors ${

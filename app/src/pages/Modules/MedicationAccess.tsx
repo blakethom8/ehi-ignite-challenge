@@ -31,6 +31,59 @@ function AccessCard({
   );
 }
 
+function FutureAccessPreview({ medicationName }: { medicationName: string | null }) {
+  return (
+    <section className="rounded-3xl border border-[#cdeee9] bg-[#f4fffc] p-5 lg:p-6">
+      <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-[#0f766e]">Illustrative future state</p>
+          <h2 className="mt-1 text-xl font-semibold text-[#1c1c1e]">Medication affordability workspace</h2>
+        </div>
+        <p className="max-w-2xl text-sm leading-6 text-[#35524d]">
+          The future page should feel like an access plan: normalize the therapy, compare available paths, and produce a checklist the patient can act on.
+        </p>
+      </div>
+
+      <div className="mt-5 grid gap-4 lg:grid-cols-[0.85fr_1.15fr]">
+        <div className="rounded-2xl bg-white p-4 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-[#a5a8b5]">Selected therapy</p>
+          <h3 className="mt-2 text-base font-semibold text-[#1c1c1e]">{medicationName ?? "Active medication selected from chart"}</h3>
+          <p className="mt-2 text-sm leading-6 text-[#667085]">
+            The module should preserve the chart medication display while preparing normalized ingredient, form, dose, brand/generic, and substitution fields for external research.
+          </p>
+          <div className="mt-4 grid gap-2">
+            {["Ingredient/form normalization", "Generic and brand candidates", "Clinical verification needed"].map((item) => (
+              <div key={item} className="rounded-xl border border-[#e9eaef] px-3 py-2 text-sm font-medium text-[#555a6a]">
+                {item}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-3">
+          {[
+            ["Price paths", "Future search", "Retail, discount, membership, mail-order, and pharmacy options will appear with source dates."],
+            ["Support programs", "Future search", "Manufacturer assistance, coupons, disease foundations, and eligibility requirements."],
+            ["Fulfillment plan", "Patient-ready", "Chosen path, documents needed, pharmacy questions, and clinician/pharmacist verification."],
+          ].map(([title, status, body]) => (
+            <div key={title} className="flex min-h-[220px] flex-col rounded-2xl bg-white p-4 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+              <div className="flex items-start justify-between gap-3">
+                <p className="text-sm font-semibold text-[#1c1c1e]">{title}</p>
+                <span className="rounded-full bg-[#f5f6f8] px-2 py-1 text-[10px] font-semibold text-[#555a6a]">{status}</span>
+              </div>
+              <p className="mt-3 text-sm leading-6 text-[#667085]">{body}</p>
+              <div className="mt-auto pt-4">
+                <div className="h-2 rounded-full bg-[#e5f6f2]" />
+                <div className="mt-2 h-2 w-3/4 rounded-full bg-[#e5f6f2]" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export function MedicationAccess() {
   const [searchParams] = useSearchParams();
   const patientId = searchParams.get("patient");
@@ -160,6 +213,8 @@ export function MedicationAccess() {
           body="Turn the research into a practical next-step list: pharmacy option, enrollment path, and documents needed."
         />
       </div>
+
+      <FutureAccessPreview medicationName={activeMeds[0]?.display ?? null} />
 
       <div className="grid gap-5 lg:grid-cols-[1.05fr_0.95fr]">
         <section className="rounded-2xl bg-white p-5 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">

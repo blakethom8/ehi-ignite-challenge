@@ -31,6 +31,76 @@ function TrialWorkflowCard({
   );
 }
 
+function FutureTrialMatchPreview({ conditionLabels }: { conditionLabels: string[] }) {
+  const signalText =
+    conditionLabels.length > 0
+      ? conditionLabels.slice(0, 3).join("; ")
+      : "Chart-derived diagnosis and treatment signals will appear here.";
+
+  return (
+    <section className="rounded-3xl border border-[#dfe4ff] bg-[#f7f8ff] p-5 lg:p-6">
+      <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-[#5b76fe]">Illustrative future state</p>
+          <h2 className="mt-1 text-xl font-semibold text-[#1c1c1e]">Trial matching workspace</h2>
+        </div>
+        <p className="max-w-2xl text-sm leading-6 text-[#667085]">
+          This is the future interface shape: chart-derived eligibility signals on the left, candidate registry results on the right,
+          and explicit criteria that still need human verification.
+        </p>
+      </div>
+
+      <div className="mt-5 grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
+        <div className="space-y-3 rounded-2xl bg-white p-4 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-[#a5a8b5]">Search packet</p>
+            <h3 className="mt-1 text-base font-semibold text-[#1c1c1e]">Eligibility signals from FHIR</h3>
+          </div>
+          {[
+            ["Condition anchors", signalText],
+            ["Timeline context", "Record span, recent encounters, procedures, and active therapies."],
+            ["Search constraints", "Age, geography, trial phase, recruitment status, and patient preferences."],
+          ].map(([label, body]) => (
+            <div key={label} className="rounded-xl border border-[#e9eaef] p-3">
+              <p className="text-sm font-semibold text-[#1c1c1e]">{label}</p>
+              <p className="mt-1 text-sm leading-6 text-[#667085]">{body}</p>
+            </div>
+          ))}
+        </div>
+
+        <div className="rounded-2xl bg-white p-4 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-[#a5a8b5]">Candidate results</p>
+              <h3 className="mt-1 text-base font-semibold text-[#1c1c1e]">Future registry result cards</h3>
+            </div>
+            <span className="rounded-full bg-[#f5f6f8] px-2.5 py-1 text-xs font-semibold text-[#555a6a]">No live search yet</span>
+          </div>
+
+          <div className="mt-4 grid gap-3">
+            {[
+              ["Potential match", "Inclusion criteria align with chart signals", "Exclusions and location need verification"],
+              ["Needs review", "Some inclusion terms have partial chart evidence", "Missing labs or staging details would be flagged"],
+              ["Share packet", "Clinician-ready summary and source citations", "Patient approval required before outreach"],
+            ].map(([title, rationale, gap]) => (
+              <div key={title} className="rounded-xl border border-[#e9eaef] p-3">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-[#1c1c1e]">{title}</p>
+                    <p className="mt-1 text-sm leading-6 text-[#667085]">{rationale}</p>
+                  </div>
+                  <span className="w-fit rounded-full bg-[#eef1ff] px-2 py-1 text-[11px] font-semibold text-[#5b76fe]">Future card</span>
+                </div>
+                <p className="mt-2 text-xs leading-5 text-[#98a2b3]">{gap}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export function ClinicalTrials() {
   const [searchParams] = useSearchParams();
   const patientId = searchParams.get("patient");
@@ -163,6 +233,8 @@ export function ClinicalTrials() {
           body="Package the patient-level evidence and candidate trial rationale into a clinician-ready review artifact."
         />
       </div>
+
+      <FutureTrialMatchPreview conditionLabels={activeConditions.map((condition) => condition.display)} />
 
       <div className="grid gap-5 lg:grid-cols-[1.05fr_0.95fr]">
         <section className="rounded-2xl bg-white p-5 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">

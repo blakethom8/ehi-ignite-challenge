@@ -21,6 +21,17 @@ import type {
   CareJourneyResponse,
   ClassificationsResponse,
   AssistantSettings,
+  PatientContextExportResponse,
+  PatientContextSessionResponse,
+  PatientContextSourceMode,
+  PatientContextStatus,
+  PatientContextTurnResponse,
+  AggregationCleaningQueueResponse,
+  AggregationDeleteResponse,
+  AggregationEnvironmentResponse,
+  AggregationReadinessResponse,
+  AggregationUploadPayload,
+  AggregationUploadResponse,
 } from "../types";
 import { mockPatients } from "./mockData";
 
@@ -120,6 +131,59 @@ export const api = {
   /** Provider-facing chart Q&A */
   chatProviderAssistant: (payload: ProviderAssistantRequest): Promise<ProviderAssistantResponse> =>
     http.post<ProviderAssistantResponse>("/assistant/chat", payload).then((r) => r.data),
+
+  /** Patient-facing guided context intake */
+  getPatientContextStatus: (): Promise<PatientContextStatus> =>
+    http.get<PatientContextStatus>("/patient-context/status").then((r) => r.data),
+
+  createPatientContextSession: (
+    patientId: string,
+    sourceMode: PatientContextSourceMode = "selected_patient",
+  ): Promise<PatientContextSessionResponse> =>
+    http.post<PatientContextSessionResponse>("/patient-context/sessions", {
+      patient_id: patientId,
+      source_mode: sourceMode,
+    }).then((r) => r.data),
+
+  sendPatientContextTurn: (
+    sessionId: string,
+    message: string,
+    selectedGapId?: string | null,
+  ): Promise<PatientContextTurnResponse> =>
+    http.post<PatientContextTurnResponse>(`/patient-context/sessions/${sessionId}/turn`, {
+      message,
+      selected_gap_id: selectedGapId || undefined,
+    }).then((r) => r.data),
+
+  exportPatientContext: (sessionId: string): Promise<PatientContextExportResponse> =>
+    http.post<PatientContextExportResponse>(`/patient-context/sessions/${sessionId}/export`).then((r) => r.data),
+
+  /** Data Aggregator workflow */
+  getAggregationSources: (patientId: string): Promise<AggregationEnvironmentResponse> =>
+    http.get<AggregationEnvironmentResponse>(`/aggregation/sources/${patientId}`).then((r) => r.data),
+
+  getAggregationCleaningQueue: (patientId: string): Promise<AggregationCleaningQueueResponse> =>
+    http.get<AggregationCleaningQueueResponse>(`/aggregation/cleaning-queue/${patientId}`).then((r) => r.data),
+
+  getAggregationReadiness: (patientId: string): Promise<AggregationReadinessResponse> =>
+    http.get<AggregationReadinessResponse>(`/aggregation/readiness/${patientId}`).then((r) => r.data),
+
+  uploadAggregationFile: (patientId: string, payload: AggregationUploadPayload): Promise<AggregationUploadResponse> => {
+    const form = new FormData();
+    form.append("file", payload.file);
+    form.append("data_type", payload.data_type);
+    form.append("source_name", payload.source_name);
+    form.append("date_range", payload.date_range);
+    form.append("contains", JSON.stringify(payload.contains));
+    form.append("description", payload.description);
+    form.append("context_notes", payload.context_notes);
+    return http.post<AggregationUploadResponse>(`/aggregation/uploads/${patientId}`, form, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }).then((r) => r.data);
+  },
+
+  deleteAggregationFile: (patientId: string, fileId: string): Promise<AggregationDeleteResponse> =>
+    http.delete<AggregationDeleteResponse>(`/aggregation/uploads/${patientId}/${fileId}`).then((r) => r.data),
 
   /** Assistant settings — available modes, models, current config */
   getAssistantSettings: (): Promise<AssistantSettings> =>

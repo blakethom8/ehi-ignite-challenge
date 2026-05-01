@@ -39,6 +39,52 @@ function PacketRow({ label, detail, status }: { label: string; detail: string; s
   );
 }
 
+function FuturePacketPreview({ secondOpinion }: { secondOpinion: boolean }) {
+  const title = secondOpinion ? "Future specialist review workspace" : "Future packet sharing workspace";
+  const subtitle = secondOpinion
+    ? "A reviewer should see a concise clinical question, the curated chart packet, evidence links, and a structured response area."
+    : "A patient should be able to choose the packet scope, recipient, expiration, and evidence appendix before anything leaves the record layer.";
+  const columns = secondOpinion
+    ? [
+        ["Clinical question", "Patient or clinician frames the exact question for the reviewer."],
+        ["Review packet", "Timeline, active issues, meds, labs, procedures, and raw evidence links."],
+        ["Specialist response", "Impression, missing items, next questions, and cited chart references."],
+      ]
+    : [
+        ["Scope", "Choose summary, medications, labs, source appendix, and module outputs."],
+        ["Recipient", "Set recipient type, access duration, and review purpose."],
+        ["Audit trail", "Track what was shared, when it expires, and which evidence was included."],
+      ];
+
+  return (
+    <section className="rounded-3xl border border-[#dfe4ff] bg-[#f7f8ff] p-5 lg:p-6">
+      <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-[#5b76fe]">Illustrative future state</p>
+          <h2 className="mt-1 text-xl font-semibold text-[#1c1c1e]">{title}</h2>
+        </div>
+        <p className="max-w-2xl text-sm leading-6 text-[#667085]">{subtitle}</p>
+      </div>
+
+      <div className="mt-5 grid gap-3 md:grid-cols-3">
+        {columns.map(([label, body], index) => (
+          <div key={label} className="flex min-h-[190px] flex-col rounded-2xl bg-white p-4 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#eef1ff] text-sm font-semibold text-[#5b76fe]">
+              {index + 1}
+            </div>
+            <h3 className="mt-4 text-sm font-semibold text-[#1c1c1e]">{label}</h3>
+            <p className="mt-2 text-sm leading-6 text-[#667085]">{body}</p>
+            <div className="mt-auto pt-4">
+              <div className="h-2 rounded-full bg-[#edf0f7]" />
+              <div className="mt-2 h-2 w-2/3 rounded-full bg-[#edf0f7]" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export function DataSharing() {
   const [searchParams] = useSearchParams();
   const location = useLocation();
@@ -103,6 +149,8 @@ export function DataSharing() {
           body="Attach source systems, normalized rows, rule outputs, and review-required gaps to every shared fact."
         />
       </section>
+
+      <FuturePacketPreview secondOpinion={secondOpinion} />
 
       <section className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
         <div className="rounded-2xl bg-white p-5 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">

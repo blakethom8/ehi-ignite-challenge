@@ -41,6 +41,22 @@ export interface EncounterTypeSummary {
   count: number;
 }
 
+export interface CareTeamSummaryItem {
+  name: string;
+  organizations: string[];
+  encounter_count: number;
+  latest_encounter_dt: string | null;
+  class_breakdown: Record<string, number>;
+}
+
+export interface SiteOfServiceSummaryItem {
+  name: string;
+  provider_count: number;
+  encounter_count: number;
+  latest_encounter_dt: string | null;
+  class_breakdown: Record<string, number>;
+}
+
 export interface PatientOverview {
   id: string;
   name: string;
@@ -78,6 +94,8 @@ export interface PatientOverview {
   encounter_class_breakdown: Record<string, number>;
   encounter_type_breakdown: EncounterTypeSummary[];
   avg_resources_per_encounter: number;
+  care_team: CareTeamSummaryItem[];
+  sites_of_service: SiteOfServiceSummaryItem[];
   allergy_count: number;
   allergy_labels: string[];
   immunization_count: number;
@@ -554,6 +572,208 @@ export interface ProviderAssistantResponse {
   citations: ProviderAssistantCitation[];
   follow_ups: string[];
   trace: TraceDetail | null;
+}
+
+// ---------------------------------------------------------------------------
+// Patient Context guided intake
+// ---------------------------------------------------------------------------
+
+export type PatientContextSourceMode = "synthetic" | "private_blake_cedars" | "selected_patient";
+export type PatientContextGapCategory =
+  | "missing_sources"
+  | "medication_reality"
+  | "timeline_gap"
+  | "uncertain_fact"
+  | "qualitative_context";
+
+export interface PatientContextGapCard {
+  id: string;
+  category: PatientContextGapCategory;
+  title: string;
+  prompt: string;
+  why_it_matters: string;
+  status: "open" | "answered" | "skipped";
+  priority: number;
+  evidence: string[];
+}
+
+export interface PatientContextTurn {
+  id: string;
+  role: "patient" | "assistant";
+  content: string;
+  created_at: string;
+  linked_gap_id: string | null;
+}
+
+export interface PatientContextFact {
+  id: string;
+  source: "patient-reported";
+  linked_gap_id: string | null;
+  statement: string;
+  summary: string;
+  confidence: "high" | "medium" | "low";
+  created_at: string;
+}
+
+export interface PatientContextExportStatus {
+  generated: boolean;
+  files: string[];
+  generated_at: string | null;
+}
+
+export interface PatientContextSessionResponse {
+  session_id: string;
+  patient_id: string;
+  patient_label: string;
+  source_mode: PatientContextSourceMode;
+  source_posture: string;
+  gap_cards: PatientContextGapCard[];
+  turns: PatientContextTurn[];
+  facts: PatientContextFact[];
+  export_status: PatientContextExportStatus;
+}
+
+export interface PatientContextTurnResponse extends PatientContextSessionResponse {
+  assistant_message: PatientContextTurn;
+}
+
+export interface PatientContextExportResponse {
+  session_id: string;
+  generated_at: string;
+  files: string[];
+  preview: string;
+}
+
+export interface PatientContextStatus {
+  private_blake_cedars_available: boolean;
+  storage: string;
+}
+
+// ---------------------------------------------------------------------------
+// Data Aggregator workflow
+// ---------------------------------------------------------------------------
+
+export interface AggregationUploadedFile {
+  file_id: string;
+  file_name: string;
+  content_type: string;
+  size_bytes: number;
+  uploaded_at: string;
+  status: "uploaded" | "needs_processing" | "unsupported";
+  data_type: string;
+  source_name: string;
+  date_range: string;
+  contains: string[];
+  description: string;
+  context_notes: string;
+  extraction_confidence: "high" | "medium" | "low" | "unknown";
+  storage_path: string;
+}
+
+export interface AggregationSourceCard {
+  id: string;
+  name: string;
+  category:
+    | "synthetic_fhir"
+    | "private_ehi"
+    | "portal"
+    | "file_upload"
+    | "lab"
+    | "pharmacy"
+    | "payer"
+    | "wearable"
+    | "planned_adapter";
+  mode: "available" | "missing" | "planned" | "uploaded" | "private";
+  status_label: string;
+  record_count: number;
+  last_updated: string | null;
+  confidence: "high" | "medium" | "low" | "not_started";
+  posture: string;
+  next_action: string;
+  help_title: string;
+  help_body: string;
+  evidence: string[];
+}
+
+export interface AggregationEnvironmentResponse {
+  patient_id: string;
+  patient_label: string;
+  environment_label: string;
+  source_posture: string;
+  private_blake_cedars_available: boolean;
+  synthetic_resource_counts: Record<string, number>;
+  uploaded_files: AggregationUploadedFile[];
+  source_cards: AggregationSourceCard[];
+  guidance: string[];
+}
+
+export interface AggregationCleaningIssue {
+  id: string;
+  category:
+    | "source_gap"
+    | "medication_reality"
+    | "timeline_gap"
+    | "duplicate_candidate"
+    | "uncoded_file"
+    | "provenance_gap"
+    | "patient_context";
+  severity: "high" | "medium" | "low";
+  status: "open" | "ready_for_review" | "planned" | "resolved";
+  title: string;
+  body: string;
+  recommended_action: string;
+  source_ids: string[];
+  evidence: string[];
+  help_title: string;
+  help_body: string;
+}
+
+export interface AggregationCleaningQueueResponse {
+  patient_id: string;
+  patient_label: string;
+  issue_counts: Record<string, number>;
+  issues: AggregationCleaningIssue[];
+  guidance: string[];
+}
+
+export interface AggregationReadinessItem {
+  id: string;
+  label: string;
+  status: "ready" | "needs_review" | "missing" | "planned";
+  score: number;
+  body: string;
+  next_action: string;
+}
+
+export interface AggregationReadinessResponse {
+  patient_id: string;
+  patient_label: string;
+  readiness_score: number;
+  posture: string;
+  checklist: AggregationReadinessItem[];
+  blockers: string[];
+  export_targets: string[];
+}
+
+export interface AggregationUploadResponse {
+  file: AggregationUploadedFile;
+  storage_posture: string;
+  source_card: AggregationSourceCard;
+}
+
+export interface AggregationUploadPayload {
+  file: File;
+  data_type: string;
+  source_name: string;
+  date_range: string;
+  contains: string[];
+  description: string;
+  context_notes: string;
+}
+
+export interface AggregationDeleteResponse {
+  deleted: boolean;
+  file_id: string;
 }
 
 // Patient classifications

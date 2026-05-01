@@ -1,4 +1,5 @@
-import { X } from "lucide-react";
+import { useState } from "react";
+import { Code2, X } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { CONDITION_STATUS_COLORS, DRUG_CLASS_COLORS } from "./careJourneyColors";
@@ -117,10 +118,16 @@ function ProcedureDetail({ proc }: { proc: ProcedureMarker }) {
 // ── Encounter detail (fetches full data) ─────────────────────────────────────
 
 function EncounterFullDetail({ patientId, enc }: { patientId: string; enc: EncounterMarker }) {
+  const [rawOpen, setRawOpen] = useState(false);
   const { data, isLoading } = useQuery({
     queryKey: ["encounter", patientId, enc.encounter_id],
     queryFn: () => api.getEncounterDetail(patientId, enc.encounter_id),
     enabled: !!enc.encounter_id,
+  });
+  const rawQ = useQuery({
+    queryKey: ["encounter-raw", patientId, enc.encounter_id],
+    queryFn: () => api.getRawEncounter(patientId, enc.encounter_id),
+    enabled: rawOpen && !!enc.encounter_id,
   });
 
   if (isLoading || !data) {
@@ -203,6 +210,28 @@ function EncounterFullDetail({ patientId, enc }: { patientId: string; enc: Encou
           </div>
         </div>
       )}
+
+      <div className="mt-3 pt-3 border-t border-slate-200">
+        <button
+          type="button"
+          onClick={() => setRawOpen((open) => !open)}
+          className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-slate-600 transition-colors hover:border-[#5b76fe] hover:text-[#5b76fe]"
+        >
+          <Code2 size={13} />
+          {rawOpen ? "Hide raw FHIR JSON" : "Show raw FHIR JSON"}
+        </button>
+        {rawOpen && (
+          <div className="mt-2 max-h-72 overflow-auto rounded-lg border border-slate-200 bg-slate-950 p-3">
+            {rawQ.isLoading && <p className="text-[11px] text-slate-300">Loading Encounter resource...</p>}
+            {rawQ.isError && <p className="text-[11px] text-red-200">Raw Encounter resource unavailable.</p>}
+            {rawQ.data && (
+              <pre className="whitespace-pre-wrap break-words text-[10px] leading-5 text-slate-100">
+                {JSON.stringify(rawQ.data, null, 2)}
+              </pre>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -1,10 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
   CalendarDays,
   ChevronRight,
   Clock3,
+  Filter,
   List,
   Pill,
   Scissors,
@@ -244,11 +245,86 @@ function TableView({ events }: { events: HistoryEvent[] }) {
   );
 }
 
+function encounterClassLabel(classCode: string): string {
+  const labels: Record<string, string> = {
+    AMB: "Ambulatory",
+    EMER: "Emergency",
+    IMP: "Inpatient",
+    VR: "Virtual",
+    WELLNESS: "Wellness",
+  };
+  return labels[classCode] ?? (classCode || "Unknown");
+}
+
+function encounterClassTone(classCode: string): string {
+  if (classCode === "EMER") return "bg-[#fef2f2] text-[#b91c1c]";
+  if (classCode === "IMP") return "bg-[#fffbeb] text-[#92400e]";
+  if (classCode === "AMB") return "bg-[#eef1ff] text-[#5b76fe]";
+  return "bg-[#f5f6f8] text-[#555a6a]";
+}
+
+function resourceSummary(encounter: EncounterEvent): string {
+  const parts = [
+    encounter.linked_observation_count ? `${encounter.linked_observation_count} Obs` : null,
+    encounter.linked_condition_count ? `${encounter.linked_condition_count} Cond` : null,
+    encounter.linked_procedure_count ? `${encounter.linked_procedure_count} Proc` : null,
+    encounter.linked_medication_count ? `${encounter.linked_medication_count} Med` : null,
+  ].filter(Boolean);
+  return parts.length > 0 ? parts.join(" / ") : "No linked resources";
+}
+
+function EncounterHistoryTable({ encounters }: { encounters: EncounterEvent[] }) {
+  if (encounters.length === 0) {
+    return (
+      <div className="rounded-2xl border border-[#e9eaef] bg-white p-8 text-center text-sm text-[#6b7280]">
+        No encounters match the current filters.
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-hidden rounded-2xl border border-[#e9eaef] bg-white shadow-sm">
+      <table className="w-full min-w-[980px] text-sm">
+        <thead>
+          <tr className="border-b border-[#e9eaef] bg-[#f9fafb] text-left text-xs uppercase tracking-[0.12em] text-[#a5a8b5]">
+            <th className="px-4 py-3 font-semibold">Date</th>
+            <th className="px-4 py-3 font-semibold">Class</th>
+            <th className="px-4 py-3 font-semibold">Type</th>
+            <th className="px-4 py-3 font-semibold">Reason</th>
+            <th className="px-4 py-3 font-semibold">Provider / Site</th>
+            <th className="px-4 py-3 font-semibold">Resources</th>
+          </tr>
+        </thead>
+        <tbody>
+          {encounters.map((encounter) => (
+            <tr key={encounter.encounter_id} className="border-b border-[#f0f1f5] last:border-0 hover:bg-[#fafafa]">
+              <td className="whitespace-nowrap px-4 py-3 font-medium text-[#1c1c1e]">{fmtDate(encounter.start)}</td>
+              <td className="px-4 py-3">
+                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${encounterClassTone(encounter.class_code)}`}>
+                  {encounterClassLabel(encounter.class_code)}
+                </span>
+              </td>
+              <td className="px-4 py-3 text-[#475467]">{encounter.encounter_type || "Encounter"}</td>
+              <td className="px-4 py-3 text-[#475467]">{encounter.reason_display || "-"}</td>
+              <td className="px-4 py-3 text-[#475467]">
+                <div className="font-medium text-[#1c1c1e]">{encounter.practitioner_name || "Provider unknown"}</div>
+                <div className="mt-0.5 text-xs text-[#667085]">{encounter.provider_org || "Organization unknown"}</div>
+              </td>
+              <td className="px-4 py-3 text-xs font-semibold text-[#5b76fe]">{resourceSummary(encounter)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export function ExplorerHistory() {
   const [params] = useSearchParams();
   const patientId = params.get("patient");
   const [tab, setTab] = useState<HistoryTab>("encounters");
-  const [view, setView] = useState<ViewMode>("timeline");
+  const [view, setView] = useState<ViewMode>("table");
+  const [classFilter, setClassFilter] = useState<string>("all");
 
   const timelineQ = useQuery({
     queryKey: ["timeline", patientId],
@@ -258,36 +334,80 @@ export function ExplorerHistory() {
   const careQ = useQuery({
     queryKey: ["care-journey", patientId],
     queryFn: () => api.getCareJourney(patientId!),
-    enabled: !!patientId,
+    enabled: !!patientId && tab === "medications",
+    retry: false,
   });
   const overviewQ = useQuery({
     queryKey: ["overview", patientId],
     queryFn: () => api.getOverview(patientId!),
-    enabled: !!patientId,
+    enabled: !!patientId && tab === "medications",
   });
   const proceduresQ = useQuery({
     queryKey: ["procedures", patientId],
     queryFn: () => api.getProcedures(patientId!),
-    enabled: !!patientId,
+    enabled: !!patientId && tab === "procedures",
   });
   const immunizationsQ = useQuery({
     queryKey: ["immunizations", patientId],
     queryFn: () => api.getImmunizations(patientId!),
-    enabled: !!patientId,
+    enabled: !!patientId && tab === "immunizations",
   });
 
-  const eventsByTab = useMemo<Record<HistoryTab, HistoryEvent[]>>(
-    () => ({
+  const eventsByTab = useMemo<Record<HistoryTab, HistoryEvent[]>>(() => {
+    const medicationEpisodes = careQ.isSuccess ? medicationEpisodeEvents(careQ.data) : [];
+    return {
       encounters: encounterEvents(timelineQ.data),
       medications:
-        medicationEpisodeEvents(careQ.data).length > 0
-          ? medicationEpisodeEvents(careQ.data)
+        medicationEpisodes.length > 0
+          ? medicationEpisodes
           : medicationCatalogEvents(overviewQ.data),
       procedures: procedureEvents(proceduresQ.data?.procedures),
       immunizations: immunizationEvents(immunizationsQ.data?.immunizations),
+    };
+  }, [careQ.data, careQ.isSuccess, immunizationsQ.data, overviewQ.data, proceduresQ.data, timelineQ.data]);
+
+  const tabCounts = useMemo<Record<HistoryTab, number | null>>(
+    () => ({
+      encounters: timelineQ.data?.encounters.length ?? null,
+      medications:
+        careQ.isSuccess && medicationEpisodeEvents(careQ.data).length > 0
+          ? medicationEpisodeEvents(careQ.data).length
+          : overviewQ.data?.medications.length ?? null,
+      procedures: proceduresQ.data?.total_count ?? null,
+      immunizations: immunizationsQ.data?.total_count ?? null,
     }),
-    [careQ.data, immunizationsQ.data, overviewQ.data, proceduresQ.data, timelineQ.data]
+    [careQ.data, careQ.isSuccess, immunizationsQ.data, overviewQ.data, proceduresQ.data, timelineQ.data],
   );
+
+  const medicationHasData = (careQ.isSuccess && medicationEpisodeEvents(careQ.data).length > 0) || !!overviewQ.data;
+  const isLoading =
+    tab === "encounters"
+      ? timelineQ.isLoading
+      : tab === "medications"
+        ? overviewQ.isLoading && !medicationHasData
+        : tab === "procedures"
+          ? proceduresQ.isLoading
+          : immunizationsQ.isLoading;
+  const isError =
+    tab === "encounters"
+      ? timelineQ.isError
+      : tab === "medications"
+        ? overviewQ.isError && !medicationHasData
+        : tab === "procedures"
+          ? proceduresQ.isError
+          : immunizationsQ.isError;
+  const patientName = timelineQ.data?.name || careQ.data?.name || overviewQ.data?.name || proceduresQ.data?.name || immunizationsQ.data?.name || "Patient";
+  const currentEvents = eventsByTab[tab];
+  const encounterClassOptions = Array.from(new Set((timelineQ.data?.encounters ?? []).map((encounter) => encounter.class_code || "Unknown")))
+    .sort((a, b) => a.localeCompare(b));
+  const currentEncounters = (timelineQ.data?.encounters ?? [])
+    .filter((encounter) => classFilter === "all" || (encounter.class_code || "Unknown") === classFilter)
+    .sort((a, b) => dateValue(b.start) - dateValue(a.start));
+
+  useEffect(() => {
+    if (classFilter === "all") return;
+    if (!encounterClassOptions.includes(classFilter)) setClassFilter("all");
+  }, [classFilter, encounterClassOptions]);
 
   if (!patientId) {
     return (
@@ -303,19 +423,9 @@ export function ExplorerHistory() {
     );
   }
 
-  const isLoading =
-    timelineQ.isLoading ||
-    careQ.isLoading ||
-    overviewQ.isLoading ||
-    proceduresQ.isLoading ||
-    immunizationsQ.isLoading;
-  const isError = timelineQ.isError || careQ.isError || overviewQ.isError || proceduresQ.isError || immunizationsQ.isError;
-  const patientName = timelineQ.data?.name || careQ.data?.name || proceduresQ.data?.name || immunizationsQ.data?.name || "Patient";
-  const currentEvents = eventsByTab[tab];
-
   if (isLoading) {
     return (
-      <div className="mx-auto max-w-5xl space-y-4 p-8">
+      <div className="mx-auto w-full max-w-7xl space-y-4 p-8">
         <div className="h-32 animate-pulse rounded-3xl bg-[#e9eaef]" />
         <div className="h-12 animate-pulse rounded-xl bg-[#e9eaef]" />
         <div className="h-80 animate-pulse rounded-2xl bg-[#e9eaef]" />
@@ -326,13 +436,13 @@ export function ExplorerHistory() {
   if (isError) {
     return (
       <div className="p-8">
-        <p className="text-sm text-[#991b1b]">Failed to load longitudinal history.</p>
+        <p className="text-sm text-[#991b1b]">Failed to load {TABS.find((item) => item.id === tab)?.label.toLowerCase() ?? "history"}.</p>
       </div>
     );
   }
 
   return (
-    <main className="mx-auto max-w-5xl space-y-5 p-8">
+    <main className="mx-auto w-full max-w-7xl space-y-5 p-8">
       <section className="rounded-3xl border border-[#d8f3ec] bg-[#f3fffb] p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
@@ -368,7 +478,7 @@ export function ExplorerHistory() {
               <Icon size={15} />
               {label}
               <span className="rounded-full bg-white/80 px-1.5 py-0.5 text-[10px] text-[#6b7280]">
-                {eventsByTab[id].length}
+                {tabCounts[id] ?? "—"}
               </span>
             </button>
           ))}
@@ -390,7 +500,38 @@ export function ExplorerHistory() {
         </div>
       </div>
 
-      {view === "timeline" ? <TimelineList events={currentEvents} /> : <TableView events={currentEvents} />}
+      {tab === "encounters" && (
+        <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-[#e9eaef] bg-white px-3 py-2 shadow-sm">
+          <div className="inline-flex items-center gap-1.5 px-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#98a2b3]">
+            <Filter size={13} />
+            Class
+          </div>
+          {["all", ...encounterClassOptions].map((classCode) => (
+            <button
+              key={classCode}
+              type="button"
+              onClick={() => setClassFilter(classCode)}
+              className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+                classFilter === classCode
+                  ? "bg-[#eef1ff] text-[#5b76fe]"
+                  : "bg-[#f9fafb] text-[#667085] hover:bg-[#f2f4f7]"
+              }`}
+            >
+              {classCode === "all" ? "All" : encounterClassLabel(classCode)}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {tab === "encounters" && view === "table" ? (
+        <div className="overflow-x-auto">
+          <EncounterHistoryTable encounters={currentEncounters} />
+        </div>
+      ) : view === "timeline" ? (
+        <TimelineList events={currentEvents} />
+      ) : (
+        <TableView events={currentEvents} />
+      )}
     </main>
   );
 }

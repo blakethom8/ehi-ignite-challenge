@@ -30,10 +30,13 @@ import { PreOpOverview } from "./pages/Modules/PreOpOverview";
 import { ClinicalTrials } from "./pages/Modules/ClinicalTrials";
 import { MedicationAccess } from "./pages/Modules/MedicationAccess";
 import { Marketplace } from "./pages/Modules/Marketplace";
+import { MarketplaceConcept } from "./pages/Modules/MarketplaceConcept";
 import { DataSharing } from "./pages/Modules/DataSharing";
 import { DataCatalog } from "./pages/Modules/DataCatalog";
 import { DataAggregator } from "./pages/Modules/DataAggregator";
 import { ClinicalInsights } from "./pages/Modules/ClinicalInsights";
+import { PatientContext } from "./pages/Modules/PatientContext";
+import { AggregationMethodology } from "./pages/Modules/AggregationMethodology";
 import { AnalysisOverview } from "./pages/Analysis/Overview";
 import { AnalysisMethodology } from "./pages/Analysis/Methodology";
 import { AnalysisDefinitions } from "./pages/Analysis/Definitions";
@@ -55,7 +58,12 @@ export default function App() {
     { path: "/platform", element: <PlatformEntry /> },
     { path: "/charts", element: <PatientRecordOverview /> },
     { path: "/record", element: <PatientRecordOverview /> },
-    { path: "/aggregate", element: <DataAggregator /> },
+    { path: "/aggregate", element: <AggregationMethodology /> },
+    { path: "/aggregate/methodology", element: <AggregationMethodology /> },
+    { path: "/aggregate/sources", element: <DataAggregator /> },
+    { path: "/aggregate/cleaning", element: <DataAggregator /> },
+    { path: "/aggregate/context", element: <PatientContext /> },
+    { path: "/aggregate/publish", element: <DataAggregator /> },
     { path: "/clinical-insights", element: <ClinicalInsights /> },
     { path: "/marketplace", element: <Marketplace /> },
     { path: "/explorer", element: <ExplorerOverview /> },
@@ -77,6 +85,9 @@ export default function App() {
     { path: "/journey", element: <PatientJourney /> },
     { path: "/trials", element: <ClinicalTrials /> },
     { path: "/medication-access", element: <MedicationAccess /> },
+    { path: "/grants", element: <MarketplaceConcept /> },
+    { path: "/research-opportunities", element: <MarketplaceConcept /> },
+    { path: "/payer-check", element: <MarketplaceConcept /> },
     { path: "/sharing", element: <DataSharing /> },
     { path: "/second-opinion", element: <DataSharing /> },
     { path: "/analysis", element: <AnalysisOverview /> },

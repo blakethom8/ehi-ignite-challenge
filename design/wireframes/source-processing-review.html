@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Source Confidence Review — Wireframe</title>
+  <style>
+    :root {
+      --ink: #1c1c1e; --text: #555a6a; --muted: #8d92a3; --line: #e3e7ef; --line-2: #f0f2f6;
+      --bg: #f4f6fa; --blue: #5b76fe; --blue-soft: #eef1ff; --teal: #187574; --teal-soft: #e7fbf7;
+      --amber: #9a5a16; --amber-soft: #fff8f1; --red: #b42318; --red-soft: #fff1f0; --shadow: rgb(224 226 232) 0 0 0 1px;
+      --font: Inter, "Noto Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font); }
+    .topbar { height: 70px; background: white; box-shadow: var(--shadow); display: flex; align-items: center; justify-content: space-between; padding: 0 28px; }
+    .brand small { display: block; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .12em; font-weight: 800; }
+    .brand strong { display: block; font-size: 18px; margin-top: 3px; }
+    .btn { border: 1px solid var(--line); background: white; border-radius: 8px; padding: 9px 12px; color: var(--text); font-size: 14px; font-weight: 750; }
+    .btn-primary { background: var(--blue); color: white; border-color: var(--blue); }
+    .page { width: min(1360px, calc(100% - 48px)); margin: 0 auto; padding: 28px 0 56px; display: grid; gap: 18px; }
+    .hero { background: white; border-radius: 12px; box-shadow: var(--shadow); padding: 24px; display: flex; justify-content: space-between; gap: 24px; align-items: start; }
+    .eyebrow { color: var(--blue); font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .1em; }
+    h1 { margin: 8px 0; font-size: 31px; line-height: 1.12; }
+    p { color: var(--text); line-height: 1.55; }
+    .pill { display: inline-flex; border-radius: 999px; padding: 4px 9px; font-size: 12px; font-weight: 800; white-space: nowrap; }
+    .pill.ready { background: var(--teal-soft); color: var(--teal); }
+    .pill.needs { background: var(--amber-soft); color: var(--amber); }
+    .pill.review { background: var(--blue-soft); color: var(--blue); }
+    .pill.error { background: var(--red-soft); color: var(--red); }
+    .metrics { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+    .metric { background: white; border-radius: 12px; box-shadow: var(--shadow); padding: 16px; }
+    .metric span { display: block; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; font-weight: 800; }
+    .metric strong { display: block; font-size: 26px; margin-top: 8px; }
+    .grid { display: grid; grid-template-columns: 1.05fr .95fr; gap: 18px; align-items: start; }
+    .panel { background: white; border-radius: 12px; box-shadow: var(--shadow); }
+    .panel-head { padding: 18px 20px; border-bottom: 1px solid var(--line-2); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .panel h2 { margin: 0; font-size: 18px; }
+    .panel-body { padding: 20px; }
+    .timeline { display: grid; gap: 12px; }
+    .step { display: grid; grid-template-columns: 34px 1fr auto; gap: 12px; align-items: start; padding: 14px; border: 1px solid var(--line-2); border-radius: 10px; }
+    .num { width: 28px; height: 28px; border-radius: 8px; background: var(--blue-soft); color: var(--blue); display: grid; place-items: center; font-size: 13px; font-weight: 900; }
+    .step.ready .num { background: var(--teal-soft); color: var(--teal); }
+    .step.needs .num { background: var(--amber-soft); color: var(--amber); }
+    .step strong { display: block; font-size: 15px; margin-bottom: 3px; }
+    .step span { display: block; color: var(--text); font-size: 13px; line-height: 1.45; }
+    .table { width: 100%; border-collapse: collapse; }
+    .table th { color: var(--muted); font-size: 11px; text-align: left; text-transform: uppercase; letter-spacing: .08em; padding: 12px 14px; border-bottom: 1px solid var(--line-2); }
+    .table td { padding: 14px; border-bottom: 1px solid var(--line-2); color: var(--text); font-size: 14px; vertical-align: top; }
+    .fact { color: var(--ink); font-weight: 750; }
+    .confidence { width: 86px; height: 7px; background: #edf0f5; border-radius: 999px; overflow: hidden; margin-top: 7px; }
+    .confidence div { height: 100%; background: var(--blue); border-radius: 999px; }
+    .split { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .card { border: 1px solid var(--line-2); border-radius: 10px; padding: 14px; }
+    .card h3 { margin: 0 0 6px; font-size: 15px; }
+    .card p { margin: 0; font-size: 13px; }
+    .review-list { display: grid; gap: 10px; }
+    .review-item { border: 1px solid var(--line-2); border-left: 4px solid var(--amber); border-radius: 10px; padding: 13px; }
+    .review-item strong { display: block; font-size: 14px; margin-bottom: 4px; }
+    .review-item p { margin: 0; font-size: 13px; }
+    .source-box { background: #fafbff; border: 1px solid #dfe4ff; border-radius: 12px; padding: 16px; display: grid; grid-template-columns: 62px 1fr; gap: 14px; }
+    .file-icon { width: 62px; height: 76px; border-radius: 8px; background: white; box-shadow: var(--shadow); color: var(--red); display: grid; place-items: center; font-weight: 900; }
+    .footer-actions { display: flex; justify-content: flex-end; gap: 10px; }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <small>EHI Exchange Platform</small>
+      <strong>Source confidence review</strong>
+    </div>
+    <div>
+      <button class="btn">Ask patient</button>
+      <button class="btn btn-primary">Save source confidence</button>
+    </div>
+  </header>
+
+  <main class="page">
+    <section class="hero">
+      <div>
+        <div class="eyebrow">Source and data confidence</div>
+        <h1>See every source and how confident we are in extracting it.</h1>
+        <p>
+          This view is less about approving individual facts and more about understanding the source inventory: what each source contains, which columns or fields we can reliably extract, and where patient context is still needed.
+        </p>
+      </div>
+      <span class="pill needs">4 sources need context</span>
+    </section>
+
+    <section class="metrics">
+      <div class="metric"><span>Total sources</span><strong>12</strong></div>
+      <div class="metric"><span>High confidence</span><strong>5</strong></div>
+      <div class="metric"><span>Needs context</span><strong>4</strong></div>
+      <div class="metric"><span>Low extraction</span><strong>2</strong></div>
+      <div class="metric"><span>Patient questions</span><strong>6</strong></div>
+    </section>
+
+    <section class="grid">
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Sources and extraction confidence</h2>
+          <span class="pill review">All sources</span>
+        </div>
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Source</th>
+              <th>Data type</th>
+              <th>Can extract reliably</th>
+              <th>Needs context</th>
+              <th>Confidence</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><div class="fact">mychart-export-fhir.json</div><span>Portal export · 18.4 MB</span></td>
+              <td>FHIR bundle</td>
+              <td>Patient, conditions, meds, encounters, observations</td>
+              <td>Source system and recency</td>
+              <td><span class="pill ready">High</span><div class="confidence"><div style="width: 94%"></div></div></td>
+            </tr>
+            <tr>
+              <td><div class="fact">cedars-discharge-summary.pdf</div><span>PDF · 14 pages</span></td>
+              <td>Hospital PDF</td>
+              <td>Dates, diagnoses, discharge instructions, medication text</td>
+              <td>Reason for visit and follow-up status</td>
+              <td><span class="pill review">Medium</span><div class="confidence"><div style="width: 72%"></div></div></td>
+            </tr>
+            <tr>
+              <td><div class="fact">function-health-labs.pdf</div><span>PDF · 22 pages</span></td>
+              <td>Lab report</td>
+              <td>Lab names, values, units, reference ranges</td>
+              <td>Ordering context and supplements</td>
+              <td><span class="pill review">Medium</span><div class="confidence"><div style="width: 68%"></div></div></td>
+            </tr>
+            <tr>
+              <td><div class="fact">whoop-export.csv</div><span>CSV · 91 KB</span></td>
+              <td>Wearable</td>
+              <td>Sleep, strain, recovery, resting HR columns</td>
+              <td>How patient wants this used</td>
+              <td><span class="pill ready">High</span><div class="confidence"><div style="width: 86%"></div></div></td>
+            </tr>
+            <tr>
+              <td><div class="fact">photo-med-list.jpg</div><span>Image · 1.2 MB</span></td>
+              <td>Medication image</td>
+              <td>Partial OCR only</td>
+              <td>Confirm names, doses, current status</td>
+              <td><span class="pill needs">Low</span><div class="confidence"><div style="width: 38%"></div></div></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <aside class="panel">
+        <div class="panel-head">
+          <h2>Document context questions</h2>
+          <span class="pill needs">Ask</span>
+        </div>
+        <div class="panel-body review-list">
+          <div class="review-item">
+            <strong>What should we know about the Function Health labs?</strong>
+            <p>Were these self-ordered, clinician-ordered, or part of a specific care episode?</p>
+          </div>
+          <div class="review-item">
+            <strong>Is the medication photo current?</strong>
+            <p>Image OCR is low confidence. Patient confirmation matters more than extraction here.</p>
+          </div>
+          <div class="review-item">
+            <strong>How should wearable data be used?</strong>
+            <p>Patient-generated data should be trend/context only unless a later review process says otherwise.</p>
+          </div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Column and field confidence</h2>
+        <span class="pill review">Extractor readiness</span>
+      </div>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Data family</th>
+            <th>Expected fields</th>
+            <th>Supported sources</th>
+            <th>Current gap</th>
+            <th>Confidence</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><div class="fact">Structured FHIR</div><span>Bundle resources</span></td>
+            <td>resource type, date, code, display, status, encounter link</td>
+            <td>FHIR JSON, Synthea, portal exports</td>
+            <td>Real-world profile differences</td>
+            <td><span class="pill ready">High</span></td>
+          </tr>
+          <tr>
+            <td><div class="fact">Lab PDFs</div><span>Result tables</span></td>
+            <td>test name, value, unit, reference range, date</td>
+            <td>Function Health, Quest/Labcorp-style PDFs</td>
+            <td>Panel layout variation and OCR quality</td>
+            <td><span class="pill review">Medium</span></td>
+          </tr>
+          <tr>
+            <td><div class="fact">Medication text</div><span>PDFs, images, portal exports</span></td>
+            <td>drug name, dose, route, frequency, current status</td>
+            <td>Discharge summaries, photos, pharmacy exports</td>
+            <td>Current vs historical medication reality</td>
+            <td><span class="pill review">Medium</span></td>
+          </tr>
+          <tr>
+            <td><div class="fact">Wearables</div><span>CSV/API exports</span></td>
+            <td>date, metric name, value, unit, device source</td>
+            <td>Whoop, Apple Health, home devices</td>
+            <td>Clinical meaning and patient consent boundary</td>
+            <td><span class="pill ready">High</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="grid">
+      <div class="panel">
+        <div class="panel-head"><h2>Source-linked output</h2><span class="pill ready">Draft</span></div>
+        <div class="panel-body split">
+          <div class="card">
+            <h3>Patient packet</h3>
+            <p>Include source list, extraction confidence, and patient-entered document descriptions.</p>
+          </div>
+          <div class="card">
+            <h3>Clinician questions</h3>
+            <p>Ask about low-confidence files, source meaning, and how patient-generated data should be interpreted.</p>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><h2>Review boundary</h2><span class="pill review">Important</span></div>
+        <div class="panel-body">
+          <p>High-confidence extraction means we understand the file structure. It does not mean every extracted fact is verified chart truth.</p>
+          <div class="footer-actions">
+            <button class="btn">Send questions to Patient Context</button>
+            <button class="btn btn-primary">Save confidence review</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

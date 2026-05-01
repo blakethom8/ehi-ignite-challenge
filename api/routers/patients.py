@@ -28,6 +28,8 @@ from api.models import (
     MedRow,
     ResourceTypeCount,
     EncounterTypeSummary,
+    CareTeamSummaryItem,
+    SiteOfServiceSummaryItem,
     TimelineResponse,
     EncounterEvent,
     EncounterDetail,
@@ -89,6 +91,91 @@ router = APIRouter(prefix="/patients", tags=["patients"])
 
 BILLING_TYPES = {"Claim", "ExplanationOfBenefit"}
 ADMIN_TYPES = {"Organization", "Practitioner", "PractitionerRole", "Location"}
+
+
+def _encounter_date_sort(value: datetime | None) -> int:
+    return value.toordinal() if value else 0
+
+
+def _care_network_summary(record) -> tuple[list[CareTeamSummaryItem], list[SiteOfServiceSummaryItem]]:
+    provider_rows: dict[str, dict] = {}
+    site_rows: dict[str, dict] = {}
+
+    for enc in record.encounters:
+        class_code = enc.class_code or "Unknown"
+        start = enc.period.start
+        provider_name = enc.practitioner_name or "Unknown provider"
+        site_name = enc.provider_org or "Unknown organization"
+
+        provider = provider_rows.setdefault(
+            provider_name,
+            {
+                "organizations": set(),
+                "encounter_count": 0,
+                "latest_encounter_dt": None,
+                "class_breakdown": defaultdict(int),
+            },
+        )
+        provider["organizations"].add(site_name)
+        provider["encounter_count"] += 1
+        provider["class_breakdown"][class_code] += 1
+        if start and (provider["latest_encounter_dt"] is None or start > provider["latest_encounter_dt"]):
+            provider["latest_encounter_dt"] = start
+
+        site = site_rows.setdefault(
+            site_name,
+            {
+                "providers": set(),
+                "encounter_count": 0,
+                "latest_encounter_dt": None,
+                "class_breakdown": defaultdict(int),
+            },
+        )
+        site["providers"].add(provider_name)
+        site["encounter_count"] += 1
+        site["class_breakdown"][class_code] += 1
+        if start and (site["latest_encounter_dt"] is None or start > site["latest_encounter_dt"]):
+            site["latest_encounter_dt"] = start
+
+    care_team = [
+        CareTeamSummaryItem(
+            name=name,
+            organizations=sorted(row["organizations"]),
+            encounter_count=row["encounter_count"],
+            latest_encounter_dt=row["latest_encounter_dt"],
+            class_breakdown=dict(row["class_breakdown"]),
+        )
+        for name, row in provider_rows.items()
+    ]
+    care_team.sort(
+        key=lambda item: (
+            item.name == "Unknown provider",
+            -item.encounter_count,
+            -_encounter_date_sort(item.latest_encounter_dt),
+            item.name,
+        )
+    )
+
+    sites_of_service = [
+        SiteOfServiceSummaryItem(
+            name=name,
+            provider_count=len(row["providers"]),
+            encounter_count=row["encounter_count"],
+            latest_encounter_dt=row["latest_encounter_dt"],
+            class_breakdown=dict(row["class_breakdown"]),
+        )
+        for name, row in site_rows.items()
+    ]
+    sites_of_service.sort(
+        key=lambda item: (
+            item.name == "Unknown organization",
+            -item.encounter_count,
+            -_encounter_date_sort(item.latest_encounter_dt),
+            item.name,
+        )
+    )
+
+    return care_team[:8], sites_of_service[:8]
 
 # ---------------------------------------------------------------------------
 # Pre-operative hold/bridge protocol notes — keyed by drug class
@@ -347,6 +434,7 @@ def patient_overview(patient_id: str) -> PatientOverview:
         EncounterTypeSummary(encounter_type=e.encounter_type, count=e.count)
         for e in stats.encounter_type_breakdown
     ]
+    care_team, sites_of_service = _care_network_summary(record)
 
     return PatientOverview(
         id=patient_id,
@@ -385,6 +473,8 @@ def patient_overview(patient_id: str) -> PatientOverview:
         encounter_class_breakdown=stats.encounter_class_breakdown,
         encounter_type_breakdown=enc_type_breakdown,
         avg_resources_per_encounter=stats.avg_resources_per_encounter,
+        care_team=care_team,
+        sites_of_service=sites_of_service,
         allergy_count=stats.allergy_count,
         allergy_labels=stats.allergy_labels,
         immunization_count=stats.immunization_count,
@@ -1387,192 +1477,219 @@ def _sof_db_path() -> Path:
     return DEFAULT_SOF_DB
 
 
+def _dt_to_iso(value: datetime | None) -> str | None:
+    return value.isoformat() if value else None
+
+
+def _dt_sort_key(value: datetime | None) -> str:
+    return value.isoformat() if value else ""
+
+
+def _record_medication_episodes(record) -> list[MedicationEpisodeItem]:
+    """Build point-in-time medication episodes from the parsed FHIR bundle.
+
+    The SOF-derived ``medication_episode`` table has better longitudinal
+    grouping when the patient is present in the warehouse. For patients outside
+    that materialized subset, use only fields present in the bundle rather than
+    leaving the patient-level journey blank.
+    """
+    items: list[MedicationEpisodeItem] = []
+    for med in sorted(record.medications, key=lambda m: _dt_sort_key(m.authored_on)):
+        classes = _classifier.classify_medication(med)
+        is_active = med.status in ("active", "on-hold")
+        authored_on = _dt_to_iso(med.authored_on)
+        items.append(MedicationEpisodeItem(
+            episode_id=med.med_id,
+            display=med.display or "Medication request",
+            drug_class=classes[0] if classes else None,
+            status=med.status or "",
+            is_active=is_active,
+            start_date=authored_on,
+            end_date=None if is_active else authored_on,
+            duration_days=None,
+            request_count=1,
+            reason=med.reason_display or None,
+        ))
+    return items
+
+
+def _record_condition_episodes(record) -> list[ConditionEpisodeItem]:
+    items: list[ConditionEpisodeItem] = []
+    for condition in sorted(record.conditions, key=lambda c: _dt_sort_key(c.onset_dt)):
+        end_dt = condition.abatement_dt
+        if end_dt is None and not condition.is_active:
+            end_dt = condition.recorded_dt
+        items.append(ConditionEpisodeItem(
+            condition_id=condition.condition_id,
+            display=condition.code.label(),
+            clinical_status=condition.clinical_status or "",
+            onset_date=_dt_to_iso(condition.onset_dt),
+            end_date=_dt_to_iso(end_dt),
+            is_active=condition.is_active,
+        ))
+    return items
+
+
+def _record_encounter_markers(record) -> list[EncounterMarker]:
+    cond_index = {c.condition_id: c for c in record.conditions}
+    markers: list[EncounterMarker] = []
+    for encounter in sorted(record.encounters, key=lambda e: _dt_sort_key(e.period.start)):
+        diagnoses = [
+            condition.code.label()
+            for condition_id in encounter.linked_conditions
+            if (condition := cond_index.get(condition_id)) is not None
+        ]
+        markers.append(EncounterMarker(
+            encounter_id=encounter.encounter_id,
+            class_code=encounter.class_code or "",
+            type_text=encounter.encounter_type or "",
+            start=_dt_to_iso(encounter.period.start),
+            reason_display=encounter.reason_display or "",
+            diagnoses=diagnoses,
+        ))
+    return markers
+
+
+def _record_procedure_markers(record) -> list[ProcedureMarker]:
+    markers: list[ProcedureMarker] = []
+    for procedure in sorted(
+        record.procedures,
+        key=lambda p: _dt_sort_key(p.performed_period.start if p.performed_period else None),
+    ):
+        period = procedure.performed_period
+        markers.append(ProcedureMarker(
+            procedure_id=procedure.procedure_id,
+            display=procedure.code.label(),
+            start=_dt_to_iso(period.start if period else None),
+            end=_dt_to_iso(period.end if period else None),
+            reason_display=procedure.reason_display or "",
+        ))
+    return markers
+
+
+def _record_diagnostic_reports(record) -> list[DiagnosticReportItem]:
+    return [
+        DiagnosticReportItem(
+            report_id=report.report_id,
+            display=report.code.label(),
+            category=report.category or "",
+            date=_dt_to_iso(report.effective_dt),
+            result_count=len(report.result_refs),
+        )
+        for report in sorted(record.diagnostic_reports, key=lambda r: _dt_sort_key(r.effective_dt))
+    ]
+
+
 @router.get("/{patient_id}/care-journey", response_model=CareJourneyResponse)
 def get_care_journey(patient_id: str) -> CareJourneyResponse:
     """Return medication episodes, conditions, and encounters for the Gantt timeline."""
     import sqlite3
 
-    path = path_from_patient_id(patient_id)
-    if path is None:
-        raise HTTPException(status_code=404, detail="Patient not found")
+    result = load_patient(patient_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"Patient not found: {patient_id}")
 
-    db_path = _sof_db_path()
-    if not db_path.exists():
-        raise HTTPException(status_code=503, detail="SOF warehouse not materialized yet")
+    record, stats = result
 
     fhir_uuid = _patient_fhir_uuid(patient_id)
     if fhir_uuid is None:
         raise HTTPException(status_code=404, detail="Cannot resolve patient FHIR UUID")
     patient_ref = f"urn:uuid:{fhir_uuid}"
-    name = patient_display_name(path)
+    name = stats.name
 
-    conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
-    conn.row_factory = sqlite3.Row
-    try:
-        # Medication episodes
-        med_rows = conn.execute(
-            """SELECT episode_id, display, drug_class, latest_status, is_active,
-                      start_date, end_date, duration_days, request_count
-               FROM medication_episode
-               WHERE patient_ref = ?
-               ORDER BY start_date""",
-            (patient_ref,),
-        ).fetchall()
+    medication_episodes: list[MedicationEpisodeItem] = []
+    conditions: list[ConditionEpisodeItem] = []
+    encounters: list[EncounterMarker] = []
 
-        medication_episodes = [
-            MedicationEpisodeItem(
-                episode_id=r["episode_id"],
-                display=r["display"],
-                drug_class=r["drug_class"],
-                status=r["latest_status"],
-                is_active=bool(r["is_active"]),
-                start_date=r["start_date"],
-                end_date=r["end_date"],
-                duration_days=r["duration_days"],
-                request_count=r["request_count"],
-            )
-            for r in med_rows
-        ]
+    db_path = _sof_db_path()
+    if db_path.exists():
+        conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+        conn.row_factory = sqlite3.Row
+        try:
+            # Medication episodes
+            med_rows = conn.execute(
+                """SELECT episode_id, display, drug_class, latest_status, is_active,
+                          start_date, end_date, duration_days, request_count
+                   FROM medication_episode
+                   WHERE patient_ref = ?
+                   ORDER BY start_date""",
+                (patient_ref,),
+            ).fetchall()
 
-        # Conditions with onset dates
-        cond_rows = conn.execute(
-            """SELECT id, display, clinical_status, onset_date,
-                      CASE WHEN clinical_status NOT IN ('active', 'recurrence', 'relapse')
-                           THEN recorded_date END AS proxy_end_date
-               FROM condition
-               WHERE patient_ref = ? AND onset_date IS NOT NULL
-               ORDER BY onset_date""",
-            (patient_ref,),
-        ).fetchall()
+            medication_episodes = [
+                MedicationEpisodeItem(
+                    episode_id=r["episode_id"],
+                    display=r["display"],
+                    drug_class=r["drug_class"],
+                    status=r["latest_status"],
+                    is_active=bool(r["is_active"]),
+                    start_date=r["start_date"],
+                    end_date=r["end_date"],
+                    duration_days=r["duration_days"],
+                    request_count=r["request_count"],
+                )
+                for r in med_rows
+            ]
 
-        conditions = [
-            ConditionEpisodeItem(
-                condition_id=r["id"],
-                display=r["display"],
-                clinical_status=r["clinical_status"],
-                onset_date=r["onset_date"],
-                end_date=r["proxy_end_date"],
-                is_active=r["clinical_status"] in ("active", "recurrence", "relapse"),
-            )
-            for r in cond_rows
-        ]
+            # Conditions with onset dates
+            cond_rows = conn.execute(
+                """SELECT id, display, clinical_status, onset_date,
+                          CASE WHEN clinical_status NOT IN ('active', 'recurrence', 'relapse')
+                               THEN recorded_date END AS proxy_end_date
+                   FROM condition
+                   WHERE patient_ref = ? AND onset_date IS NOT NULL
+                   ORDER BY onset_date""",
+                (patient_ref,),
+            ).fetchall()
 
-        # Encounters with linked diagnoses
-        enc_rows = conn.execute(
-            """SELECT e.id, e.class_code, e.type_text, e.period_start, e.reason_text,
-                      GROUP_CONCAT(c.display, '||') AS dx_list
-               FROM encounter e
-               LEFT JOIN condition c ON c.encounter_ref = 'urn:uuid:' || e.id
-               WHERE e.patient_ref = ?
-               GROUP BY e.id
-               ORDER BY e.period_start""",
-            (patient_ref,),
-        ).fetchall()
+            conditions = [
+                ConditionEpisodeItem(
+                    condition_id=r["id"],
+                    display=r["display"],
+                    clinical_status=r["clinical_status"],
+                    onset_date=r["onset_date"],
+                    end_date=r["proxy_end_date"],
+                    is_active=r["clinical_status"] in ("active", "recurrence", "relapse"),
+                )
+                for r in cond_rows
+            ]
 
-        encounters = [
-            EncounterMarker(
-                encounter_id=r["id"],
-                class_code=r["class_code"] or "",
-                type_text=r["type_text"] or "",
-                start=r["period_start"],
-                reason_display=r["reason_text"] or "",
-                diagnoses=[d.strip() for d in r["dx_list"].split("||") if d.strip()] if r["dx_list"] else [],
-            )
-            for r in enc_rows
-        ]
+            # Encounters with linked diagnoses
+            enc_rows = conn.execute(
+                """SELECT e.id, e.class_code, e.type_text, e.period_start, e.reason_text,
+                          GROUP_CONCAT(c.display, '||') AS dx_list
+                   FROM encounter e
+                   LEFT JOIN condition c ON c.encounter_ref = 'urn:uuid:' || e.id
+                   WHERE e.patient_ref = ?
+                   GROUP BY e.id
+                   ORDER BY e.period_start""",
+                (patient_ref,),
+            ).fetchall()
 
-    finally:
-        conn.close()
+            encounters = [
+                EncounterMarker(
+                    encounter_id=r["id"],
+                    class_code=r["class_code"] or "",
+                    type_text=r["type_text"] or "",
+                    start=r["period_start"],
+                    reason_display=r["reason_text"] or "",
+                    diagnoses=[d.strip() for d in r["dx_list"].split("||") if d.strip()] if r["dx_list"] else [],
+                )
+                for r in enc_rows
+            ]
 
-    # ── FHIR bundle enrichment (procedures, diagnostic reports, reason links) ──
-    # Open the raw bundle once for everything not in the SOF warehouse.
-    procedures: list[ProcedureMarker] = []
-    diagnostic_reports: list[DiagnosticReportItem] = []
+        finally:
+            conn.close()
 
-    if path:
-        with open(path) as f:
-            bundle = json.load(f)
+    if not medication_episodes:
+        medication_episodes = _record_medication_episodes(record)
+    if not conditions:
+        conditions = _record_condition_episodes(record)
+    if not encounters:
+        encounters = _record_encounter_markers(record)
 
-        # Build a fullUrl → resource index for resolving references
-        ref_index: dict[str, dict] = {}
-        for entry in bundle.get("entry", []):
-            full_url = entry.get("fullUrl", "")
-            if full_url:
-                ref_index[full_url] = entry["resource"]
-
-        def resolve_reason(reason_refs: list[dict]) -> str:
-            """Resolve reasonReference list to a display string."""
-            reasons = []
-            for ref in reason_refs:
-                display = ref.get("display", "")
-                if not display:
-                    target = ref_index.get(ref.get("reference", ""), {})
-                    display = target.get("code", {}).get("text", "")
-                if display:
-                    reasons.append(display)
-            return "; ".join(reasons)
-
-        # --- Medication reason enrichment ---
-        # Build a map: normalized drug display → reason from MedicationRequest
-        med_reasons: dict[str, str] = {}
-        for entry in bundle.get("entry", []):
-            resource = entry.get("resource", {})
-            if resource.get("resourceType") == "MedicationRequest":
-                drug_text = resource.get("medicationCodeableConcept", {}).get("text", "")
-                reason_refs = resource.get("reasonReference", [])
-                if drug_text and reason_refs:
-                    reason = resolve_reason(reason_refs)
-                    if reason:
-                        med_reasons[drug_text.strip().lower()] = reason
-
-        # Enrich medication episodes with resolved reasons
-        for m in medication_episodes:
-            key = m.display.strip().lower()
-            if key in med_reasons:
-                m.reason = med_reasons[key]
-
-        # --- Procedures ---
-        for entry in bundle.get("entry", []):
-            resource = entry.get("resource", {})
-            if resource.get("resourceType") == "Procedure":
-                code_text = resource.get("code", {}).get("text", "")
-                if not code_text:
-                    codings = resource.get("code", {}).get("coding", [])
-                    code_text = codings[0].get("display", "Unknown") if codings else "Unknown"
-                period = resource.get("performedPeriod", {})
-                start = period.get("start")
-                end = period.get("end")
-                reason = resolve_reason(resource.get("reasonReference", []))
-                procedures.append(ProcedureMarker(
-                    procedure_id=resource.get("id", ""),
-                    display=code_text,
-                    start=start,
-                    end=end,
-                    reason_display=reason,
-                ))
-        procedures.sort(key=lambda x: x.start or "")
-
-        # --- Diagnostic reports ---
-        for entry in bundle.get("entry", []):
-            resource = entry.get("resource", {})
-            if resource.get("resourceType") == "DiagnosticReport":
-                code_text = resource.get("code", {}).get("text", "")
-                if not code_text:
-                    codings = resource.get("code", {}).get("coding", [])
-                    code_text = codings[0].get("display", "Unknown") if codings else "Unknown"
-                categories = resource.get("category", [])
-                cat_text = ""
-                if categories:
-                    cat_codings = categories[0].get("coding", [])
-                    cat_text = cat_codings[0].get("display", "") if cat_codings else categories[0].get("text", "")
-                diagnostic_reports.append(DiagnosticReportItem(
-                    report_id=resource.get("id", ""),
-                    display=code_text,
-                    category=cat_text,
-                    date=resource.get("effectiveDateTime"),
-                    result_count=len(resource.get("result", [])),
-                ))
-        diagnostic_reports.sort(key=lambda x: x.date or "")
+    procedures = _record_procedure_markers(record)
+    diagnostic_reports = _record_diagnostic_reports(record)
 
     # Compute date bounds and distinct drug classes
     all_dates: list[str] = []

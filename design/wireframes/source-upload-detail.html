@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Upload Detail — Wireframe</title>
+  <style>
+    :root {
+      --ink: #1c1c1e; --text: #555a6a; --muted: #8d92a3; --line: #e3e7ef; --line-2: #f0f2f6;
+      --bg: #f4f6fa; --card: #fff; --blue: #5b76fe; --blue-soft: #eef1ff; --teal: #187574; --teal-soft: #e7fbf7;
+      --amber: #9a5a16; --amber-soft: #fff8f1; --red: #b42318; --red-soft: #fff1f0; --shadow: rgb(224 226 232) 0 0 0 1px;
+      --font: Inter, "Noto Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font); }
+    .topbar { height: 70px; background: white; box-shadow: var(--shadow); display: flex; align-items: center; justify-content: space-between; padding: 0 28px; }
+    .brand small { display: block; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .12em; font-weight: 800; }
+    .brand strong { display: block; font-size: 18px; margin-top: 3px; }
+    .actions { display: flex; align-items: center; gap: 10px; }
+    .btn { border: 1px solid var(--line); background: white; border-radius: 8px; padding: 9px 12px; color: var(--text); font-size: 14px; font-weight: 700; }
+    .btn-primary { background: var(--blue); color: white; border-color: var(--blue); }
+    .btn-muted { background: #f7f8fb; }
+    .page { width: min(1280px, calc(100% - 48px)); margin: 0 auto; padding: 28px 0 56px; display: grid; gap: 18px; }
+    .crumbs { color: var(--muted); font-size: 13px; }
+    .crumbs a { color: var(--blue); text-decoration: none; font-weight: 750; }
+    .header { background: white; border-radius: 12px; box-shadow: var(--shadow); padding: 24px; display: grid; grid-template-columns: 1fr auto; gap: 20px; align-items: start; }
+    .eyebrow { color: var(--blue); font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .1em; }
+    h1 { margin: 8px 0 8px; font-size: 31px; line-height: 1.12; }
+    p { color: var(--text); line-height: 1.55; }
+    .pill { display: inline-flex; border-radius: 999px; padding: 4px 9px; font-size: 12px; font-weight: 800; white-space: nowrap; }
+    .pill.needs { background: var(--amber-soft); color: var(--amber); }
+    .pill.ready { background: var(--teal-soft); color: var(--teal); }
+    .pill.review { background: var(--blue-soft); color: var(--blue); }
+    .grid { display: grid; grid-template-columns: 1fr 380px; gap: 18px; align-items: start; }
+    .panel { background: white; border-radius: 12px; box-shadow: var(--shadow); }
+    .panel-head { padding: 18px 20px; border-bottom: 1px solid var(--line-2); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .panel h2 { margin: 0; font-size: 18px; }
+    .panel-body { padding: 20px; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    label { display: grid; gap: 7px; color: var(--ink); font-size: 13px; font-weight: 800; }
+    input, select, textarea { border: 1px solid var(--line); border-radius: 8px; padding: 11px 12px; color: var(--ink); font: inherit; background: white; }
+    textarea { min-height: 92px; resize: vertical; }
+    .span-2 { grid-column: span 2; }
+    .helper { color: var(--muted); font-size: 12px; margin-top: -2px; font-weight: 500; }
+    .file-preview { display: grid; grid-template-columns: 76px 1fr; gap: 16px; padding: 16px; background: #fafbff; border: 1px solid #dfe4ff; border-radius: 12px; }
+    .file-icon { width: 76px; height: 92px; border-radius: 8px; background: white; box-shadow: var(--shadow); display: grid; place-items: center; color: var(--red); font-weight: 900; }
+    .meta-list { display: grid; gap: 8px; margin-top: 12px; }
+    .meta-row { display: flex; justify-content: space-between; gap: 16px; padding-bottom: 8px; border-bottom: 1px solid var(--line-2); color: var(--text); font-size: 14px; }
+    .meta-row strong { color: var(--ink); }
+    .callout { background: var(--amber-soft); border: 1px solid #f3dfc8; border-radius: 12px; padding: 15px; }
+    .callout strong { display: block; color: var(--amber); font-size: 12px; text-transform: uppercase; letter-spacing: .1em; margin-bottom: 6px; }
+    .callout p { margin: 0; font-size: 14px; }
+    .checklist { display: grid; gap: 10px; }
+    .check { display: grid; grid-template-columns: 20px 1fr; gap: 10px; padding: 12px; border: 1px solid var(--line-2); border-radius: 10px; }
+    .box { width: 18px; height: 18px; border-radius: 5px; border: 1px solid var(--line); display: grid; place-items: center; color: var(--teal); font-size: 12px; }
+    .checked .box { background: var(--teal-soft); border-color: #bcebe4; }
+    .check strong { display: block; font-size: 14px; }
+    .check span { color: var(--text); font-size: 13px; line-height: 1.45; }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <small>EHI Exchange Platform</small>
+      <strong>Describe uploaded file</strong>
+    </div>
+    <div class="actions">
+      <button class="btn btn-muted">Save draft</button>
+      <button class="btn btn-primary">Save file details</button>
+    </div>
+  </header>
+
+  <main class="page">
+    <div class="crumbs"><a href="source-inventory-portal.html">My files & sources</a> / function-health-labs.pdf</div>
+
+    <section class="header">
+      <div>
+        <div class="eyebrow">Upload classification</div>
+        <h1>Tell us what this file contains.</h1>
+        <p>
+          This screen turns a raw upload into useful source material. The data type, patient description, and source context travel with the file through extraction, review, and publishing.
+        </p>
+      </div>
+      <span class="pill needs">Needs description</span>
+    </section>
+
+    <section class="grid">
+      <div class="panel">
+        <div class="panel-head">
+          <h2>File description</h2>
+          <span class="pill review">Patient-entered metadata</span>
+        </div>
+        <div class="panel-body">
+          <div class="form-grid">
+            <label>
+              Data type
+              <select>
+                <option>Lab or diagnostic report</option>
+                <option>Health system portal export</option>
+                <option>Hospital or clinic PDF</option>
+                <option>Medication / pharmacy record</option>
+                <option>Wearable or device export</option>
+                <option>Insurance / payer document</option>
+              </select>
+            </label>
+            <label>
+              Source or organization
+              <input value="Function Health" />
+            </label>
+            <label>
+              Date range covered
+              <input value="March 2026 - April 2026" />
+              <span class="helper">Approximate is okay.</span>
+            </label>
+            <label>
+              Who uploaded it?
+              <select>
+                <option>Patient</option>
+                <option>Care partner</option>
+                <option>Clinician office</option>
+                <option>Imported from portal</option>
+              </select>
+            </label>
+            <label class="span-2">
+              Description and context
+              <textarea>This is the lab packet from Function Health with my recent thyroid, metabolic, vitamin, inflammation, and hormone labs. I want my clinician to compare it with my chart labs.</textarea>
+            </label>
+            <label class="span-2">
+              Anything we should know before processing?
+              <textarea placeholder="Example: Some of these labs were self-ordered; I was taking supplements at the time; I am not sure if all pages belong to me."></textarea>
+              <span class="helper">This becomes document-specific Patient Context, not verified chart truth.</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <aside class="panel">
+        <div class="panel-head">
+          <h2>File snapshot</h2>
+          <span class="pill needs">PDF</span>
+        </div>
+        <div class="panel-body">
+          <div class="file-preview">
+            <div class="file-icon">PDF</div>
+            <div>
+              <strong>function-health-labs.pdf</strong>
+              <p style="margin: 6px 0 0; font-size: 14px;">22 pages · 4.1 MB · uploaded today</p>
+            </div>
+          </div>
+
+          <div class="meta-list">
+            <div class="meta-row"><span>Processing status</span><strong>Waiting</strong></div>
+            <div class="meta-row"><span>Provenance</span><strong>Patient upload</strong></div>
+            <div class="meta-row"><span>Chart merge</span><strong>Not allowed</strong></div>
+            <div class="meta-row"><span>Privacy posture</span><strong>Local staging</strong></div>
+          </div>
+
+          <div class="callout" style="margin-top: 16px;">
+            <strong>Why this matters</strong>
+            <p>Without this metadata, the platform can store the file but cannot safely explain what it contains or how confident extraction should be.</p>
+          </div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Ready checklist</h2>
+        <button class="btn btn-primary">Mark ready for processing</button>
+      </div>
+      <div class="panel-body checklist">
+        <div class="check checked"><div class="box">✓</div><div><strong>Data type selected</strong><span>Lab or diagnostic report.</span></div></div>
+        <div class="check checked"><div class="box">✓</div><div><strong>Source identified</strong><span>Function Health.</span></div></div>
+        <div class="check checked"><div class="box">✓</div><div><strong>Patient description captured</strong><span>Useful for the agent and reviewer before parsing.</span></div></div>
+        <div class="check"><div class="box"></div><div><strong>Optional: document context captured</strong><span>Add anything that would help explain this file before processing.</span></div></div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

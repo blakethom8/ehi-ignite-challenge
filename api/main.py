@@ -25,6 +25,8 @@ from api.routers import corpus
 from api.routers import assistant
 from api.routers import traces
 from api.routers import classifications
+from api.routers import patient_context
+from api.routers import aggregation
 
 _ENVIRONMENT = os.getenv("ENVIRONMENT", "development").strip().lower()
 _IS_PRODUCTION = _ENVIRONMENT in {"prod", "production"}
@@ -84,7 +86,7 @@ app.add_middleware(
         ],
     ),
     allow_credentials=False,
-    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
     allow_headers=["Accept", "Authorization", "Content-Type"],
 )
 
@@ -95,6 +97,8 @@ app.include_router(corpus.router, prefix="/api")
 app.include_router(assistant.router, prefix="/api")
 app.include_router(traces.router, prefix="/api")
 app.include_router(classifications.router, prefix="/api")
+app.include_router(patient_context.router, prefix="/api")
+app.include_router(aggregation.router, prefix="/api")
 
 
 @app.get("/api/health")

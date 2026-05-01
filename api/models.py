@@ -709,3 +709,200 @@ class ProviderAssistantResponse(BaseModel):
     citations: list[ProviderAssistantCitation]
     follow_ups: list[str]
     trace: TraceDetail | None = None  # tool calls + context transparency
+
+
+# ---------------------------------------------------------------------------
+# Patient Context guided intake
+# ---------------------------------------------------------------------------
+
+class PatientContextSessionCreateRequest(BaseModel):
+    patient_id: str = Field(..., min_length=1, max_length=300)
+    source_mode: Literal["synthetic", "private_blake_cedars", "selected_patient"] = "selected_patient"
+
+
+class PatientContextTurnRequest(BaseModel):
+    message: str = Field(..., min_length=1, max_length=4000)
+    selected_gap_id: str | None = Field(default=None, max_length=80)
+
+
+class PatientContextGapCard(BaseModel):
+    id: str
+    category: Literal[
+        "missing_sources",
+        "medication_reality",
+        "timeline_gap",
+        "uncertain_fact",
+        "qualitative_context",
+    ]
+    title: str
+    prompt: str
+    why_it_matters: str
+    status: Literal["open", "answered", "skipped"] = "open"
+    priority: int = Field(ge=1, le=5)
+    evidence: list[str] = Field(default_factory=list)
+
+
+class PatientContextTurn(BaseModel):
+    id: str
+    role: Literal["patient", "assistant"]
+    content: str
+    created_at: datetime
+    linked_gap_id: str | None = None
+
+
+class PatientContextFact(BaseModel):
+    id: str
+    source: Literal["patient-reported"] = "patient-reported"
+    linked_gap_id: str | None = None
+    statement: str
+    summary: str
+    confidence: Literal["high", "medium", "low"] = "medium"
+    created_at: datetime
+
+
+class PatientContextExportStatus(BaseModel):
+    generated: bool = False
+    files: list[str] = Field(default_factory=list)
+    generated_at: datetime | None = None
+
+
+class PatientContextSessionResponse(BaseModel):
+    session_id: str
+    patient_id: str
+    patient_label: str
+    source_mode: Literal["synthetic", "private_blake_cedars", "selected_patient"]
+    source_posture: str
+    gap_cards: list[PatientContextGapCard]
+    turns: list[PatientContextTurn]
+    facts: list[PatientContextFact]
+    export_status: PatientContextExportStatus
+
+
+class PatientContextTurnResponse(PatientContextSessionResponse):
+    assistant_message: PatientContextTurn
+
+
+class PatientContextExportResponse(BaseModel):
+    session_id: str
+    generated_at: datetime
+    files: list[str]
+    preview: str
+
+
+# ---------------------------------------------------------------------------
+# Data Aggregator workflow
+# ---------------------------------------------------------------------------
+
+class AggregationUploadedFile(BaseModel):
+    file_id: str
+    file_name: str
+    content_type: str
+    size_bytes: int
+    uploaded_at: datetime
+    status: Literal["uploaded", "needs_processing", "unsupported"] = "uploaded"
+    data_type: str = "Not classified"
+    source_name: str = ""
+    date_range: str = ""
+    contains: list[str] = Field(default_factory=list)
+    description: str = ""
+    context_notes: str = ""
+    extraction_confidence: Literal["high", "medium", "low", "unknown"] = "unknown"
+    storage_path: str = ""
+
+
+class AggregationSourceCard(BaseModel):
+    id: str
+    name: str
+    category: Literal[
+        "synthetic_fhir",
+        "private_ehi",
+        "portal",
+        "file_upload",
+        "lab",
+        "pharmacy",
+        "payer",
+        "wearable",
+        "planned_adapter",
+    ]
+    mode: Literal["available", "missing", "planned", "uploaded", "private"]
+    status_label: str
+    record_count: int = 0
+    last_updated: datetime | None = None
+    confidence: Literal["high", "medium", "low", "not_started"] = "not_started"
+    posture: str
+    next_action: str
+    help_title: str
+    help_body: str
+    evidence: list[str] = Field(default_factory=list)
+
+
+class AggregationEnvironmentResponse(BaseModel):
+    patient_id: str
+    patient_label: str
+    environment_label: str
+    source_posture: str
+    private_blake_cedars_available: bool
+    synthetic_resource_counts: dict[str, int]
+    uploaded_files: list[AggregationUploadedFile]
+    source_cards: list[AggregationSourceCard]
+    guidance: list[str]
+
+
+class AggregationCleaningIssue(BaseModel):
+    id: str
+    category: Literal[
+        "source_gap",
+        "medication_reality",
+        "timeline_gap",
+        "duplicate_candidate",
+        "uncoded_file",
+        "provenance_gap",
+        "patient_context",
+    ]
+    severity: Literal["high", "medium", "low"]
+    status: Literal["open", "ready_for_review", "planned", "resolved"] = "open"
+    title: str
+    body: str
+    recommended_action: str
+    source_ids: list[str] = Field(default_factory=list)
+    evidence: list[str] = Field(default_factory=list)
+    help_title: str
+    help_body: str
+
+
+class AggregationCleaningQueueResponse(BaseModel):
+    patient_id: str
+    patient_label: str
+    issue_counts: dict[str, int]
+    issues: list[AggregationCleaningIssue]
+    guidance: list[str]
+
+
+class AggregationReadinessItem(BaseModel):
+    id: str
+    label: str
+    status: Literal["ready", "needs_review", "missing", "planned"]
+    score: int = Field(ge=0, le=100)
+    body: str
+    next_action: str
+
+
+class AggregationReadinessResponse(BaseModel):
+    patient_id: str
+    patient_label: str
+    readiness_score: int = Field(ge=0, le=100)
+    posture: str
+    checklist: list[AggregationReadinessItem]
+    blockers: list[str]
+    export_targets: list[str]
+
+
+class AggregationUploadResponse(BaseModel):
+    file: AggregationUploadedFile
+    storage_posture: str
+    source_card: AggregationSourceCard
+
+
+class AggregationDeleteResponse(BaseModel):
+    deleted: bool
+    file_id: str

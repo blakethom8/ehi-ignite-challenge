@@ -75,7 +75,7 @@ with st.sidebar:
     )
     st.divider()
     st.page_link("streamlit_app.py", label="← Overview", icon="🏠")
-    st.page_link("pages/02b_PDF_Lab.py", label="← PDF Lab (single-PDF view)", icon="🧪")
+    st.page_link("pages/03_PDF_Lab.py", label="← PDF Lab (single-PDF view)", icon="🧪")
 
 # ---------------------------------------------------------------------------
 # 1 · Pick PDFs

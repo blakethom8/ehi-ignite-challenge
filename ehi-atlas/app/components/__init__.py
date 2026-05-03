@@ -1,4 +1,25 @@
 # EHI Atlas Console — reusable components
+#
+# Side effect: load credentials from the repo-root .env on first import so
+# every page in the app picks up ANTHROPIC_API_KEY / GOOGLE_API_KEY from the
+# same place the API server reads them from. Streamlit's multi-page model
+# means a user can navigate directly to any page without first hitting
+# streamlit_app.py, so we have to be defensive about where dotenv runs.
+import os as _os
+from pathlib import Path as _Path
+
+try:
+    from dotenv import load_dotenv as _load_dotenv
+
+    # ehi-atlas/app/components/__init__.py → parents[3] = repo root
+    _REPO_ROOT = _Path(__file__).resolve().parents[3]
+    _ENV_FILE = _REPO_ROOT / ".env"
+    if _ENV_FILE.exists():
+        _load_dotenv(_ENV_FILE, override=False)
+except ImportError:
+    # python-dotenv not installed — caller must export env vars themselves
+    pass
+
 from .badges import engine_badge, engine_badge_row
 from .header import render_header
 from .pipeline_diagram import render_pipeline_diagram

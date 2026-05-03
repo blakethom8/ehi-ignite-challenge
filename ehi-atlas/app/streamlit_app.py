@@ -62,10 +62,10 @@ with st.sidebar:
     st.markdown("### Quick Links")
     st.page_link("pages/01_Sources_and_Bronze.py", label="Sources & Bronze", icon="📦")
     st.page_link("pages/02_Standardize.py", label="Standardize", icon="🔄")
-    st.page_link("pages/02b_PDF_Lab.py", label="PDF Lab (single PDF)", icon="🧪")
-    st.page_link("pages/02c_PDF_Compare.py", label="PDF Compare (A/B)", icon="🆚")
-    st.page_link("pages/03_Harmonize.py", label="Harmonize", icon="🔗")
-    st.page_link("pages/04_Gold_and_Provenance.py", label="Gold & Provenance", icon="🏆")
+    st.page_link("pages/03_PDF_Lab.py", label="PDF Lab (single PDF)", icon="🧪")
+    st.page_link("pages/04_PDF_Compare.py", label="PDF Compare (A/B)", icon="🆚")
+    st.page_link("pages/05_Harmonize.py", label="Harmonize", icon="🔗")
+    st.page_link("pages/06_Gold_and_Provenance.py", label="Gold & Provenance", icon="🏆")
 
 # ---------------------------------------------------------------------------
 # Explainer
@@ -184,7 +184,7 @@ card_cols = st.columns(3)
 _CARDS = [
     ("📦", "Sources & Bronze", "What we received: one record per source, immutable.", "pages/01_Sources_and_Bronze.py"),
     ("🔄", "Standardize", "Silver tier: all sources projected to FHIR R4.", "pages/02_Standardize.py"),
-    ("🔗", "Harmonize", "Merge visualization: cross-source dedup, conflict detection.", "pages/03_Harmonize.py"),
+    ("🔗", "Harmonize", "Merge visualization: cross-source dedup, conflict detection.", "pages/05_Harmonize.py"),
 ]
 for col, (icon, title, desc, page) in zip(card_cols, _CARDS):
     with col:
@@ -197,9 +197,9 @@ for col, (icon, title, desc, page) in zip(card_cols, _CARDS):
 st.markdown("")
 tool_cols = st.columns(3)
 _TOOLS = [
-    ("🧪", "PDF Lab", "Drop a PDF, watch it parse end-to-end. Live extraction, four-panel inspection.", "pages/02b_PDF_Lab.py"),
-    ("🆚", "PDF Compare", "Run multiple backends across multiple PDFs. A/B harness with pivots.", "pages/02c_PDF_Compare.py"),
-    ("🏆", "Gold & Provenance", "Unified canonical record and full lineage graph.", "pages/04_Gold_and_Provenance.py"),
+    ("🧪", "PDF Lab", "Drop a PDF, watch it parse end-to-end. Live extraction, four-panel inspection.", "pages/03_PDF_Lab.py"),
+    ("🆚", "PDF Compare", "Run multiple backends across multiple PDFs. A/B harness with pivots.", "pages/04_PDF_Compare.py"),
+    ("🏆", "Gold & Provenance", "Unified canonical record and full lineage graph.", "pages/06_Gold_and_Provenance.py"),
 ]
 for col, (icon, title, desc, page) in zip(tool_cols, _TOOLS):
     with col:

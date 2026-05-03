@@ -91,8 +91,9 @@ with st.sidebar:
     st.markdown("### Backend")
     st.code(f"{DEFAULT_BACKEND} / {DEFAULT_MODEL}", language="text")
     st.caption(
-        "Set `EHI_VISION_BACKEND` env var to swap (Gemma 4 backends ship in a "
-        "follow-up commit)."
+        "Set `EHI_VISION_BACKEND=gemma-google-ai-studio` to swap to Gemma 4 31B "
+        "(requires `GOOGLE_API_KEY` in `.env`). For multi-backend A/B, see "
+        "[**PDF Compare**](./PDF_Compare)."
     )
 
     st.markdown("### Run mode")
@@ -338,10 +339,10 @@ with tab_pages:
     main_col, strip_col = st.columns([3, 1], gap="small")
     with main_col:
         png_bytes, (w, h) = pages[selected_page - 1]
-        st.image(png_bytes, caption=f"Page {selected_page} ({w}×{h} px)", use_column_width=True)
+        st.image(png_bytes, caption=f"Page {selected_page} ({w}×{h} px)", width="stretch")
     with strip_col:
         for i, (b, _) in enumerate(pages, start=1):
-            st.image(b, caption=f"p.{i}", use_column_width=True)
+            st.image(b, caption=f"p.{i}", width="stretch")
 
 # --- Panel 2: text + bbox table ----------------------------------------------
 
@@ -508,7 +509,7 @@ with left:
     )
 with right:
     st.page_link(
-        "pages/02c_PDF_Compare.py",
+        "pages/04_PDF_Compare.py",
         label="🆚 Compare backends across multiple PDFs →",
     )
 st.caption(

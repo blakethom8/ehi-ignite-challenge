@@ -554,6 +554,7 @@ def extract_from_pdf(
     cache: ExtractionCache | None = None,
     api_client: Anthropic | None = None,
     skip_cache: bool = False,
+    max_tokens: int = 16384,
 ) -> T:
     """Extract structured content from a PDF using a vision-capable LLM.
 
@@ -609,6 +610,7 @@ def extract_from_pdf(
         pdf_bytes=pdf_path.read_bytes(),
         system_prompt=SYSTEM_PROMPT,
         schema_json=output_schema.model_json_schema(),
+        max_tokens=max_tokens,
     )
 
     raw = _coerce_stringified_subobjects(raw)

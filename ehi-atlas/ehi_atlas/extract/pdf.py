@@ -580,10 +580,12 @@ def extract_from_pdf(
     if not skip_cache:
         cached = cache.get(key)
         if cached is not None:
-            # Apply coercions on read too — pre-fix cache entries pick up
-            # the latest repair logic without requiring a re-extraction.
+            # Apply coercions + calibration on read too — pre-fix cache
+            # entries pick up the latest repair logic without forcing a
+            # re-extraction.
             cached = _coerce_stringified_subobjects(cached)
             cached = _unwrap_extraction_envelope(cached)
+            cached = _calibrate_bboxes_via_layout(cached, pdf_path)
             return output_schema.model_validate(cached)
 
     raw = backend.extract(
@@ -594,6 +596,7 @@ def extract_from_pdf(
 
     raw = _coerce_stringified_subobjects(raw)
     raw = _unwrap_extraction_envelope(raw)
+    raw = _calibrate_bboxes_via_layout(raw, pdf_path)
 
     # Trust the orchestrator over the model for these fields. Some models
     # (notably Gemma 4 via Google AI Studio) hallucinate the extraction_model
@@ -609,6 +612,95 @@ def extract_from_pdf(
 # ---------------------------------------------------------------------------
 # Response repair
 # ---------------------------------------------------------------------------
+
+
+def _calibrate_bboxes_via_layout(
+    raw: dict[str, Any],
+    pdf_path: Path,
+) -> dict[str, Any]:
+    """Replace model-emitted bboxes with pdfplumber-derived ground truth.
+
+    Vision models report bboxes in whatever coordinate system they invent —
+    image pixels, top-left origin, scaled-but-not-quite-PDF units, etc.
+    Gemma 4 in particular emits coordinates that look plausible but are off
+    by tens of points; Claude is closer to correct but still inconsistent
+    across runs. pdfplumber's text-extraction bboxes are deterministic
+    ground truth in PDF user units (bottom-left origin), so we use those.
+
+    Strategy: for each extracted item that has both a locatable string
+    (``test_name`` for lab results, ``source_text``/``label`` for clinical
+    facts) and a bbox, find the matching row in the layout and replace.
+    The model's coordinate values are discarded; the page number is kept
+    as a hint to scope the search.
+
+    No-op when:
+      - The PDF has no extractable text layer (scanned/OCR-needed) — the
+        model's bboxes (image-space-ish) are the only signal we have.
+      - A given test_name / source_text doesn't appear in the layout (the
+        model fabricated or paraphrased) — leave the original bbox alone.
+
+    Idempotent: calling this on already-calibrated output is a no-op
+    because find_text_bbox returns the same row bbox both times.
+    """
+    if not isinstance(raw, dict):
+        return raw
+
+    document = raw.get("document")
+    if not isinstance(document, dict):
+        return raw
+
+    try:
+        from ehi_atlas.extract.layout import extract_layout, find_text_bbox
+
+        layout = extract_layout(pdf_path)
+    except Exception:
+        # Scanned PDF or pdfplumber failure — nothing we can do here.
+        # The model's bboxes (whatever coord system they're in) are the
+        # only geometry signal available.
+        return raw
+
+    def _replace_bbox(item: dict[str, Any], anchor_text: str) -> None:
+        if not anchor_text:
+            return
+        existing = item.get("bbox")
+        if not isinstance(existing, dict):
+            return
+        page = existing.get("page", 1)
+        # Try the full anchor first, fall back to a shorter prefix to handle
+        # paraphrased / parenthetical-augmented model output.
+        for probe in (anchor_text, anchor_text[:40], anchor_text.split()[0] if anchor_text else ""):
+            if not probe:
+                continue
+            located = find_text_bbox(layout, probe, page=page)
+            if located is not None:
+                item["bbox"] = {
+                    "page": located.page,
+                    "x1": float(located.x1),
+                    "y1": float(located.y1),
+                    "x2": float(located.x2),
+                    "y2": float(located.y2),
+                }
+                return
+
+    # Lab results — anchor on test_name
+    results = document.get("results")
+    if isinstance(results, list):
+        for r in results:
+            if isinstance(r, dict):
+                _replace_bbox(r, str(r.get("test_name") or ""))
+
+    # Clinical-note facts — anchor on source_text (preferred) then label
+    for key in ("extracted_conditions", "extracted_symptoms"):
+        items = document.get(key)
+        if not isinstance(items, list):
+            continue
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            anchor = str(item.get("source_text") or item.get("label") or "")
+            _replace_bbox(item, anchor)
+
+    return raw
 
 
 def _unwrap_extraction_envelope(raw: dict[str, Any]) -> dict[str, Any]:

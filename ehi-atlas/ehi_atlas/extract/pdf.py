@@ -580,6 +580,10 @@ def extract_from_pdf(
     if not skip_cache:
         cached = cache.get(key)
         if cached is not None:
+            # Apply coercions on read too — pre-fix cache entries pick up
+            # the latest repair logic without requiring a re-extraction.
+            cached = _coerce_stringified_subobjects(cached)
+            cached = _unwrap_extraction_envelope(cached)
             return output_schema.model_validate(cached)
 
     raw = backend.extract(
@@ -589,6 +593,7 @@ def extract_from_pdf(
     )
 
     raw = _coerce_stringified_subobjects(raw)
+    raw = _unwrap_extraction_envelope(raw)
 
     # Trust the orchestrator over the model for these fields. Some models
     # (notably Gemma 4 via Google AI Studio) hallucinate the extraction_model
@@ -604,6 +609,30 @@ def extract_from_pdf(
 # ---------------------------------------------------------------------------
 # Response repair
 # ---------------------------------------------------------------------------
+
+
+def _unwrap_extraction_envelope(raw: dict[str, Any]) -> dict[str, Any]:
+    """Repair an "extra envelope" Claude tool-call quirk.
+
+    Some PDFs (observed first on a 15-page colon-cancer medical record) cause
+    Claude to wrap its tool-call output in an extra ``{"extraction": {...}}``
+    layer instead of returning the schema's top-level fields directly. The
+    inner content is correct — every nested field is present and well-formed
+    — but Pydantic's validator can't see ``document`` because it's one level
+    deeper than the schema declares.
+
+    If the dict has an ``"extraction"`` key whose value is itself a dict that
+    *looks like* the real payload (i.e. contains ``"document"``), lift that
+    inner dict's keys up to the top level. Sibling keys (e.g. orchestrator-
+    injected ``extraction_model``) are preserved.
+    """
+    if not isinstance(raw, dict):
+        return raw
+    inner = raw.get("extraction")
+    if not (isinstance(inner, dict) and "document" in inner):
+        return raw
+    others = {k: v for k, v in raw.items() if k != "extraction"}
+    return {**inner, **others}
 
 
 def _coerce_stringified_subobjects(raw: dict[str, Any]) -> dict[str, Any]:

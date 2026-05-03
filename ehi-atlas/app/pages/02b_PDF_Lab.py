@@ -500,11 +500,19 @@ with tab_fhir:
 # ---------------------------------------------------------------------------
 
 st.divider()
+left, right = st.columns(2)
+with left:
+    st.caption(
+        "Notebook walkthrough: "
+        "[`notebooks/03_layer2b_vision_extraction.ipynb`](../notebooks/03_layer2b_vision_extraction.ipynb)"
+    )
+with right:
+    st.page_link(
+        "pages/02c_PDF_Compare.py",
+        label="🆚 Compare backends across multiple PDFs →",
+    )
 st.caption(
-    "Notebook walkthrough: "
-    "[`notebooks/03_layer2b_vision_extraction.ipynb`](../notebooks/03_layer2b_vision_extraction.ipynb)"
-    " · "
-    "Backend abstraction: `ehi_atlas/extract/pdf.py` (`VisionBackend` Protocol)"
-    " · "
-    "Uploads dropbox: `corpus/_sources/uploads/` (gitignored)"
+    "Backend abstraction: `ehi_atlas/extract/pdf.py` (`VisionBackend` Protocol) · "
+    "Uploads dropbox: `corpus/_sources/uploads/` (gitignored) · "
+    "Compare module: `ehi_atlas/extract/compare.py`"
 )

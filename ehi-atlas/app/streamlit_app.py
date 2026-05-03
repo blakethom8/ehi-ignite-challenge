@@ -62,6 +62,8 @@ with st.sidebar:
     st.markdown("### Quick Links")
     st.page_link("pages/01_Sources_and_Bronze.py", label="Sources & Bronze", icon="📦")
     st.page_link("pages/02_Standardize.py", label="Standardize", icon="🔄")
+    st.page_link("pages/02b_PDF_Lab.py", label="PDF Lab (single PDF)", icon="🧪")
+    st.page_link("pages/02c_PDF_Compare.py", label="PDF Compare (A/B)", icon="🆚")
     st.page_link("pages/03_Harmonize.py", label="Harmonize", icon="🔗")
     st.page_link("pages/04_Gold_and_Provenance.py", label="Gold & Provenance", icon="🏆")
 
@@ -178,14 +180,28 @@ else:
 st.divider()
 st.subheader("Explore the Pipeline")
 
-card_cols = st.columns(4)
+card_cols = st.columns(3)
 _CARDS = [
     ("📦", "Sources & Bronze", "What we received: one record per source, immutable.", "pages/01_Sources_and_Bronze.py"),
     ("🔄", "Standardize", "Silver tier: all sources projected to FHIR R4.", "pages/02_Standardize.py"),
     ("🔗", "Harmonize", "Merge visualization: cross-source dedup, conflict detection.", "pages/03_Harmonize.py"),
-    ("🏆", "Gold & Provenance", "Unified canonical record and full lineage graph.", "pages/04_Gold_and_Provenance.py"),
 ]
 for col, (icon, title, desc, page) in zip(card_cols, _CARDS):
+    with col:
+        st.markdown(f"**{icon} {title}**")
+        st.caption(desc)
+        st.page_link(page, label=f"Open {title} →")
+
+# Vision-extraction tools — PDF Lab and PDF Compare are the developer-facing
+# surfaces for iterating on the Layer 2-B vision pipeline.
+st.markdown("")
+tool_cols = st.columns(3)
+_TOOLS = [
+    ("🧪", "PDF Lab", "Drop a PDF, watch it parse end-to-end. Live extraction, four-panel inspection.", "pages/02b_PDF_Lab.py"),
+    ("🆚", "PDF Compare", "Run multiple backends across multiple PDFs. A/B harness with pivots.", "pages/02c_PDF_Compare.py"),
+    ("🏆", "Gold & Provenance", "Unified canonical record and full lineage graph.", "pages/04_Gold_and_Provenance.py"),
+]
+for col, (icon, title, desc, page) in zip(tool_cols, _TOOLS):
     with col:
         st.markdown(f"**{icon} {title}**")
         st.caption(desc)

@@ -7,6 +7,9 @@ data/synthea-samples/sample-bulk-fhir-datasets-10-patients/log.ndjson
 # Keep the folder structure
 !data/synthea-samples/.gitkeep
 
+# Node (Cursor sidecar)
+cursor-sidecar/node_modules/
+
 # Python
 __pycache__/
 *.pyc
@@ -14,8 +17,7 @@ __pycache__/
 venv/
 .venv/
 .DS_Store
-fhir_explorer/.venv/
-fhir_explorer/catalog/.corpus_cache.json
+lib/patient_catalog/.corpus_cache.json
 __pycache__/
 *.pyc
 data/traces.db

@@ -37,41 +37,77 @@ Keep implementation code, tests, repo-specific docs, deployment config, and gene
 
 ## Repository Structure
 
+The codebase splits cleanly into two zones:
+
+- **Application zone** — code and data the production app runs on. Ships in Docker, covered by tests, deployed to Hetzner.
+- **Development zone** — research, prototypes, the data bench, end-to-end notebooks. Reads from the application zone but never modifies it.
+
 ```
 ehi-ignite-challenge/
 │
 ├── CLAUDE.md                              ← you are here
 ├── README.md
 │
+│ ─── APPLICATION ZONE ────────────────────────────────────────────
+│
 ├── api/                                   ← FastAPI backend (PRIMARY — build here)
 │   ├── main.py                            ← app entry, dotenv loading, middleware registration
 │   ├── routers/                           ← patients, safety, timeline, search, corpus, traces
 │   ├── middleware/
 │   │   └── tracing.py                     ← request-level trace lifecycle
-│   └── core/                             ← clinical intelligence modules
-│       ├── tracing.py                     ← LLM observability (traces, spans, SQLite, Langfuse)
-│       ├── provider_assistant_service.py  ← mode selector (agent-sdk / deterministic)
-│       ├── provider_assistant_agent_sdk.py ← Claude Agent SDK runtime (instrumented)
-│       ├── provider_assistant.py          ← deterministic fact ranking + evidence retrieval
-│       ├── sof_tools.py                   ← run_sql MCP tool: SELECT-only gate + read-only runner
-│       ├── sof_materialize.py             ← FastAPI startup hook — rebuilds data/sof.db on mtime gate
-│       ├── loader.py
-│       ├── drug_classifier.py
-│       ├── episode_detector.py
-│       ├── temporal.py                    ← TODO
-│       ├── batch_enrichment.py            ← TODO (LLM pipeline)
-│       ├── context_builder.py             ← TODO (5-layer pipeline)
-│       └── rag_tools.py                   ← TODO
+│   ├── core/                              ← clinical intelligence modules
+│   │   ├── tracing.py                     ← LLM observability (traces, spans, SQLite, Langfuse)
+│   │   ├── provider_assistant_service.py  ← mode selector (agent-sdk / deterministic)
+│   │   ├── provider_assistant_agent_sdk.py ← Claude Agent SDK runtime (instrumented)
+│   │   ├── provider_assistant.py          ← deterministic fact ranking + evidence retrieval
+│   │   ├── sof_tools.py                   ← run_sql MCP tool: SELECT-only gate + read-only runner
+│   │   ├── sof_materialize.py             ← FastAPI startup hook — rebuilds data/sof.db on mtime gate
+│   │   ├── loader.py
+│   │   ├── temporal.py                    ← TODO
+│   │   ├── batch_enrichment.py            ← TODO (LLM pipeline)
+│   │   ├── context_builder.py             ← TODO (5-layer pipeline)
+│   │   └── rag_tools.py                   ← TODO
+│   └── tests/                             ← FastAPI tests
 │
 ├── app/                                   ← React + Vite + TypeScript frontend (PRIMARY)
 │   ├── src/
 │   │   ├── pages/
-│   │   │   ├── Explorer/                  ← FHIR data exploration (build first)
-│   │   │   └── PatientJourney/            ← clinician-facing app (build second)
+│   │   │   ├── Explorer/                  ← FHIR data exploration
+│   │   │   └── PatientJourney/            ← clinician-facing app
 │   │   ├── components/
 │   │   ├── hooks/
 │   │   └── api/client.ts
 │   └── vite.config.ts
+│
+├── lib/                                   ← Shared production library code ⭐
+│   ├── README.md                          ← what's here, import conventions
+│   ├── fhir_parser/                       ← FHIR R4 bundle parser + dataclass models
+│   │   ├── bundle_parser.py
+│   │   ├── extractors.py
+│   │   └── models.py                      ← PatientRecord + all data models (source of truth)
+│   ├── patient_catalog/                   ← single-patient stats + corpus loader
+│   │   ├── single_patient.py
+│   │   ├── corpus.py
+│   │   └── field_profiler.py
+│   ├── sql_on_fhir/                       ← SQL-on-FHIR v2 engine: ViewDefinition → SQLite ⭐
+│   │   ├── enrich.py                      ← extra columns spliced onto view rows at ingest (drug_class)
+│   │   ├── derived.py                     ← derived tables built after views flush (medication_episode)
+│   │   └── views/                         ← 5 ViewDefinitions + README of the four warehouse layers
+│   ├── clinical/                          ← drug classifier, episode detector, interaction checker
+│   │   ├── drug_classifier.py
+│   │   ├── drug_classes.json              ← canonical drug-class mapping
+│   │   ├── episode_detector.py
+│   │   ├── interaction_checker.py
+│   │   └── loader.py
+│   └── tests/                             ← library tests
+│
+├── data/                                  ← Production runtime data only
+│   ├── synthea-samples/
+│   │   ├── synthea-r4-individual/fhir/    ← 1,180 individual FHIR bundles (PRIMARY TEST DATA)
+│   │   └── sample-bulk-fhir-datasets-10-patients/
+│   ├── sof.db                             ← live SOF warehouse (gitignored, materialized on startup)
+│   ├── traces.db                          ← request traces (gitignored)
+│   └── patient-context/                   ← LLM session captures (gitignored)
 │
 ├── deploy/                                ← Docker Compose + nginx configs (LIVE)
 │   ├── docker-compose.prod.yml            ← production compose (api:8090, app:8091)
@@ -80,53 +116,47 @@ ehi-ignite-challenge/
 │   ├── nginx-app.conf                     ← SPA routing inside the app container
 │   └── nginx-host.conf                    ← Hetzner 2 host nginx (ehi.healthcaredataai.com)
 │
+├── scripts/                               ← Utility scripts (classify_patients, etc.)
+│
+├── docs/architecture/                     ← architecture docs
+│   ├── ATLAS-DATA-MODEL.md                ← architectural decisions for Atlas's data layer ⭐
+│   ├── CONTEXT-ENGINEERING.md             ← LLM context pipeline design ⭐
+│   ├── DATA-DEFINITIONS.md                ← data model reference ⭐
+│   ├── ECOSYSTEM-OVERVIEW.md              ← platform framing, full directory layout, build sequence
+│   ├── DEPLOYMENT.md                      ← Hetzner + Docker Compose deployment guide
+│   ├── tracing.md                         ← LLM observability — traces, spans, costs, Langfuse
+│   ├── FHIR-EXPLORER-DATA-REVIEW.md       ← original FHIR explorer purpose statement
+│   └── CONTEXT-PIPELINE.md                ← LLM context engineering (TODO)
+│
 ├── design/                                ← design system reference
 │   ├── README.md
 │   └── DESIGN.md                          ← Miro-inspired tokens, components, color roles
 │
-├── docs/architecture/                     ← architecture docs
-│   ├── ECOSYSTEM-OVERVIEW.md              ← platform framing, full directory layout, build sequence
-│   ├── DEPLOYMENT.md                      ← Hetzner + Docker Compose deployment guide
-│   ├── tracing.md                         ← LLM observability — traces, spans, costs, Langfuse
-│   └── CONTEXT-PIPELINE.md               ← LLM context engineering (TODO)
-│
-├── ideas/                                ← product specs (read before building)
+├── ideas/                                 ← product specs (read before building)
 │   ├── FEATURE-IDEAS.md
 │   ├── PATIENT-JOURNEY-APP.md             ← patient journey spec ⭐
 │   ├── FORMAT-AGNOSTIC-INGESTION.md       ← ingestion service spec ⭐
 │   └── PODCAST-INSIGHTS-FHIR-POSITIONING.md ← strategic positioning (on feature branch)
 │
-├── fhir_explorer/                         ← LEGACY Streamlit (internal reference tool — DO NOT EXTEND)
-│   ├── app.py                             ← run: streamlit run fhir_explorer/app.py
-│   ├── parser/                            ← SHARED PARSER — always import from here
-│   │   ├── bundle_parser.py
-│   │   ├── extractors.py
-│   │   └── models.py                      ← PatientRecord + all data models (source of truth)
-│   ├── catalog/
-│   │   ├── corpus.py
-│   │   ├── field_profiler.py
-│   │   └── single_patient.py
-│   └── views/                             ← reference implementations for React ports
-│
-├── patient-journey/                       ← LEGACY Streamlit (reference only — DO NOT EXTEND)
-│   ├── app.py
-│   ├── core/                              ← drug_classifier, episode_detector (migrate to api/core/)
-│   │   └── sql_on_fhir/                   ← SQL-on-FHIR v2 engine: ViewDefinition → SQLite ⭐
-│   │       ├── enrich.py                  ← extra columns spliced onto view rows at ingest (drug_class)
-│   │       ├── derived.py                 ← derived tables built after views flush (medication_episode)
-│   │       └── views/                     ← 5 ViewDefinitions + README of the three warehouse layers
-│   ├── views/                             ← reference implementations for React ports
-│   ├── CONTEXT-ENGINEERING.md             ← READ THIS — LLM context pipeline design ⭐
-│   └── DATA-DEFINITIONS.md               ← READ THIS — data model reference ⭐
-│
-├── research/
+├── research/                              ← committed research artifacts
 │   ├── SQL-ON-FHIR-REVIEW.md              ← SOF prototype review + run_sql tool surface addendum ⭐
 │   └── ehi-ignite.db                      ← 200-patient pitch snapshot (committed, 11 MB)
 │
-├── data/
-│   └── synthea-samples/
-│       ├── synthea-r4-individual/fhir/    ← 1,180 individual FHIR bundles (PRIMARY TEST DATA)
-│       └── sample-bulk-fhir-datasets-10-patients/
+│ ─── DEVELOPMENT ZONE ────────────────────────────────────────────
+│
+├── ehi-atlas/                             ← The dev surface for the Atlas data platform
+│   ├── CLAUDE.md                          ← Atlas-zone conventions ⭐
+│   ├── corpus/                            ← bench: _sources/ bronze/ silver/ gold/
+│   ├── ehi_atlas/                         ← in-development Python package (adapters/extract/harmonize)
+│   ├── notebooks/                         ← end-to-end pipeline notebooks
+│   ├── prototypes/                        ← josh-* (faithful ports) and atlas-* (Atlas experiments)
+│   ├── notes/                             ← josh-stack-deep-dive multi-session notes
+│   ├── scripts/, tests/, app/, docs/      ← Atlas-specific utility, tests, UI, design docs
+│
+├── archive/                               ← Frozen legacy code (do not extend)
+│   ├── README.md                          ← what's here, why it's frozen
+│   ├── fhir-explorer-streamlit/           ← original Streamlit data-review tool
+│   └── patient-journey-streamlit/         ← original Streamlit clinician journey app
 │
 ├── pyproject.toml                         ← UV root environment
 └── uv.lock
@@ -142,25 +172,25 @@ ehi-ignite-challenge/
 **Count:** 1,180 JSON files  
 **Format:** FHIR R4 Bundle (each file = one patient's complete record)
 
-These are the primary test files. The existing `fhir_explorer` parser reads these directly.
+These are the primary test files. The shared FHIR parser at `lib/fhir_parser/` reads these directly.
 
 ---
 
-## The Existing Parser (Always Reuse This)
+## The Shared Parser (Always Reuse This)
 
-The `fhir_explorer/parser/` module is stable and well-tested. **Do not rewrite it.** Always import from it — even in the new `api/` backend.
+The `lib/fhir_parser/` module is stable and well-tested. **Do not rewrite it.** Always import from `lib/` — `api/`, `ehi-atlas/`, and `scripts/` all share this code.
 
 ### Loading a patient
 
 ```python
-from fhir_explorer.parser.bundle_parser import parse_bundle
-from fhir_explorer.catalog.single_patient import compute_patient_stats
+from lib.fhir_parser.bundle_parser import parse_bundle
+from lib.patient_catalog.single_patient import compute_patient_stats
 
 record = parse_bundle("data/synthea-samples/synthea-r4-individual/fhir/Robert854_Botsford977_148ad83c-4dbc-4cb6-9334-44e6886f1e42.json")
 stats = compute_patient_stats(record)
 ```
 
-### Key data models (from `fhir_explorer/parser/models.py`)
+### Key data models (from `lib/fhir_parser/models.py`)
 
 | Class | What It Is |
 |---|---|
@@ -180,7 +210,7 @@ stats = compute_patient_stats(record)
 
 ### Backend (`api/`)
 - **Python 3.13**, FastAPI, uvicorn
-- Imports from `fhir_explorer.parser` for all FHIR parsing
+- Imports from `lib.fhir_parser`, `lib.patient_catalog`, `lib.sql_on_fhir`, `lib.clinical` for shared library code
 - Anthropic SDK (Claude Haiku for batch enrichment, Sonnet for NL search)
 - Run: `uv run uvicorn api.main:app --reload --port 8000`
 
@@ -207,9 +237,9 @@ stats = compute_patient_stats(record)
 
 ## Build Order
 
-1. **FastAPI backend** — stand up `api/`, wire in existing parser, expose patient list + data endpoints
+1. **FastAPI backend** — stand up `api/`, wire in shared parser from `lib/`, expose patient list + data endpoints
 2. **React shell** — routing, patient selector sidebar, layout
-3. **Explorer views** (React ports of fhir_explorer): Overview → Timeline → Encounter Hub → Field Profiler → Corpus
+3. **Explorer views** (React ports of the original Streamlit explorer in `archive/fhir-explorer-streamlit/`): Overview → Timeline → Encounter Hub → Field Profiler → Corpus
 4. **Patient Journey views**: Safety Panel → Medication Timeline → Conditions
 5. **Context engineering pipeline**: `temporal.py` → `batch_enrichment.py` → `context_builder.py`
 6. **NL Search**: streaming Claude Q&A with citations
@@ -223,21 +253,25 @@ stats = compute_patient_stats(record)
 
 | Doc | What It Is |
 |---|---|
-| `patient-journey/CONTEXT-ENGINEERING.md` | 5-layer LLM context pipeline design — read before building batch_enrichment or NL search |
-| `patient-journey/DATA-DEFINITIONS.md` | Full data model reference — encounter types, medication records, observation fields |
+| `docs/architecture/ATLAS-DATA-MODEL.md` | ⭐ **Read this first.** Architectural decisions for Atlas's data layer — FHIR R4 + USCDI as silver, bronze preserves native shape, LLM-authored mapping specs, hot path UI + cold path agent, Provenance graph as the wedge |
+| `docs/architecture/CONTEXT-ENGINEERING.md` | 5-layer LLM context pipeline design — read before building batch_enrichment or NL search |
+| `docs/architecture/DATA-DEFINITIONS.md` | Full data model reference — encounter types, medication records, observation fields |
 | `ideas/PATIENT-JOURNEY-APP.md` | Full product spec for the clinical journey app |
 | `docs/architecture/ECOSYSTEM-OVERVIEW.md` | Platform framing and complete directory layout |
 | `docs/architecture/DEPLOYMENT.md` | Hetzner + Docker Compose deployment guide |
 | `docs/architecture/tracing.md` | LLM observability — traces, spans, token/cost tracking, Langfuse |
 | `research/SQL-ON-FHIR-REVIEW.md` | SOF prototype "was it worth it" review **+ `run_sql` tool-surface addendum** (Phase 0) |
 | `research/README.md` | Pitch snapshot layout + regen command for `research/ehi-ignite.db` |
-| `patient-journey/core/sql_on_fhir/views/README.md` | Pure views, filtered subset views, enriched columns, derived tables/views — the four warehouse layers and how to extend each |
+| `lib/sql_on_fhir/views/README.md` | Pure views, filtered subset views, enriched columns, derived tables/views — the four warehouse layers and how to extend each |
+| `lib/README.md` | Shared library code — what's where, import conventions |
+| `ehi-atlas/CLAUDE.md` | Atlas development zone — corpus bench, prototypes, notes, promotion path |
+| `archive/README.md` | Frozen legacy Streamlit shells — what they were, what replaced them |
 | `design/DESIGN.md` | Miro-inspired design tokens + component guide |
 
 ### SQL-on-FHIR quick reference
 
-- **Engine:** `patient-journey/core/sql_on_fhir/` — ViewDefinition → SQLite (stable, reused everywhere)
-- **Four-layer warehouse** (see `patient-journey/core/sql_on_fhir/views/README.md`):
+- **Engine:** `lib/sql_on_fhir/` — ViewDefinition → SQLite (stable, reused everywhere)
+- **Four-layer warehouse** (see `lib/sql_on_fhir/views/README.md`):
   1. **Pure ViewDefinition tables** — JSON under `views/`. Standards-compliant projection from FHIR resources (`patient`, `condition`, `medication_request`, `observation`, `encounter`).
   2. **Filtered subset views** — still pure JSON, plus a view-level `where` clause that prunes rows at ingest. Same column shape as the "full" sibling so queries can swap one for the other. *(e.g. `condition_active` — only `active` / `recurrence` / `relapse` rows; P1.3)*
   3. **Enriched columns** — `enrich.py`. Extra columns spliced onto view rows at ingest time. *(e.g. `medication_request.drug_class`; P1.1)*
@@ -265,8 +299,9 @@ stats = compute_patient_stats(record)
 - **Python 3.13+**, fully typed with type hints
 - **FastAPI** for backend — follow `provider-search` repo patterns (routers, service layer, Pydantic models)
 - **React + TypeScript** — functional components, hooks, React Query for data fetching
-- **Imports:** always import from `fhir_explorer.parser` — never copy parser code
+- **Imports:** always import from `lib/` (`lib.fhir_parser`, `lib.patient_catalog`, `lib.sql_on_fhir`, `lib.clinical`) — never copy library code
 - **No hardcoded paths** — use `Path(__file__).parent` for relative paths in Python; `import.meta.env.VITE_API_URL` for API URL in React
+- **No sys.path hacks** — repo root is on `sys.path` when uvicorn runs from the project directory, which makes `lib.*`, `api.*` importable directly
 
 ---
 
@@ -279,4 +314,4 @@ stats = compute_patient_stats(record)
 
 ---
 
-*Last updated: April 5, 2026*
+*Last updated: May 3, 2026 — major refactor: lib/ extracted, fhir_explorer/ + patient-journey/ archived, data-research/ absorbed into ehi-atlas/*

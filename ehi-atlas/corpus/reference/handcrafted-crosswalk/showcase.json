@@ -1,0 +1,240 @@
+{
+  "version": "0.1.0",
+  "generated_at": "2026-04-29",
+  "scope": "Phase 1 showcase patient codes only. Covers conditions across Rhett759 (Synthea), the Cerner CCDA fixture, and synthesized artifacts. Phase 2 = full UMLS load (see BUILD-TRACKER D9).",
+  "notes": "umls_cui values are taken from the UMLS 2024AA release via public concept search. Entries marked TBD were not confidently resolved at build time and require UMLS license access to verify.",
+  "codes": [
+    {
+      "concept_label": "Hypertensive disorder",
+      "umls_cui": "C0020538",
+      "snomed_ct": {
+        "code": "38341003",
+        "display": "Hypertensive disorder, systemic arterial"
+      },
+      "icd_10_cm": {
+        "code": "I10",
+        "display": "Essential (primary) hypertension"
+      },
+      "rxnorm": null,
+      "notes": "Artifact 1 anchor — present in Cerner CCDA; merged with Synthea Condition via this CUI. SNOMED preferred term; ICD-10 I10 is the standard US billing code."
+    },
+    {
+      "concept_label": "Type 2 diabetes mellitus",
+      "umls_cui": "C0011860",
+      "snomed_ct": {
+        "code": "44054006",
+        "display": "Diabetes mellitus type 2"
+      },
+      "icd_10_cm": {
+        "code": "E11.9",
+        "display": "Type 2 diabetes mellitus without complications"
+      },
+      "rxnorm": null,
+      "notes": "Present in Cerner CCDA; used in cross-vendor condition merge."
+    },
+    {
+      "concept_label": "Prediabetes",
+      "umls_cui": "C0362046",
+      "snomed_ct": {
+        "code": "15777000",
+        "display": "Prediabetes"
+      },
+      "icd_10_cm": {
+        "code": "R73.09",
+        "display": "Other abnormal glucose"
+      },
+      "rxnorm": null,
+      "notes": "Active condition in Rhett759 Synthea record. ICD-10 R73.09 is commonly used when E11 not yet confirmed."
+    },
+    {
+      "concept_label": "Hyperlipidemia",
+      "umls_cui": "C0020473",
+      "snomed_ct": {
+        "code": "55822004",
+        "display": "Hyperlipidemia"
+      },
+      "icd_10_cm": {
+        "code": "E78.5",
+        "display": "Hyperlipidemia, unspecified"
+      },
+      "rxnorm": null,
+      "notes": "Active condition in Rhett759. Closely related to hypercholesterolemia (C0020443) in UMLS — see next entry."
+    },
+    {
+      "concept_label": "Hypercholesterolemia",
+      "umls_cui": "C0020443",
+      "snomed_ct": {
+        "code": "13644009",
+        "display": "Hypercholesterolemia"
+      },
+      "icd_10_cm": {
+        "code": "E78.00",
+        "display": "Pure hypercholesterolemia, unspecified"
+      },
+      "rxnorm": null,
+      "notes": "Cerner CCDA uses hypercholesterolemia terminology; Synthea records hyperlipidemia. Both map via UMLS CUI grouping in Artifact 1 harmonization."
+    },
+    {
+      "concept_label": "Chronic obstructive pulmonary disease",
+      "umls_cui": "C0024117",
+      "snomed_ct": {
+        "code": "13645005",
+        "display": "Chronic obstructive lung disease"
+      },
+      "icd_10_cm": {
+        "code": "J44.1",
+        "display": "Chronic obstructive pulmonary disease with (acute) exacerbation"
+      },
+      "rxnorm": null,
+      "notes": "Active condition in Rhett759. J44.1 represents exacerbation variant; J44.0 / J44.9 also plausible depending on encounter context."
+    },
+    {
+      "concept_label": "Non-small cell lung cancer",
+      "umls_cui": "C0007131",
+      "snomed_ct": {
+        "code": "254637007",
+        "display": "Non-small cell carcinoma of lung (disorder)"
+      },
+      "icd_10_cm": {
+        "code": "C34.10",
+        "display": "Malignant neoplasm of upper lobe, bronchus or lung, unspecified side"
+      },
+      "rxnorm": null,
+      "notes": "Primary active malignancy for Rhett759. TNM stage 1 variant per Synthea. ICD-10 C34.10 used for stage-1 presentation without laterality specified."
+    },
+    {
+      "concept_label": "Suspected lung cancer (situation)",
+      "umls_cui": "C0349530",
+      "snomed_ct": {
+        "code": "162573006",
+        "display": "Suspected lung cancer (situation)"
+      },
+      "icd_10_cm": {
+        "code": "Z12.2",
+        "display": "Encounter for screening for malignant neoplasm of respiratory organs"
+      },
+      "rxnorm": null,
+      "notes": "Synthea records a 'suspected lung cancer (situation)' condition code prior to confirmed NSCLC diagnosis. Used for temporal ordering in harmonization."
+    },
+    {
+      "concept_label": "TNM tumor staging — T1 (tumor size)",
+      "umls_cui": "C0475440",
+      "snomed_ct": {
+        "code": "1228882005",
+        "display": "American Joint Commission on Cancer cT1 (qualifier value)"
+      },
+      "icd_10_cm": null,
+      "rxnorm": null,
+      "notes": "TNM staging qualifier. ICD-10 does not have a direct T1 staging code; clinical stage is conveyed via the primary C34.x code."
+    },
+    {
+      "concept_label": "Anemia",
+      "umls_cui": "C0002871",
+      "snomed_ct": {
+        "code": "271737000",
+        "display": "Anemia (disorder)"
+      },
+      "icd_10_cm": {
+        "code": "D64.9",
+        "display": "Anemia, unspecified"
+      },
+      "rxnorm": null,
+      "notes": "Active condition in Rhett759. Hemoglobin (LOINC 718-7) is the key lab indicator. Common comorbidity in lung cancer."
+    },
+    {
+      "concept_label": "Chest tightness on exertion",
+      "umls_cui": "C0232292",
+      "snomed_ct": {
+        "code": "23924001",
+        "display": "Tight chest (finding)"
+      },
+      "icd_10_cm": {
+        "code": "R07.89",
+        "display": "Other chest pain"
+      },
+      "rxnorm": null,
+      "notes": "Artifact 4 planted free-text fact target. Phrase 'occasional chest tightness on exertion since approximately November of last year' in the synthesized SOAP note. Expected Layer 3 extraction → Condition (SNOMED 23924001)."
+    },
+    {
+      "concept_label": "Simvastatin",
+      "umls_cui": "C0074554",
+      "snomed_ct": {
+        "code": "387584000",
+        "display": "Simvastatin (substance)"
+      },
+      "icd_10_cm": null,
+      "rxnorm": {
+        "rxcui": "36567",
+        "display": "Simvastatin"
+      },
+      "notes": "Active medication in Rhett759 Synthea record. RxCUI 36567 is the ingredient-level concept. Artifact 2: Synthea shows simvastatin; Epic EHI projection shows atorvastatin — deliberate cross-source conflict."
+    },
+    {
+      "concept_label": "Atorvastatin",
+      "umls_cui": "C0286651",
+      "snomed_ct": {
+        "code": "372912004",
+        "display": "Atorvastatin (substance)"
+      },
+      "icd_10_cm": null,
+      "rxnorm": {
+        "rxcui": "83367",
+        "display": "Atorvastatin"
+      },
+      "notes": "Medication in the synthesized Epic EHI projection (Artifact 2 conflict). Both simvastatin and atorvastatin are HMG-CoA reductase inhibitors (statins) — clinically plausible cross-source discrepancy."
+    },
+    {
+      "concept_label": "Fluticasone/salmeterol inhaler",
+      "umls_cui": "C1700478",
+      "snomed_ct": {
+        "code": "407118002",
+        "display": "Fluticasone propionate and salmeterol xinafoate (product)"
+      },
+      "icd_10_cm": null,
+      "rxnorm": {
+        "rxcui": "896188",
+        "display": "fluticasone / salmeterol Inhalant Product"
+      },
+      "notes": "Active COPD/asthma inhaler for Rhett759 (Advair equivalent). RxCUI 896188 is a product-level concept; ingredient CUIs are fluticasone (C0083924) and salmeterol (C0074431)."
+    },
+    {
+      "concept_label": "Statin therapy (class concept)",
+      "umls_cui": "C0360714",
+      "snomed_ct": {
+        "code": "372912004",
+        "display": "Atorvastatin (substance)"
+      },
+      "icd_10_cm": null,
+      "rxnorm": {
+        "rxcui": "TBD",
+        "display": "HMG-CoA reductase inhibitor class"
+      },
+      "notes": "Cerner CCDA records a generic 'statin' medication. During Artifact 2 medication reconciliation, this is used as the class anchor to detect conflict between simvastatin and atorvastatin. SNOMED code here points to atorvastatin as the CCDA-side specific substance when identified."
+    },
+    {
+      "concept_label": "Creatinine measurement",
+      "umls_cui": "C0201975",
+      "snomed_ct": {
+        "code": "70901006",
+        "display": "Creatinine measurement (procedure)"
+      },
+      "icd_10_cm": null,
+      "rxnorm": null,
+      "notes": "Artifact 5 anchor — LOINC 2160-0 maps to this SNOMED procedure concept. Used for PDF↔FHIR creatinine dedup via UMLS CUI bridge."
+    },
+    {
+      "concept_label": "Dyslipidemia (synonym group)",
+      "umls_cui": "C0242339",
+      "snomed_ct": {
+        "code": "370992007",
+        "display": "Dyslipidemia (disorder)"
+      },
+      "icd_10_cm": {
+        "code": "E78.5",
+        "display": "Hyperlipidemia, unspecified"
+      },
+      "rxnorm": null,
+      "notes": "Broader synonym group for hyperlipidemia/hypercholesterolemia — used as fallback CUI if source uses 'dyslipidemia' terminology."
+    }
+  ]
+}

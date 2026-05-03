@@ -1,0 +1,67 @@
+PULMONOLOGY / THORACIC ONCOLOGY FOLLOW-UP
+Date: January 15, 2026
+Provider: Patricia Chen, MD — Pulmonary Medicine & Thoracic Oncology
+Location: Outpatient Pulmonary Clinic
+Patient: Rhett Rohan, DOB: [redacted], MRN: [redacted]
+
+---
+
+REASON FOR VISIT
+Follow-up, 6 weeks post-diagnosis of non-small cell lung cancer, right upper lobe, stage IA2 (T1bN0M0). Also reviewing COPD management and lipid status in the context of upcoming surgical planning.
+
+---
+
+SUBJECTIVE
+
+Mr. Rohan presents today in reasonably good spirits, though understandably anxious about the upcoming right upper lobectomy consult with thoracic surgery. He reports his energy has been roughly stable over the past month. He has been using his fluticasone/salmeterol inhaler consistently — about one puff twice daily — and feels his breathing is "about the same as before the diagnosis," which he characterizes as mildly effortful with brisk walking or stair climbing.
+
+He mentions that he first noticed occasional chest tightness on exertion since approximately November of last year. He describes it as a mild pressure sensation, not pleuritic, occurring mainly when he walks more than a few blocks or climbs two flights of stairs. It resolves quickly with rest. He has not had any exertional syncope, orthopnea, or worsening nocturnal dyspnea. He denies hemoptysis since the index bronchoscopy.
+
+He has been taking simvastatin 10 mg nightly without interruption and has no myalgias or GI complaints attributable to the statin. He has not started any new medications.
+
+He does not smoke and stopped over 15 years ago (40 pack-year history prior). No new environmental exposures. Diet has been modest; appetite somewhat reduced since diagnosis.
+
+---
+
+OBJECTIVE
+
+Vitals: BP 128/76, HR 74, RR 16, SpO2 96% on room air, weight 181 lbs (stable from November visit).
+
+General: Alert, oriented, mildly anxious but cooperative. No acute distress.
+HEENT: Unremarkable.
+Pulmonary: Mildly decreased breath sounds in the right upper zone consistent with prior bronchoscopic findings. No focal consolidation. No wheezing at rest. Mild expiratory prolongation throughout.
+Cardiovascular: Regular rate and rhythm, no murmurs. No peripheral edema.
+Abdomen: Soft, non-tender.
+Extremities: No clubbing. Mild trace lower extremity edema, unchanged.
+
+Pertinent studies: PET-CT from December 2025 confirmed a solitary 1.7 cm RUL lesion, SUVmax 4.1. No mediastinal or distant uptake. Pulmonary function tests from November 2025: FEV1 68% predicted, FVC 82% predicted, FEV1/FVC 0.63 — consistent with moderate obstructive pattern (COPD, GOLD Stage II). DLCO 61% predicted.
+
+---
+
+ASSESSMENT
+
+1. Non-small cell lung cancer, right upper lobe, clinical stage IA2 (T1bN0M0).
+   Surgically resectable. Proceeding toward thoracic surgery evaluation for video-assisted right upper lobectomy. Predicted post-operative FEV1 approximately 50% — borderline adequate; will formally assess surgical risk with thoracic surgery and anesthesia. No evidence of distant metastases on PET-CT.
+
+2. COPD, moderate (GOLD Stage II).
+   Currently managed on fluticasone/salmeterol 250/50 inhaler. Exertional dyspnea is at baseline for his degree of obstruction. The chest tightness on exertion, present since November, is most consistent with ventilatory limitation from obstructive physiology in the setting of the underlying lung mass. Cardiac etiology has not been formally ruled out; will order resting ECG and refer for cardiology pre-op clearance.
+
+3. Hyperlipidemia.
+   On simvastatin 10 mg, which he tolerates well. Most recent lipid panel from September 2025: LDL 112 mg/dL — adequate control for primary prevention. No dose adjustment at this time. Will revisit post-operatively.
+
+---
+
+PLAN
+
+1. Referral to thoracic surgery (Dr. Henderson, per patient preference) for VATS lobectomy evaluation. Surgery consult requested by January 22.
+2. Resting 12-lead ECG ordered today; referral to cardiology for pre-operative cardiac clearance.
+3. Continue fluticasone/salmeterol 250/50 inhaler BID without interruption through the perioperative period.
+4. Continue simvastatin 10 mg nightly. Hold statin 48h before planned surgical date per anesthesia protocol — patient instructed.
+5. Repeat spirometry in 6 weeks if surgical planning is delayed.
+6. Patient counseled on lung resection risk-benefit in the context of moderate COPD and overall good functional status. He understands the plan and agrees to proceed with surgical evaluation.
+
+Return to clinic in 6 weeks or sooner if respiratory symptoms worsen, new hemoptysis, or significant weight loss.
+
+Electronically signed: Patricia Chen, MD
+Pulmonary Medicine & Thoracic Oncology
+January 15, 2026, 10:32 AM

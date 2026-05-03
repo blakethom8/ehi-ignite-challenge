@@ -1,0 +1,89 @@
+{
+  "resourceType": "DocumentReference",
+  "id": "synthesized-progress-note-rhett759-2026-01-15",
+  "meta": {
+    "source": "constructed://synthesized-clinical-note/2026-01-15",
+    "tag": [
+      {
+        "system": "https://ehi-atlas.example/fhir/CodeSystem/source-tag",
+        "code": "synthesized",
+        "display": "Synthesized demo artifact"
+      },
+      {
+        "system": "https://ehi-atlas.example/fhir/CodeSystem/lifecycle",
+        "code": "constructed",
+        "display": "Constructed for EHI Atlas showcase"
+      }
+    ]
+  },
+  "status": "current",
+  "type": {
+    "coding": [
+      {
+        "system": "http://loinc.org",
+        "code": "11506-3",
+        "display": "Progress note"
+      }
+    ]
+  },
+  "category": [
+    {
+      "coding": [
+        {
+          "system": "http://hl7.org/fhir/us/core/CodeSystem/us-core-documentreference-category",
+          "code": "clinical-note",
+          "display": "Clinical Note"
+        }
+      ]
+    }
+  ],
+  "subject": {
+    "reference": "Patient/Rhett759_Rohan584_cd64ff18-472b-4d58-b73c-2a04a2bf3e61",
+    "display": "Rhett759 Rohan584"
+  },
+  "date": "2026-01-15T10:30:00Z",
+  "author": [
+    {
+      "display": "Patricia Chen, MD — Pulmonary Medicine & Thoracic Oncology"
+    }
+  ],
+  "description": "Pulmonology / Thoracic Oncology Follow-up Progress Note — NSCLC stage IA2 + COPD follow-up, 6 weeks post-diagnosis",
+  "content": [
+    {
+      "attachment": {
+        "contentType": "text/plain",
+        "url": "Binary/synthesized-progress-note-rhett759-2026-01-15-binary",
+        "title": "Pulmonology Follow-up Progress Note",
+        "creation": "2026-01-15"
+      },
+      "format": {
+        "system": "http://ihe.net/fhir/ValueSet/IHE.FormatCode.codesystem",
+        "code": "urn:ihe:iti:xds:2013:referral",
+        "display": "XDS Referral"
+      }
+    }
+  ],
+  "context": {
+    "period": {
+      "start": "2026-01-15"
+    },
+    "practiceSetting": {
+      "coding": [
+        {
+          "system": "http://snomed.info/sct",
+          "code": "418112009",
+          "display": "Pulmonary medicine"
+        }
+      ]
+    },
+    "facilityType": {
+      "coding": [
+        {
+          "system": "http://snomed.info/sct",
+          "code": "440655000",
+          "display": "Outpatient environment"
+        }
+      ]
+    }
+  }
+}

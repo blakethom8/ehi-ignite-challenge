@@ -27,6 +27,7 @@ from api.routers import traces
 from api.routers import classifications
 from api.routers import patient_context
 from api.routers import aggregation
+from api.routers import cursor_internal_tools
 
 _ENVIRONMENT = os.getenv("ENVIRONMENT", "development").strip().lower()
 _IS_PRODUCTION = _ENVIRONMENT in {"prod", "production"}
@@ -99,6 +100,7 @@ app.include_router(traces.router, prefix="/api")
 app.include_router(classifications.router, prefix="/api")
 app.include_router(patient_context.router, prefix="/api")
 app.include_router(aggregation.router, prefix="/api")
+app.include_router(cursor_internal_tools.router, prefix="/api")
 
 
 @app.get("/api/health")

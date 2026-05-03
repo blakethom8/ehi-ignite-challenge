@@ -13,8 +13,22 @@ services:
       - PROVIDER_ASSISTANT_MAX_RESPONSE_TOKENS=2000
       - CORS_ALLOWED_ORIGINS=https://ehi.healthcaredataai.com
       - ALLOWED_HOSTS=ehi.healthcaredataai.com
+      - CURSOR_SIDECAR_URL=http://cursor-sidecar:3040
     volumes:
       - ../data:/app/data
+    restart: unless-stopped
+    depends_on:
+      - cursor-sidecar
+    networks:
+      - personal-website_default
+
+  cursor-sidecar:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.cursor-sidecar
+    env_file: ../.env
+    environment:
+      - CURSOR_SIDECAR_PORT=3040
     restart: unless-stopped
     networks:
       - personal-website_default

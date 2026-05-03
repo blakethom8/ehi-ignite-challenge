@@ -38,7 +38,7 @@ from view_definition import ViewDefinition  # type: ignore  # noqa: E402
 # Prior approach
 REPO_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO_ROOT))
-from fhir_explorer.parser.bundle_parser import parse_bundle  # type: ignore  # noqa: E402
+from lib.fhir_parser.bundle_parser import parse_bundle  # type: ignore  # noqa: E402
 
 DEFAULT_BUNDLE_DIR = REPO_ROOT / "data" / "synthea-samples" / "synthea-r4-individual" / "fhir"
 VIEWS_DIR = _THIS_DIR / "views"

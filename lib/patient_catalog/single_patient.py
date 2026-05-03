@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from collections import defaultdict
 
-from ..parser.models import PatientRecord, ObservationRecord
+from ..fhir_parser.models import PatientRecord, ObservationRecord
 
 
 # ---------------------------------------------------------------------------

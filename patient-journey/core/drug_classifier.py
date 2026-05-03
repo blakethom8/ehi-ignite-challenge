@@ -12,7 +12,7 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from fhir_explorer.parser.models import MedicationRecord
+from lib.fhir_parser.models import MedicationRecord
 
 
 # ---------------------------------------------------------------------------

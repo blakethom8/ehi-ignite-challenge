@@ -9,7 +9,7 @@ _APP_DIR = str(Path(__file__).parent.parent)
 sys.path.insert(0, _REPO_ROOT)
 sys.path.insert(0, _APP_DIR)
 
-from fhir_explorer.parser.models import MedicationRecord
+from lib.fhir_parser.models import MedicationRecord
 from core.interaction_checker import check_interactions, DrugInteraction
 from core.drug_classifier import DrugClassifier
 

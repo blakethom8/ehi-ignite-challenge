@@ -12,7 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
-from fhir_explorer.parser.models import (
+from lib.fhir_parser.models import (
     ConditionRecord,
     EncounterRecord,
     MedicationRecord,

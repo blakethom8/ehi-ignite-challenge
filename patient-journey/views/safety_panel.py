@@ -12,8 +12,8 @@ from datetime import datetime
 
 import streamlit as st
 
-from fhir_explorer.parser.models import PatientRecord
-from fhir_explorer.catalog.single_patient import PatientStats
+from lib.fhir_parser.models import PatientRecord
+from lib.patient_catalog.single_patient import PatientStats
 
 from core.drug_classifier import DrugClassifier, SafetyFlag
 

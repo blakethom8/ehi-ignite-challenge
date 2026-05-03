@@ -18,8 +18,8 @@ def _naive(dt: datetime | None) -> datetime | None:
         return None
     return dt.replace(tzinfo=None)
 
-from fhir_explorer.parser.models import PatientRecord
-from fhir_explorer.catalog.single_patient import PatientStats
+from lib.fhir_parser.models import PatientRecord
+from lib.patient_catalog.single_patient import PatientStats
 
 from core.episode_detector import ConditionEpisode, detect_condition_episodes
 

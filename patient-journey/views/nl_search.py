@@ -19,8 +19,8 @@ from dataclasses import dataclass, field
 
 import streamlit as st
 
-from fhir_explorer.parser.models import PatientRecord
-from fhir_explorer.catalog.single_patient import PatientStats
+from lib.fhir_parser.models import PatientRecord
+from lib.patient_catalog.single_patient import PatientStats
 
 from core.drug_classifier import DrugClassifier, ClassifiedMedication
 from core.episode_detector import detect_medication_episodes, detect_condition_episodes

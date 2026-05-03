@@ -24,8 +24,8 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "patient-journey"))
 
-from fhir_explorer.parser.bundle_parser import parse_bundle
-from fhir_explorer.catalog.single_patient import compute_patient_stats
+from lib.fhir_parser.bundle_parser import parse_bundle
+from lib.patient_catalog.single_patient import compute_patient_stats
 from core.drug_classifier import DrugClassifier
 
 # ---------------------------------------------------------------------------

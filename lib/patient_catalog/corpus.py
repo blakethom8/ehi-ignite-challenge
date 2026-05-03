@@ -15,8 +15,8 @@ from dataclasses import dataclass, field, asdict
 from pathlib import Path
 from typing import Callable
 
-from ..parser.bundle_parser import parse_bundle
-from ..catalog.single_patient import compute_patient_stats
+from ..fhir_parser.bundle_parser import parse_bundle
+from ..patient_catalog.single_patient import compute_patient_stats
 
 
 CACHE_FILE = Path(__file__).parent / ".corpus_cache.json"

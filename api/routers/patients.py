@@ -273,7 +273,7 @@ def _cached_patient_list() -> list[PatientListItem]:
     Uses the corpus cache (instant if already built, ~5-10s first time).
     """
     try:
-        from fhir_explorer.catalog.corpus import load_corpus
+        from lib.patient_catalog.corpus import load_corpus
         catalog = load_corpus(data_dir())
         return [
             PatientListItem(

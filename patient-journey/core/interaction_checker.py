@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from fhir_explorer.parser.models import MedicationRecord
+from lib.fhir_parser.models import MedicationRecord
 
 from core.drug_classifier import DrugClassifier
 

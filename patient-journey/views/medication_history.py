@@ -10,8 +10,8 @@ from datetime import datetime, timezone
 import pandas as pd
 import streamlit as st
 
-from fhir_explorer.parser.models import PatientRecord
-from fhir_explorer.catalog.single_patient import PatientStats
+from lib.fhir_parser.models import PatientRecord
+from lib.patient_catalog.single_patient import PatientStats
 
 from core.drug_classifier import DrugClassifier
 from core.episode_detector import MedicationEpisode, detect_medication_episodes
@@ -73,7 +73,7 @@ def render(record: PatientRecord, stats: PatientStats) -> None:
         if status_filter == "Historical only" and ep.is_active:
             continue
 
-        from fhir_explorer.parser.models import MedicationRecord
+        from lib.fhir_parser.models import MedicationRecord
         dummy = MedicationRecord(display=ep.display, rxnorm_code=ep.rxnorm_code)
         classes = classifier.classify_medication(dummy)
 

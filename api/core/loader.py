@@ -17,9 +17,9 @@ _REPO_ROOT = Path(__file__).parent.parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from fhir_explorer.parser.bundle_parser import parse_bundle
-from fhir_explorer.catalog.single_patient import compute_patient_stats, PatientStats
-from fhir_explorer.parser.models import PatientRecord
+from lib.fhir_parser.bundle_parser import parse_bundle
+from lib.patient_catalog.single_patient import compute_patient_stats, PatientStats
+from lib.fhir_parser.models import PatientRecord
 
 _DATA_DIR = _REPO_ROOT / "data" / "synthea-samples" / "synthea-r4-individual" / "fhir"
 

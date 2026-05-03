@@ -23,8 +23,8 @@ def _naive(dt: datetime | None) -> datetime | None:
         return None
     return dt.replace(tzinfo=None)
 
-from fhir_explorer.parser.models import PatientRecord
-from fhir_explorer.catalog.single_patient import PatientStats
+from lib.fhir_parser.models import PatientRecord
+from lib.patient_catalog.single_patient import PatientStats
 
 from core.drug_classifier import DrugClassifier
 from core.episode_detector import MedicationEpisode, detect_medication_episodes
@@ -58,7 +58,7 @@ _ENCOUNTER_MARKERS: dict[str, dict] = {
 
 def _get_bar_color(episode: MedicationEpisode, classifier: DrugClassifier) -> str:
     """Pick a color based on the medication's drug class."""
-    from fhir_explorer.parser.models import MedicationRecord
+    from lib.fhir_parser.models import MedicationRecord
     dummy = MedicationRecord(
         display=episode.display,
         rxnorm_code=episode.rxnorm_code,

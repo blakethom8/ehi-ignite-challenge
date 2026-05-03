@@ -12,8 +12,8 @@ import streamlit as st
 # Add parent dir to path so relative imports work when run via streamlit
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from fhir_explorer.parser.bundle_parser import parse_bundle
-from fhir_explorer.catalog.single_patient import compute_patient_stats
+from lib.fhir_parser.bundle_parser import parse_bundle
+from lib.patient_catalog.single_patient import compute_patient_stats
 
 # ---------------------------------------------------------------------------
 # Page config

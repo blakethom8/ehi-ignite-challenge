@@ -9,9 +9,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fhir_explorer.parser.bundle_parser import parse_bundle
-from fhir_explorer.parser.models import PatientRecord
-from fhir_explorer.catalog.single_patient import PatientStats, compute_patient_stats
+from lib.fhir_parser.bundle_parser import parse_bundle
+from lib.fhir_parser.models import PatientRecord
+from lib.patient_catalog.single_patient import PatientStats, compute_patient_stats
 
 
 # Default data directory — Synthea individual patient bundles

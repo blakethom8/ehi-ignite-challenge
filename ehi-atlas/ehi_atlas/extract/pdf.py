@@ -128,7 +128,7 @@ class VisionBackend(Protocol):
         pdf_bytes: bytes,
         system_prompt: str,
         schema_json: dict[str, Any],
-        max_tokens: int = 4096,
+        max_tokens: int = 16384,
     ) -> dict[str, Any]:
         """Run extraction; return the structured tool-call input as a dict."""
         ...
@@ -164,7 +164,7 @@ class AnthropicBackend:
         pdf_bytes: bytes,
         system_prompt: str,
         schema_json: dict[str, Any],
-        max_tokens: int = 4096,
+        max_tokens: int = 16384,
     ) -> dict[str, Any]:
         pdf_b64 = base64.standard_b64encode(pdf_bytes).decode("utf-8")
 
@@ -222,7 +222,24 @@ class AnthropicBackend:
                 f"was rejected. Try lowering max_tokens or simplifying the schema."
             )
 
-        return tool_call.input  # already a dict from the SDK
+        raw_input = tool_call.input  # already a dict from the SDK
+
+        # Detect truncated responses. When Claude hits max_tokens partway
+        # through writing the tool_use input, the SDK still surfaces the
+        # block but its `input` is partial — sometimes empty, sometimes
+        # missing the discriminated-union branch we need. Surface a
+        # specific, actionable error rather than letting Pydantic raise
+        # an opaque "Field required" five frames later.
+        if message.stop_reason == "max_tokens":
+            raise RuntimeError(
+                f"Model response truncated at max_tokens={max_tokens}. "
+                f"The tool_use input is incomplete — Pydantic validation "
+                f"would fail on missing required fields. Re-run with a "
+                f"larger max_tokens (e.g. 32000) or split the PDF into "
+                f"smaller chunks. Partial input keys: {list(raw_input.keys()) if isinstance(raw_input, dict) else type(raw_input).__name__}"
+            )
+
+        return raw_input
 
 
 class GoogleAIStudioBackend:
@@ -275,7 +292,7 @@ class GoogleAIStudioBackend:
         pdf_bytes: bytes,
         system_prompt: str,
         schema_json: dict[str, Any],
-        max_tokens: int = 4096,
+        max_tokens: int = 16384,
     ) -> dict[str, Any]:
         page_images = self._rasterize(pdf_bytes)
 

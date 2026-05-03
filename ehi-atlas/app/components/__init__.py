@@ -15,7 +15,11 @@ try:
     _REPO_ROOT = _Path(__file__).resolve().parents[3]
     _ENV_FILE = _REPO_ROOT / ".env"
     if _ENV_FILE.exists():
-        _load_dotenv(_ENV_FILE, override=False)
+        # override=True: parent processes (Claude Code launcher, shell rc, etc)
+        # sometimes inject empty-string ANTHROPIC_API_KEY / GOOGLE_API_KEY,
+        # and override=False would treat that as "already set" and skip the
+        # real value in .env. The .env is canonical for this project.
+        _load_dotenv(_ENV_FILE, override=True)
 except ImportError:
     # python-dotenv not installed — caller must export env vars themselves
     pass

@@ -9,6 +9,7 @@ data/synthea-samples/sample-bulk-fhir-datasets-10-patients/log.ndjson
 
 # Node (Cursor sidecar)
 cursor-sidecar/node_modules/
+cursor-sidecar/dist/
 
 # Python
 __pycache__/

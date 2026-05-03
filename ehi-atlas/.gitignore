@@ -1,6 +1,9 @@
 # --- Privacy gate (non-negotiable) -----------------------------------
 # Real personal source data NEVER committed in raw form.
 # Only redacted/ subdirectories are committable.
+corpus/_sources/blake-cedars/
+corpus/_sources/devon-cedars/
+corpus/_sources/cedars-portal-pdfs/
 corpus/_sources/blake-cedars/raw/
 corpus/_sources/devon-cedars/raw/
 corpus/_sources/cedars-portal-pdfs/raw/
@@ -22,8 +25,13 @@ corpus/gold/
 corpus/reference/umls/
 corpus/reference/loinc/
 corpus/reference/snomed/
+corpus/reference/rxnorm/
 # Keep the version-pinning manifest
 !corpus/reference/VERSIONS.md
+
+# External public source clones are reproducible from their pinned SHAs.
+corpus/_sources/josh-ccdas/raw/
+corpus/_sources/josh-epic-ehi/raw/
 
 # --- Vision extraction cache -----------------------------------------
 ehi_atlas/extract/.cache/

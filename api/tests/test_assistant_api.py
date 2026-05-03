@@ -134,6 +134,40 @@ class ProviderAssistantApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 503)
         self.assertIn("ANTHROPIC_API_KEY", response.json().get("detail", ""))
 
+    def test_assistant_chat_cursor_missing_sidecar_falls_back(self) -> None:
+        with patched_env(
+            {
+                "PROVIDER_ASSISTANT_MODE": "cursor",
+                "PROVIDER_ASSISTANT_FALLBACK_TO_DETERMINISTIC": "true",
+                "CURSOR_SIDECAR_URL": "",
+            }
+        ):
+            response = self.client.post("/api/assistant/chat", json=self._payload())
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["engine"], "deterministic-fallback")
+
+    def test_assistant_chat_cursor_missing_sidecar_no_fallback_returns_503(self) -> None:
+        with patched_env(
+            {
+                "PROVIDER_ASSISTANT_MODE": "cursor",
+                "PROVIDER_ASSISTANT_FALLBACK_TO_DETERMINISTIC": "false",
+                "CURSOR_SIDECAR_URL": "",
+            }
+        ):
+            response = self.client.post("/api/assistant/chat", json=self._payload())
+
+        self.assertEqual(response.status_code, 503)
+        self.assertIn("CURSOR_SIDECAR_URL", response.json().get("detail", ""))
+
+    def test_internal_cursor_tools_requires_secret(self) -> None:
+        with patched_env({"CURSOR_INTERNAL_TOOL_SECRET": "test-secret"}):
+            r = self.client.post(
+                "/api/internal/cursor-tools/run-sql",
+                json={"query": "select 1", "limit": 5},
+            )
+        self.assertEqual(r.status_code, 401)
+
     def test_traces_list_and_detail_endpoints(self) -> None:
         # Generate at least one assistant request so traces can exist when tracing is enabled.
         with patched_env(

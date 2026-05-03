@@ -1,7 +1,7 @@
 """
 Provider assistant mode selector.
 
-Chooses deterministic or Anthropic Agent SDK runtime based on environment.
+Chooses deterministic, Anthropic Agent SDK, Cursor sidecar, or context runtime based on environment.
 """
 
 from __future__ import annotations
@@ -62,9 +62,11 @@ def answer_provider_question(
     question: str,
     history: list[dict[str, str]] | None,
     stance: str,
+    context_packages: list[dict[str, str]] | None = None,
     model_override: str | None = None,
     mode_override: str | None = None,
     max_tokens_override: int | None = None,
+    cursor_model: str | None = None,
 ) -> AssistantResult:
     """
     Unified provider-assistant entry point.
@@ -73,11 +75,13 @@ def answer_provider_question(
     - deterministic (default) — rule-based keyword matching, no LLM
     - context (recommended) — clean context + single Claude call (~3-5s)
     - anthropic (alias: agent_sdk) — multi-turn agent loop (~15-30s)
+    - cursor — Cursor `@cursor/sdk` via Node sidecar
     """
     if not _client_overrides_enabled():
         model_override = None
         mode_override = None
         max_tokens_override = None
+        cursor_model = None
     elif max_tokens_override is not None:
         max_tokens_override = min(max_tokens_override, _max_response_tokens())
 
@@ -93,6 +97,7 @@ def answer_provider_question(
                 patient_id=patient_id,
                 question=question,
                 history=history,
+                context_packages=context_packages,
                 stance=stance,
                 model_override=model_override,
                 max_tokens_override=max_tokens_override,
@@ -103,6 +108,50 @@ def answer_provider_question(
             if not fallback_enabled:
                 raise RuntimeError(f"Context mode failed: {exc}") from exc
             LOGGER.warning("Context mode failed (%s). Falling back to deterministic.", str(exc))
+            fallback = answer_deterministic(
+                patient_id=patient_id,
+                question=question,
+                history=history,
+                stance=stance,
+            )
+            fallback.engine = "deterministic-fallback"
+            _record_trace_metadata(fallback)
+            return fallback
+
+    if mode in {"cursor", "cursor_sdk"}:
+        try:
+            from api.core.provider_assistant_cursor import (
+                CursorSidecarConfigurationError,
+                CursorSidecarExecutionError,
+                answer_with_cursor_sidecar,
+            )
+
+            result = answer_with_cursor_sidecar(
+                patient_id=patient_id,
+                question=question,
+                history=history,
+                stance=stance,
+                cursor_model=cursor_model,
+            )
+            _record_trace_metadata(result)
+            return result
+        except (CursorSidecarConfigurationError, CursorSidecarExecutionError) as exc:
+            if not fallback_enabled:
+                raise
+            LOGGER.warning("Cursor sidecar mode failed (%s). Falling back to deterministic.", str(exc))
+            fallback = answer_deterministic(
+                patient_id=patient_id,
+                question=question,
+                history=history,
+                stance=stance,
+            )
+            fallback.engine = "deterministic-fallback"
+            _record_trace_metadata(fallback)
+            return fallback
+        except Exception as exc:  # pragma: no cover
+            if not fallback_enabled:
+                raise RuntimeError(f"Cursor sidecar mode failed: {exc}") from exc
+            LOGGER.exception("Unexpected Cursor sidecar failure. Falling back to deterministic mode.")
             fallback = answer_deterministic(
                 patient_id=patient_id,
                 question=question,

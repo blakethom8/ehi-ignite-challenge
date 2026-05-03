@@ -67,7 +67,31 @@ INSTRUCTIONS:
 - At the end, suggest 2-3 follow-up questions the surgeon should consider.
 
 {context}
+
+{context_packages}
 """
+
+
+def _format_context_packages(context_packages: list[dict[str, str]] | None) -> str:
+    if not context_packages:
+        return ""
+
+    sections = [
+        "ATTACHED CONTEXT PACKAGES:",
+        "The clinician attached the following reusable context packages for this chat session. Use them as review instructions and workflow guidance, but do not treat them as patient-specific chart facts.",
+    ]
+    for package in context_packages[:8]:
+        title = str(package.get("title") or "Untitled package").strip()
+        package_type = str(package.get("type") or "Context").strip()
+        summary = str(package.get("summary") or "").strip()
+        instructions = str(package.get("instructions") or "").strip()
+        sections.append(
+            f"\n## {title}\n"
+            f"Type: {package_type}\n"
+            f"Summary: {summary}\n"
+            f"Instructions:\n{instructions}"
+        )
+    return "\n".join(sections).strip()
 
 
 def answer_with_context(
@@ -75,6 +99,7 @@ def answer_with_context(
     patient_id: str,
     question: str,
     history: list[dict[str, str]] | None = None,
+    context_packages: list[dict[str, str]] | None = None,
     stance: str = "opinionated",
     model_override: str | None = None,
     max_tokens_override: int | None = None,
@@ -113,6 +138,7 @@ def answer_with_context(
     system_prompt = _SYSTEM_TEMPLATE.format(
         stance=stance,
         context=context_prompt,
+        context_packages=_format_context_packages(context_packages),
     )
 
     messages = []

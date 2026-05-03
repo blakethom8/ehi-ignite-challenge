@@ -640,12 +640,23 @@ class ProviderAssistantCitation(BaseModel):
     event_date: datetime | None = None
 
 
+class ProviderAssistantContextPackage(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(min_length=1, max_length=80)
+    title: str = Field(min_length=1, max_length=120)
+    type: str = Field(min_length=1, max_length=80)
+    summary: str = Field(min_length=1, max_length=500)
+    instructions: str = Field(min_length=1, max_length=1500)
+
+
 class ProviderAssistantRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     patient_id: str = Field(min_length=1, max_length=200)
     question: str = Field(min_length=1, max_length=4000)
     history: list[ProviderAssistantTurn] = Field(default_factory=list, max_length=12)
+    context_packages: list[ProviderAssistantContextPackage] = Field(default_factory=list, max_length=8)
     stance: Literal["opinionated", "balanced"] = "opinionated"
     # Per-request overrides (optional — falls back to env config)
     model: Literal[
@@ -663,8 +674,20 @@ class ProviderAssistantRequest(BaseModel):
         "anthropic_agent",
         "agent_sdk",
         "anthropic_sdk",
+        "cursor",
+        "cursor_sdk",
     ] | None = None
     max_tokens: int | None = Field(default=None, ge=128, le=4000)
+    # Cursor sidecar model id (e.g. composer-2). Validated against CURSOR_SIDECAR_MODEL_ALLOWLIST when set.
+    cursor_model: str | None = Field(default=None, max_length=120)
+
+    @field_validator("cursor_model", mode="before")
+    @classmethod
+    def _normalize_cursor_model(cls, value: object) -> str | None:
+        if value is None:
+            return None
+        s = str(value).strip()
+        return s or None
 
     @field_validator("question")
     @classmethod

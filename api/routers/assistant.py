@@ -6,6 +6,7 @@ import json
 
 from fastapi import APIRouter, HTTPException
 
+from api.core.provider_assistant_cursor import CursorSidecarConfigurationError, CursorSidecarExecutionError
 from api.core.provider_assistant_service import answer_provider_question
 from api.core.tracing import get_current_trace, SpanKind
 from api.models import (
@@ -42,6 +43,29 @@ def _max_response_tokens() -> int:
     return min(max(value, 128), 4000)
 
 
+def _cursor_sidecar_model_options() -> list[dict[str, str]]:
+    raw = (os.getenv("CURSOR_SIDECAR_MODEL_ALLOWLIST") or "").strip()
+    if raw:
+        return [
+            {
+                "id": m.strip(),
+                "label": m.strip(),
+                "description": "Allowlisted Cursor sidecar model",
+            }
+            for m in raw.split(",")
+            if m.strip()
+        ]
+    dm = (os.getenv("CURSOR_SIDECAR_MODEL") or "composer-2").strip() or "composer-2"
+    seeds = ["composer-2", "auto", dm]
+    seen: set[str] = set()
+    out: list[dict[str, str]] = []
+    for m in seeds:
+        if m not in seen:
+            seen.add(m)
+            out.append({"id": m, "label": m, "description": "Cursor @cursor/sdk model id"})
+    return out
+
+
 @router.get("/settings")
 def get_assistant_settings() -> dict:
     """Return current assistant configuration and available options."""
@@ -49,7 +73,7 @@ def get_assistant_settings() -> dict:
         "current": {
             "mode": os.getenv("PROVIDER_ASSISTANT_MODE", "deterministic"),
             "model": os.getenv("PROVIDER_ASSISTANT_MODEL", "claude-sonnet-4-5"),
-            "max_tokens": 1500,
+            "max_tokens": _max_response_tokens(),
         },
         "client_overrides_enabled": _client_overrides_enabled(),
         "max_tokens_limit": _max_response_tokens(),
@@ -57,6 +81,7 @@ def get_assistant_settings() -> dict:
             {"id": "deterministic", "label": "Deterministic", "description": "Rule-based, instant (<100ms), no LLM cost"},
             {"id": "context", "label": "Context (Recommended)", "description": "Single Claude call with pre-built clinical context"},
             {"id": "anthropic", "label": "Agent SDK", "description": "Multi-turn agentic loop with tool calls (slowest)"},
+            {"id": "cursor", "label": "Cursor sidecar", "description": "Cursor @cursor/sdk local agent via Node sidecar"},
         ],
         "available_models": [
             {"id": "claude-haiku-4-5", "label": "Haiku 4.5", "description": "Fastest, good for quick Q&A", "speed": "fast"},
@@ -64,6 +89,11 @@ def get_assistant_settings() -> dict:
             {"id": "claude-sonnet-4-6", "label": "Sonnet 4.6", "description": "Latest Sonnet, best quality/speed ratio", "speed": "medium"},
             {"id": "claude-opus-4-5", "label": "Opus 4.5", "description": "Most capable, slowest", "speed": "slow"},
         ],
+        "cursor_sidecar": {
+            "sidecar_url_configured": bool((os.getenv("CURSOR_SIDECAR_URL") or "").strip()),
+            "default_model": (os.getenv("CURSOR_SIDECAR_MODEL") or "composer-2").strip() or "composer-2",
+            "available_models": _cursor_sidecar_model_options(),
+        },
     }
 
 
@@ -95,8 +125,10 @@ def _build_trace_detail() -> TraceDetail | None:
                 except (json.JSONDecodeError, AttributeError):
                     pass
 
-        # Capture tool and retrieval spans
-        if span.kind in (SpanKind.TOOL, SpanKind.RETRIEVAL):
+        # Capture tool, retrieval, and Cursor sidecar LLM invoke spans
+        if span.kind in (SpanKind.TOOL, SpanKind.RETRIEVAL) or (
+            span.kind == SpanKind.LLM and span.name == "cursor_sidecar_invoke"
+        ):
             # Build human-readable input summary
             input_summary = ""
             if span.input_data:
@@ -110,6 +142,12 @@ def _build_trace_detail() -> TraceDetail | None:
                         input_summary = "Fetching patient safety + chart snapshot"
                     elif span.name == "baseline_evidence":
                         input_summary = f"Building baseline for: {data.get('question', '')}"
+                    elif span.name == "cursor_baseline_evidence":
+                        input_summary = f"Cursor baseline for: {data.get('question', '')}"
+                    elif span.name == "cursor_sidecar_invoke":
+                        input_summary = (
+                            f"model={data.get('model', '')} patient={data.get('patient_id', '')}"
+                        )
                     else:
                         input_summary = json.dumps(data)[:200]
                 except (json.JSONDecodeError, AttributeError):
@@ -125,10 +163,17 @@ def _build_trace_detail() -> TraceDetail | None:
                         trunc = " (truncated)" if data.get("truncated") else ""
                         err = data.get("error")
                         output_summary = f"Error: {err}" if err else f"{rc} rows returned{trunc}"
-                    elif span.name in ("query_chart_evidence", "get_patient_snapshot", "baseline_evidence"):
+                    elif span.name in (
+                        "query_chart_evidence",
+                        "get_patient_snapshot",
+                        "baseline_evidence",
+                        "cursor_baseline_evidence",
+                    ):
                         fc = data.get("fact_count", "?")
                         cc = data.get("citation_count", "?")
                         output_summary = f"{fc} facts, {cc} citations"
+                    elif span.name == "cursor_sidecar_invoke":
+                        output_summary = json.dumps(data)[:240]
                     else:
                         output_summary = json.dumps(data)[:200]
                 except (json.JSONDecodeError, AttributeError):
@@ -168,13 +213,19 @@ def provider_chat(payload: ProviderAssistantRequest) -> ProviderAssistantRespons
             patient_id=payload.patient_id,
             question=payload.question,
             history=[turn.model_dump() for turn in payload.history],
+            context_packages=[package.model_dump() for package in payload.context_packages],
             stance=payload.stance,
             model_override=payload.model,
             mode_override=payload.mode,
             max_tokens_override=payload.max_tokens,
+            cursor_model=payload.cursor_model,
         )
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except CursorSidecarConfigurationError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except CursorSidecarExecutionError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 

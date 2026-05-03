@@ -231,7 +231,10 @@ def test_extract_validates_against_schema(tmp_path: Path) -> None:
     result = extract_from_pdf(pdf_path, cache=cache, api_client=api_client)
 
     assert isinstance(result, ExtractionResult)
-    assert result.extraction_model == "claude-opus-4-7"
+    # extraction_model is now overridden by the orchestrator to the canonical
+    # "<backend>/<model>" identifier so models can't hallucinate their own name
+    # into the output (Gemma 4 was caught doing this).
+    assert result.extraction_model == _DEFAULT_CACHE_MODEL_ID
     assert result.extraction_prompt_version == "v0.1.0"
     assert result.extraction_confidence == pytest.approx(0.97)
 

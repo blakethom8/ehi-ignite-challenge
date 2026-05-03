@@ -54,8 +54,11 @@ Prompt and schema versioning policy
 from __future__ import annotations
 
 import base64
+import io
 import json
 import os
+import urllib.error
+import urllib.request
 from pathlib import Path
 from typing import Any, Protocol, Type, TypeVar
 
@@ -71,6 +74,11 @@ DEFAULT_BACKEND = "anthropic"
 DEFAULT_MODEL = "claude-opus-4-7"
 DEFAULT_PROMPT_VERSION = "v0.1.0"
 DEFAULT_SCHEMA_VERSION = "extraction-result-v0.1.0"
+
+# Google AI Studio defaults — Gemma 4 31B is the flagship and the only Gemma 4
+# variant on the hosted API that supports vision + responseSchema reliably.
+DEFAULT_GOOGLE_MODEL = "gemma-4-31b-it"
+GOOGLE_GEMMA_RASTER_DPI = 150
 
 
 # ---------------------------------------------------------------------------
@@ -217,6 +225,270 @@ class AnthropicBackend:
         return tool_call.input  # already a dict from the SDK
 
 
+class GoogleAIStudioBackend:
+    """Gemma 4 vision-extraction backend via Google AI Studio's hosted API.
+
+    Three things differ from :class:`AnthropicBackend` and are encapsulated here:
+
+    1. **Image input.** Gemini's API takes images per page, not whole PDFs.
+       We rasterize via pypdfium2 (already a project dep) at 150 DPI and
+       attach each page as ``inline_data``.
+    2. **Structured output.** Gemma 4 is a "thinking" model; without a schema
+       constraint it spends thousands of reasoning tokens before emitting
+       prose. ``responseSchema`` (Gemini's structured-output mechanism)
+       suppresses thinking entirely and yields valid JSON in ~500 tokens.
+    3. **Schema dialect.** ``responseSchema`` is OpenAPI-3-subset, not full
+       JSON Schema — it rejects ``$defs``, ``$ref``, and ``discriminator``.
+       We translate the input schema via :func:`_pydantic_schema_to_gemini`
+       before sending; the validation step downstream still uses the full
+       Pydantic schema, so any schema drift surfaces there.
+
+    Requires ``GOOGLE_API_KEY`` in the environment (or via ``api_key=`` arg).
+    """
+
+    name = "gemma-google-ai-studio"
+
+    def __init__(
+        self,
+        model: str = DEFAULT_GOOGLE_MODEL,
+        api_key: str | None = None,
+        dpi: int = GOOGLE_GEMMA_RASTER_DPI,
+    ) -> None:
+        self.model = model
+        self.dpi = dpi
+        self._api_key = api_key
+
+    @property
+    def api_key(self) -> str:
+        key = self._api_key or os.environ.get("GOOGLE_API_KEY", "")
+        if not key:
+            raise RuntimeError(
+                "GoogleAIStudioBackend requires GOOGLE_API_KEY. Add it to "
+                ".env (one-time) and dotenv-source before running, or pass "
+                "api_key=... explicitly."
+            )
+        return key
+
+    def extract(
+        self,
+        *,
+        pdf_bytes: bytes,
+        system_prompt: str,
+        schema_json: dict[str, Any],
+        max_tokens: int = 4096,
+    ) -> dict[str, Any]:
+        page_images = self._rasterize(pdf_bytes)
+
+        gemini_schema = _pydantic_schema_to_gemini(schema_json)
+
+        # Gemma uses Gemini's content-parts API. System prompt is concatenated
+        # into the user message because Gemma doesn't honor systemInstruction.
+        parts: list[dict[str, Any]] = [
+            {
+                "text": (
+                    f"{system_prompt}\n\n"
+                    "Extract this document into the structured schema. "
+                    "Pages follow as separate images."
+                )
+            }
+        ]
+        for img_bytes in page_images:
+            parts.append(
+                {
+                    "inline_data": {
+                        "mime_type": "image/png",
+                        "data": base64.standard_b64encode(img_bytes).decode("utf-8"),
+                    }
+                }
+            )
+
+        payload = {
+            "contents": [{"parts": parts}],
+            "generationConfig": {
+                "maxOutputTokens": max_tokens,
+                "temperature": 0.0,
+                "responseMimeType": "application/json",
+                "responseSchema": gemini_schema,
+            },
+        }
+
+        url = (
+            f"https://generativelanguage.googleapis.com/v1beta/models/"
+            f"{self.model}:generateContent?key={self.api_key}"
+        )
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=180) as resp:
+                body = json.loads(resp.read())
+        except urllib.error.HTTPError as e:
+            err_text = e.read().decode("utf-8", errors="replace")
+            raise RuntimeError(
+                f"Google AI Studio HTTP {e.code}: {err_text[:500]}"
+            ) from e
+
+        candidates = body.get("candidates", [])
+        if not candidates:
+            raise RuntimeError(
+                f"Google AI Studio returned no candidates. "
+                f"promptFeedback={body.get('promptFeedback')!r}"
+            )
+
+        text_parts = candidates[0].get("content", {}).get("parts", [])
+        if not text_parts:
+            raise RuntimeError(
+                f"Google AI Studio response had no text parts. "
+                f"finish_reason={candidates[0].get('finishReason')!r}"
+            )
+
+        text = text_parts[0].get("text", "")
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError as e:
+            raise RuntimeError(
+                f"Google AI Studio returned non-JSON text despite "
+                f"responseMimeType=application/json. First 300 chars: "
+                f"{text[:300]!r}"
+            ) from e
+
+    def _rasterize(self, pdf_bytes: bytes) -> list[bytes]:
+        """Render each PDF page to PNG bytes via pypdfium2."""
+        import pypdfium2 as pdfium  # lazy import — only Google backend needs it
+
+        doc = pdfium.PdfDocument(io.BytesIO(pdf_bytes))
+        scale = self.dpi / 72.0
+        out: list[bytes] = []
+        for page in doc:
+            pil = page.render(scale=scale).to_pil()
+            buf = io.BytesIO()
+            pil.save(buf, format="PNG")
+            out.append(buf.getvalue())
+        return out
+
+
+# ---------------------------------------------------------------------------
+# Schema dialect translation: Pydantic JSON Schema → Gemini responseSchema
+# ---------------------------------------------------------------------------
+
+
+def _pydantic_schema_to_gemini(schema: dict[str, Any]) -> dict[str, Any]:
+    """Translate a Pydantic-emitted JSON Schema to Gemini's responseSchema dialect.
+
+    Gemini's responseSchema is the OpenAPI 3 subset and rejects:
+      - ``$defs`` / ``$ref`` (everything must be inlined)
+      - ``discriminator`` / ``oneOf`` / ``anyOf`` with discriminator
+        (no tagged unions; we collapse to the FIRST branch)
+      - ``const`` (Pydantic emits this for ``Literal[...]`` fields; we
+        translate to ``{type: string, enum: [<const>]}``)
+      - JSON-Schema-only annotations: ``title``, ``examples``, ``default``,
+        ``additionalProperties``
+
+    For nullable fields (Pydantic emits ``"anyOf": [{"type": ...}, {"type": "null"}]``)
+    we collapse to the non-null branch — Gemini doesn't have a clean
+    "nullable" surface and the field can be absent in optional cases.
+
+    Discriminated-union collapse picks the FIRST branch. For our use case
+    (always lab-report) that's correct. If you add union variants later,
+    pass the concrete branch's schema directly or extend this helper to
+    thread a discriminator hint.
+
+    The full Pydantic schema is still used for validation downstream, so
+    schema drift between what Gemini sees and what we accept surfaces there.
+    """
+    defs: dict[str, Any] = schema.get("$defs", {})
+
+    _UNSUPPORTED = {
+        "$defs",
+        "title",
+        "examples",
+        "default",
+        "additionalProperties",
+        "discriminator",
+    }
+
+    def _strip(node: Any) -> Any:
+        if isinstance(node, dict):
+            # Resolve $ref before doing anything else — it usually IS the node
+            if "$ref" in node:
+                ref = node["$ref"]
+                if ref.startswith("#/$defs/"):
+                    target = defs.get(ref.removeprefix("#/$defs/"))
+                    if target is not None:
+                        return _strip(target)
+                node = {k: v for k, v in node.items() if k != "$ref"}
+
+            # const (Pydantic emits for Literal[...]) → enum
+            if "const" in node:
+                const_value = node["const"]
+                converted = {
+                    "type": "string" if isinstance(const_value, str) else node.get("type", "string"),
+                    "enum": [const_value],
+                }
+                # Carry through description if present
+                if "description" in node:
+                    converted["description"] = node["description"]
+                return converted
+
+            # Discriminated union: oneOf/anyOf + discriminator → first branch
+            if ("oneOf" in node or "anyOf" in node) and "discriminator" in node:
+                branches = node.get("oneOf") or node.get("anyOf") or []
+                first = branches[0] if branches else {}
+                return _strip(first)
+
+            # anyOf used for nullable / Optional fields:
+            # "anyOf": [{type: string}, {type: "null"}] → just the non-null branch
+            if "anyOf" in node and not branches_are_concrete_alternatives(node["anyOf"]):
+                non_null = [b for b in node["anyOf"] if b.get("type") != "null"]
+                if len(non_null) == 1:
+                    merged = {k: v for k, v in node.items() if k != "anyOf"}
+                    merged.update(_strip(non_null[0]))
+                    return merged
+
+            # Plain oneOf/anyOf without discriminator: collapse to first
+            for key in ("oneOf", "anyOf"):
+                if key in node:
+                    branches = node[key]
+                    if branches:
+                        return _strip(branches[0])
+
+            cleaned = {
+                k: _strip(v)
+                for k, v in node.items()
+                if k not in _UNSUPPORTED
+            }
+
+            # enum fixups for Gemini: must declare type=string and reject null
+            if "enum" in cleaned:
+                cleaned["enum"] = [v for v in cleaned["enum"] if v is not None]
+                if not cleaned.get("type"):
+                    cleaned["type"] = "string"
+
+            return cleaned
+
+        if isinstance(node, list):
+            return [_strip(item) for item in node]
+
+        return node
+
+    return _strip(schema)
+
+
+def branches_are_concrete_alternatives(branches: list[dict]) -> bool:
+    """Return True if an anyOf list represents real alternatives (not just nullability).
+
+    Pydantic emits ``"anyOf": [{type: T}, {type: "null"}]`` for ``Optional[T]``.
+    That's a nullability marker, not a real union. Real alternative anyOfs
+    (e.g. ``Union[A, B]`` without discriminator) should be treated differently.
+    """
+    if len(branches) <= 1:
+        return False
+    non_null = [b for b in branches if b.get("type") != "null"]
+    return len(non_null) > 1
+
+
 def get_backend(
     name: str | None = None,
     *,
@@ -237,10 +509,15 @@ def get_backend(
             model=model or DEFAULT_MODEL,
             client=client,
         )
+    if name == "gemma-google-ai-studio":
+        return GoogleAIStudioBackend(
+            model=model or DEFAULT_GOOGLE_MODEL,
+            api_key=client if isinstance(client, str) else None,
+        )
     raise ValueError(
-        f"Unknown vision backend: {name!r}. Known: 'anthropic'. "
-        f"Phase 1 ships only the Anthropic backend; Gemma 4 (Google AI Studio "
-        f"and Ollama) backends will be added in a follow-up commit."
+        f"Unknown vision backend: {name!r}. "
+        f"Known: 'anthropic', 'gemma-google-ai-studio'. "
+        f"Local Ollama backend (gemma-ollama) is a future addition."
     )
 
 
@@ -312,6 +589,13 @@ def extract_from_pdf(
     )
 
     raw = _coerce_stringified_subobjects(raw)
+
+    # Trust the orchestrator over the model for these fields. Some models
+    # (notably Gemma 4 via Google AI Studio) hallucinate the extraction_model
+    # name into the output; we know which backend ran, so override.
+    if isinstance(raw, dict):
+        raw.setdefault("extraction_prompt_version", prompt_version)
+        raw["extraction_model"] = cache_model_id
 
     cache.put(key, raw)
     return output_schema.model_validate(raw)

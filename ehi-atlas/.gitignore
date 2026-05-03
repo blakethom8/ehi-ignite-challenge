@@ -1,0 +1,70 @@
+# --- Privacy gate (non-negotiable) -----------------------------------
+# Real personal source data NEVER committed in raw form.
+# Only redacted/ subdirectories are committable.
+corpus/_sources/blake-cedars/raw/
+corpus/_sources/devon-cedars/raw/
+corpus/_sources/cedars-portal-pdfs/raw/
+
+# Personal source raw artifacts at top level
+corpus/_sources/blake-cedars/*.json
+corpus/_sources/blake-cedars/*.zip
+corpus/_sources/devon-cedars/*.json
+corpus/_sources/devon-cedars/*.zip
+
+# --- Bronze/silver/gold tier outputs ---------------------------------
+# These are reproducible from sources; don't commit.
+# (Comment out specific subdirs if we want to commit the showcase patient.)
+corpus/bronze/
+corpus/silver/
+corpus/gold/
+
+# Reference terminology snapshots — sized too large for git
+corpus/reference/umls/
+corpus/reference/loinc/
+corpus/reference/snomed/
+# Keep the version-pinning manifest
+!corpus/reference/VERSIONS.md
+
+# --- Vision extraction cache -----------------------------------------
+ehi_atlas/extract/.cache/
+.extraction-cache/
+
+# --- PDF Lab uploads -------------------------------------------------
+# Arbitrary PDFs uploaded via the Streamlit PDF Lab or the notebook.
+# Always treated as potentially PHI; never committed. README stays.
+corpus/_sources/uploads/*
+!corpus/_sources/uploads/README.md
+
+# --- Python / environment --------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+.env
+.env.local
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.egg-info/
+build/
+dist/
+
+# --- Jupyter ---------------------------------------------------------
+.ipynb_checkpoints/
+notebooks/.ipynb_checkpoints/
+
+# --- IDE / OS --------------------------------------------------------
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# --- Secrets ---------------------------------------------------------
+.anthropic-key
+*.pem
+*.key
+secrets.json

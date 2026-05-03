@@ -14,6 +14,7 @@ import {
   Database,
   DatabaseZap,
   FileJson2,
+  FileSearch,
   GraduationCap,
   Heart,
   Layers3,
@@ -58,24 +59,235 @@ interface NavGroup {
   advanced?: boolean;
 }
 
-const CLINICAL_INSIGHTS_NAV_GROUPS: NavGroup[] = [
+interface ModuleMapItem {
+  label: string;
+  description: string;
+  hash: string;
+}
+
+interface ModuleMapSection {
+  id: string;
+  label: string;
+  description: string;
+  icon: LucideIcon;
+  items: ModuleMapItem[];
+}
+
+interface ModuleWorkspaceMap {
+  basePath: string;
+  title: string;
+  subtitle: string;
+  icon: LucideIcon;
+  sections: ModuleMapSection[];
+}
+
+const MARKETPLACE_PINNED_STORAGE_KEY = "ehi-marketplace-pinned-modules";
+const DEFAULT_MARKETPLACE_PINNED_IDS = ["trials", "medication-access", "payer-check", "second-opinion"];
+const MARKETPLACE_PINNED_LINK_OPTIONS = [
+  { id: "trials", key: "trialMatch", label: "Trial Match", path: "/trials" },
+  { id: "medication-access", key: "medAccess", label: "Med Access", path: "/medication-access" },
+  { id: "payer-check", key: "payerCheck", label: "Payer Check", path: "/payer-check" },
+  { id: "second-opinion", key: "secondOpinion", label: "Second Opinion", path: "/second-opinion" },
+  { id: "grants", key: "grants", label: "Grants", path: "/grants" },
+  { id: "research-opportunities", key: "research", label: "Research", path: "/research-opportunities" },
+  { id: "caregiver-sharing", key: "sharing", label: "Caregiver Packet", path: "/sharing" },
+];
+
+function loadMarketplacePinnedIds(): string[] {
+  try {
+    const raw = localStorage.getItem(MARKETPLACE_PINNED_STORAGE_KEY);
+    if (!raw) return DEFAULT_MARKETPLACE_PINNED_IDS;
+    const parsed = JSON.parse(raw) as unknown;
+    if (Array.isArray(parsed)) return parsed.filter((id): id is string => typeof id === "string");
+    return DEFAULT_MARKETPLACE_PINNED_IDS;
+  } catch {
+    return DEFAULT_MARKETPLACE_PINNED_IDS;
+  }
+}
+
+const MODULE_WORKSPACE_MAPS: ModuleWorkspaceMap[] = [
   {
-    label: "Clinical Insights",
-    items: [
-      { to: "/clinical-insights", label: "Module Inventory", icon: Activity, description: "Private chart modules" },
-      { to: "/explorer/assistant", label: "Chart Q&A", icon: MessageSquareText, description: "Chart-grounded answers" },
+    basePath: "/preop",
+    title: "Pre-Op Support",
+    subtitle: "Surgical readiness, medication holds, clearance, and handoff review",
+    icon: Stethoscope,
+    sections: [
       {
-        to: "/preop",
-        label: "Pre-Op Support",
-        icon: Stethoscope,
-        description: "Standalone briefing module",
-        children: [
-          { to: "/journey", label: "Patient Briefing", icon: ClipboardCheck, description: "30-second briefing" },
-          { to: "/explorer/clearance", label: "Clearance", icon: ClipboardCheck, description: "Readiness check" },
-          { to: "/explorer/safety", label: "Medication Holds", icon: ShieldAlert, description: "Medication safety review" },
-          { to: "/explorer/anesthesia", label: "Anesthesia Handoff", icon: Stethoscope, description: "Perioperative handoff" },
+        id: "preop-review",
+        label: "Review",
+        description: "Understand readiness before surgery",
+        icon: ClipboardCheck,
+        items: [
+          { label: "Overview", description: "Module summary", hash: "overview" },
+          { label: "Surgical brief", description: "30-second readiness view", hash: "surgical-brief" },
+          { label: "Review boundary", description: "What the chart supports", hash: "review-boundary" },
         ],
       },
+      {
+        id: "preop-data",
+        label: "Workflow Sections",
+        description: "Focused pre-op review areas",
+        icon: FileJson2,
+        items: [
+          { label: "Clearance", description: "Readiness check", hash: "clearance" },
+          { label: "Medication Holds", description: "Medication safety review", hash: "medication-holds" },
+          { label: "Anesthesia Handoff", description: "Perioperative handoff", hash: "anesthesia-handoff" },
+        ],
+      },
+      {
+        id: "preop-packet",
+        label: "Handoff",
+        description: "Prepare clinical output",
+        icon: Share2,
+        items: [
+          { label: "Anesthesia handoff", description: "Perioperative summary", hash: "anesthesia-handoff" },
+          { label: "Future agent", description: "Dedicated surgical review agent", hash: "future-agent" },
+        ],
+      },
+    ],
+  },
+  {
+    basePath: "/trials",
+    title: "Trial Match",
+    subtitle: "Eligibility research and outreach packet",
+    icon: Search,
+    sections: [
+      {
+        id: "trial-review",
+        label: "Review",
+        description: "Understand fit before outreach",
+        icon: ClipboardCheck,
+        items: [
+          { label: "Overview", description: "Workspace summary", hash: "overview" },
+          { label: "Candidate trials", description: "Matched opportunities", hash: "candidate-trials" },
+          { label: "Eligibility review", description: "Inclusion and exclusion logic", hash: "eligibility-review" },
+        ],
+      },
+      {
+        id: "trial-data",
+        label: "Data Needs",
+        description: "Resolve gaps before sharing",
+        icon: FileJson2,
+        items: [
+          { label: "Missing data", description: "Labs, staging, dates, and medications", hash: "missing-data" },
+          { label: "Patient questions", description: "Context the chart cannot answer", hash: "patient-questions" },
+        ],
+      },
+      {
+        id: "trial-packet",
+        label: "Packet",
+        description: "Prepare patient-controlled outreach",
+        icon: Share2,
+        items: [
+          { label: "Share packet", description: "Scoped evidence bundle", hash: "share-packet" },
+          { label: "Activity", description: "Outreach and review history", hash: "activity" },
+        ],
+      },
+    ],
+  },
+  {
+    basePath: "/medication-access",
+    title: "Medication Access",
+    subtitle: "Programs, coverage, and fulfillment tasks",
+    icon: Pill,
+    sections: [
+      {
+        id: "access-workflow",
+        label: "Workflow",
+        description: "Organize access options",
+        icon: ClipboardCheck,
+        items: [
+          { label: "Overview", description: "Access summary", hash: "overview" },
+          { label: "Programs", description: "Manufacturer and foundation options", hash: "programs" },
+          { label: "Cost and coverage", description: "Benefit and price context", hash: "cost-coverage" },
+        ],
+      },
+      {
+        id: "access-tasks",
+        label: "Tasks",
+        description: "Move from recommendation to action",
+        icon: SlidersHorizontal,
+        items: [
+          { label: "Applications", description: "Forms and eligibility needs", hash: "applications" },
+          { label: "Pharmacy tasks", description: "Fill, coupon, and prior-auth steps", hash: "pharmacy-tasks" },
+        ],
+      },
+    ],
+  },
+  {
+    basePath: "/payer-check",
+    title: "Payer Check",
+    subtitle: "Coverage rules and evidence packets",
+    icon: ShieldAlert,
+    sections: [
+      {
+        id: "payer-review",
+        label: "Review",
+        description: "Understand the coverage path",
+        icon: ClipboardCheck,
+        items: [
+          { label: "Overview", description: "Coverage summary", hash: "overview" },
+          { label: "Coverage rules", description: "Policy and criteria", hash: "coverage-rules" },
+          { label: "Evidence packet", description: "Chart facts supporting request", hash: "evidence-packet" },
+        ],
+      },
+      {
+        id: "payer-actions",
+        label: "Actions",
+        description: "Prepare payer-facing artifacts",
+        icon: Share2,
+        items: [
+          { label: "Prior auth", description: "Submission readiness", hash: "prior-auth" },
+          { label: "Appeal support", description: "Denial response materials", hash: "appeal-support" },
+        ],
+      },
+    ],
+  },
+  {
+    basePath: "/second-opinion",
+    title: "Second Opinion",
+    subtitle: "Specialist review packet and questions",
+    icon: MessageSquareText,
+    sections: [
+      {
+        id: "opinion-packet",
+        label: "Packet",
+        description: "Control what reviewers receive",
+        icon: FileSearch,
+        items: [
+          { label: "Overview", description: "Review workspace summary", hash: "overview" },
+          { label: "Clinical question", description: "What the patient wants answered", hash: "clinical-question" },
+          { label: "Evidence packet", description: "Scoped chart materials", hash: "evidence-packet" },
+        ],
+      },
+      {
+        id: "opinion-network",
+        label: "Review",
+        description: "Manage specialist workflow",
+        icon: Share2,
+        items: [
+          { label: "Specialists", description: "Reviewer options", hash: "specialists" },
+          { label: "Activity", description: "Requests and responses", hash: "activity" },
+        ],
+      },
+    ],
+  },
+];
+
+const CLINICAL_INSIGHTS_NAV_GROUPS: NavGroup[] = [
+  {
+    label: "LLM Review",
+    items: [
+      { to: "/explorer/assistant", label: "Chat", icon: MessageSquareText, description: "Chart-grounded agent review" },
+      { to: "/clinical-insights/context-library", label: "Context Library", icon: Layers3, description: "Packages and published scripts" },
+    ],
+  },
+  {
+    label: "Clinical Modules",
+    items: [
+      { to: "/clinical-insights/favorites", label: "Favorites", icon: Star, description: "Saved clinical modules" },
+      { to: "/clinical-insights", label: "Explore Modules", icon: Activity, description: "Browse review workflows" },
+      { to: "/clinical-insights/create", label: "Create a Module", icon: ClipboardCheck, description: "Build a review workflow" },
     ],
   },
 ];
@@ -128,15 +340,17 @@ const MEDICATION_ACCESS_NAV_GROUPS: NavGroup[] = [
 
 const MARKETPLACE_NAV_GROUPS: NavGroup[] = [
   {
-    label: "Featured Marketplaces",
+    label: "Workspace",
     items: [
-      { to: "/marketplace", label: "Module Inventory", icon: Store, description: "Marketplace catalog" },
-      { to: "/trials", label: "Trial Match", icon: Search, description: "External opportunity" },
-      { to: "/medication-access", label: "Med Access", icon: Pill, description: "Affordability workflow" },
-      { to: "/payer-check", label: "Payer Check", icon: ShieldAlert, description: "Coverage workflow" },
-      { to: "/grants", label: "Grant Finder", icon: Share2, description: "Support programs" },
-      { to: "/research-opportunities", label: "Research", icon: BookMarked, description: "Registries and studies" },
-      { to: "/second-opinion", label: "Second Opinion", icon: MessageSquareText, description: "Specialist marketplace" },
+      { to: "/marketplace/workspace", label: "Favorites", icon: Star, description: "Saved modules" },
+      { to: "/marketplace/settings", label: "Configuration", icon: SlidersHorizontal, description: "Access and sharing scope" },
+    ],
+  },
+  {
+    label: "Marketplace",
+    items: [
+      { to: "/marketplace", label: "Explore Modules", icon: Store, description: "Browse and select modules" },
+      { to: "/marketplace/publish", label: "Create Module", icon: Share2, description: "Submit a workflow" },
     ],
   },
 ];
@@ -345,6 +559,10 @@ function getTopArea(environment: AppEnvironment): TopArea {
     return "marketplace";
   }
   return "clinical";
+}
+
+function getActiveModuleMap(pathname: string): ModuleWorkspaceMap | null {
+  return MODULE_WORKSPACE_MAPS.find((moduleMap) => pathname.startsWith(moduleMap.basePath)) ?? null;
 }
 
 function StatusDot({ risk }: { risk: PatientRiskSummary | undefined }) {
@@ -806,6 +1024,9 @@ export function Layout({ children }: LayoutProps) {
 
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [patientPickerOpen, setPatientPickerOpen] = useState(false);
+  const [marketplacePinnedIds, setMarketplacePinnedIds] = useState<string[]>(loadMarketplacePinnedIds);
+  const [moduleMapOpen, setModuleMapOpen] = useState(true);
+  const [openModuleMapSections, setOpenModuleMapSections] = useState<Set<string>>(() => new Set(["trial-review"]));
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
     try { return localStorage.getItem("ehi-sidebar-collapsed") === "true"; } catch { return false; }
@@ -828,6 +1049,8 @@ export function Layout({ children }: LayoutProps) {
   const workspace = getWorkspaceCopy(environment);
   const WorkspaceIcon = workspace.icon;
   const topArea = getTopArea(environment);
+  const activeModuleMap = getActiveModuleMap(location.pathname);
+  const ActiveModuleMapIcon = activeModuleMap?.icon;
   const headerHeight = isPlatform ? 76 : 126;
   const sidebarTone =
     topArea === "clinical"
@@ -869,15 +1092,45 @@ export function Layout({ children }: LayoutProps) {
     { key: "internal", label: "Internal Tools", to: "/analysis" },
   ];
 
-  const marketplaceLinks: { key: AppEnvironment | "grants" | "research" | "payer" | "secondOpinion"; label: string; to: string }[] = [
-    { key: "marketplace", label: "Module Inventory", to: withPatientQuery("/marketplace", patientId) },
-    { key: "trials", label: "Trial Match", to: withPatientQuery("/trials", patientId) },
-    { key: "medication", label: "Med Access", to: withPatientQuery("/medication-access", patientId) },
-    { key: "payer", label: "Payer Check", to: withPatientQuery("/payer-check", patientId) },
-    { key: "grants", label: "Grants", to: withPatientQuery("/grants", patientId) },
-    { key: "research", label: "Research", to: withPatientQuery("/research-opportunities", patientId) },
-    { key: "sharing", label: "Sharing", to: withPatientQuery("/sharing", patientId) },
-    { key: "secondOpinion", label: "Second Opinion", to: withPatientQuery("/second-opinion", patientId) },
+  useEffect(() => {
+    const refreshMarketplacePinnedIds = () => setMarketplacePinnedIds(loadMarketplacePinnedIds());
+    window.addEventListener("storage", refreshMarketplacePinnedIds);
+    window.addEventListener("ehi-marketplace-workspace-updated", refreshMarketplacePinnedIds);
+    return () => {
+      window.removeEventListener("storage", refreshMarketplacePinnedIds);
+      window.removeEventListener("ehi-marketplace-workspace-updated", refreshMarketplacePinnedIds);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!activeModuleMap) return;
+    setModuleMapOpen(true);
+    setOpenModuleMapSections(new Set([activeModuleMap.sections[0]?.id].filter(Boolean) as string[]));
+    setSidebarCollapsed(true);
+  }, [activeModuleMap?.basePath]);
+
+  const toggleModuleMapSection = useCallback((sectionId: string) => {
+    setOpenModuleMapSections((current) => {
+      const next = new Set(current);
+      if (next.has(sectionId)) {
+        next.delete(sectionId);
+      } else {
+        next.add(sectionId);
+      }
+      return next;
+    });
+  }, []);
+
+  const marketplaceLinks: {
+    key: AppEnvironment | "trialMatch" | "medAccess" | "payerCheck" | "secondOpinion" | "grants" | "research";
+    label: string;
+    to: string;
+  }[] = [
+    ...MARKETPLACE_PINNED_LINK_OPTIONS.filter((link) => marketplacePinnedIds.includes(link.id)).map((link) => ({
+      key: link.key as "trialMatch" | "medAccess" | "payerCheck" | "secondOpinion" | "grants" | "research" | "sharing",
+      label: link.label,
+      to: withPatientQuery(link.path, patientId),
+    })),
   ];
 
   const chartLinks: { key: string; label: string; to: string }[] = [
@@ -896,9 +1149,7 @@ export function Layout({ children }: LayoutProps) {
     { key: "publishReadiness", label: "Publish Readiness", to: withPatientQuery("/aggregate/publish", patientId) },
   ];
 
-  const clinicalInsightLinks: { key: AppEnvironment | "preop" | "qa"; label: string; to: string }[] = [
-    { key: "clinical", label: "Module Inventory", to: withPatientQuery("/clinical-insights", patientId) },
-    { key: "qa", label: "Chart Q&A", to: withPatientQuery("/explorer/assistant", patientId) },
+  const clinicalInsightLinks: { key: string; label: string; to: string }[] = [
     { key: "preop", label: "Pre-Op Support", to: withPatientQuery("/preop", patientId) },
   ];
 
@@ -927,7 +1178,7 @@ export function Layout({ children }: LayoutProps) {
           }
         : topArea === "clinical"
           ? {
-              label: "Private clinical insights",
+              label: "Pinned clinical modules",
               links: clinicalInsightLinks,
               tone: "amber",
             }
@@ -938,7 +1189,7 @@ export function Layout({ children }: LayoutProps) {
                 tone: "green",
               }
             : {
-                label: "Marketplace modules",
+                label: "Pinned modules",
                 links: marketplaceLinks,
                 tone: "blue",
               };
@@ -963,7 +1214,14 @@ export function Layout({ children }: LayoutProps) {
           };
 
   const isSubnavActive = (key: string): boolean => {
-    if (key === "marketplace") return location.pathname.startsWith("/marketplace");
+    if (key === "workspace") {
+      return location.pathname.startsWith("/marketplace/workspace");
+    }
+    if (key === "marketplace") return location.pathname === "/marketplace";
+    if (key === "mySettings") return location.pathname.startsWith("/marketplace/settings") || location.pathname.startsWith("/sharing");
+    if (key === "trialMatch") return location.pathname.startsWith("/trials");
+    if (key === "medAccess") return location.pathname.startsWith("/medication-access");
+    if (key === "payerCheck") return location.pathname.startsWith("/payer-check");
     if (key === "trials") return location.pathname.startsWith("/trials");
     if (key === "medication") return location.pathname.startsWith("/medication-access");
     if (key === "payer") return location.pathname.startsWith("/payer-check");
@@ -981,16 +1239,15 @@ export function Layout({ children }: LayoutProps) {
     if (key === "cleaningQueue") return location.pathname.startsWith("/aggregate/cleaning");
     if (key === "patientContext") return location.pathname.startsWith("/aggregate/context");
     if (key === "publishReadiness") return location.pathname.startsWith("/aggregate/publish");
-    if (key === "clinical") return location.pathname.startsWith("/clinical-insights");
     if (key === "preop") {
       return (
         location.pathname.startsWith("/preop") ||
-        location.pathname === "/journey" ||
-        location.pathname.startsWith("/explorer/clearance") ||
-        location.pathname.startsWith("/explorer/safety") ||
-        location.pathname.startsWith("/explorer/anesthesia")
+        location.pathname === "/journey"
       );
     }
+    if (key === "medSafety") return location.pathname.startsWith("/explorer/safety");
+    if (key === "clearance") return location.pathname.startsWith("/explorer/clearance");
+    if (key === "anesthesia") return location.pathname.startsWith("/explorer/anesthesia");
     if (key === "qa") return location.pathname.startsWith("/explorer/assistant");
     if (key === "dataLab") return location.pathname === "/analysis";
     if (key === "catalog") return location.pathname.startsWith("/catalog");
@@ -1154,23 +1411,52 @@ export function Layout({ children }: LayoutProps) {
               <>
                 {/* Workspace header + collapse toggle */}
                 <div className="shrink-0 border-b border-[#e9eaef] px-2 pb-3 pt-4 lg:px-3">
-                  <div className="flex items-center justify-between">
-                    <div className={`flex items-center gap-2 ${sidebarCollapsed ? "justify-center w-full" : ""}`}>
-                      <WorkspaceIcon size={18} className={`shrink-0 ${sidebarTone.icon}`} />
-                      {!sidebarCollapsed && (
-                        <span className="text-sm font-semibold tracking-tight text-[#1c1c1e]">{workspace.sidebarTitle}</span>
-                      )}
+                  {environment === "marketplace" ? (
+                    <div className="flex items-start justify-between gap-2">
+                      <Link
+                        to={withPatientQuery("/marketplace/overview", patientId)}
+                        title={sidebarCollapsed ? "Marketplace overview" : undefined}
+                        className={`flex min-w-0 flex-1 items-start gap-2 rounded-lg no-underline transition-colors hover:bg-[#f5f6f8] ${
+                          sidebarCollapsed ? "justify-center p-2" : "-ml-1 px-1 py-1.5"
+                        }`}
+                      >
+                        <WorkspaceIcon size={18} className={`mt-0.5 shrink-0 ${sidebarTone.icon}`} />
+                        {!sidebarCollapsed && (
+                          <span className="min-w-0">
+                            <span className="block text-sm font-semibold tracking-tight text-[#1c1c1e]">{workspace.sidebarTitle}</span>
+                            <span className="mt-1 block text-xs leading-5 text-[#a5a8b5]">{workspace.subtitle}</span>
+                          </span>
+                        )}
+                      </Link>
+                      <button
+                        onClick={toggleSidebar}
+                        className={`hidden lg:flex shrink-0 items-center justify-center w-6 h-6 rounded hover:bg-[#f5f6f8] text-[#a5a8b5] hover:text-[#555a6a] transition-colors ${sidebarCollapsed ? "absolute right-1 top-4" : ""}`}
+                        title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+                      >
+                        {sidebarCollapsed ? <ChevronsRight size={14} /> : <ChevronsLeft size={14} />}
+                      </button>
                     </div>
-                    <button
-                      onClick={toggleSidebar}
-                      className={`hidden lg:flex shrink-0 items-center justify-center w-6 h-6 rounded hover:bg-[#f5f6f8] text-[#a5a8b5] hover:text-[#555a6a] transition-colors ${sidebarCollapsed ? "absolute right-1 top-4" : ""}`}
-                      title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-                    >
-                      {sidebarCollapsed ? <ChevronsRight size={14} /> : <ChevronsLeft size={14} />}
-                    </button>
-                  </div>
-                  {!sidebarCollapsed && (
-                    <p className="mt-1 text-xs text-[#a5a8b5]">{workspace.subtitle}</p>
+                  ) : (
+                    <>
+                      <div className="flex items-center justify-between">
+                        <div className={`flex items-center gap-2 ${sidebarCollapsed ? "justify-center w-full" : ""}`}>
+                          <WorkspaceIcon size={18} className={`shrink-0 ${sidebarTone.icon}`} />
+                          {!sidebarCollapsed && (
+                            <span className="text-sm font-semibold tracking-tight text-[#1c1c1e]">{workspace.sidebarTitle}</span>
+                          )}
+                        </div>
+                        <button
+                          onClick={toggleSidebar}
+                          className={`hidden lg:flex shrink-0 items-center justify-center w-6 h-6 rounded hover:bg-[#f5f6f8] text-[#a5a8b5] hover:text-[#555a6a] transition-colors ${sidebarCollapsed ? "absolute right-1 top-4" : ""}`}
+                          title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+                        >
+                          {sidebarCollapsed ? <ChevronsRight size={14} /> : <ChevronsLeft size={14} />}
+                        </button>
+                      </div>
+                      {!sidebarCollapsed && (
+                        <p className="mt-1 text-xs text-[#a5a8b5]">{workspace.subtitle}</p>
+                      )}
+                    </>
                   )}
                 </div>
 
@@ -1356,6 +1642,112 @@ export function Layout({ children }: LayoutProps) {
                 </p>
               </div>
             )}
+            </aside>
+          )}
+
+          {activeModuleMap && ActiveModuleMapIcon && (
+            <aside
+              className={`relative flex max-h-[50vh] w-full shrink-0 flex-col overflow-hidden border-b border-r border-[#dfe4ff] bg-[#fbfcff] transition-all duration-200 lg:max-h-full lg:border-b-0 ${
+                moduleMapOpen ? "lg:w-72" : "lg:w-14"
+              }`}
+            >
+              <div className={`shrink-0 border-b border-[#dfe4ff] ${moduleMapOpen ? "px-3 py-4" : "px-1 py-3"}`}>
+                <div className={`flex items-center ${moduleMapOpen ? "justify-between gap-3" : "justify-center"}`}>
+                  <div className={`flex min-w-0 items-center gap-2 ${moduleMapOpen ? "" : "justify-center"}`}>
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#eef1ff] text-[#5b76fe]">
+                      <ActiveModuleMapIcon size={17} />
+                    </span>
+                    {moduleMapOpen && (
+                      <div className="min-w-0">
+                        <p className="truncate text-[10px] font-semibold uppercase tracking-wider text-[#5b76fe]">Module Map</p>
+                        <p className="truncate text-sm font-semibold text-[#1c1c1e]">{activeModuleMap.title}</p>
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setModuleMapOpen((open) => !open)}
+                    className={`hidden h-6 w-6 shrink-0 items-center justify-center rounded text-[#8d92a3] transition-colors hover:bg-[#eef1ff] hover:text-[#5b76fe] lg:flex ${
+                      moduleMapOpen ? "" : "absolute right-1 top-4"
+                    }`}
+                    title={moduleMapOpen ? `Collapse ${activeModuleMap.title} map` : `Expand ${activeModuleMap.title} map`}
+                  >
+                    {moduleMapOpen ? <ChevronsLeft size={14} /> : <ChevronsRight size={14} />}
+                  </button>
+                </div>
+                {moduleMapOpen && <p className="mt-2 text-xs leading-5 text-[#8d92a3]">{activeModuleMap.subtitle}</p>}
+              </div>
+
+              {moduleMapOpen ? (
+                <nav className="flex-1 overflow-y-auto px-3 py-4">
+                  <div className="space-y-2">
+                    {activeModuleMap.sections.map((section) => {
+                      const SectionIcon = section.icon;
+                      const sectionOpen = openModuleMapSections.has(section.id);
+                      return (
+                        <div key={section.id} className="border-b border-[#edf0ff] pb-2 last:border-b-0">
+                          <button
+                            type="button"
+                            onClick={() => toggleModuleMapSection(section.id)}
+                            className="flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-[#f3f5ff]"
+                          >
+                            <span className="flex min-w-0 items-center gap-2">
+                              <SectionIcon size={14} className="shrink-0 text-[#5b76fe]" />
+                              <span className="min-w-0">
+                                <span className="block truncate text-sm font-semibold text-[#1c1c1e]">{section.label}</span>
+                                <span className="block truncate text-[11px] text-[#8d92a3]">{section.description}</span>
+                              </span>
+                            </span>
+                            <span className="shrink-0 text-[#a5a8b5]">
+                              {sectionOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+                            </span>
+                          </button>
+
+                          {sectionOpen && (
+                            <div className="ml-4 mt-1 space-y-0.5 border-l border-[#dfe4ff] pl-2">
+                              {section.items.map((item) => {
+                                const active = location.hash === `#${item.hash}`;
+                                return (
+                                  <Link
+                                    key={item.hash}
+                                    to={`${withPatientQuery(activeModuleMap.basePath, patientId)}#${item.hash}`}
+                                    className={`block rounded-md px-2.5 py-2 no-underline transition-colors ${
+                                      active ? "bg-[#eef1ff] text-[#5b76fe]" : "text-[#555a6a] hover:bg-[#f3f5ff] hover:text-[#1c1c1e]"
+                                    }`}
+                                  >
+                                    <span className="block text-xs font-medium">{item.label}</span>
+                                    <span className="block truncate text-[11px] opacity-65">{item.description}</span>
+                                  </Link>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </nav>
+              ) : (
+                <nav className="flex-1 space-y-1 px-1 py-2">
+                  {activeModuleMap.sections.map((section) => {
+                    const SectionIcon = section.icon;
+                    return (
+                      <button
+                        key={section.id}
+                        type="button"
+                        onClick={() => {
+                          setModuleMapOpen(true);
+                          toggleModuleMapSection(section.id);
+                        }}
+                        className="flex w-full justify-center rounded-lg p-2.5 text-[#667085] transition-colors hover:bg-[#eef1ff] hover:text-[#5b76fe]"
+                        title={section.label}
+                      >
+                        <SectionIcon size={17} />
+                      </button>
+                    );
+                  })}
+                </nav>
+              )}
             </aside>
           )}
 

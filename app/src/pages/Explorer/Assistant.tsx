@@ -3,14 +3,30 @@ import type { FormEvent } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
-import { AlertTriangle, Bot, ChevronDown, ChevronRight, Database, Eye, MessageSquare, Search, Send, Sparkles, Terminal, User } from "lucide-react";
+import {
+  AlertTriangle,
+  Bot,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  Database,
+  Eye,
+  Layers3,
+  MessageSquare,
+  Search,
+  Send,
+  Sparkles,
+  Terminal,
+  User,
+  X,
+} from "lucide-react";
 import { api } from "../../api/client";
-import { EmptyState } from "../../components/EmptyState";
 import { AgentSettingsPanel } from "../../components/AgentSettingsPanel";
 import { useChatForPatient } from "../../context/ChatContext";
 import type { ChatMessage } from "../../context/ChatContext";
 import type {
   ProviderAssistantResponse,
+  ProviderAssistantContextPackage,
   TraceDetail,
   ToolCallDetail,
 } from "../../types";
@@ -22,6 +38,41 @@ const STARTER_PROMPTS = [
   "Any active blood thinner or interaction risk?",
   "What changed recently that affects peri-op risk?",
   "Summarize the active problem list.",
+];
+
+const CONTEXT_LIBRARY_PACKAGES: ProviderAssistantContextPackage[] = [
+  {
+    id: "preop-medication-holds",
+    title: "Pre-op Medication Holds",
+    type: "Medication safety",
+    summary: "Antiplatelets, anticoagulants, NSAIDs, diabetes medications, and perioperative medication questions.",
+    instructions:
+      "When answering pre-op questions, explicitly review antiplatelets, anticoagulants, NSAIDs, diabetes medications, and supplements. Separate active medications from historical medications. If a hold window depends on procedure type or renal function, say what must be verified.",
+  },
+  {
+    id: "cardiometabolic-review",
+    title: "Cardiometabolic Review",
+    type: "Disease review",
+    summary: "Diabetes, blood pressure, lipids, kidney function, weight, and medication context.",
+    instructions:
+      "For cardiometabolic questions, look across A1c, blood pressure, lipids, BMI, kidney function, and active therapy. Highlight missing recent labs or unclear treatment adherence. Avoid implying longitudinal control when the data is sparse.",
+  },
+  {
+    id: "patient-context-intake",
+    title: "Patient Context Intake",
+    type: "Qualitative context",
+    summary: "Patient goals, preferences, timeline clarifications, symptoms, and questions not present in chart exports.",
+    instructions:
+      "When chart evidence is incomplete, identify what patient-reported context would help: current symptoms, medication reality, goals, care preferences, recent outside care, and source gaps. Label these as questions for the patient, not verified chart facts.",
+  },
+  {
+    id: "local-clinical-style-guide",
+    title: "Local Clinical Style Guide",
+    type: "Organization rules",
+    summary: "Concise answer format, escalation posture, and preferred clinical wording.",
+    instructions:
+      "Answer in a concise clinical review style. Start with the direct answer, then bullets for evidence, uncertainties, and next actions. Use bold only for the most important finding or action. Do not use broad disclaimers unless there is a specific safety boundary.",
+  },
 ];
 
 function fmt(dt: string | null): string {
@@ -50,6 +101,149 @@ function errorMessage(error: unknown): string {
   }
   if (error instanceof Error && error.message.trim()) return error.message;
   return "Request failed. Try again.";
+}
+
+type AssistantMarkdownBlock =
+  | { type: "heading"; level: number; text: string }
+  | { type: "paragraph"; lines: string[] }
+  | { type: "list"; ordered: boolean; items: string[] }
+  | { type: "separator" };
+
+function parseAssistantMarkdown(content: string): AssistantMarkdownBlock[] {
+  const blocks: AssistantMarkdownBlock[] = [];
+  const lines = content.replace(/\r\n/g, "\n").split("\n");
+  let paragraph: string[] = [];
+  let list: { ordered: boolean; items: string[] } | null = null;
+
+  function flushParagraph() {
+    if (paragraph.length > 0) {
+      blocks.push({ type: "paragraph", lines: paragraph });
+      paragraph = [];
+    }
+  }
+
+  function flushList() {
+    if (list) {
+      blocks.push({ type: "list", ordered: list.ordered, items: list.items });
+      list = null;
+    }
+  }
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line) {
+      flushParagraph();
+      flushList();
+      continue;
+    }
+
+    const headingMatch = /^(#{1,6})\s+(.+)$/.exec(line);
+    if (headingMatch) {
+      flushParagraph();
+      flushList();
+      blocks.push({ type: "heading", level: headingMatch[1].length, text: headingMatch[2].trim() });
+      continue;
+    }
+
+    if (/^[-*_]{3,}$/.test(line)) {
+      flushParagraph();
+      flushList();
+      blocks.push({ type: "separator" });
+      continue;
+    }
+
+    const unorderedMatch = /^[-*]\s+(.+)$/.exec(line);
+    const orderedMatch = /^\d+[.)]\s+(.+)$/.exec(line);
+    if (unorderedMatch || orderedMatch) {
+      flushParagraph();
+      const ordered = Boolean(orderedMatch);
+      const text = (orderedMatch?.[1] ?? unorderedMatch?.[1] ?? "").trim();
+      if (!list || list.ordered !== ordered) {
+        flushList();
+        list = { ordered, items: [] };
+      }
+      list.items.push(text);
+      continue;
+    }
+
+    flushList();
+    paragraph.push(line);
+  }
+
+  flushParagraph();
+  flushList();
+  return blocks;
+}
+
+function renderInlineMarkdown(text: string): React.ReactNode[] {
+  const nodes: React.ReactNode[] = [];
+  const pattern = /\*\*([^*]+)\*\*/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = pattern.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      nodes.push(text.slice(lastIndex, match.index));
+    }
+    nodes.push(
+      <strong key={`${match.index}-${match[1]}`} className="font-semibold text-[#111827]">
+        {match[1]}
+      </strong>,
+    );
+    lastIndex = match.index + match[0].length;
+  }
+
+  if (lastIndex < text.length) {
+    nodes.push(text.slice(lastIndex));
+  }
+
+  return nodes.length ? nodes : [text];
+}
+
+function AssistantMarkdown({ content, compact = false }: { content: string; compact?: boolean }) {
+  const blocks = parseAssistantMarkdown(content);
+  const textSize = compact ? "text-[12px]" : "text-[13px]";
+
+  return (
+    <div className={`space-y-3 ${textSize} leading-6 text-[#1c1c1e]`}>
+      {blocks.map((block, index) => {
+        if (block.type === "heading") {
+          const levelClass = block.level <= 2 ? "text-[15px]" : "text-[13px]";
+          return (
+            <h3 key={index} className={`${levelClass} pt-1 font-semibold tracking-normal text-[#111827]`}>
+              {renderInlineMarkdown(block.text)}
+            </h3>
+          );
+        }
+
+        if (block.type === "separator") {
+          return <div key={index} className="h-px bg-slate-200" />;
+        }
+
+        if (block.type === "list") {
+          const ListTag = block.ordered ? "ol" : "ul";
+          return (
+            <ListTag
+              key={index}
+              className={`${block.ordered ? "list-decimal" : "list-disc"} space-y-1 pl-5 marker:text-slate-400`}
+            >
+              {block.items.map((item, itemIndex) => (
+                <li key={`${index}-${itemIndex}`} className="pl-1">
+                  {renderInlineMarkdown(item)}
+                </li>
+              ))}
+            </ListTag>
+          );
+        }
+
+        return (
+          <p key={index} className="max-w-none">
+            {renderInlineMarkdown(block.lines.join(" "))}
+          </p>
+        );
+      })}
+    </div>
+  );
 }
 
 // ── Expandable section ───────────────────────────────────────────────────────
@@ -89,17 +283,35 @@ const TOOL_ICONS: Record<string, React.ReactNode> = {
   baseline_evidence: <Terminal size={10} className="text-slate-500" />,
 };
 
-function ToolCallsSection({ trace }: { trace: TraceDetail }) {
+type SessionPanelTab = "context" | "settings" | "logs";
+
+type SelectedToolLog = {
+  trace: TraceDetail;
+  toolCall: ToolCallDetail;
+  index: number;
+};
+
+function ToolCallsSection({
+  trace,
+  onSelectToolCall,
+}: {
+  trace: TraceDetail;
+  onSelectToolCall?: (selection: SelectedToolLog) => void;
+}) {
   return (
     <div className="space-y-1">
       {trace.tool_calls.map((tc, i) => (
-        <ToolCallCard key={i} tc={tc} />
+        <ToolCallCard
+          key={`${tc.tool_name}-${i}`}
+          tc={tc}
+          onSelect={() => onSelectToolCall?.({ trace, toolCall: tc, index: i })}
+        />
       ))}
     </div>
   );
 }
 
-function ToolCallCard({ tc }: { tc: ToolCallDetail }) {
+function ToolCallCard({ tc, onSelect }: { tc: ToolCallDetail; onSelect?: () => void }) {
   const [expanded, setExpanded] = useState(!!tc.error);
   const icon = TOOL_ICONS[tc.tool_name] || <Terminal size={10} className="text-slate-400" />;
   const hasError = !!tc.error;
@@ -107,7 +319,10 @@ function ToolCallCard({ tc }: { tc: ToolCallDetail }) {
   return (
     <div className={`rounded-md border text-[11px] ${hasError ? "border-red-200 bg-red-50" : "border-slate-200 bg-slate-50"}`}>
       <button
-        onClick={() => setExpanded(!expanded)}
+        onClick={() => {
+          onSelect?.();
+          setExpanded(!expanded);
+        }}
         className="flex items-center gap-1.5 w-full px-2 py-1.5 hover:bg-slate-100/50 transition-colors text-left"
       >
         {icon}
@@ -351,17 +566,401 @@ function ContextModal({ trace, onClose }: { trace: TraceDetail; onClose: () => v
   );
 }
 
+function ContextPackagePreviewModal({
+  contextPackage,
+  attached,
+  onTogglePackage,
+  onClose,
+}: {
+  contextPackage: ProviderAssistantContextPackage;
+  attached: boolean;
+  onTogglePackage: (contextPackage: ProviderAssistantContextPackage) => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4" onClick={onClose}>
+      <div
+        className="flex max-h-[82vh] w-full max-w-2xl flex-col rounded-xl bg-white shadow-xl"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="shrink-0 border-b border-slate-200 px-5 py-4">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-[#9a5a16]">Context package</p>
+              <h2 className="mt-1 text-lg font-semibold tracking-normal text-[#1c1c1e]">{contextPackage.title}</h2>
+              <p className="mt-1 text-sm leading-6 text-[#667085]">{contextPackage.summary}</p>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+              title="Close preview"
+            >
+              <X size={17} />
+            </button>
+          </div>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto p-5">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Package type</p>
+              <span className="rounded-full bg-white px-2 py-1 text-[11px] font-semibold text-[#9a5a16]">
+                {contextPackage.type}
+              </span>
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Prompt instructions</p>
+            <pre className="mt-2 max-h-[42vh] overflow-y-auto whitespace-pre-wrap rounded-xl border border-slate-200 bg-white p-4 text-[12px] leading-6 text-slate-700">
+              {contextPackage.instructions}
+            </pre>
+          </div>
+        </div>
+
+        <div className="shrink-0 border-t border-slate-200 px-5 py-3">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[11px] leading-4 text-slate-500">
+              This text is sent as session guidance. It does not replace patient-specific chart evidence.
+            </p>
+            <button
+              type="button"
+              onClick={() => onTogglePackage(contextPackage)}
+              className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-[12px] font-semibold transition-colors ${
+                attached ? "bg-[#e9f8ef] text-[#087443]" : "bg-[#fff1df] text-[#9a5a16] hover:bg-[#ffe6cd]"
+              }`}
+            >
+              {attached ? <Check size={13} /> : <Layers3 size={13} />}
+              {attached ? "Attached" : "Attach package"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SessionContextPanel({
+  openTab,
+  onTabChange,
+  activePackages,
+  onTogglePackage,
+  messages,
+  selectedToolLog,
+  onSelectToolLog,
+  stance,
+  setStance,
+  settings,
+  onUpdateSettings,
+}: {
+  openTab: SessionPanelTab;
+  onTabChange: (tab: SessionPanelTab) => void;
+  activePackages: ProviderAssistantContextPackage[];
+  onTogglePackage: (contextPackage: ProviderAssistantContextPackage) => void;
+  messages: ChatMessage[];
+  selectedToolLog: SelectedToolLog | null;
+  onSelectToolLog: (selection: SelectedToolLog) => void;
+  stance: "opinionated" | "balanced";
+  setStance: (stance: "opinionated" | "balanced") => void;
+  settings: ReturnType<typeof useChatForPatient>["agentSettings"];
+  onUpdateSettings: ReturnType<typeof useChatForPatient>["setAgentSettings"];
+}) {
+  const [previewPackage, setPreviewPackage] = useState<ProviderAssistantContextPackage | null>(null);
+  const activeIds = new Set(activePackages.map((contextPackage) => contextPackage.id));
+  const logEvents = messages.flatMap((message) =>
+    message.role === "assistant" && message.trace
+      ? message.trace.tool_calls.map((toolCall, index) => ({ trace: message.trace!, toolCall, index }))
+      : [],
+  );
+  const activeLog = selectedToolLog ?? logEvents[0] ?? null;
+  const panelTitle =
+    openTab === "settings" ? "Chat settings" : openTab === "logs" ? "Tool logs" : "Review context";
+
+  function handleDrop(event: React.DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    const packageId = event.dataTransfer.getData("application/ehi-context-package");
+    const contextPackage = CONTEXT_LIBRARY_PACKAGES.find((item) => item.id === packageId);
+    if (contextPackage && !activeIds.has(contextPackage.id)) {
+      onTogglePackage(contextPackage);
+    }
+  }
+
+  return (
+    <aside className="hidden w-[340px] shrink-0 flex-col border-l border-slate-200 bg-white xl:flex">
+      {previewPackage && (
+        <ContextPackagePreviewModal
+          contextPackage={previewPackage}
+          attached={activeIds.has(previewPackage.id)}
+          onTogglePackage={onTogglePackage}
+          onClose={() => setPreviewPackage(null)}
+        />
+      )}
+      <div className="shrink-0 border-b border-slate-200 p-3">
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-[#9a5a16]">Session tools</p>
+            <h2 className="truncate text-sm font-semibold text-[#1c1c1e]">{panelTitle}</h2>
+          </div>
+        </div>
+        <div className="mt-3 grid grid-cols-3 gap-1 rounded-xl bg-slate-100 p-1">
+          {[
+            ["context", "Context"],
+            ["settings", "Settings"],
+            ["logs", "Logs"],
+          ].map(([tab, label]) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => onTabChange(tab as SessionPanelTab)}
+              className={`rounded-lg px-2 py-1.5 text-[11px] font-semibold transition-colors ${
+                openTab === tab ? "bg-white text-[#1c1c1e] shadow-sm" : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {openTab === "context" && (
+        <div className="flex-1 overflow-y-auto p-2.5">
+          <div
+            onDragOver={(event) => event.preventDefault()}
+            onDrop={handleDrop}
+            className="rounded-xl border border-dashed border-[#f0d7bf] bg-[#fffaf4] p-2.5"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-[#9a5a16]">Attached to chat</p>
+                <p className="mt-0.5 text-[11px] leading-4 text-[#667085]">Sent as session instructions.</p>
+              </div>
+              <span className="rounded-full bg-white px-2 py-1 text-[11px] font-semibold text-[#9a5a16]">
+                {activePackages.length}
+              </span>
+            </div>
+
+            <div className="mt-2 space-y-1.5">
+              {activePackages.length === 0 ? (
+                <p className="rounded-lg bg-white px-2.5 py-2 text-[11px] leading-4 text-slate-500">
+                  Attach from the library below or drag a package here.
+                </p>
+              ) : (
+                activePackages.map((contextPackage) => (
+                  <div key={contextPackage.id} className="rounded-lg bg-white px-2.5 py-2 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-xs font-semibold text-[#1c1c1e]">{contextPackage.title}</p>
+                        <p className="truncate text-[10px] text-slate-500">{contextPackage.type}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setPreviewPackage(contextPackage)}
+                        className="rounded-md px-1.5 py-1 text-[10px] font-semibold text-[#9a5a16] transition-colors hover:bg-[#fff1df]"
+                      >
+                        View
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onTogglePackage(contextPackage)}
+                        className="rounded-md p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                        title={`Remove ${contextPackage.title}`}
+                      >
+                        <X size={13} />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          <div className="mt-3">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Context Library</p>
+            <div className="mt-2 space-y-1.5">
+              {CONTEXT_LIBRARY_PACKAGES.map((contextPackage) => {
+                const attached = activeIds.has(contextPackage.id);
+                return (
+                  <article
+                    key={contextPackage.id}
+                    draggable
+                    onDragStart={(event) => {
+                      event.dataTransfer.setData("application/ehi-context-package", contextPackage.id);
+                    }}
+                    className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 transition-colors hover:border-[#f0d7bf] hover:bg-[#fffdf9]"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-xs font-semibold text-[#1c1c1e]">{contextPackage.title}</p>
+                        <p className="truncate text-[10px] font-medium text-[#9a5a16]">
+                          {contextPackage.type} · {contextPackage.summary}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setPreviewPackage(contextPackage)}
+                        className="inline-flex shrink-0 items-center rounded-full bg-white px-2 py-1 text-[10px] font-semibold text-slate-600 ring-1 ring-slate-200 transition-colors hover:bg-slate-50"
+                      >
+                        View
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onTogglePackage(contextPackage)}
+                        className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-[10px] font-semibold transition-colors ${
+                          attached ? "bg-[#e9f8ef] text-[#087443]" : "bg-[#fff1df] text-[#9a5a16] hover:bg-[#ffe6cd]"
+                        }`}
+                      >
+                        {attached ? <Check size={11} /> : <Layers3 size={11} />}
+                        {attached ? "Attached" : "Attach"}
+                      </button>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {openTab === "settings" && (
+        <div className="flex-1 overflow-y-auto p-3">
+          <div className="rounded-xl bg-slate-50 p-3">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Review posture</p>
+            <div className="mt-2 grid grid-cols-2 gap-1 rounded-lg bg-white p-1 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+              {(["opinionated", "balanced"] as const).map((nextStance) => (
+                <button
+                  key={nextStance}
+                  type="button"
+                  onClick={() => setStance(nextStance)}
+                  className={`rounded-md px-2 py-1.5 text-[11px] font-semibold capitalize transition-colors ${
+                    stance === nextStance ? "bg-blue-100 text-blue-700" : "text-slate-500 hover:bg-slate-50"
+                  }`}
+                >
+                  {nextStance}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-3 rounded-xl border border-slate-200 bg-white p-3">
+            <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Model and mode</p>
+            <AgentSettingsPanel settings={settings} onUpdate={onUpdateSettings} defaultOpen lockOpen />
+          </div>
+
+          <div className="mt-3 rounded-xl bg-[#fffaf4] p-3 text-xs leading-5 text-[#667085]">
+            Context packages are distinct from chart facts. They guide the assistant’s review style and checklist, but
+            the answer still needs patient-specific evidence.
+          </div>
+        </div>
+      )}
+
+      {openTab === "logs" && (
+        <div className="flex-1 overflow-y-auto p-2.5">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Tool calls</p>
+                <p className="mt-0.5 text-[11px] leading-4 text-slate-500">Select a call to inspect the input and result.</p>
+              </div>
+              <span className="rounded-full bg-white px-2 py-1 text-[11px] font-semibold text-slate-600">
+                {logEvents.length}
+              </span>
+            </div>
+
+            <div className="mt-2 space-y-1.5">
+              {logEvents.length === 0 ? (
+                <p className="rounded-lg bg-white px-2.5 py-2 text-[11px] leading-4 text-slate-500">
+                  Tool calls, context builds, and retrieval events will appear here after the assistant responds.
+                </p>
+              ) : (
+                logEvents.map((event) => {
+                  const eventKey = `${event.trace.trace_id}-${event.index}-${event.toolCall.tool_name}`;
+                  const activeKey = activeLog
+                    ? `${activeLog.trace.trace_id}-${activeLog.index}-${activeLog.toolCall.tool_name}`
+                    : "";
+                  const hasError = Boolean(event.toolCall.error);
+                  return (
+                    <button
+                      key={eventKey}
+                      type="button"
+                      onClick={() => onSelectToolLog(event)}
+                      className={`w-full rounded-lg border px-2.5 py-2 text-left transition-colors ${
+                        eventKey === activeKey
+                          ? "border-[#5b76fe] bg-blue-50"
+                          : "border-slate-200 bg-white hover:border-slate-300"
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        {TOOL_ICONS[event.toolCall.tool_name] || <Terminal size={10} className="text-slate-400" />}
+                        <span className="truncate text-[11px] font-semibold text-[#1c1c1e]">
+                          {event.toolCall.tool_name}
+                        </span>
+                        {event.toolCall.duration_ms != null && (
+                          <span className="ml-auto shrink-0 text-[10px] text-slate-400">
+                            {event.toolCall.duration_ms.toFixed(0)}ms
+                          </span>
+                        )}
+                      </div>
+                      <p className={`mt-1 truncate text-[10px] ${hasError ? "text-red-600" : "text-slate-500"}`}>
+                        {hasError ? `Error: ${event.toolCall.error}` : event.toolCall.output_summary}
+                      </p>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          {activeLog && (
+            <div className="mt-3 rounded-xl border border-slate-200 bg-white p-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate text-xs font-semibold text-[#1c1c1e]">{activeLog.toolCall.tool_name}</p>
+                  <p className="text-[10px] text-slate-500">Trace {activeLog.trace.trace_id}</p>
+                </div>
+                {activeLog.toolCall.error ? (
+                  <span className="rounded-full bg-red-100 px-2 py-1 text-[10px] font-semibold text-red-700">Error</span>
+                ) : (
+                  <span className="rounded-full bg-green-100 px-2 py-1 text-[10px] font-semibold text-green-700">OK</span>
+                )}
+              </div>
+
+              {activeLog.toolCall.input_summary && (
+                <div className="mt-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Input</p>
+                  <pre className="mt-1 max-h-44 overflow-y-auto rounded-lg bg-slate-50 p-2 text-[10px] leading-4 text-slate-700 font-mono whitespace-pre-wrap">
+                    {activeLog.toolCall.input_summary}
+                  </pre>
+                </div>
+              )}
+
+              <div className="mt-3">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Result</p>
+                <p className={`mt-1 text-[11px] leading-4 ${activeLog.toolCall.error ? "text-red-600" : "text-slate-600"}`}>
+                  {activeLog.toolCall.error ? `Error: ${activeLog.toolCall.error}` : activeLog.toolCall.output_summary}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </aside>
+  );
+}
+
 // ── Shared message renderer (used by both full page and widget) ──────────────
 
 export function ChatMessageBubble({
   msg,
   onSubmitFollowUp,
   onViewContext,
+  onSelectToolCall,
   compact = false,
 }: {
   msg: ChatMessage;
   onSubmitFollowUp: (question: string) => void;
   onViewContext?: (trace: TraceDetail) => void;
+  onSelectToolCall?: (selection: SelectedToolLog) => void;
   compact?: boolean;
 }) {
   if (msg.role === "user") {
@@ -382,7 +981,7 @@ export function ChatMessageBubble({
       </div>
       <div className="flex-1 min-w-0 space-y-2">
         {!compact && msg.trace && msg.trace.tool_calls.length > 0 && (
-          <ToolCallsSection trace={msg.trace} />
+          <ToolCallsSection trace={msg.trace} onSelectToolCall={onSelectToolCall} />
         )}
 
         {!compact && msg.trace && msg.trace.tool_calls.some((tc) => tc.tool_name === "build_clinical_context") && (
@@ -398,7 +997,7 @@ export function ChatMessageBubble({
           </p>
         )}
 
-        <pre className={`whitespace-pre-wrap ${compact ? "text-[12px]" : "text-[13px]"} leading-relaxed text-[#1c1c1e] font-sans`}>{msg.content}</pre>
+        <AssistantMarkdown content={msg.content} compact={compact} />
 
         <div className="flex items-center gap-1.5 flex-wrap">
           {confidenceBadge(msg.confidence)}
@@ -482,6 +1081,8 @@ export function ExplorerAssistant() {
   const chat = useChatForPatient(patientId);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const [contextModal, setContextModal] = useState<TraceDetail | null>(null);
+  const [sessionPanelTab, setSessionPanelTab] = useState<SessionPanelTab>("context");
+  const [selectedToolLog, setSelectedToolLog] = useState<SelectedToolLog | null>(null);
 
   const { data: overview } = useQuery({
     queryKey: ["overview", patientId],
@@ -504,26 +1105,19 @@ export function ExplorerAssistant() {
     handleSubmit(input);
   }
 
-  if (!patientId) {
-    return (
-      <EmptyState
-        icon={MessageSquare}
-        title="Choose a patient to start"
-        bullets={[
-          "Ask clinical questions grounded in chart data",
-          "Get concise answers with evidence citations",
-          "Assistant challenges weak evidence",
-        ]}
-      />
-    );
+  function handleSelectToolLog(selection: SelectedToolLog) {
+    setSelectedToolLog(selection);
+    setSessionPanelTab("logs");
   }
 
+  const hasPatient = Boolean(patientId);
   const hasMessages = chat.messages.length > 0;
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full overflow-hidden">
       {contextModal && <ContextModal trace={contextModal} onClose={() => setContextModal(null)} />}
 
+      <div className="flex min-w-0 flex-1 flex-col">
       {/* Header bar */}
       <div className="shrink-0 flex items-center justify-between gap-3 pb-3 border-b border-slate-200">
         <div className="flex items-center gap-2">
@@ -533,34 +1127,39 @@ export function ExplorerAssistant() {
           <div>
             <h1 className="text-sm font-semibold text-[#1c1c1e]">Provider Assistant</h1>
             <p className="text-[11px] text-slate-500">
-              {overview?.name ?? "Patient"} · chart-grounded Q&A
+              {hasPatient ? overview?.name ?? "Patient" : "Select patient"} · chart-grounded Q&A
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* Stance toggle */}
-          <div className="flex items-center gap-1 text-[11px]">
-            {(["opinionated", "balanced"] as const).map((s) => (
-              <button
-                key={s}
-                onClick={() => chat.setStance(s)}
-                className={`rounded-full px-2.5 py-1 font-medium transition-colors ${
-                  chat.stance === s ? "bg-blue-100 text-blue-700" : "text-slate-500 hover:bg-slate-100"
-                }`}
-              >
-                {s.charAt(0).toUpperCase() + s.slice(1)}
-              </button>
-            ))}
-          </div>
-          {/* Agent settings */}
-          <AgentSettingsPanel settings={chat.agentSettings} onUpdate={chat.setAgentSettings} />
-        </div>
       </div>
 
       {/* Chat area */}
       <div className="flex-1 overflow-y-auto min-h-0 py-3 space-y-3">
-        {!hasMessages && !chat.isPending && (
+        {!hasPatient && (
+          <div className="flex h-full flex-col items-center justify-center gap-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50">
+              <MessageSquare size={24} className="text-[#5b76fe]" />
+            </div>
+            <div className="text-center">
+              <h2 className="text-base font-semibold text-[#1c1c1e]">Choose a patient to start</h2>
+              <ul className="mt-3 space-y-2 text-left text-sm text-[#667085]">
+                {[
+                  "Ask clinical questions grounded in chart data",
+                  "Get concise answers with evidence citations",
+                  "Assistant challenges weak evidence",
+                ].map((item) => (
+                  <li key={item} className="flex items-start gap-2">
+                    <span className="mt-2 h-1.5 w-1.5 rounded-full bg-[#5b76fe]" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        )}
+
+        {hasPatient && !hasMessages && !chat.isPending && (
           <div className="flex flex-col items-center justify-center h-full gap-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-50">
               <Bot size={24} className="text-blue-500" />
@@ -589,6 +1188,7 @@ export function ExplorerAssistant() {
             msg={msg}
             onSubmitFollowUp={handleSubmit}
             onViewContext={setContextModal}
+            onSelectToolCall={handleSelectToolLog}
           />
         ))}
 
@@ -629,13 +1229,14 @@ export function ExplorerAssistant() {
               }
             }}
             rows={1}
-            placeholder="Ask about this patient's chart..."
+            placeholder={hasPatient ? "Ask about this patient's chart..." : "Select a patient to ask chart-grounded questions..."}
+            disabled={!hasPatient}
             className="flex-1 resize-none rounded-lg border border-slate-300 px-3 py-2 text-[13px] text-[#1c1c1e] outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 placeholder:text-slate-400"
             style={{ minHeight: 38, maxHeight: 120 }}
           />
           <button
             type="submit"
-            disabled={chat.isPending || input.trim().length === 0}
+            disabled={!hasPatient || chat.isPending || input.trim().length === 0}
             className="inline-flex h-[38px] items-center gap-1.5 rounded-lg bg-[#5b76fe] px-3 text-[12px] font-semibold text-white disabled:opacity-50 hover:bg-[#4a65ed] transition-colors"
           >
             <Send size={13} />
@@ -643,6 +1244,21 @@ export function ExplorerAssistant() {
           </button>
         </form>
       </div>
+      </div>
+
+      <SessionContextPanel
+        openTab={sessionPanelTab}
+        onTabChange={setSessionPanelTab}
+        activePackages={chat.contextPackages}
+        onTogglePackage={chat.toggleContextPackage}
+        messages={chat.messages}
+        selectedToolLog={selectedToolLog}
+        onSelectToolLog={handleSelectToolLog}
+        stance={chat.stance}
+        setStance={chat.setStance}
+        settings={chat.agentSettings}
+        onUpdateSettings={chat.setAgentSettings}
+      />
     </div>
   );
 }

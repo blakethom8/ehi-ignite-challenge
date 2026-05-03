@@ -1,5 +1,5 @@
 import { Link, useSearchParams } from "react-router-dom";
-import { Activity, ArrowRight, ClipboardCheck, FileText, MessageSquareText, ShieldAlert, Stethoscope } from "lucide-react";
+import { Activity, ArrowRight, ClipboardCheck, FileText, ShieldAlert, Stethoscope } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 const PREOP_AREAS: { icon: LucideIcon; title: string; body: string }[] = [
@@ -11,7 +11,7 @@ const PREOP_AREAS: { icon: LucideIcon; title: string; body: string }[] = [
   {
     icon: FileText,
     title: "Inputs it expects",
-    body: "Reads normalized chart facts and can reference sibling modules such as clearance, medication holds, labs, and problem review.",
+    body: "Reads normalized chart facts across clearance, medication holds, anesthesia handoff, labs, and problem review.",
   },
   {
     icon: ShieldAlert,
@@ -58,24 +58,25 @@ export function PreOpOverview() {
       <section className="rounded-2xl bg-white p-5 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
         <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-[#5b76fe]">Sibling modules</p>
-            <h2 className="mt-1 text-base font-semibold text-[#1c1c1e]">Pre-Op Support does not own the whole workspace</h2>
+            <p className="text-xs font-semibold uppercase tracking-wider text-[#5b76fe]">Pre-op workflow</p>
+            <h2 className="mt-1 text-base font-semibold text-[#1c1c1e]">Clearance, medication holds, and handoff belong inside Pre-Op Support</h2>
           </div>
           <p className="max-w-2xl text-sm leading-6 text-[#667085]">
-            Clearance, Medication Holds, Patient Briefing, and Chart Q&A are separate Clinical Insights modules. Pre-Op
-            Support can consume their outputs, but Clinical Insights is the parent workspace.
+            These are sections of the surgical readiness module, not separate pinned modules. Each section can still open
+            its own focused workspace when the user needs deeper review.
           </p>
         </div>
         <div className="mt-4 grid gap-3 md:grid-cols-3">
           {[
-            ["/explorer/clearance", ClipboardCheck, "Clearance", "Readiness check"],
-            ["/explorer/safety", ShieldAlert, "Medication Holds", "Medication safety review"],
-            ["/explorer/assistant", MessageSquareText, "Chart Q&A", "Cited clinical questions"],
-          ].map(([path, Icon, title, body]) => {
+            ["/explorer/clearance", "clearance", ClipboardCheck, "Clearance", "Readiness check"],
+            ["/explorer/safety", "medication-holds", ShieldAlert, "Medication Holds", "Medication safety review"],
+            ["/explorer/anesthesia", "anesthesia-handoff", Stethoscope, "Anesthesia Handoff", "Perioperative handoff"],
+          ].map(([path, id, Icon, title, body]) => {
             const TypedIcon = Icon as LucideIcon;
             return (
               <Link
                 key={title as string}
+                id={id as string}
                 to={withPatient(path as string, patientId)}
                 className="group rounded-xl border border-[#e9eaef] bg-[#fbfcff] p-4 no-underline transition-colors hover:border-[#dfe4ff] hover:bg-[#f7f8ff]"
               >
@@ -85,7 +86,7 @@ export function PreOpOverview() {
                 </div>
                 <p className="mt-2 text-sm text-[#667085]">{body as string}</p>
                 <p className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-[#5b76fe]">
-                  Open sibling module
+                  Open pre-op section
                   <ArrowRight size={13} className="transition-transform group-hover:translate-x-0.5" />
                 </p>
               </Link>

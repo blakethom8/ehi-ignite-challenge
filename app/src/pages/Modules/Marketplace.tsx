@@ -1,16 +1,22 @@
 import { useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import {
   ArrowRight,
   BookMarked,
+  CheckCircle2,
   DollarSign,
   FileSearch,
+  LayoutGrid,
   MessageSquareText,
   Pill,
   Search,
   ShieldCheck,
+  SlidersHorizontal,
+  Star,
   Store,
+  Table2,
   TestTubeDiagonal,
+  Upload,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -20,6 +26,7 @@ function withPatient(path: string, patientId: string | null): string {
 
 type Tone = "blue" | "green" | "orange" | "rose" | "slate";
 type MarketStatus = "Preview" | "Concept";
+type MarketplaceViewMode = "cards" | "table";
 
 interface MarketplaceModule {
   id: string;
@@ -158,8 +165,32 @@ const marketplaceModules: MarketplaceModule[] = [
   },
 ];
 
-const defaultSelected = new Set(["trials", "medication-access", "payer-check", "second-opinion"]);
+const FAVORITES_STORAGE_KEY = "ehi-marketplace-favorite-modules";
+const PINNED_STORAGE_KEY = "ehi-marketplace-pinned-modules";
+const defaultFavoriteIds = ["trials", "medication-access", "payer-check", "second-opinion", "grants", "research-opportunities", "caregiver-sharing"];
+const defaultPinnedIds = ["trials", "medication-access", "payer-check", "second-opinion"];
 const categories = ["All", ...Array.from(new Set(marketplaceModules.map((module) => module.category)))];
+
+function loadModuleIds(storageKey: string, fallback: string[]): Set<string> {
+  try {
+    const raw = localStorage.getItem(storageKey);
+    if (!raw) return new Set(fallback);
+    const parsed = JSON.parse(raw) as unknown;
+    if (Array.isArray(parsed)) return new Set(parsed.filter((id): id is string => typeof id === "string"));
+    return new Set(fallback);
+  } catch {
+    return new Set(fallback);
+  }
+}
+
+function saveModuleIds(storageKey: string, ids: Set<string>): void {
+  try {
+    localStorage.setItem(storageKey, JSON.stringify(Array.from(ids)));
+    window.dispatchEvent(new Event("ehi-marketplace-workspace-updated"));
+  } catch {
+    // Local storage is progressive enhancement for the prototype workspace.
+  }
+}
 
 function StatusBadge({ status }: { status: MarketStatus }) {
   const classes = status === "Preview" ? "bg-[#eef1ff] text-[#5b76fe]" : "bg-[#f5f6f8] text-[#667085]";
@@ -239,7 +270,7 @@ function MarketplaceCard({
             selected ? "bg-[#1c1c1e] text-white" : "bg-[#eef1ff] text-[#5b76fe] hover:bg-[#dfe4ff]"
           }`}
         >
-          {selected ? "Shown in marketplace" : "Add to marketplace"}
+          {selected ? "In favorites" : "Add favorite"}
         </button>
         <Link
           to={withPatient(module.route, patientId)}
@@ -253,57 +284,385 @@ function MarketplaceCard({
   );
 }
 
-function SelectedMarketplace({
+function ViewModeToggle({
+  viewMode,
+  onChange,
+}: {
+  viewMode: MarketplaceViewMode;
+  onChange: (mode: MarketplaceViewMode) => void;
+}) {
+  return (
+    <div className="inline-flex rounded-xl bg-white p-1 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+      {[
+        { mode: "cards" as const, label: "Cards", icon: LayoutGrid },
+        { mode: "table" as const, label: "Table", icon: Table2 },
+      ].map(({ mode, label, icon: Icon }) => (
+        <button
+          key={mode}
+          type="button"
+          onClick={() => onChange(mode)}
+          className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors ${
+            viewMode === mode ? "bg-[#1c1c1e] text-white" : "text-[#667085] hover:bg-[#eef1ff] hover:text-[#5b76fe]"
+          }`}
+          aria-pressed={viewMode === mode}
+        >
+          <Icon size={14} />
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function MarketplaceTable({
   modules,
   patientId,
+  favoriteIds,
+  pinnedIds,
+  onToggle,
+  onTogglePin,
 }: {
   modules: MarketplaceModule[];
   patientId: string | null;
+  favoriteIds: Set<string>;
+  pinnedIds: Set<string>;
+  onToggle: (moduleId: string) => void;
+  onTogglePin: (moduleId: string) => void;
 }) {
   return (
-    <section className="rounded-2xl bg-white p-5 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
-      <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-[#5b76fe]">Patient-selected marketplace</p>
-          <h2 className="mt-1 text-xl font-semibold text-[#1c1c1e]">External modules visible on the main marketplace page</h2>
-        </div>
-        <p className="max-w-xl text-sm leading-6 text-[#667085]">
-          This previews a configurable marketplace shelf. The key product point is that the patient chooses which outbound
-          workflows are available and what chart evidence each can request.
-        </p>
-      </div>
+    <div className="mt-5 overflow-x-auto rounded-2xl bg-white shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+      <table className="w-full min-w-[1080px] border-collapse text-[12px]">
+        <thead>
+          <tr className="bg-[#fafafa] text-left text-[10px] font-semibold uppercase tracking-wider text-[#8d92a3]">
+            <th className="border-b border-[#eef0f5] px-3 py-2">Module</th>
+            <th className="border-b border-[#eef0f5] px-3 py-2">Status</th>
+            <th className="border-b border-[#eef0f5] px-3 py-2">Category</th>
+            <th className="border-b border-[#eef0f5] px-3 py-2">Requires</th>
+            <th className="border-b border-[#eef0f5] px-3 py-2">Produces</th>
+            <th className="border-b border-[#eef0f5] px-3 py-2">Boundary</th>
+            <th className="border-b border-[#eef0f5] px-3 py-2">Favorite</th>
+            <th className="border-b border-[#eef0f5] px-3 py-2">Pinned</th>
+            <th className="border-b border-[#eef0f5] px-3 py-2" />
+          </tr>
+        </thead>
+        <tbody>
+          {modules.map((module) => {
+            const isFavorite = favoriteIds.has(module.id);
+            const isPinned = pinnedIds.has(module.id);
+            return (
+              <tr key={module.id} className="hover:bg-[#fafbff]">
+                <td className="border-b border-[#f2f4f8] px-3 py-2">
+                  <Link to={withPatient(module.route, patientId)} className="font-semibold text-[#1c1c1e] no-underline hover:text-[#5b76fe]">
+                    {module.title}
+                  </Link>
+                  {module.recommended ? <span className="ml-2 text-[10px] font-semibold uppercase text-[#5b76fe]">Recommended</span> : null}
+                </td>
+                <td className="border-b border-[#f2f4f8] px-3 py-2 text-[#555a6a]">{module.status}</td>
+                <td className="border-b border-[#f2f4f8] px-3 py-2 text-[#555a6a]">{module.category}</td>
+                <td className="border-b border-[#f2f4f8] px-3 py-2 text-[#555a6a]">{module.inputs.join(", ")}</td>
+                <td className="border-b border-[#f2f4f8] px-3 py-2 text-[#555a6a]">{module.outputs.join(", ")}</td>
+                <td className="border-b border-[#f2f4f8] px-3 py-2 text-[#667085]">{module.boundary}</td>
+                <td className="border-b border-[#f2f4f8] px-3 py-2">
+                  <button
+                    type="button"
+                    onClick={() => onToggle(module.id)}
+                    className={`rounded-md px-2 py-1 text-[11px] font-semibold transition-colors ${
+                      isFavorite ? "bg-[#1c1c1e] text-white" : "bg-white text-[#5b76fe] shadow-[rgb(224_226_232)_0px_0px_0px_1px] hover:bg-[#eef1ff]"
+                    }`}
+                  >
+                    {isFavorite ? "Yes" : "Add"}
+                  </button>
+                </td>
+                <td className="border-b border-[#f2f4f8] px-3 py-2">
+                  <button
+                    type="button"
+                    onClick={() => onTogglePin(module.id)}
+                    className={`rounded-md px-2 py-1 text-[11px] font-semibold transition-colors ${
+                      isPinned ? "bg-[#eef1ff] text-[#5b76fe]" : "bg-white text-[#667085] shadow-[rgb(224_226_232)_0px_0px_0px_1px] hover:bg-[#eef1ff]"
+                    }`}
+                  >
+                    {isPinned ? "Top" : "Pin"}
+                  </button>
+                </td>
+                <td className="border-b border-[#f2f4f8] px-3 py-2 text-right">
+                  <Link to={withPatient(module.route, patientId)} className="font-semibold text-[#5b76fe] no-underline">{module.action}</Link>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
 
-      <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        {modules.map((module) => {
-          const Icon = module.icon;
+function WorkspaceFavorites({
+  modules,
+  patientId,
+  favoriteIds,
+  pinnedIds,
+  onToggleFavorite,
+  onTogglePin,
+}: {
+  modules: MarketplaceModule[];
+  patientId: string | null;
+  favoriteIds: Set<string>;
+  pinnedIds: Set<string>;
+  onToggleFavorite: (moduleId: string) => void;
+  onTogglePin: (moduleId: string) => void;
+}) {
+  const favoriteModules = modules.filter((module) => favoriteIds.has(module.id));
+  const sortedFavoriteModules = [
+    ...favoriteModules.filter((module) => pinnedIds.has(module.id)),
+    ...favoriteModules.filter((module) => !pinnedIds.has(module.id)),
+  ];
+
+  return (
+    <main className="mx-auto max-w-7xl space-y-4 p-4 lg:p-5">
+      <section className="rounded-2xl bg-white p-5 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="max-w-3xl">
+            <p className="inline-flex items-center gap-2 rounded-full bg-[#eef1ff] px-3 py-1 text-xs font-semibold uppercase tracking-wider text-[#5b76fe]">
+              <Star size={13} />
+              Workspace favorites
+            </p>
+            <h1 className="mt-3 text-2xl font-semibold tracking-tight text-[#1c1c1e] lg:text-3xl">
+              Favorite modules
+            </h1>
+            <p className="mt-2 text-sm leading-6 text-[#667085]">
+              Manage the modules saved to this workspace and choose which ones stay pinned in the top navigation.
+            </p>
+          </div>
+          <div className="grid min-w-[220px] grid-cols-2 gap-2">
+            <div className="rounded-xl bg-[#fafbff] px-4 py-3 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+              <p className="text-xs font-semibold uppercase tracking-wider text-[#667085]">Favorites</p>
+              <p className="mt-1 text-2xl font-semibold text-[#1c1c1e]">{favoriteModules.length}</p>
+            </div>
+            <div className="rounded-xl bg-[#fafbff] px-4 py-3 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+              <p className="text-xs font-semibold uppercase tracking-wider text-[#667085]">Pinned</p>
+              <p className="mt-1 text-2xl font-semibold text-[#1c1c1e]">{favoriteModules.filter((module) => pinnedIds.has(module.id)).length}</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="rounded-2xl bg-white p-5 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+        <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-[#5b76fe]">Favorite modules</p>
+            <h2 className="mt-1 text-xl font-semibold text-[#1c1c1e]">Extended workspace list</h2>
+          </div>
+          <p className="max-w-xl text-sm leading-6 text-[#667085]">
+            Favorites can be used often without taking over the main navigation. Pin only the few modules that should be
+            one click away.
+          </p>
+        </div>
+
+        <div className="mt-5 overflow-x-auto rounded-xl border border-[#e9eaef]">
+          <table className="w-full min-w-[920px] border-collapse text-[12px]">
+            <thead>
+              <tr className="bg-[#fafafa] text-left text-[10px] font-semibold uppercase tracking-wider text-[#8d92a3]">
+                <th className="border-b border-[#eef0f5] px-3 py-2">Module</th>
+                <th className="border-b border-[#eef0f5] px-3 py-2">Category</th>
+                <th className="border-b border-[#eef0f5] px-3 py-2">Produces</th>
+                <th className="border-b border-[#eef0f5] px-3 py-2">Top nav</th>
+                <th className="border-b border-[#eef0f5] px-3 py-2" />
+              </tr>
+            </thead>
+            <tbody>
+              {sortedFavoriteModules.map((module) => {
+                const isPinned = pinnedIds.has(module.id);
+                return (
+                  <tr key={module.id} className="hover:bg-[#fafbff]">
+                    <td className="border-b border-[#f2f4f8] px-3 py-2">
+                      <Link to={withPatient(module.route, patientId)} className="font-semibold text-[#1c1c1e] no-underline hover:text-[#5b76fe]">
+                        {module.title}
+                      </Link>
+                    </td>
+                    <td className="border-b border-[#f2f4f8] px-3 py-2 text-[#555a6a]">{module.category}</td>
+                    <td className="border-b border-[#f2f4f8] px-3 py-2 text-[#555a6a]">{module.outputs.join(", ")}</td>
+                    <td className="border-b border-[#f2f4f8] px-3 py-2">
+                      <button
+                        type="button"
+                        onClick={() => onTogglePin(module.id)}
+                        className={`rounded-md px-2 py-1 text-[11px] font-semibold transition-colors ${
+                          isPinned ? "bg-[#eef1ff] text-[#5b76fe]" : "bg-white text-[#667085] shadow-[rgb(224_226_232)_0px_0px_0px_1px] hover:bg-[#eef1ff]"
+                        }`}
+                      >
+                        {isPinned ? "Pinned" : "Pin"}
+                      </button>
+                    </td>
+                    <td className="border-b border-[#f2f4f8] px-3 py-2 text-right">
+                      <button
+                        type="button"
+                        onClick={() => onToggleFavorite(module.id)}
+                        className="text-[11px] font-semibold text-[#667085] hover:text-[#1c1c1e]"
+                      >
+                        Remove
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-2">
+        {[
+          { title: "Explore Modules", body: "Browse the full marketplace and add modules into this workspace.", icon: Store, to: "/marketplace" },
+          { title: "Create Module", body: "Draft a new workflow, declare required chart inputs, and define the output contract.", icon: SlidersHorizontal, to: "/marketplace/publish" },
+        ].map((item) => {
+          const Icon = item.icon;
           return (
-            <Link
-              key={module.id}
-              to={withPatient(module.route, patientId)}
-              className="rounded-xl border border-[#dfe4ff] bg-[#fafbff] p-4 no-underline transition-colors hover:bg-[#f2f5ff]"
-            >
-              <div className="flex items-center justify-between gap-3">
-                <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${toneClasses[module.tone]}`}>
-                  <Icon size={17} />
+            <Link key={item.title} to={withPatient(item.to, patientId)} className="rounded-2xl bg-white p-5 no-underline shadow-[rgb(224_226_232)_0px_0px_0px_1px] hover:bg-[#fafbff]">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#eef1ff] text-[#5b76fe]">
+                  <Icon size={18} />
                 </div>
-                <StatusBadge status={module.status} />
+                <div>
+                  <p className="text-base font-semibold text-[#1c1c1e]">{item.title}</p>
+                  <p className="mt-1 text-sm leading-6 text-[#667085]">{item.body}</p>
+                </div>
               </div>
-              <p className="mt-3 text-sm font-semibold text-[#1c1c1e]">{module.title}</p>
-              <p className="mt-1 text-xs leading-5 text-[#667085]">{module.outputs[0]}</p>
             </Link>
           );
         })}
-      </div>
-    </section>
+      </section>
+    </main>
+  );
+}
+
+function MarketplaceOverview({ patientId }: { patientId: string | null }) {
+  return (
+    <main className="mx-auto max-w-7xl space-y-4 p-4 lg:p-5">
+      <section className="rounded-2xl bg-white p-5 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="max-w-3xl">
+            <p className="inline-flex items-center gap-2 rounded-full bg-[#eef1ff] px-3 py-1 text-xs font-semibold uppercase tracking-wider text-[#5b76fe]">
+              <Store size={13} />
+              Marketplace overview
+            </p>
+            <h1 className="mt-3 text-2xl font-semibold tracking-tight text-[#1c1c1e] lg:text-3xl">
+              Use your health record with trusted modules
+            </h1>
+            <p className="mt-2 text-sm leading-6 text-[#667085]">
+              Marketplace modules can review your patient-owned chart, help complete focused workflows, and prepare
+              packets for outside people or services. Any module that acts outside the private record workspace should
+              make the requested data, destination, and saved output clear before anything is shared.
+            </p>
+          </div>
+          <div className="rounded-xl bg-[#fafbff] p-4 shadow-[rgb(224_226_232)_0px_0px_0px_1px] lg:max-w-[360px]">
+            <div className="flex items-center gap-2">
+              <ShieldCheck size={16} className="text-[#00b473]" />
+              <p className="text-sm font-semibold text-[#1c1c1e]">Patient-controlled exchange</p>
+            </div>
+            <p className="mt-2 text-xs leading-5 text-[#667085]">
+              This is the bridge between private clinical data and the outside world: trials, second opinions, payer
+              packets, affordability programs, research, and caregiver support.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-3">
+        {[
+          {
+            icon: FileSearch,
+            title: "Review your data",
+            body: "Modules read scoped chart facts, source notes, and patient context to produce a focused review.",
+          },
+          {
+            icon: CheckCircle2,
+            title: "Act on your behalf",
+            body: "A module may prepare searches, packets, checklists, or outreach steps for a specific real-world workflow.",
+          },
+          {
+            icon: Upload,
+            title: "Share only with consent",
+            body: "Before data leaves the workspace, the patient should see what is shared, who receives it, and what is saved.",
+          },
+        ].map((item) => {
+          const Icon = item.icon;
+          return (
+            <article key={item.title} className="rounded-2xl bg-white p-5 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#eef1ff] text-[#5b76fe]">
+                <Icon size={18} />
+              </div>
+              <h2 className="mt-4 text-base font-semibold text-[#1c1c1e]">{item.title}</h2>
+              <p className="mt-2 text-sm leading-6 text-[#667085]">{item.body}</p>
+            </article>
+          );
+        })}
+      </section>
+
+      <section className="rounded-2xl bg-white p-5 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+        <div className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-[#5b76fe]">Transparency contract</p>
+            <h2 className="mt-1 text-xl font-semibold text-[#1c1c1e]">Every module should declare its data behavior</h2>
+            <p className="mt-2 text-sm leading-6 text-[#667085]">
+              The module contract is the product promise: patients and care teams should know what the module needs,
+              whether it contacts an outside party, and what artifact comes back into the record workspace.
+            </p>
+          </div>
+          <div className="overflow-hidden rounded-xl border border-[#e9eaef]">
+            <table className="w-full border-collapse text-sm">
+              <tbody>
+                {[
+                  ["Data requested", "Chart facts, uploaded files, patient context, or generated summaries."],
+                  ["Destination", "Private workspace only, patient download, clinician packet, or external service."],
+                  ["Saved output", "A review, checklist, packet, match list, or activity log with evidence attached."],
+                  ["Patient control", "Consent, expiration, revocation, and audit trail should be visible."],
+                ].map(([label, body]) => (
+                  <tr key={label} className="border-b border-[#f2f4f8] last:border-b-0">
+                    <td className="w-44 bg-[#fafafa] px-3 py-3 text-xs font-semibold uppercase tracking-wider text-[#667085]">
+                      {label}
+                    </td>
+                    <td className="px-3 py-3 text-[#555a6a]">{body}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-2">
+        {[
+          { title: "Explore modules", body: "Browse available modules and choose which ones belong in your workspace.", to: "/marketplace", icon: Store },
+          { title: "Configure sharing", body: "Review access, packet scope, and sharing controls for module workflows.", to: "/marketplace/settings", icon: SlidersHorizontal },
+        ].map((item) => {
+          const Icon = item.icon;
+          return (
+            <Link key={item.title} to={withPatient(item.to, patientId)} className="rounded-2xl bg-white p-5 no-underline shadow-[rgb(224_226_232)_0px_0px_0px_1px] hover:bg-[#fafbff]">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#eef1ff] text-[#5b76fe]">
+                  <Icon size={18} />
+                </div>
+                <div>
+                  <p className="text-base font-semibold text-[#1c1c1e]">{item.title}</p>
+                  <p className="mt-1 text-sm leading-6 text-[#667085]">{item.body}</p>
+                </div>
+              </div>
+            </Link>
+          );
+        })}
+      </section>
+    </main>
   );
 }
 
 export function Marketplace() {
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const patientId = searchParams.get("patient");
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("All");
-  const [selected, setSelected] = useState(defaultSelected);
+  const [favoriteIds, setFavoriteIds] = useState(() => loadModuleIds(FAVORITES_STORAGE_KEY, defaultFavoriteIds));
+  const [pinnedIds, setPinnedIds] = useState(() => loadModuleIds(PINNED_STORAGE_KEY, defaultPinnedIds));
+  const [viewMode, setViewMode] = useState<MarketplaceViewMode>("table");
 
   const filteredModules = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -324,43 +683,86 @@ export function Marketplace() {
     });
   }, [category, query]);
 
-  const selectedModules = useMemo(() => marketplaceModules.filter((module) => selected.has(module.id)), [selected]);
+  const favoriteModules = useMemo(() => marketplaceModules.filter((module) => favoriteIds.has(module.id)), [favoriteIds]);
 
   function toggleModule(moduleId: string) {
-    setSelected((current) => {
+    setFavoriteIds((current) => {
+      const next = new Set(current);
+      if (next.has(moduleId)) {
+        next.delete(moduleId);
+        setPinnedIds((currentPinned) => {
+          const nextPinned = new Set(currentPinned);
+          nextPinned.delete(moduleId);
+          saveModuleIds(PINNED_STORAGE_KEY, nextPinned);
+          return nextPinned;
+        });
+      } else {
+        next.add(moduleId);
+      }
+      saveModuleIds(FAVORITES_STORAGE_KEY, next);
+      return next;
+    });
+  }
+
+  function togglePinned(moduleId: string) {
+    setPinnedIds((current) => {
       const next = new Set(current);
       if (next.has(moduleId)) {
         next.delete(moduleId);
       } else {
         next.add(moduleId);
+        setFavoriteIds((currentFavorites) => {
+          const nextFavorites = new Set(currentFavorites);
+          nextFavorites.add(moduleId);
+          saveModuleIds(FAVORITES_STORAGE_KEY, nextFavorites);
+          return nextFavorites;
+        });
       }
+      saveModuleIds(PINNED_STORAGE_KEY, next);
       return next;
     });
   }
 
+  if (location.pathname.startsWith("/marketplace/overview")) {
+    return <MarketplaceOverview patientId={patientId} />;
+  }
+
+  if (location.pathname.startsWith("/marketplace/workspace")) {
+    return (
+      <WorkspaceFavorites
+        modules={marketplaceModules}
+        patientId={patientId}
+        favoriteIds={favoriteIds}
+        pinnedIds={pinnedIds}
+        onToggleFavorite={toggleModule}
+        onTogglePin={togglePinned}
+      />
+    );
+  }
+
   return (
-    <main className="mx-auto max-w-7xl space-y-5 p-4 lg:p-6">
-      <section className="rounded-3xl bg-white p-6 shadow-[rgb(224_226_232)_0px_0px_0px_1px] lg:p-8">
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+    <main className="mx-auto max-w-7xl space-y-4 p-4 lg:p-5">
+      <section className="rounded-2xl bg-white p-5 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="max-w-3xl">
             <p className="inline-flex items-center gap-2 rounded-full bg-[#eef1ff] px-3 py-1 text-xs font-semibold uppercase tracking-wider text-[#5b76fe]">
               <Store size={13} />
               Marketplace inventory
             </p>
-            <h1 className="mt-5 text-3xl font-semibold tracking-tight text-[#1c1c1e] lg:text-4xl">
-              Choose external modules that can use the patient-owned FHIR Chart
+            <h1 className="mt-3 text-2xl font-semibold tracking-tight text-[#1c1c1e] lg:text-3xl">
+              Explore modules that can use the patient-owned FHIR Chart
             </h1>
-            <p className="mt-3 text-base leading-7 text-[#667085]">
+            <p className="mt-2 text-sm leading-6 text-[#667085]">
               Marketplace modules help patients act outside the care record: trials, medication access, payer coverage,
               grants, research programs, second opinions, and scoped caregiver support.
             </p>
           </div>
-          <div className="rounded-2xl bg-[#fafbff] p-4 shadow-[rgb(224_226_232)_0px_0px_0px_1px] lg:min-w-[280px]">
+          <div className="rounded-xl bg-[#fafbff] p-3 shadow-[rgb(224_226_232)_0px_0px_0px_1px] lg:max-w-[360px]">
             <div className="flex items-center gap-2">
-              <ShieldCheck size={18} className="text-[#00b473]" />
+              <ShieldCheck size={16} className="text-[#00b473]" />
               <p className="text-sm font-semibold text-[#1c1c1e]">Module contract</p>
             </div>
-            <p className="mt-2 text-sm leading-6 text-[#667085]">
+            <p className="mt-1.5 text-xs leading-5 text-[#667085]">
               Every module declares whether it leaves the private record workspace, what data it needs, and what evidence
               must stay attached to its output.
             </p>
@@ -368,23 +770,24 @@ export function Marketplace() {
         </div>
       </section>
 
-      <SelectedMarketplace modules={selectedModules} patientId={patientId} />
-
       <section className="rounded-[24px] border border-[#dfe4ff] bg-[#f7f8ff] p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider text-[#5b76fe]">Search marketplace</p>
             <h2 className="mt-1 text-xl font-semibold text-[#1c1c1e]">Available patient action modules</h2>
           </div>
-          <label className="flex min-w-[280px] items-center gap-2 rounded-xl bg-white px-3 py-2 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
-            <Search size={16} className="text-[#a5a8b5]" />
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search by goal, record input, or output"
-              className="w-full bg-transparent text-sm text-[#1c1c1e] outline-none placeholder:text-[#a5a8b5]"
-            />
-          </label>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <label className="flex min-w-[280px] items-center gap-2 rounded-xl bg-white px-3 py-2 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+              <Search size={16} className="text-[#a5a8b5]" />
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Search by goal, record input, or output"
+                className="w-full bg-transparent text-sm text-[#1c1c1e] outline-none placeholder:text-[#a5a8b5]"
+              />
+            </label>
+            <ViewModeToggle viewMode={viewMode} onChange={setViewMode} />
+          </div>
         </div>
 
         <div className="mt-4 flex flex-wrap gap-2">
@@ -407,21 +810,32 @@ export function Marketplace() {
             {filteredModules.length} modules shown
           </span>
           <span className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[#667085]">
-            {selectedModules.length} selected for marketplace
+            {favoriteModules.length} favorites in workspace
           </span>
         </div>
 
-        <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {filteredModules.map((module) => (
-            <MarketplaceCard
-              key={module.id}
-              module={module}
-              patientId={patientId}
-              selected={selected.has(module.id)}
-              onToggle={toggleModule}
-            />
-          ))}
-        </div>
+        {viewMode === "cards" ? (
+          <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {filteredModules.map((module) => (
+              <MarketplaceCard
+                key={module.id}
+                module={module}
+                patientId={patientId}
+                selected={favoriteIds.has(module.id)}
+                onToggle={toggleModule}
+              />
+            ))}
+          </div>
+        ) : (
+          <MarketplaceTable
+            modules={filteredModules}
+            patientId={patientId}
+            favoriteIds={favoriteIds}
+            pinnedIds={pinnedIds}
+            onToggle={toggleModule}
+            onTogglePin={togglePinned}
+          />
+        )}
       </section>
 
       <section className="rounded-2xl bg-white p-5 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">

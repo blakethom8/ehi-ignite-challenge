@@ -3,6 +3,7 @@ import { useMutation } from "@tanstack/react-query";
 import { api } from "../api/client";
 import type {
   ProviderAssistantCitation,
+  ProviderAssistantContextPackage,
   ProviderAssistantResponse,
   ProviderAssistantTurn,
   TraceDetail,
@@ -47,6 +48,9 @@ interface ChatContextInner {
   setStance: (s: "opinionated" | "balanced") => void;
   agentSettings: AgentSettings;
   setAgentSettings: (s: AgentSettings) => void;
+  contextPackages: ProviderAssistantContextPackage[];
+  setContextPackages: (packages: ProviderAssistantContextPackage[]) => void;
+  toggleContextPackage: (contextPackage: ProviderAssistantContextPackage) => void;
   submitQuestion: (patientId: string, question: string) => void;
   isPending: boolean;
   isError: boolean;
@@ -60,6 +64,9 @@ export interface PatientChatHandle {
   setStance: (s: "opinionated" | "balanced") => void;
   agentSettings: AgentSettings;
   setAgentSettings: (s: AgentSettings) => void;
+  contextPackages: ProviderAssistantContextPackage[];
+  setContextPackages: (packages: ProviderAssistantContextPackage[]) => void;
+  toggleContextPackage: (contextPackage: ProviderAssistantContextPackage) => void;
   submitQuestion: (question: string) => void;
   isPending: boolean;
   isError: boolean;
@@ -82,12 +89,36 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     } catch { /* noop */ }
     return DEFAULT_SETTINGS;
   });
+  const [contextPackages, setContextPackagesState] = useState<ProviderAssistantContextPackage[]>(() => {
+    try {
+      const saved = localStorage.getItem("ehi-provider-assistant-context-packages");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch { /* noop */ }
+    return [];
+  });
   const [messagesByPatient, setMessagesByPatient] = useState<Record<string, ChatMessage[]>>({});
 
   const updateSettings = useCallback((next: AgentSettings) => {
     const normalized = { ...next, maxTokens: clampMaxTokens(next.maxTokens) };
     setAgentSettings(normalized);
     try { localStorage.setItem("ehi-agent-settings", JSON.stringify(normalized)); } catch { /* noop */ }
+  }, []);
+
+  const setContextPackages = useCallback((packages: ProviderAssistantContextPackage[]) => {
+    setContextPackagesState(packages);
+    try { localStorage.setItem("ehi-provider-assistant-context-packages", JSON.stringify(packages)); } catch { /* noop */ }
+  }, []);
+
+  const toggleContextPackage = useCallback((contextPackage: ProviderAssistantContextPackage) => {
+    setContextPackagesState((current) => {
+      const exists = current.some((item) => item.id === contextPackage.id);
+      const next = exists ? current.filter((item) => item.id !== contextPackage.id) : [...current, contextPackage];
+      try { localStorage.setItem("ehi-provider-assistant-context-packages", JSON.stringify(next)); } catch { /* noop */ }
+      return next;
+    });
   }, []);
 
   const mutation = useMutation({
@@ -99,11 +130,13 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       model?: string;
       mode?: string;
       max_tokens?: number;
+      context_packages?: ProviderAssistantContextPackage[];
     }) => {
       return api.chatProviderAssistant({
         patient_id: payload.patientId,
         question: payload.question,
         history: payload.history,
+        context_packages: payload.context_packages,
         stance: payload.stance,
         model: payload.model || undefined,
         mode: payload.mode || undefined,
@@ -157,12 +190,13 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         question: trimmed,
         history,
         stance,
+        context_packages: contextPackages,
         model: agentSettings.model || undefined,
         mode: agentSettings.mode || undefined,
         max_tokens: agentSettings.maxTokens || undefined,
       });
     },
-    [messagesByPatient, mutation, stance, agentSettings],
+    [messagesByPatient, mutation, stance, agentSettings, contextPackages],
   );
 
   const value = useMemo<ChatContextInner>(
@@ -172,12 +206,15 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       setStance,
       agentSettings,
       setAgentSettings: updateSettings,
+      contextPackages,
+      setContextPackages,
+      toggleContextPackage,
       submitQuestion,
       isPending: mutation.isPending,
       isError: mutation.isError,
       error: mutation.error,
     }),
-    [messagesByPatient, stance, agentSettings, updateSettings, submitQuestion, mutation.isPending, mutation.isError, mutation.error],
+    [messagesByPatient, stance, agentSettings, updateSettings, contextPackages, setContextPackages, toggleContextPackage, submitQuestion, mutation.isPending, mutation.isError, mutation.error],
   );
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
@@ -208,6 +245,9 @@ export function useChatForPatient(patientId: string | null): PatientChatHandle {
     setStance: ctx.setStance,
     agentSettings: ctx.agentSettings,
     setAgentSettings: ctx.setAgentSettings,
+    contextPackages: ctx.contextPackages,
+    setContextPackages: ctx.setContextPackages,
+    toggleContextPackage: ctx.toggleContextPackage,
     submitQuestion: submit,
     isPending: ctx.isPending,
     isError: ctx.isError,

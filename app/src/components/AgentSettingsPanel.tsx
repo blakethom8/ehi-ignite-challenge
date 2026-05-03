@@ -19,11 +19,15 @@ const MODE_ICONS: Record<string, React.ReactNode> = {
 export function AgentSettingsPanel({
   settings,
   onUpdate,
+  defaultOpen = false,
+  lockOpen = false,
 }: {
   settings: AgentSettings;
   onUpdate: (next: AgentSettings) => void;
+  defaultOpen?: boolean;
+  lockOpen?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen || lockOpen);
 
   const { data: config } = useQuery({
     queryKey: ["assistant-settings"],
@@ -38,7 +42,7 @@ export function AgentSettingsPanel({
   const overridesEnabled = config?.client_overrides_enabled ?? true;
   const maxTokensLimit = config?.max_tokens_limit ?? 4000;
 
-  if (!open) {
+  if (!open && !lockOpen) {
     return (
       <button
         onClick={() => setOpen(true)}
@@ -55,19 +59,21 @@ export function AgentSettingsPanel({
   }
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white shadow-lg p-4 space-y-4 w-[340px]">
+    <div className={`rounded-xl border border-slate-200 bg-white p-4 space-y-4 ${lockOpen ? "w-full shadow-none" : "w-[340px] shadow-lg"}`}>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Settings2 size={14} className="text-slate-500" />
           <span className="text-[13px] font-semibold text-[#1c1c1e]">Agent Settings</span>
         </div>
-        <button
-          onClick={() => setOpen(false)}
-          className="text-[11px] text-blue-600 hover:text-blue-800 font-medium"
-        >
-          Done
-        </button>
+        {!lockOpen && (
+          <button
+            onClick={() => setOpen(false)}
+            className="text-[11px] text-blue-600 hover:text-blue-800 font-medium"
+          >
+            Done
+          </button>
+        )}
       </div>
 
       {/* Model selector */}

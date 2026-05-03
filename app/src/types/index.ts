@@ -507,10 +507,19 @@ export interface ProviderAssistantRequest {
   patient_id: string;
   question: string;
   history?: ProviderAssistantTurn[];
+  context_packages?: ProviderAssistantContextPackage[];
   stance?: "opinionated" | "balanced";
   model?: string;
   mode?: string;
   max_tokens?: number;
+}
+
+export interface ProviderAssistantContextPackage {
+  id: string;
+  title: string;
+  type: string;
+  summary: string;
+  instructions: string;
 }
 
 export interface AssistantModeOption {

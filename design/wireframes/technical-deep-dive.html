@@ -1,0 +1,491 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Technical Deep Dive — EHI Atlas</title>
+  <style>
+    :root {
+      --text: #111827;
+      --text-2: #374151;
+      --muted: #6b7280;
+      --muted-2: #9ca3af;
+      --border: #d9dee7;
+      --border-light: #edf0f5;
+      --surface: #ffffff;
+      --surface-2: #f7f9fc;
+      --surface-3: #f1f4f8;
+      --blue: #2f5fcb;
+      --blue-2: #153e8a;
+      --teal: #0f766e;
+      --green: #16794c;
+      --amber: #9a6700;
+      --slate: #334155;
+      --code-bg: #0b1220;
+      --code-text: #d6def0;
+      --font: Inter, "Noto Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --mono: "SFMono-Regular", "Roboto Mono", "Cascadia Code", monospace;
+      --shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; color: var(--text); background: #eef2f7; font-family: var(--font); line-height: 1.55; }
+    .page { width: min(1080px, calc(100% - 40px)); margin: 0 auto; padding: 24px 0 80px; }
+    .bar { height: 56px; display: flex; align-items: center; justify-content: space-between; gap: 20px; border: 1px solid var(--border); background: var(--surface); padding: 0 18px; margin-bottom: 24px; box-shadow: var(--shadow); }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .mark { width: 30px; height: 30px; border-radius: 4px; background: var(--slate); color: white; display: grid; place-items: center; font-size: 11px; font-weight: 700; font-family: var(--mono); }
+    .brand strong { display: block; font-size: 14px; }
+    .brand span { display: block; color: var(--muted); font-size: 12px; }
+    .nav { display: flex; gap: 22px; color: var(--muted); font-size: 13px; }
+    .nav a { color: var(--text-2); text-decoration: none; }
+    .nav a:hover { color: var(--blue); }
+    .panel { background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow); }
+    .hero { padding: 48px 48px 40px; margin-bottom: 24px; }
+    .eyebrow { color: var(--teal); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; }
+    h1 { font-size: 32px; line-height: 1.2; margin: 14px 0 14px; font-weight: 700; letter-spacing: -0.005em; }
+    .lede { font-size: 16px; color: var(--text-2); max-width: 820px; line-height: 1.6; }
+    .toc { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 26px; }
+    .toc a { padding: 6px 11px; background: var(--surface-2); border: 1px solid var(--border-light); border-radius: 3px; font-size: 12px; color: var(--text-2); text-decoration: none; font-family: var(--mono); }
+    .toc a:hover { border-color: var(--slate); color: var(--text); }
+    .section { padding: 40px 48px; margin-bottom: 24px; }
+    .section h2 { font-size: 22px; line-height: 1.3; margin: 0 0 6px; font-weight: 700; letter-spacing: -0.005em; }
+    .section h3 { font-size: 16px; font-weight: 700; margin: 26px 0 10px; }
+    .section .kicker { color: var(--muted); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; }
+    .section p { color: var(--text-2); font-size: 14.5px; line-height: 1.65; }
+    .section ul, .section ol { color: var(--text-2); font-size: 14.5px; line-height: 1.7; }
+    .section li { margin-bottom: 6px; }
+    code { font-family: var(--mono); background: var(--surface-3); padding: 1px 6px; border-radius: 3px; font-size: 0.92em; color: var(--text); }
+    pre { background: var(--code-bg); color: var(--code-text); padding: 18px 20px; border-radius: 4px; overflow-x: auto; font-family: var(--mono); font-size: 12.5px; line-height: 1.55; margin: 18px 0; }
+    pre code { background: transparent; padding: 0; color: inherit; }
+    table { width: 100%; border-collapse: collapse; margin: 18px 0; font-size: 13.5px; }
+    th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border-light); vertical-align: top; }
+    th { background: var(--surface-2); color: var(--text); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+    td { color: var(--text-2); }
+    td code { font-size: 0.85em; }
+    .pipeline { padding: 22px 24px; background: var(--surface-2); border: 1px dashed var(--border); border-radius: 4px; font-family: var(--mono); font-size: 12.5px; line-height: 1.7; color: var(--text-2); white-space: pre; overflow-x: auto; }
+    .callout { padding: 16px 20px; background: #fef9e7; border: 1px solid #f0e0a8; border-left: 3px solid var(--amber); border-radius: 0 4px 4px 0; font-size: 13.5px; color: var(--text-2); margin: 18px 0; line-height: 1.6; }
+    .callout-teal { background: #e6f4f1; border-color: #a7d4cb; border-left-color: var(--teal); }
+    .principle { display: grid; grid-template-columns: 200px 1fr; gap: 16px; padding: 14px 0; border-bottom: 1px solid var(--border-light); }
+    .principle:last-child { border-bottom: 0; }
+    .principle .name { font-weight: 700; color: var(--blue-2); font-size: 13.5px; }
+    .principle p { margin: 0; font-size: 13.5px; }
+    .citations { display: grid; grid-template-columns: 1fr; gap: 10px; margin-top: 16px; }
+    .citation { padding: 14px 18px; background: var(--surface-2); border: 1px solid var(--border-light); border-radius: 4px; font-size: 13px; }
+    .citation .label { font-weight: 700; color: var(--text); }
+    .citation .why { color: var(--muted); font-size: 12.5px; margin-top: 4px; line-height: 1.5; }
+    .citation a { color: var(--blue); text-decoration: none; font-family: var(--mono); font-size: 12px; }
+    .attribution { padding: 26px 30px; background: #eef4ff; border: 1px solid #b5cdf5; border-radius: 4px; margin: 20px 0; }
+    .attribution h3 { margin-top: 0; color: var(--blue-2); font-size: 16px; }
+    .attribution ul { margin: 12px 0 0; }
+    .closing { padding: 40px 48px; }
+    footer { color: var(--muted); font-size: 12px; text-align: center; padding: 24px 0; }
+    .meta-flag { display: inline-block; font-size: 10px; padding: 2px 7px; border-radius: 2px; background: #fff8e1; color: var(--amber); border: 1px solid #f0e0a8; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; margin-left: 10px; vertical-align: middle; }
+    .pill { display: inline-block; font-size: 10.5px; font-weight: 600; padding: 2px 8px; border-radius: 3px; background: var(--surface-3); color: var(--slate); font-family: var(--mono); }
+    .pill-teal { background: #d8ece9; color: var(--teal); }
+    .pill-amber { background: #fdf2cc; color: var(--amber); }
+    .pill-green { background: #d8eddf; color: var(--green); }
+  </style>
+</head>
+<body>
+  <div class="page">
+
+    <header class="bar">
+      <div class="brand">
+        <div class="mark">EA</div>
+        <div>
+          <strong>EHI Atlas <span class="meta-flag">working name</span></strong>
+          <span>Technical deep dive · Phase 1 brief</span>
+        </div>
+      </div>
+      <nav class="nav">
+        <a href="marketing-overview.html">Overview</a>
+        <a href="patient-guide.html">For patients</a>
+        <a href="technical-deep-dive.html">Technical</a>
+        <a href="development-process.html">Process</a>
+      </nav>
+    </header>
+
+    <section class="panel hero">
+      <div class="eyebrow">HHS EHI Ignite Challenge · Technical brief · v0.2</div>
+      <h1>Patient-side EHI harmonization with FHIR-native provenance.</h1>
+      <p class="lede">
+        How we turn fragmented patient health data — SMART-on-FHIR pulls, Epic EHI Export TSV, CMS claims, C-CDA documents, and PDFs — into one canonical FHIR R4 record with full Provenance lineage exposed to clinicians and patients. Architecture, prior art, and the worked example we ship for Phase 1.
+      </p>
+      <div class="toc">
+        <a href="#problem">01 Problem</a>
+        <a href="#architecture">02 Five-layer pipeline</a>
+        <a href="#harmonize">03 Layer 3 differentiation</a>
+        <a href="#provenance">04 FHIR-native provenance</a>
+        <a href="#multiformat">05 Multi-format ingestion</a>
+        <a href="#scripts-vs-llm">06 Scripts vs LLMs</a>
+        <a href="#showcase">07 Worked example</a>
+        <a href="#prior-art">08 Prior art &amp; attribution</a>
+        <a href="#open-source">09 Open source</a>
+        <a href="#roadmap">10 Roadmap</a>
+      </div>
+    </section>
+
+    <section id="problem" class="panel section">
+      <div class="kicker">01 · The problem</div>
+      <h2>EHI is broader than FHIR, and the unsolved layer is harmonization.</h2>
+      <p>
+        HHS legally defines EHI as the HIPAA Designated Record Set (45 CFR 164.501): all electronic patient information a covered entity maintains, in any form. ONC's <code>(b)(10)</code> certification criterion does not mandate FHIR — Epic ships EHI Export as ~552 raw TSV tables; other vendors ship CSV, XML, or scanned PDFs. Roughly half of certified EHRs satisfy the requirement by exporting C-CDAs, not FHIR USCDI.
+      </p>
+      <p>
+        The patient-side prior art splits cleanly. <strong>Connectors are solved</strong> — Josh Mandel's <code>health-skillz</code> covers 88,000+ providers via SMART on FHIR; commercial aggregators (1upHealth, Particle Health, Health Gorilla, Zus Health) ship managed FHIR servers behind TEFCA / Carequality / Commonwell pulls; Apple Health does patient-side multi-provider FHIR aggregation. <strong>Harmonization is not solved.</strong> Existing systems either:
+      </p>
+      <ul>
+        <li>preserve per-source slices and don't merge (Mandel's published design — explicit non-decision)</li>
+        <li>merge with audit-only Provenance never exposed to end users (1upHealth, Particle, Zus, the cloud-platform offerings)</li>
+        <li>label per-fact source in a closed product without lineage walking (Apple)</li>
+        <li>operate at enterprise scale without a patient-facing UX (Epic Cosmos, OMOP-on-FHIR institutional warehouses)</li>
+      </ul>
+      <p>
+        And none of them connect document extraction (PDFs, CCDAs, scanned faxes — where most patient-side EHI actually lives) into a clinician-facing FHIR record with per-fact source-coordinate provenance.
+      </p>
+      <div class="callout">
+        <strong>Our position:</strong> we embed Mandel's connector with attribution, build the harmonization layer above it, and ship a clinician-facing Sources panel that walks the Provenance graph uniformly across structured and unstructured sources. Phase 1 demonstrates the architecture on a worked example; Phase 2 productionizes for multi-vendor coverage.
+      </div>
+    </section>
+
+    <section id="architecture" class="panel section">
+      <div class="kicker">02 · Architecture</div>
+      <h2>Five layers, immutable boundaries, FHIR R4 as the canonical schema.</h2>
+      <div class="pipeline">            ┌─────────────────────────────────────────┐
+            │  Source A: SMART-on-FHIR pull (Cedars)  │
+            │  Source B: Epic EHI Export TSV          │
+            │  Source C: CMS Blue Button claims       │
+            │  Source D: C-CDA documents              │
+            │  Source E: Lab report / EOB PDFs        │
+            │  Source F: AHRQ SDoH (optional)         │
+            └────────────────────┬────────────────────┘
+                                 │
+                    ┌────────────▼─────────────┐
+                    │ LAYER 1: INGEST          │  per-source adapters →
+                    │ raw immutable bronze     │  Mandel-shape envelope
+                    └────────────┬─────────────┘
+                                 │
+                    ┌────────────▼─────────────┐
+                    │ LAYER 2: STANDARDIZE     │  every source → FHIR R4
+                    │ silver per source        │  USCDI / CARIN BB profiles
+                    └────────────┬─────────────┘  + vision extraction sub-layer
+                                 │
+                    ┌────────────▼─────────────┐
+                    │ LAYER 3: HARMONIZE       │ ◀── DIFFERENTIATION
+                    │ Cross-source dedup,      │     per-fact Provenance
+                    │ entity resolution, code  │     + UMLS code mapping
+                    │ mapping, temporal align, │     + Fellegi-Sunter
+                    │ conflict detection       │     + LLM extraction
+                    └────────────┬─────────────┘
+                                 │
+                    ┌────────────▼─────────────┐
+                    │ LAYER 4: CURATE          │  SQL-on-FHIR views
+                    │ analytic warehouse       │  enrichments (RxNorm)
+                    └────────────┬─────────────┘
+                                 │
+                    ┌────────────▼─────────────┐
+                    │ LAYER 5: INTERPRET       │  Context pipeline
+                    │ clinician-facing UX      │  surgical risk briefing
+                    └──────────────────────────┘  Sources panel + Q&amp;A</div>
+      <p>
+        Each layer is an immutable boundary: data moves down by transformation, never by mutation. Provenance flows through — every harmonized fact in gold knows which silver records it came from, which in turn know which bronze artifact they came from. Three-tier storage:
+      </p>
+      <pre><code>BRONZE  per-source envelopes, immutable             ← Mandel-shape
+        providers[] × fhir{ResourceType[]} × attachments[]
+        + binaries (PDF originals) + page rasterizations + bbox text
+
+SILVER  FHIR Bundles per source, profile-validated  ← Layer 2 output
+        one Bundle per (source, patient, ingest_run)
+        includes vision-extracted resources with extraction-provenance Extensions
+
+GOLD    cross-source merged FHIR + Provenance graph ← Layer 3 output
+        one resource per logical fact
+        Provenance edges to silver, transitively to bronze</code></pre>
+      <p>
+        Layers 4 and 5 already exist in production: a SQL-on-FHIR warehouse (<code>data/sof.db</code>) with RxNorm-driven drug-class enrichments, and a four-stage context pipeline (filter → episode-compress → format → persona) that compresses raw FHIR to ~1,400 tokens of clinician-ready briefing for the surgical pre-op scenario. The architectural payoff of standardizing on FHIR at Layer 2 is that Layers 4 and 5 require no changes to consume harmonized multi-source data.
+      </p>
+    </section>
+
+    <section id="harmonize" class="panel section">
+      <div class="kicker">03 · Layer 3 — the differentiation work</div>
+      <h2>Cross-source dedup, entity resolution, code mapping, conflict detection.</h2>
+      <p>
+        The output of Layer 3 is what a clinician would think of as "the patient" — not five disconnected slices. Sub-tasks and the engine that owns each:
+      </p>
+      <table>
+        <thead>
+          <tr><th>Sub-task</th><th>Primary engine</th><th>Why</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Patient identity resolution</td><td>Fellegi-Sunter probabilistic linkage on (name, DOB, address, MRN-when-shared)</td><td>algorithm unchanged since 1969; Splink, N3C, PCORnet, TriNetX use this</td></tr>
+          <tr><td>Provider identity resolution</td><td>NPPES-anchored entity resolution</td><td>leverages existing CMS pipelines</td></tr>
+          <tr><td>Encounter dedup</td><td>hash on (patient, period.start, location) + temporal proximity</td><td>high precision; false negatives keep both with provenance</td></tr>
+          <tr><td>Condition merge</td><td>UMLS CUI-level merge + temporal envelope union</td><td>one Hypertension on the problem list, sourced from N records</td></tr>
+          <tr><td>Medication episode reconciliation</td><td>RxNorm-ingredient grouping + active-period intervals</td><td>extends single-source episode logic to multi-source</td></tr>
+          <tr><td>Observation dedup</td><td>(LOINC, effectiveDateTime, value, unit) hash with UCUM unit normalization first</td><td>exact match kills duplicates; near-misses preserve both</td></tr>
+          <tr><td>Code harmonization</td><td>UMLS lookups, scripts</td><td>deterministic; 80% of mappings are table lookups</td></tr>
+          <tr><td>Temporal alignment</td><td>UTC normalize; <code>DocumentReference.context.period.start</code> precedence rule</td><td>prevents the "metadata date as clinical date" bug Mandel flagged</td></tr>
+          <tr><td>Free-text → structured</td><td>small LLM (Haiku-class) per attachment, schema-constrained output</td><td>scripts can't do NLP; LLM is the right tool here</td></tr>
+          <tr><td>Conflict detection</td><td>rule first, LLM-judge for ambiguous cases (build-time, not runtime)</td><td>rules catch common patterns; LLM-judge for novel cases</td></tr>
+          <tr><td>Quality scoring</td><td>rule-based: recency × source authority × completeness</td><td>policy needs to be explicit, not LLM-learned</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="provenance" class="panel section">
+      <div class="kicker">04 · Provenance — use FHIR-native machinery</div>
+      <h2>Don't invent custom fields. FHIR has the vocabulary.</h2>
+      <p>
+        Six native FHIR mechanisms carry source tracking. The <code>Provenance</code> resource is the load-bearing piece — every cross-source merge emits one with <code>target</code> = merged resource, <code>entity[]</code> = source records, <code>agent</code> = our pipeline (versioned), <code>activity</code> = MERGE / DERIVE / EXTRACT, <code>recorded</code> = timestamp.
+      </p>
+      <h3>Worked example: Hypertension merged from Cedars + Epic EHI</h3>
+      <pre><code>// gold/Condition/harmonized-htn-blake
+{
+  "resourceType": "Condition",
+  "id": "harmonized-htn-blake",
+  "meta": {
+    "profile": ["http://hl7.org/fhir/us/core/StructureDefinition/us-core-condition"],
+    "source": "harmonizer://merge/2026-04-29",
+    "tag": [
+      {"system": ".../source-tag", "code": "cedars-sinai"},
+      {"system": ".../source-tag", "code": "epic-ehi-fixture"},
+      {"system": ".../lifecycle", "code": "harmonized"}
+    ],
+    "extension": [
+      {"url": ".../quality-score", "valueDecimal": 0.94}
+    ]
+  },
+  "identifier": [
+    {"system": "https://fhir.cedars-sinai.org/Condition", "value": "abc123"},
+    {"system": "epic-ehi://Condition", "value": "789xyz"}
+  ],
+  "code": {
+    "coding": [
+      {"system": "http://snomed.info/sct", "code": "38341003", "display": "Hypertensive disorder"},
+      {"system": "http://hl7.org/fhir/sid/icd-10-cm", "code": "I10", "display": "Essential hypertension"}
+    ]
+  },
+  "subject": {"reference": "Patient/blake-merged"},
+  "onsetDateTime": "2018-03-04",
+  "clinicalStatus": {"coding": [{"system": ".../condition-clinical", "code": "active"}]}
+}
+
+// gold/Provenance/...
+{
+  "resourceType": "Provenance",
+  "target": [{"reference": "Condition/harmonized-htn-blake"}],
+  "recorded": "2026-04-29T14:21:00Z",
+  "activity": {"coding": [{"code": "MERGE"}]},
+  "agent": [{"who": {"display": "ehi-harmonizer v0.3.1"}}],
+  "entity": [
+    {"role": "source", "what": {"reference": "Condition/cedars-abc123"}},
+    {"role": "source", "what": {"reference": "Condition/epic-789xyz"}}
+  ]
+}</code></pre>
+      <p>
+        Both source records preserved in the bronze tier with original IDs. One merged record in gold with both identifiers retained, both code systems retained (UMLS-mapped, not chosen-between), quality-scored. A Provenance edge written by our pipeline. No information destroyed at any stage.
+      </p>
+    </section>
+
+    <section id="multiformat" class="panel section">
+      <div class="kicker">05 · Multi-format ingestion</div>
+      <h2>Vision extraction with page-level provenance.</h2>
+      <p>
+        Layer 2 has two paths and uses each where it wins.
+      </p>
+      <h3>Path A — deterministic (structured-format documents)</h3>
+      <p>
+        C-CDA → FHIR via Microsoft FHIR-Converter Liquid templates. HL7 V2 → FHIR via the same converter. Battle-tested, free, no LLM cost. Fall back to LLM only for sections the templates don't cover.
+      </p>
+      <h3>Path B — vision LLM (PDFs, complex layouts, free-text-only documents)</h3>
+      <ul>
+        <li><strong>Input:</strong> rasterized PDF pages plus layout-aware text extraction with bounding boxes (<code>pdfplumber</code> for structured PDFs, <code>tesseract</code> OCR fallback for scanned). Combining vision + ground-truth strings outperforms either alone.</li>
+        <li><strong>Engine:</strong> Claude Opus 4.7 or Sonnet 4.6 via the Anthropic SDK with native multi-page PDF support; vision-accurate on tables and forms.</li>
+        <li><strong>Output:</strong> schema-constrained JSON via Pydantic / <code>instructor</code> / structured outputs. No free-form text in the production path.</li>
+        <li><strong>Determinism via caching:</strong> content-hash → cached extraction. Same PDF in, same extraction out. Re-extract only on prompt or schema-version change.</li>
+        <li><strong>Per-fact provenance:</strong> every emitted FHIR resource carries <code>meta.extension(.../extraction)</code> with the extraction model, version, confidence, source attachment reference, and page+bbox locator.</li>
+      </ul>
+      <h3>Worked example: creatinine value lifted from a Quest lab PDF</h3>
+      <pre><code>{
+  "resourceType": "Observation",
+  "code": {"coding": [{"system": "http://loinc.org", "code": "2160-0",
+                       "display": "Creatinine [Mass/volume] in Serum or Plasma"}]},
+  "valueQuantity": {"value": 1.4, "unit": "mg/dL"},
+  "effectiveDateTime": "2025-09-12",
+  "meta": {
+    "source": "lab-report-pdf://2025-09-12-quest.pdf",
+    "profile": ["http://hl7.org/fhir/us/core/StructureDefinition/us-core-observation-lab"],
+    "extension": [
+      {"url": ".../extraction-model", "valueCoding": {"display": "claude-opus-4-7"}},
+      {"url": ".../extraction-confidence", "valueDecimal": 0.97},
+      {"url": ".../source-attachment", "valueReference": {"reference": "Binary/quest-2025-09-12"}},
+      {"url": ".../source-locator", "valueString": "page=2;bbox=144,302,260,318"}
+    ]
+  }
+}</code></pre>
+      <div class="callout callout-teal">
+        <strong>The demo's strongest moment:</strong> a clinician clicks a fact in the patient-journey briefing. The Sources panel walks the Provenance edges. For structured sources it opens the parent FHIR Bundle. <strong>For PDF-extracted facts it opens the PDF page with the bounding box highlighted.</strong> Same UI, same lineage primitive, working uniformly across structured and unstructured sources. None of the surveyed prior-art systems ships this.
+      </div>
+    </section>
+
+    <section id="scripts-vs-llm" class="panel section">
+      <div class="kicker">06 · Engine principle</div>
+      <h2>LLMs at the boundaries. Scripts in the middle.</h2>
+      <div class="principle">
+        <div class="name">Scripts win:</div>
+        <p>structured-to-structured mapping (column → FHIR field; SNOMED → ICD-10 via UMLS); deduplication on exact-match keys; quality scoring with explicit policy.</p>
+      </div>
+      <div class="principle">
+        <div class="name">LLMs win:</div>
+        <p>free-text → structured extraction at ingest (clinical notes → Condition); build-time crosswalk generation (validate against ground truth, then freeze); conflict adjudication and "what changed" narration.</p>
+      </div>
+      <div class="principle">
+        <div class="name">Iterative agents:</div>
+        <p>quality assurance, not transformation. Post-pipeline auditors sample N patients and flag — they don't rewrite. Crosswalk drift detectors watch for vendor schema changes. Adversarial test-case generators feed CI.</p>
+      </div>
+      <div class="principle">
+        <div class="name">Out of scope:</div>
+        <p>autonomous LLM merge, runtime free-form prompting per record, LLM-as-final-arbiter on clinical facts. Failure modes are well-documented in the prior art and we want none of them in the pipeline.</p>
+      </div>
+      <p style="margin-top: 18px;">
+        Cited precedents validate this posture: FHIR-GPT (Wang et al., <em>PMC</em> 2024) achieves >90% exact-match on medication-statement extraction with constrained prompts; LLMonFHIR (Stanford, <em>arXiv</em> 2402.01711) ships physician-validated FHIR-LLM UX. Both are narrow extractors, not general agents.
+      </p>
+    </section>
+
+    <section id="showcase" class="panel section">
+      <div class="kicker">07 · Worked example</div>
+      <h2>One showcase patient. Five sources. Five pre-engineered artifacts.</h2>
+      <p>
+        Phase 1 demonstrates the architecture on one patient stitched across three real-format sources, plus a CCDA fixture and a lab report PDF, with deliberate cross-source artifacts engineered to exercise each Layer 3 behavior.
+      </p>
+      <table>
+        <thead><tr><th>#</th><th>Artifact</th><th>What it demonstrates</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td><span class="pill">DUPLICATE</span> Hypertension in SNOMED + ICD-10</td><td>UMLS CUI-level merge across code systems</td></tr>
+          <tr><td>2</td><td><span class="pill pill-amber">CONFLICT</span> Atorvastatin active vs discontinued</td><td>Layer 3 conflict detection + LLM-narrator explanation</td></tr>
+          <tr><td>3</td><td><span class="pill">ORPHAN</span> Statin fill in BB claims only</td><td>single-source fact preserved with provenance asymmetry</td></tr>
+          <tr><td>4</td><td><span class="pill pill-teal">EXTRACTION</span> Chest tightness from clinical note</td><td>schema-constrained LLM extraction → Condition</td></tr>
+          <tr><td>5</td><td><span class="pill pill-green">PDF-LIFTED</span> Creatinine from lab report</td><td>vision extraction with page-bbox provenance, merged with FHIR Observation</td></tr>
+        </tbody>
+      </table>
+      <p>
+        Plus a sixth supporting bullet: a CCDA fixture from Mandel's <code>sample_ccdas</code> representing a transition-of-care document, converted via Microsoft FHIR-Converter and merged into the showcase record — demonstrating the deterministic-converter path alongside the vision-extraction path.
+      </p>
+      <div class="callout">
+        Honesty about construction beats fake naturalism. The narrative explicitly states: <em>these artifacts are pre-engineered to demonstrate Layer 3 behavior on canonical real-world cases.</em>
+      </div>
+    </section>
+
+    <section id="prior-art" class="panel section">
+      <div class="kicker">08 · Prior art &amp; attribution</div>
+      <h2>We embed; we don't reinvent.</h2>
+      <p>
+        Architecture patterns we adopt as table-stakes — <em>not</em> claimed as novel: medallion bronze/silver/gold (Databricks vocabulary; OHDSI's raw → staging → CDM is the same shape); FHIR R4 + USCDI / CARIN BB profiles as exchange schema; UMLS / OHDSI Athena for vocabulary harmonization; Fellegi-Sunter probabilistic linkage; Microsoft FHIR-Converter Liquid templates for HL7v2 / CCDA → FHIR; SQL on FHIR for the analytic warehouse.
+      </p>
+
+      <div class="attribution">
+        <h3>Josh Mandel's open-source stack</h3>
+        <p style="margin-top: 0;">
+          Mandel is a SMART on FHIR co-creator and the EHI Ignite Challenge's published technical reference. His four repos cover the full patient-data-to-AI access flow. Phase 1 embeds his connector layer with attribution; Phase 2 productionizes our own implementations of the modules we've extended. Specific dependencies:
+        </p>
+        <ul>
+          <li><strong><a href="https://github.com/jmandel/request-my-ehi">request-my-ehi</a></strong> (Apache-2.0) — Anthropic-format Claude Code skill that generates the PDF request packet to obtain an EHI Export. Embedded as the patient-side request workflow.</li>
+          <li><strong><a href="https://github.com/jmandel/health-skillz">health-skillz</a></strong> (MIT, claimed) — Bun + React SMART-on-FHIR connector covering 88,000+ providers; ships a Privacy Redaction Studio with auto-suggested PII clustering. Embedded as the data-collection layer for Phase 1.</li>
+          <li><strong><a href="https://github.com/jmandel/health-record-mcp">health-record-mcp</a></strong> (MIT) — first-generation MCP server exposing fetched FHIR data via grep/query/eval tools. We adopt the FHIR-to-plaintext renderer (<code>src/fhirToPlaintext.ts</code>, ~1,500 lines covering USCDI).</li>
+          <li><strong><a href="https://github.com/jmandel/my-health-data-ehi-wip">my-health-data-ehi-wip</a></strong> (MIT, claimed) — Vite app ingesting Epic EHI Export TSV through a numbered 0–8 pipeline, including the heuristic logical-table inference (<code>02-merge-related-tables.ts</code>) we lift verbatim into our Layer 1 Epic adapter.</li>
+          <li><strong><a href="https://github.com/jmandel/sample_ccdas">sample_ccdas</a></strong> (CC BY 4.0) — 747 PHI-free C-CDA fixtures across ~12 vendors. We use one fixture as Phase 1's CCDA showcase document.</li>
+        </ul>
+        <p style="margin: 14px 0 0;">
+          Specific design moves we adopt verbatim: per-source envelope preservation in bronze; <code>bestEffortPlaintext</code> + <code>originals[]</code> attachment-lift pattern; <code>DocumentReference.context.period.start</code> precedence rule for clinical timing; brand-directory tag-filter syntax.
+        </p>
+      </div>
+
+      <h3>Citations for the Phase 1 narrative</h3>
+      <div class="citations">
+        <div class="citation">
+          <div class="label">Bennett TD et al., "MIMIC-IV on FHIR: converting a decade of in-patient data into an exchangeable, interoperable format," <em>JAMIA</em> 2023.</div>
+          <div class="why">The strongest peer-reviewed precedent for source-format → FHIR mapping with a published mapping IG. Our submission frames itself as extending this precedent to multi-source merge with full Provenance.</div>
+        </div>
+        <div class="citation">
+          <div class="label">Wang J et al., "FHIR-GPT enhances medication statement extraction," <em>PMC</em> 2024.</div>
+          <div class="why">Production-validated LLM-to-FHIR extraction at &gt;90% exact-match. The precedent for our vision-extraction angle, which extends the pattern to general clinical content with provenance.</div>
+        </div>
+        <div class="citation">
+          <div class="label">Vorisek CN et al., "LLM on FHIR — Demystifying Health Records," <em>arXiv</em> 2402.01711 (Stanford BDHG, 2024).</div>
+          <div class="why">Physician-validated FHIR + LLM UX. Sets the bar for clinician-facing FHIR-LLM work that we aim for in the Sources panel and Q&amp;A.</div>
+        </div>
+        <div class="citation">
+          <div class="label">OHDSI / OMOP CDM v5.4 (<em>ohdsi.github.io/CommonDataModel</em>).</div>
+          <div class="why">The research-grade harmonization standard. Cited to position our FHIR-target choice as exchange-side complementary, not naïve.</div>
+        </div>
+        <div class="citation">
+          <div class="label">All of Us Data and Research Center, <em>PMC</em> 2024.</div>
+          <div class="why">Multi-CDM (FHIR ingest + OMOP analytic) precedent at NIH scale.</div>
+        </div>
+        <div class="citation">
+          <div class="label">"SQL on FHIR" — <em>npj Digital Medicine</em>, 2025.</div>
+          <div class="why">Analytic-views-over-FHIR. Cited to position our Layer-4 SOF warehouse as in-step with the standard.</div>
+        </div>
+        <div class="citation">
+          <div class="label">Microsoft FHIR-Converter (github.com/microsoft/FHIR-Converter).</div>
+          <div class="why">Liquid-template HL7v2 / CCDA / JSON → FHIR conversion. We adopt rather than rebuild.</div>
+        </div>
+        <div class="citation">
+          <div class="label">OHDSI WhiteRabbit / Usagi / Athena.</div>
+          <div class="why">Vocabulary-mapping toolchain. Cited to credibly say "we use the OHDSI tooling pattern for code mapping."</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="open-source" class="panel section">
+      <div class="kicker">09 · Open source posture</div>
+      <h2>MIT licensed, public showcase patient, reproducible.</h2>
+      <ul>
+        <li>The harmonizer code is open source from day one (MIT license).</li>
+        <li>The showcase patient is entirely synthetic — derived from one Synthea ground-truth patient projected into Epic EHI shape and CMS Blue Button claim shape. Zero PHI. Reproducible by anyone who clones the repo.</li>
+        <li>All embedded third-party components are credited with their license and source URL.</li>
+        <li>The FHIR Provenance and Extension URLs we mint are documented and versioned; the schema is inspectable, not opaque.</li>
+        <li>Phase 1 build artifacts (the Synthea patient ID, the synthesized lab PDF, the redacted Epic SQLite dump from Mandel's repo, the CCDA fixture) are all redistributable under their respective licenses.</li>
+      </ul>
+    </section>
+
+    <section id="roadmap" class="panel section">
+      <div class="kicker">10 · Roadmap</div>
+      <h2>Phase 1 demonstrates. Phase 2 productionizes.</h2>
+      <h3>Phase 1 (now → 2026-05-13)</h3>
+      <ul>
+        <li>End-to-end pipeline operating on one showcase patient stitched from three real-format sources plus a CCDA fixture and a lab PDF</li>
+        <li>Five pre-engineered artifacts demonstrating each Layer 3 behavior</li>
+        <li>Sources panel walking provenance from gold → silver → bronze, with PDF page-bbox highlighting</li>
+        <li>30-second clinical briefing rendering on the harmonized data</li>
+        <li>AI-bonus angle: multi-format vision extraction with page-level provenance</li>
+        <li>Phase 1 narrative + design + working live demo URL</li>
+      </ul>
+      <h3>Phase 2 (Summer 2026 → Spring 2027)</h3>
+      <ul>
+        <li>License-clean reimplementation of the Mandel modules we currently embed (or formal collaboration if the conversation goes that way)</li>
+        <li>Multi-vendor harmonization at population scale (not just one showcase patient)</li>
+        <li>Full free-text extraction across attachment corpora — not just a planted fact</li>
+        <li>Production-grade entity resolution with PPRL options for multi-organization deployment</li>
+        <li>HIPAA-aligned deployment options for clinical use</li>
+        <li>OMOP-on-FHIR analytic export for research customers</li>
+        <li>Full vendor coverage of the EHI Export TSV pipeline beyond Epic</li>
+      </ul>
+    </section>
+
+    <section class="panel closing">
+      <div class="kicker">For collaborators</div>
+      <h2>Feedback welcome.</h2>
+      <p style="font-size: 15px; max-width: 720px;">
+        This brief is intentionally written so a technical peer can read it cold and either spot a mistake or contribute. We particularly welcome feedback from the SMART on FHIR, OHDSI, and FHIR-on-OMOP communities; from clinicians thinking about provenance UX; and from anyone whose work we've cited. If we've misrepresented something or missed a relevant precedent, please tell us.
+      </p>
+      <p style="font-size: 15px; margin-top: 18px;">
+        For Josh Mandel specifically: we credit your work as the foundation of Phase 1. We'd love a license confirmation on <code>health-skillz</code> and <code>my-health-data-ehi-wip</code> (both claim MIT in README/<code>package.json</code> but lack a LICENSE file) and any feedback you have on our framing. We'd also welcome a technical conversation when convenient. Phase 1 embeds your portal as the data-collection layer with attribution; the harmonization layer above is where we're trying to add new value.
+      </p>
+    </section>
+
+    <footer>
+      EHI Atlas (working name) · Technical deep dive v0.2 · Updated 2026-04-29
+    </footer>
+  </div>
+</body>
+</html>

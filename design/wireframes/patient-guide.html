@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Patient Guide — EHI Atlas</title>
+  <style>
+    :root {
+      --text: #111827;
+      --text-2: #374151;
+      --muted: #6b7280;
+      --muted-2: #9ca3af;
+      --border: #d9dee7;
+      --border-light: #edf0f5;
+      --surface: #ffffff;
+      --surface-2: #f7f9fc;
+      --surface-3: #f1f4f8;
+      --blue: #2f5fcb;
+      --blue-2: #153e8a;
+      --teal: #0f766e;
+      --green: #16794c;
+      --amber: #9a6700;
+      --slate: #334155;
+      --font: Inter, "Noto Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --mono: "SFMono-Regular", "Roboto Mono", "Cascadia Code", monospace;
+      --shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; color: var(--text); background: #eef2f7; font-family: var(--font); line-height: 1.6; }
+    .page { width: min(840px, calc(100% - 40px)); margin: 0 auto; padding: 24px 0 80px; }
+    .bar { height: 56px; display: flex; align-items: center; justify-content: space-between; gap: 20px; border: 1px solid var(--border); background: var(--surface); padding: 0 18px; margin-bottom: 24px; box-shadow: var(--shadow); }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .mark { width: 30px; height: 30px; border-radius: 4px; background: var(--slate); color: white; display: grid; place-items: center; font-size: 11px; font-weight: 700; font-family: var(--mono); }
+    .brand strong { display: block; font-size: 14px; }
+    .brand span { display: block; color: var(--muted); font-size: 12px; }
+    .nav { display: flex; gap: 22px; color: var(--muted); font-size: 13px; }
+    .nav a { color: var(--text-2); text-decoration: none; }
+    .nav a:hover { color: var(--blue); }
+    .panel { background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow); }
+    .hero { padding: 56px 48px 48px; margin-bottom: 24px; }
+    .eyebrow { color: var(--teal); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; }
+    h1 { font-size: 36px; line-height: 1.18; margin: 14px 0 18px; font-weight: 700; letter-spacing: -0.01em; }
+    .lede { font-size: 17px; color: var(--text-2); line-height: 1.6; }
+    .section { padding: 44px 48px; margin-bottom: 24px; }
+    .section h2 { font-size: 23px; line-height: 1.3; margin: 0 0 8px; font-weight: 700; letter-spacing: -0.005em; }
+    .section .kicker { color: var(--muted); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; }
+    .section p { color: var(--text-2); font-size: 15px; }
+    .lived { background: var(--surface-2); border: 1px solid var(--border-light); border-radius: 4px; padding: 20px 22px; font-style: italic; color: var(--text-2); margin: 22px 0 0; font-size: 15px; line-height: 1.6; }
+    .steps { display: grid; grid-template-columns: 1fr; gap: 14px; margin-top: 28px; }
+    .step { display: grid; grid-template-columns: 56px 1fr; gap: 18px; padding: 22px 22px; background: var(--surface-2); border: 1px solid var(--border-light); border-radius: 4px; align-items: start; }
+    .step-num { font-size: 24px; color: var(--teal); font-weight: 700; font-family: var(--mono); text-align: center; line-height: 1.1; }
+    .step-num small { display: block; font-size: 10px; color: var(--muted); font-weight: 600; letter-spacing: 0.08em; margin-top: 4px; }
+    .step h4 { margin: 0 0 6px; font-size: 16px; font-weight: 700; }
+    .step p { margin: 0; font-size: 14px; color: var(--text-2); line-height: 1.55; }
+    .promises { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 26px; }
+    .promise { padding: 20px 22px; background: var(--surface); border: 1px solid var(--border-light); border-radius: 4px; }
+    .promise h4 { margin: 0 0 6px; font-size: 14px; font-weight: 700; color: var(--green); }
+    .promise p { margin: 0; font-size: 13px; color: var(--text-2); line-height: 1.55; }
+    .uses { display: grid; grid-template-columns: 1fr; gap: 12px; margin-top: 24px; }
+    .use { display: grid; grid-template-columns: 130px 1fr; gap: 18px; padding: 18px 22px; border-bottom: 1px solid var(--border-light); }
+    .use:last-child { border-bottom: 0; }
+    .use-label { font-size: 13px; font-weight: 700; color: var(--blue-2); padding-top: 2px; }
+    .use-text { font-size: 14px; color: var(--text-2); line-height: 1.55; }
+    .questions { margin-top: 24px; padding: 24px; background: var(--surface-2); border: 1px solid var(--border-light); border-radius: 4px; }
+    .questions h4 { margin: 0 0 14px; font-size: 13px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; }
+    .questions ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+    .questions li { padding: 10px 14px; background: var(--surface); border-left: 3px solid var(--teal); font-size: 14px; color: var(--text-2); border-radius: 0 3px 3px 0; }
+    .faq { margin-top: 24px; }
+    .faq-item { padding: 18px 0; border-bottom: 1px solid var(--border-light); }
+    .faq-item:last-child { border-bottom: 0; }
+    .faq-q { font-weight: 700; color: var(--text); font-size: 15px; margin-bottom: 6px; }
+    .faq-a { color: var(--text-2); font-size: 14px; line-height: 1.6; }
+    .closing { padding: 44px 48px; text-align: center; }
+    .closing h2 { margin-bottom: 12px; }
+    .ctas { display: flex; gap: 12px; margin-top: 24px; justify-content: center; }
+    .btn { display: inline-flex; align-items: center; gap: 8px; padding: 11px 18px; border-radius: 6px; font-size: 14px; font-weight: 600; text-decoration: none; border: 1px solid transparent; cursor: pointer; }
+    .btn-primary { background: var(--slate); color: white; }
+    .btn-secondary { background: var(--surface); color: var(--text); border-color: var(--border); }
+    footer { color: var(--muted); font-size: 12px; text-align: center; padding: 24px 0; }
+    .meta-flag { display: inline-block; font-size: 10px; padding: 2px 7px; border-radius: 2px; background: #fff8e1; color: var(--amber); border: 1px solid #f0e0a8; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; margin-left: 10px; vertical-align: middle; }
+  </style>
+</head>
+<body>
+  <div class="page">
+
+    <header class="bar">
+      <div class="brand">
+        <div class="mark">EA</div>
+        <div>
+          <strong>EHI Atlas <span class="meta-flag">working name</span></strong>
+          <span>For patients</span>
+        </div>
+      </div>
+      <nav class="nav">
+        <a href="marketing-overview.html">Overview</a>
+        <a href="patient-guide.html">For patients</a>
+        <a href="technical-deep-dive.html">Technical</a>
+        <a href="development-process.html">Process</a>
+      </nav>
+    </header>
+
+    <section class="panel hero">
+      <div class="eyebrow">Patient guide</div>
+      <h1>Your health record, finally in one place.</h1>
+      <p class="lede">
+        If you've ever tried to gather all your records before a procedure or a new specialist visit, you know how scattered they are. EHI Atlas helps you bring them together — and keep them yours.
+      </p>
+    </section>
+
+    <section class="panel section">
+      <div class="kicker">If this sounds familiar</div>
+      <h2>Your records live in a dozen different places.</h2>
+      <p>
+        Your primary care doctor uses one portal. The hospital where you had surgery uses another. Your dermatologist is on a third. The lab company that ran your blood work mailed you a PDF. Your insurance company sent statements about claims. Somewhere there's a faxed referral letter from years ago.
+      </p>
+      <div class="lived">
+        "I just need my last A1c, the medication list from my surgeon, and the imaging report from my back MRI — but they're across three portals and one mailed packet, and I'm seeing a new specialist Tuesday."
+      </div>
+      <p style="margin-top: 24px;">
+        That's the problem we're solving. Not by inventing a new portal — there are too many already — but by pulling from all of them and giving you one trustworthy view.
+      </p>
+    </section>
+
+    <section class="panel section">
+      <div class="kicker">How it works</div>
+      <h2>Three steps. You stay in control the whole time.</h2>
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">1<small>CONNECT</small></div>
+          <div>
+            <h4>Sign in to your hospital portals — once.</h4>
+            <p>We embed Josh Mandel's open Health Skillz connector. You sign in to each portal the same way you do today. Your records download into your browser. Nothing goes to our servers in the clear. Add as many providers as you want.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">2<small>BRING TOGETHER</small></div>
+          <div>
+            <h4>We unify the records — with provenance.</h4>
+            <p>Same condition appearing in two systems? We merge it. Same medication active in one place and discontinued in another? We surface the conflict so you can see both. Lab value buried in a PDF? We extract it into your record. Every fact carries a label showing where it came from.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">3<small>USE IT</small></div>
+          <div>
+            <h4>Ask, share, prepare.</h4>
+            <p>Ask questions about your own record in plain language. Hand off to a new provider in seconds. Prepare for a procedure by handing your surgeon a 30-second briefing. Carry it with you when you travel. You decide what to share, with whom, when.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel section">
+      <div class="kicker">Privacy</div>
+      <h2>Four promises about your data.</h2>
+      <p>
+        Health information is the most sensitive personal data you have. We treat it that way — and we make the architecture do the work, not just the policy.
+      </p>
+      <div class="promises">
+        <div class="promise">
+          <h4>1 · Browser-first.</h4>
+          <p>Records live in your browser cache, not on our servers. We never see your data unencrypted. The connector is open source and inspectable.</p>
+        </div>
+        <div class="promise">
+          <h4>2 · End-to-end encrypted.</h4>
+          <p>If you choose to share with an AI assistant, your data is encrypted in your browser before it leaves and decrypted only by the recipient. We can't read it in transit.</p>
+        </div>
+        <div class="promise">
+          <h4>3 · Built-in redaction.</h4>
+          <p>A redaction studio reviews your record, suggests sensitive items to hide, and saves named profiles you can apply before sharing. Your original records are never modified.</p>
+        </div>
+        <div class="promise">
+          <h4>4 · You decide.</h4>
+          <p>What's shared, with whom, and when is your call. We don't sell your data. We don't market on top of it. We don't have a deal with your employer or insurer.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel section">
+      <div class="kicker">What you can actually do</div>
+      <h2>Once everything's together, the use cases are obvious.</h2>
+      <div class="uses">
+        <div class="use">
+          <div class="use-label">Pre-op briefing</div>
+          <div class="use-text">Show your surgeon the five things they need to know before your procedure: active anticoagulants, recent labs, allergies, key conditions, anesthesia notes — in 30 seconds, not 30 minutes of chart-digging.</div>
+        </div>
+        <div class="use">
+          <div class="use-label">Second opinion</div>
+          <div class="use-text">Share your full unified record with a specialist for a second opinion, with one click and a redaction profile applied. They see the whole picture, not three faxed packets.</div>
+        </div>
+        <div class="use">
+          <div class="use-label">New provider</div>
+          <div class="use-text">Hand off to a new doctor on day one. Instead of filling out the same intake form for the eighth time, give them your unified record with provenance.</div>
+        </div>
+        <div class="use">
+          <div class="use-label">Travel</div>
+          <div class="use-text">Carry your record with you. If something happens away from home, the ER has your active conditions, medications, and allergies — with sources they can verify.</div>
+        </div>
+        <div class="use">
+          <div class="use-label">Conversational Q&amp;A</div>
+          <div class="use-text">"Why am I on this medication?" "When was my last tetanus shot?" "Has my creatinine been trending up?" Ask in plain language; get answers grounded in your real data, with citations to the source.</div>
+        </div>
+        <div class="use">
+          <div class="use-label">Conflict resolution</div>
+          <div class="use-text">When two systems disagree about whether you're still on a medication, see both records side-by-side and decide what to do — instead of finding out at the next visit.</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel section">
+      <div class="kicker">Try it</div>
+      <h2>Sample questions you can ask once your records are loaded.</h2>
+      <div class="questions">
+        <h4>Example prompts</h4>
+        <ul>
+          <li>"Summarize my last cardiology visit and tell me what to expect at the follow-up."</li>
+          <li>"What medications am I currently taking, and which are blood thinners?"</li>
+          <li>"Show me a timeline of every imaging study I've had in the last three years."</li>
+          <li>"What changed in my record since my last visit?"</li>
+          <li>"My new doctor needs a one-page summary of my surgical history. Generate it."</li>
+          <li>"Are there any conflicts between what my hospital and my insurance company show for my medications?"</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="panel section">
+      <div class="kicker">Frequently asked</div>
+      <h2>FAQ.</h2>
+      <div class="faq">
+        <div class="faq-item">
+          <div class="faq-q">Is this HIPAA-protected?</div>
+          <div class="faq-a">HIPAA covers healthcare providers, payers, and their business associates. As a tool you use directly, EHI Atlas isn't a "covered entity" under HIPAA — but the records you bring in came from HIPAA-protected sources. We treat them with the same standards: end-to-end encrypted, no third-party sale, browser-first storage. The Phase 2 productionization plan includes formal HIPAA-aligned deployment options for clinical use.</div>
+        </div>
+        <div class="faq-item">
+          <div class="faq-q">What if my hospital isn't connected?</div>
+          <div class="faq-a">The Health Skillz connector covers 88,000+ providers — most US hospitals on Epic, Oracle Cerner, athenahealth, and others. If yours isn't connected, you can still upload PDFs and CCDA documents you've received directly. The vision-extraction pipeline lifts those into structured form just like the connected sources.</div>
+        </div>
+        <div class="faq-item">
+          <div class="faq-q">Who can see my data?</div>
+          <div class="faq-a">By default, only you. When you share — with a clinician, an AI assistant, a new specialist — you choose what's included via a redaction profile, and the share itself is end-to-end encrypted. We don't have a backend that stores your records. We can't read what we don't have.</div>
+        </div>
+        <div class="faq-item">
+          <div class="faq-q">What does it cost?</div>
+          <div class="faq-a">Phase 1 is a research demo, free. The eventual product will be free for individuals to connect, view, and ask questions about their own records. Premium features for clinicians and care teams will be paid. We'll never sell your data as a revenue model.</div>
+        </div>
+        <div class="faq-item">
+          <div class="faq-q">What does the AI know about me?</div>
+          <div class="faq-a">The AI sees only what you choose to share, in the moment you share it, with end-to-end encryption. It doesn't retain your data between sessions. Every answer it gives cites the specific records it used — so you can verify the source, not just the answer.</div>
+        </div>
+        <div class="faq-item">
+          <div class="faq-q">What does "provenance" mean in practice?</div>
+          <div class="faq-a">It means every fact in your unified record knows where it came from. Click a medication, see the original record from your hospital. Click a lab value, see the source PDF page with the value highlighted. Click a condition that came from two systems, see both source records and how we merged them. You're never asked to trust a fact without seeing the source.</div>
+        </div>
+        <div class="faq-item">
+          <div class="faq-q">Can I delete everything?</div>
+          <div class="faq-a">Yes, instantly. Records live in your browser cache; clearing them is one click. There's no server-side copy to chase down. If you've shared anything with an AI session, that session is ephemeral by default — closing the tab ends the share.</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel closing">
+      <div class="kicker">Get involved</div>
+      <h2>Phase 1 is a research demo.</h2>
+      <p class="lede">
+        We're submitting to the HHS EHI Ignite Challenge in May 2026. The Phase 1 build demonstrates the architecture on a worked example. Phase 2 — funded by the prize — productionizes for everyday use. Want to be on the early-access list, or have feedback as a clinician or patient? Get in touch.
+      </p>
+      <div class="ctas">
+        <a class="btn btn-primary" href="#">Join the early-access list →</a>
+        <a class="btn btn-secondary" href="technical-deep-dive.html">For developers</a>
+      </div>
+    </section>
+
+    <footer>
+      EHI Atlas (working name) · For patients · Updated 2026-04-29
+    </footer>
+  </div>
+</body>
+</html>

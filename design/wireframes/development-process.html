@@ -1,0 +1,632 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Development Process — EHI Atlas</title>
+  <style>
+    :root {
+      --text: #111827;
+      --text-2: #374151;
+      --muted: #6b7280;
+      --muted-2: #9ca3af;
+      --border: #d9dee7;
+      --border-light: #edf0f5;
+      --surface: #ffffff;
+      --surface-2: #f7f9fc;
+      --surface-3: #f1f4f8;
+      --blue: #2f5fcb;
+      --blue-2: #153e8a;
+      --teal: #0f766e;
+      --green: #16794c;
+      --amber: #9a6700;
+      --red: #a61b1b;
+      --slate: #334155;
+      --code-bg: #0b1220;
+      --code-text: #d6def0;
+      --font: Inter, "Noto Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --mono: "SFMono-Regular", "Roboto Mono", "Cascadia Code", monospace;
+      --shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; color: var(--text); background: #eef2f7; font-family: var(--font); line-height: 1.55; }
+    .page { width: min(1080px, calc(100% - 40px)); margin: 0 auto; padding: 24px 0 80px; }
+    .bar { height: 56px; display: flex; align-items: center; justify-content: space-between; gap: 20px; border: 1px solid var(--border); background: var(--surface); padding: 0 18px; margin-bottom: 24px; box-shadow: var(--shadow); }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .mark { width: 30px; height: 30px; border-radius: 4px; background: var(--slate); color: white; display: grid; place-items: center; font-size: 11px; font-weight: 700; font-family: var(--mono); }
+    .brand strong { display: block; font-size: 14px; }
+    .brand span { display: block; color: var(--muted); font-size: 12px; }
+    .nav { display: flex; gap: 22px; color: var(--muted); font-size: 13px; }
+    .nav a { color: var(--text-2); text-decoration: none; }
+    .nav a:hover { color: var(--blue); }
+    .panel { background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow); }
+    .hero { padding: 48px 48px 40px; margin-bottom: 24px; }
+    .eyebrow { color: var(--teal); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; }
+    h1 { font-size: 32px; line-height: 1.2; margin: 14px 0 14px; font-weight: 700; letter-spacing: -0.005em; }
+    .lede { font-size: 16px; color: var(--text-2); max-width: 820px; line-height: 1.6; }
+    .toc { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 26px; }
+    .toc a { padding: 6px 11px; background: var(--surface-2); border: 1px solid var(--border-light); border-radius: 3px; font-size: 12px; color: var(--text-2); text-decoration: none; font-family: var(--mono); }
+    .toc a:hover { border-color: var(--slate); color: var(--text); }
+    .section { padding: 40px 48px; margin-bottom: 24px; }
+    .section h2 { font-size: 22px; line-height: 1.3; margin: 0 0 6px; font-weight: 700; letter-spacing: -0.005em; }
+    .section h3 { font-size: 16px; font-weight: 700; margin: 26px 0 10px; }
+    .section h4 { font-size: 14px; font-weight: 700; margin: 20px 0 8px; color: var(--blue-2); }
+    .section .kicker { color: var(--muted); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; }
+    .section p { color: var(--text-2); font-size: 14.5px; line-height: 1.65; }
+    .section ul, .section ol { color: var(--text-2); font-size: 14.5px; line-height: 1.7; }
+    .section li { margin-bottom: 6px; }
+    code { font-family: var(--mono); background: var(--surface-3); padding: 1px 6px; border-radius: 3px; font-size: 0.92em; color: var(--text); }
+    pre { background: var(--code-bg); color: var(--code-text); padding: 18px 20px; border-radius: 4px; overflow-x: auto; font-family: var(--mono); font-size: 12.5px; line-height: 1.55; margin: 18px 0; }
+    pre code { background: transparent; padding: 0; color: inherit; }
+    table { width: 100%; border-collapse: collapse; margin: 18px 0; font-size: 13.5px; }
+    th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border-light); vertical-align: top; }
+    th { background: var(--surface-2); color: var(--text); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+    td { color: var(--text-2); }
+    td code { font-size: 0.85em; }
+    .roles { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin: 22px 0 10px; }
+    .role { padding: 22px; background: var(--surface-2); border: 1px solid var(--border-light); border-radius: 4px; }
+    .role h4 { margin: 0 0 6px; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; }
+    .role .who { font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 10px; }
+    .role ul { margin: 0; padding-left: 18px; font-size: 13.5px; line-height: 1.6; }
+    .stage { display: grid; grid-template-columns: 80px 1fr; gap: 24px; padding: 28px 0; border-bottom: 1px solid var(--border-light); }
+    .stage:last-child { border-bottom: 0; }
+    .stage-num { font-family: var(--mono); font-size: 36px; font-weight: 700; color: var(--teal); line-height: 1; padding-top: 6px; }
+    .stage-num small { display: block; font-size: 10px; color: var(--muted); font-weight: 600; letter-spacing: 0.1em; margin-top: 8px; }
+    .stage-body h3 { margin: 0 0 4px; font-size: 18px; font-weight: 700; }
+    .stage-body .sub { color: var(--muted); font-size: 13px; margin-bottom: 12px; }
+    .stage-body p { margin: 8px 0; }
+    .stage-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+    .stage-block { padding: 14px 16px; background: var(--surface-2); border-left: 3px solid var(--teal); border-radius: 0 3px 3px 0; }
+    .stage-block .label { font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; }
+    .stage-block ul { margin: 0; padding-left: 16px; font-size: 13px; line-height: 1.55; }
+    .stage-block li { margin-bottom: 4px; }
+    .pill { display: inline-block; font-size: 10.5px; font-weight: 600; padding: 2px 8px; border-radius: 3px; background: var(--surface-3); color: var(--slate); font-family: var(--mono); }
+    .pill-blake { background: #e3edff; color: var(--blue-2); }
+    .pill-chief { background: #d8ece9; color: var(--teal); }
+    .pill-shared { background: #f3e8ff; color: #6d28d9; }
+    .source-row { display: grid; grid-template-columns: 200px 110px 1fr 110px; gap: 16px; padding: 14px 0; border-bottom: 1px solid var(--border-light); align-items: start; font-size: 13.5px; }
+    .source-row:last-child { border-bottom: 0; }
+    .source-name { font-weight: 700; color: var(--text); }
+    .source-name small { display: block; color: var(--muted); font-weight: 400; font-size: 12px; margin-top: 2px; }
+    .source-mode { font-family: var(--mono); font-size: 12px; color: var(--text-2); padding-top: 2px; }
+    .source-text { color: var(--text-2); line-height: 1.55; }
+    .source-consent { padding-top: 2px; }
+    .callout { padding: 16px 20px; background: #fef9e7; border: 1px solid #f0e0a8; border-left: 3px solid var(--amber); border-radius: 0 4px 4px 0; font-size: 13.5px; color: var(--text-2); margin: 18px 0; line-height: 1.6; }
+    .callout-teal { background: #e6f4f1; border-color: #a7d4cb; border-left-color: var(--teal); }
+    .callout-red { background: #fdecec; border-color: #f0bdbd; border-left-color: var(--red); }
+    .gate { display: grid; grid-template-columns: 32px 1fr; gap: 12px; padding: 12px 16px; background: var(--surface-2); border-radius: 3px; margin-top: 8px; align-items: start; }
+    .gate-icon { color: var(--green); font-weight: 700; font-family: var(--mono); padding-top: 2px; }
+    .gate-text { font-size: 13px; color: var(--text-2); line-height: 1.55; }
+    .stack { display: grid; gap: 8px; }
+    footer { color: var(--muted); font-size: 12px; text-align: center; padding: 24px 0; }
+    .meta-flag { display: inline-block; font-size: 10px; padding: 2px 7px; border-radius: 2px; background: #fff8e1; color: var(--amber); border: 1px solid #f0e0a8; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; margin-left: 10px; vertical-align: middle; }
+  </style>
+</head>
+<body>
+  <div class="page">
+
+    <header class="bar">
+      <div class="brand">
+        <div class="mark">EA</div>
+        <div>
+          <strong>EHI Atlas <span class="meta-flag">working name</span></strong>
+          <span>Development process</span>
+        </div>
+      </div>
+      <nav class="nav">
+        <a href="marketing-overview.html">Overview</a>
+        <a href="patient-guide.html">For patients</a>
+        <a href="technical-deep-dive.html">Technical</a>
+        <a href="development-process.html">Process</a>
+      </nav>
+    </header>
+
+    <section class="panel hero">
+      <div class="eyebrow">Phase 1 development process · No timelines, just structure</div>
+      <h1>How we build it.</h1>
+      <p class="lede">
+        Our workflow is built around the part of this project we feel most acutely: getting heterogeneous, real-world patient data into one reproducible corpus before anything else can run. This document describes the stages, who owns what, the decision and quality gates between them, and the meta-patterns we use to keep the work coherent across architecture docs, code, and demos.
+      </p>
+      <div class="toc">
+        <a href="#how-we-work">01 How we work together</a>
+        <a href="#stages">02 Six stages overview</a>
+        <a href="#stage-1">03 Stage 1: Data acquisition</a>
+        <a href="#stage-2">04 Stage 2: Standardization</a>
+        <a href="#stage-3">05 Stage 3: Harmonization</a>
+        <a href="#stage-4">06 Stage 4: Vision extraction</a>
+        <a href="#stage-5">07 Stage 5: Application</a>
+        <a href="#stage-6">08 Stage 6: Submission</a>
+        <a href="#meta">09 Meta-workflow patterns</a>
+      </div>
+    </section>
+
+    <section id="how-we-work" class="panel section">
+      <div class="kicker">01 · How we work together</div>
+      <h2>Roles, decisions, and the document-first principle.</h2>
+      <p>
+        This is a two-person build (Blake + Chief, the AI assistant) augmented by spawned sub-agents for parallel research. We split the work along a clean line: Blake owns domain judgment, real-data acquisition, demo decisions, and outreach; Chief owns code, documentation, automation, and orchestration of research sub-agents. Shared decisions land in writing before they get implemented.
+      </p>
+      <div class="roles">
+        <div class="role">
+          <h4>Blake owns</h4>
+          <div class="who">Domain &amp; decisions</div>
+          <ul>
+            <li>Real-data acquisition (own portal logins, consent for self/family)</li>
+            <li>Strategic decisions (showcase patient choice, AI-bonus angle, scope cuts)</li>
+            <li>Outreach (Josh email, clinician feedback, future collaborators)</li>
+            <li>Demo voice and narrative tone</li>
+            <li>Final say on what's shipped</li>
+          </ul>
+        </div>
+        <div class="role">
+          <h4>Chief owns</h4>
+          <div class="who">Code &amp; orchestration</div>
+          <ul>
+            <li>Architecture docs and execution plans (always written first)</li>
+            <li>Implementation: adapters, harmonizer, extraction, UI plumbing</li>
+            <li>Sub-agent orchestration for prior-art research, EHI scope review, etc.</li>
+            <li>Test fixtures, validation, automation</li>
+            <li>Status updates and risk surfacing</li>
+          </ul>
+        </div>
+        <div class="role">
+          <h4>Shared</h4>
+          <div class="who">Direction-setting</div>
+          <ul>
+            <li>Stage gates (alignment before moving forward)</li>
+            <li>Open questions surface immediately, not batched</li>
+            <li>Architecture changes (Chief proposes, Blake approves)</li>
+            <li>Showcase-patient artifacts (Blake picks, Chief implements)</li>
+            <li>Cuts when scope strains the deadline</li>
+          </ul>
+        </div>
+      </div>
+
+      <h3>Document-first principle</h3>
+      <p>
+        Architecture docs are the source of truth, not the code. Before any non-trivial implementation, the relevant doc gets updated; the commit references the doc section it implements. This is what lets sub-agents and future contributors orient quickly, and what lets us pause and resume across sessions without losing the thread.
+      </p>
+      <p>
+        Document hierarchy:
+      </p>
+      <ul>
+        <li><code>EXECUTION-PLAN.md</code> — what we're building, success criteria, risks, reviewer pushbacks (the active build plan)</li>
+        <li><code>architecture/DATA-AGGREGATION-LAYER.md</code> — the technical heart (5-layer pipeline, FHIR-native Provenance, scripts vs LLMs)</li>
+        <li><code>architecture/CONTEXT-PIPELINE.md</code> — existing Layer 5 (LLM context engineering), unchanged by this project</li>
+        <li><code>research/strategic-options.md</code> — embed/partner/parallel-build decision and rationale</li>
+        <li><code>research/josh-mandel/</code> — full prior-art dossier on Mandel's stack</li>
+        <li><code>research/harmonization-prior-art.md</code> — broader prior-art survey with citations and reviewer-pushback answers</li>
+        <li><code>design/wireframes/*.html</code> — these pages, the audience-specific outputs</li>
+      </ul>
+
+      <h3>Sub-agent pattern</h3>
+      <p>
+        For research tasks that would otherwise stall the main thread, we spawn focused sub-agents with self-contained briefs. Each writes its findings to a specific path in <code>research/</code> and returns a punch-line summary. The main thread synthesizes the findings back into the active execution plan. Pattern used so far for the Mandel GitHub inventory, the LinkedIn synthesis, the live-site walkthrough, the EHI Ignite scope review, and the harmonization prior-art survey.
+      </p>
+
+      <h3>Decision cadence</h3>
+      <ol>
+        <li><strong>Open questions surface immediately.</strong> When a decision is required, Chief surfaces it explicitly with options, recommendation, and the cost of deferring. Blake answers; the answer goes into the doc.</li>
+        <li><strong>Stage gates require explicit alignment.</strong> Moving from one stage to the next isn't automatic. A short checkpoint, "are we satisfied with Stage N's outputs," precedes the start of Stage N+1.</li>
+        <li><strong>Cuts are explicit, not silent.</strong> When scope strains, the cut order is stated up front (in <code>EXECUTION-PLAN.md</code> §Risks). We don't quietly drop work — we name what we're cutting and why.</li>
+      </ol>
+    </section>
+
+    <section id="stages" class="panel section">
+      <div class="kicker">02 · Six stages overview</div>
+      <h2>The build, end to end.</h2>
+      <p>
+        Six stages, ordered by dependency. Stage 1 is the longest and the one we most underestimated; the rest are bounded by it. There are no committed timelines on this page — refer to <code>EXECUTION-PLAN.md</code> for day-by-day if you need it. Here we describe structure, ownership, and definition-of-done.
+      </p>
+
+      <table>
+        <thead>
+          <tr><th style="width: 40px;">#</th><th>Stage</th><th>What we produce</th><th>Definition of done</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>1</strong></td>
+            <td><strong>Data acquisition &amp; corpus building</strong></td>
+            <td>Bronze tier populated with all source artifacts; reference terminologies loaded</td>
+            <td>Anyone with the repo + the documented credentials can rebuild the corpus from scratch</td>
+          </tr>
+          <tr>
+            <td><strong>2</strong></td>
+            <td><strong>Standardization &amp; ingestion plumbing</strong></td>
+            <td>Per-source adapters; Layer 2 transforms producing valid silver FHIR Bundles</td>
+            <td>Every source produces profile-validated FHIR R4; CI passes</td>
+          </tr>
+          <tr>
+            <td><strong>3</strong></td>
+            <td><strong>Harmonization layer (Layer 3)</strong></td>
+            <td>Cross-source merge with Provenance graph; conflict + duplicate + orphan detection</td>
+            <td>Showcase patient passes the 5-artifact test suite end-to-end</td>
+          </tr>
+          <tr>
+            <td><strong>4</strong></td>
+            <td><strong>Vision extraction sub-layer</strong></td>
+            <td>PDF → FHIR Observations with page-level Provenance; deterministic cache</td>
+            <td>Same PDF in produces same extraction out; bbox locator round-trips to UI</td>
+          </tr>
+          <tr>
+            <td><strong>5</strong></td>
+            <td><strong>Application integration</strong></td>
+            <td>Sources panel; PDF page-bbox highlighting; conflict + diff UI; AI-bonus polish</td>
+            <td>End-to-end demo runs without manual intervention; live URL deployable</td>
+          </tr>
+          <tr>
+            <td><strong>6</strong></td>
+            <td><strong>Submission packaging</strong></td>
+            <td>Phase 1 narrative PDF, design wireframes, public GitHub repo, frozen demo URL</td>
+            <td>A judge clones the repo, opens the URL, reads the narrative — and arrives at the same one-paragraph summary we wrote</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="stage-1" class="panel section">
+      <div class="kicker">03 · Stage 1 (deep dive)</div>
+      <h2>Data acquisition &amp; corpus building.</h2>
+      <p>
+        This is the stage we feel weakest on, because it's where the work splits across many small acquisition modes — APIs, git clones, manual portal downloads, file uploads, generated artifacts — each with different consent and reproducibility properties. Here's how we break it down.
+      </p>
+
+      <h3>What we have access to</h3>
+      <p>
+        Inventory of every source we can plausibly use, with its acquisition mode and consent posture:
+      </p>
+
+      <div class="source-row" style="border-bottom: 2px solid var(--border); padding-bottom: 8px;">
+        <div style="font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase;">Source</div>
+        <div style="font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase;">Acquisition mode</div>
+        <div style="font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase;">What it gives us</div>
+        <div style="font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase;">Consent / license</div>
+      </div>
+
+      <div class="source-row">
+        <div class="source-name">Synthea<small>~/Repo/.../data/synthea-samples/</small></div>
+        <div class="source-mode">already on disk</div>
+        <div class="source-text">1,180 synthetic FHIR R4 patients with multi-year clinical histories. Volume + a ground-truth showcase patient candidate.</div>
+        <div class="source-consent"><span class="pill" style="background: #d8eddf; color: var(--green);">OPEN</span></div>
+      </div>
+
+      <div class="source-row">
+        <div class="source-name">Josh's Epic EHI fixture<small>jmandel/my-health-data-ehi-wip</small></div>
+        <div class="source-mode">git clone</div>
+        <div class="source-text">~1.7 MB redacted SQLite dump from a real Epic EHI Export. 552 raw tables, 6,631 schemas. Validates our parser; we don't use the patient content.</div>
+        <div class="source-consent"><span class="pill" style="background: #fdf2cc; color: var(--amber);">MIT (claim)</span></div>
+      </div>
+
+      <div class="source-row">
+        <div class="source-name">Josh's CCDA fixtures<small>jmandel/sample_ccdas</small></div>
+        <div class="source-mode">git clone</div>
+        <div class="source-text">747 PHI-free CCDA documents across ~12 vendors. Pick one as the showcase patient's referral document; demonstrates Path A (deterministic CCDA → FHIR conversion).</div>
+        <div class="source-consent"><span class="pill" style="background: #d8eddf; color: var(--green);">CC BY 4.0</span></div>
+      </div>
+
+      <div class="source-row">
+        <div class="source-name">CMS Blue Button 2.0 sandbox<small>bluebutton.cms.gov</small></div>
+        <div class="source-mode">OAuth + API</div>
+        <div class="source-text">Synthetic Medicare claims in FHIR R4 with CARIN BB profiles. ~30 sample beneficiaries with multi-year history. Unlocks the payer-workflow scenario.</div>
+        <div class="source-consent"><span class="pill" style="background: #d8eddf; color: var(--green);">OPEN + reg</span></div>
+      </div>
+
+      <div class="source-row">
+        <div class="source-name">Blake's Cedars-Sinai<small>research/josh-mandel/health-records.json</small></div>
+        <div class="source-mode">already on disk</div>
+        <div class="source-text">16 MB FHIR R4, 234 Observations, 31 attachments. Real patient data — Blake's. Available as live-demo "real connector proof-of-life" sidebar.</div>
+        <div class="source-consent"><span class="pill" style="background: #fdf2cc; color: var(--amber);">PERSONAL</span></div>
+      </div>
+
+      <div class="source-row">
+        <div class="source-name">Devon's Cedars-Sinai<small>(to acquire)</small></div>
+        <div class="source-mode">SMART pull via Health Skillz</div>
+        <div class="source-text">Same shape as Blake's pull. Useful as a second real patient if we want to demonstrate the multi-patient view, or as a substitute showcase patient.</div>
+        <div class="source-consent"><span class="pill" style="background: #fdf2cc; color: var(--amber);">PERSONAL</span></div>
+      </div>
+
+      <div class="source-row">
+        <div class="source-name">Cedars portal PDFs / screenshots<small>(to acquire)</small></div>
+        <div class="source-mode">manual portal download</div>
+        <div class="source-text">Lab reports, discharge summaries, imaging reports, EOBs. Real-world test material for the vision-extraction pipeline. May expose facts not in the FHIR API export.</div>
+        <div class="source-consent"><span class="pill" style="background: #fdf2cc; color: var(--amber);">PERSONAL</span></div>
+      </div>
+
+      <div class="source-row">
+        <div class="source-name">Synthesized lab report PDF<small>(constructed)</small></div>
+        <div class="source-mode">generated</div>
+        <div class="source-text">A clean Quest-style lab PDF for the showcase patient containing a creatinine value that also appears in the FHIR Observations. Artifact 5 in the demo.</div>
+        <div class="source-consent"><span class="pill" style="background: #d8eddf; color: var(--green);">CONSTRUCTED</span></div>
+      </div>
+
+      <div class="source-row">
+        <div class="source-name">Reference terminologies<small>UMLS / RxNorm / LOINC / HL7 ConceptMaps</small></div>
+        <div class="source-mode">download / API</div>
+        <div class="source-text">Code-system crosswalks for SNOMED ↔ ICD-10 ↔ RxNorm ↔ LOINC. Required for Layer 3 code harmonization. UMLS needs a free NIH license (~24h approval).</div>
+        <div class="source-consent"><span class="pill" style="background: #d8eddf; color: var(--green);">OPEN + reg</span></div>
+      </div>
+
+      <h3>Per-source acquisition workflow</h3>
+      <p>
+        Each source goes through the same five-step workflow, owned per the role split. The point of structuring it this way is that we can apply it to any new source we add later without re-deciding the process.
+      </p>
+
+      <ol>
+        <li><strong>Plan the acquisition.</strong> One README per source under <code>data/real-world-examples/&lt;source&gt;/README.md</code> capturing: what it is, where it came from, who acquired it, when, what consent applies, what license redistribution is allowed under, and any known gotchas. <span class="pill pill-shared">Shared</span></li>
+        <li><strong>Acquire the bytes.</strong> Different per source — API call, git clone, manual download, generation script. Whichever path, the result lands in <code>data/real-world-examples/&lt;source&gt;/raw/</code> with a checksum. <span class="pill pill-blake">Blake</span> for portal logins and personal data; <span class="pill pill-chief">Chief</span> for everything else.</li>
+        <li><strong>Apply the privacy gate.</strong> If the source contains real personal data (Blake's, Devon's, Cedars portal scrapes), it stays out of any public artifact until a redaction profile has been applied — using Josh's redaction studio, with named profiles checked into the repo. Original artifacts never modified; redacted versions land alongside under <code>raw-redacted/</code>. <span class="pill pill-blake">Blake</span></li>
+        <li><strong>Document the source format.</strong> A short note on what shape the data is in, what fields are present, and any pre-engineered artifacts we plant for the showcase patient. Goes in the per-source README. <span class="pill pill-chief">Chief</span></li>
+        <li><strong>Stage to bronze.</strong> The cleaned, redacted artifact gets copied (or symlinked) into <code>data/real-world-examples/bronze/&lt;source&gt;/&lt;patient&gt;/</code> in the canonical bronze layout. This is the only path Layer 1 adapters read from. <span class="pill pill-chief">Chief</span></li>
+      </ol>
+
+      <h3>Corpus storage layout</h3>
+      <p>
+        Storage matches the bronze/silver/gold convention introduced in <code>DATA-AGGREGATION-LAYER.md</code>. Layout under <code>~/Repo/ehi-ignite-challenge/data/real-world-examples/</code>:
+      </p>
+      <pre><code>real-world-examples/
+├── README.md                     # corpus overview, reproduction instructions
+├── _sources/                     # raw source materials, immutable
+│   ├── synthea/
+│   │   ├── README.md            # what + when + license
+│   │   └── raw/                 # the actual artifacts
+│   ├── josh-epic-ehi/
+│   │   ├── README.md
+│   │   └── raw/db.sqlite.dump
+│   ├── josh-ccdas/
+│   │   ├── README.md
+│   │   └── raw/                 # selected fixtures only
+│   ├── cms-blue-button/
+│   │   ├── README.md
+│   │   └── raw/                 # OAuth-pulled FHIR JSON
+│   ├── blake-cedars/
+│   │   ├── README.md
+│   │   ├── raw/                 # original (gitignored)
+│   │   └── raw-redacted/        # public-safe version
+│   ├── devon-cedars/
+│   │   └── (same shape)
+│   ├── cedars-portal-pdfs/
+│   │   ├── README.md
+│   │   ├── raw/                 # original PDFs (gitignored)
+│   │   └── raw-redacted/
+│   └── synthesized-lab-pdf/
+│       ├── README.md
+│       └── raw/                 # generated artifact + generator script
+├── bronze/                       # immutable per-source canonical staging
+│   ├── synthea/&lt;patient-id&gt;/
+│   ├── josh-epic-ehi/&lt;patient-id&gt;/
+│   ├── ccda/&lt;patient-id&gt;/
+│   ├── blue-button/&lt;patient-id&gt;/
+│   └── lab-pdf/&lt;patient-id&gt;/
+├── silver/                       # Layer 2 output (FHIR Bundles)
+├── gold/                         # Layer 3 output (merged + Provenance)
+└── reference/                    # terminology snapshots
+    ├── umls/
+    ├── loinc/
+    └── crosswalks/               # frozen LLM-generated mappings</code></pre>
+
+      <div class="callout callout-red">
+        <strong>Privacy gate is non-negotiable.</strong> Any source containing real personal data (Blake's, Devon's, Cedars-portal-derived) gets gitignored at the <code>raw/</code> level. Only the redacted form is committed. The privacy gate is part of the per-source workflow and the repo's <code>.gitignore</code> patterns enforce it. If the redacted form would still be identifying, it doesn't get committed at all — only documented as locally-available.
+      </div>
+
+      <h3>Reproducibility test</h3>
+      <p>
+        The corpus is "done" when a contributor with a fresh checkout can rebuild the bronze tier from the documented sources. Concretely:
+      </p>
+      <div class="stack">
+        <div class="gate"><div class="gate-icon">✓</div><div class="gate-text"><code>data/real-world-examples/_sources/&lt;source&gt;/README.md</code> exists for every source and includes the reproduction recipe.</div></div>
+        <div class="gate"><div class="gate-icon">✓</div><div class="gate-text">Open sources (Synthea, Josh's repos, BB sandbox) reproduce automatically via a single <code>make corpus</code> or equivalent.</div></div>
+        <div class="gate"><div class="gate-icon">✓</div><div class="gate-text">Personal sources (Blake's, Devon's) are documented but gated — the README explains how Blake/Devon would re-acquire if needed; the redacted form is what's committed.</div></div>
+        <div class="gate"><div class="gate-icon">✓</div><div class="gate-text">Generated artifacts (synthesized lab PDF) include the generator script in their <code>_sources/</code> folder and reproduce deterministically.</div></div>
+        <div class="gate"><div class="gate-icon">✓</div><div class="gate-text">Reference terminology snapshots are pinned to specific UMLS / LOINC versions in a <code>reference/VERSIONS.md</code> file.</div></div>
+      </div>
+
+      <h3>Showcase patient construction</h3>
+      <p>
+        The showcase patient is fully synthetic, derived from one Synthea ground-truth patient projected into the other source shapes (Epic EHI TSV, CMS BB claims, CCDA, lab PDF). This sidesteps both the privacy concerns of using real Blake/Devon data publicly and the artificial-merge problem of stitching real FHIR to synthetic claims about a different person. Five pre-engineered cross-source artifacts demonstrate each Layer 3 behavior — see <code>EXECUTION-PLAN.md</code> §"Showcase patient construction recipe" for the full list.
+      </p>
+      <p>
+        Real Blake's Cedars data and (if acquired) Devon's stay available as a live-demo "real connector proof-of-life" sidebar — proves the connector works on real records, but the harmonization story runs on the synthetic showcase patient where we control the artifacts.
+      </p>
+    </section>
+
+    <section id="stage-2" class="panel section">
+      <div class="kicker">04 · Stage 2</div>
+      <h2>Standardization &amp; ingestion plumbing.</h2>
+      <p class="sub" style="color: var(--muted); font-size: 13px;">Layer 1 adapters + Layer 2 transforms.</p>
+
+      <p>
+        Once Stage 1's bronze tier is stable, we build adapters that read bronze and produce silver — FHIR R4 Bundles, profile-validated. Each adapter is a vertical slice owned end-to-end before moving to the next.
+      </p>
+
+      <div class="stage-grid">
+        <div class="stage-block">
+          <div class="label">How we work</div>
+          <ul>
+            <li>One adapter at a time, end-to-end (don't build five 70%-done adapters)</li>
+            <li>Test fixtures land alongside the adapter — minimum 3 inputs each</li>
+            <li>Schema-validation gate is automated; non-conforming Bundles are rejected at the silver boundary</li>
+            <li>LLM-bootstrapped crosswalks (e.g., Epic-table → FHIR-resource) are validated against ground truth and frozen as static files; never re-generated at runtime</li>
+          </ul>
+        </div>
+        <div class="stage-block">
+          <div class="label">Done means</div>
+          <ul>
+            <li>Every source produces a profile-validated FHIR Bundle</li>
+            <li>CCDA → FHIR uses Microsoft FHIR-Converter (we don't reinvent)</li>
+            <li>Crosswalk decisions are documented per-source in <code>docs/mapping-decisions.md</code></li>
+            <li>Re-running the pipeline on the same bronze input produces byte-identical silver output</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="stage-3" class="panel section">
+      <div class="kicker">05 · Stage 3</div>
+      <h2>Harmonization layer.</h2>
+      <p class="sub" style="color: var(--muted); font-size: 13px;">Layer 3 — the differentiation work.</p>
+
+      <p>
+        With clean silver Bundles per source, Layer 3 takes the cross-source merge problem on directly: identity resolution, code mapping, temporal alignment, dedup, conflict detection, Provenance emission. Sub-tasks ordered by dependency.
+      </p>
+
+      <div class="stage-grid">
+        <div class="stage-block">
+          <div class="label">How we work</div>
+          <ul>
+            <li>Sub-tasks ordered by dependency: identity → code map → temporal align → dedup → conflict → Provenance</li>
+            <li>Integration tests run on the showcase patient after every commit; the 5-artifact suite is the regression bar</li>
+            <li>Visual diff: before/after JSON for every merge — easy to inspect what the harmonizer actually did</li>
+            <li>UMLS lookups are deterministic; LLM use is bounded to the free-text-extraction sub-task and conflict-narration (build-time)</li>
+          </ul>
+        </div>
+        <div class="stage-block">
+          <div class="label">Done means</div>
+          <ul>
+            <li>Showcase patient passes the full 5-artifact suite</li>
+            <li>Every gold-tier resource has at least one Provenance edge to silver</li>
+            <li>Conflicts are detected, not silently resolved — both records preserved</li>
+            <li>Quality scores are explicit (not learned), inspectable, defensible in narrative</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="stage-4" class="panel section">
+      <div class="kicker">06 · Stage 4</div>
+      <h2>Vision extraction sub-layer.</h2>
+      <p class="sub" style="color: var(--muted); font-size: 13px;">PDFs → FHIR with page-level Provenance.</p>
+
+      <p>
+        The vision extraction work begins as notebook exploration — testing prompts on real PDFs, iterating on the schema-constrained output format — and only after the prompts stabilize does it become production code with caching and Provenance emission.
+      </p>
+
+      <div class="stage-grid">
+        <div class="stage-block">
+          <div class="label">How we work</div>
+          <ul>
+            <li>Notebook-driven prompt iteration first; freeze the prompt before writing production code</li>
+            <li>Pydantic / <code>instructor</code> schemas are the contract — output validation is part of the test</li>
+            <li>Content-hash cache from day one: same PDF in, same extraction out</li>
+            <li>"Golden output" fixtures: one extraction per document type committed to the repo as the reference</li>
+            <li>Confidence threshold enforced — low-confidence extractions flagged, not silently shipped</li>
+          </ul>
+        </div>
+        <div class="stage-block">
+          <div class="label">Done means</div>
+          <ul>
+            <li>The showcase lab PDF produces an Observation with the right LOINC, value, unit, date</li>
+            <li><code>meta.extension(.../source-locator)</code> carries valid page+bbox</li>
+            <li>Cache invalidation works correctly on prompt-version change</li>
+            <li>Re-running extraction on cached input is a no-op (no LLM call)</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="stage-5" class="panel section">
+      <div class="kicker">07 · Stage 5</div>
+      <h2>Application integration.</h2>
+      <p class="sub" style="color: var(--muted); font-size: 13px;">Sources panel + PDF page-bbox highlighting + AI bonus.</p>
+
+      <p>
+        The patient-journey app already exists in production. Stage 5 wires it to the harmonized data and adds the new UI surfaces — the Sources panel for Provenance walking, the PDF viewer with bounding-box highlighting, the conflict side-by-side, the "what changed since last visit" diff. UI work is mocked against fake harmonized data first; real-data wiring follows once Layer 3 stabilizes.
+      </p>
+
+      <div class="stage-grid">
+        <div class="stage-block">
+          <div class="label">How we work</div>
+          <ul>
+            <li>Mock the harmonized data first; build UI without dependency on Layer 3 timing</li>
+            <li>Wire to real data via the existing Layer 4 SOF warehouse — no app-code changes for upstream changes</li>
+            <li>Demo rehearsal happens twice: once mid-stage, once before submission</li>
+            <li>Live URL deployable from a single command; no human-in-the-loop deploys near the deadline</li>
+          </ul>
+        </div>
+        <div class="stage-block">
+          <div class="label">Done means</div>
+          <ul>
+            <li>Sources panel walks Provenance edges for every fact in the briefing</li>
+            <li>Clicking a PDF-derived fact opens the source PDF with bbox highlighted</li>
+            <li>End-to-end demo runs without manual intervention</li>
+            <li>AI-bonus angle ships as a clean narrative beat in the demo flow</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="stage-6" class="panel section">
+      <div class="kicker">08 · Stage 6</div>
+      <h2>Submission packaging.</h2>
+      <p class="sub" style="color: var(--muted); font-size: 13px;">Narrative + design + repo + frozen URL.</p>
+
+      <p>
+        The submission itself is a deliverable: a Phase 1 narrative PDF, design wireframes (these pages plus what we add for the actual narrative), a public GitHub repo, and a frozen live demo URL. Stage 6 is mostly assembly + final review; nothing in this stage should require new code.
+      </p>
+
+      <div class="stage-grid">
+        <div class="stage-block">
+          <div class="label">How we work</div>
+          <ul>
+            <li>Narrative drafted from the existing docs — <code>EXECUTION-PLAN.md</code>, <code>DATA-AGGREGATION-LAYER.md</code>, prior-art survey, strategic-options memo — not rewritten from scratch</li>
+            <li>Wireframes assembled from these design pages plus screenshots of the live app</li>
+            <li>Repo is cleaned for public view: README rewritten, licenses checked, attribution to Mandel prominent</li>
+            <li>Live URL frozen 24h before deadline; no deploys after the freeze</li>
+          </ul>
+        </div>
+        <div class="stage-block">
+          <div class="label">Done means</div>
+          <ul>
+            <li>A judge reading the narrative cold arrives at the same one-paragraph summary we wrote in <code>EXECUTION-PLAN.md</code> §"How a competitor or judge would read this submission"</li>
+            <li>Public repo passes a "fresh-clone" reproducibility test</li>
+            <li>Live URL works, shows the showcase patient, demonstrates the Sources panel + PDF highlighting</li>
+            <li>Submission package uploaded by deadline; confirmation received</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="meta" class="panel section">
+      <div class="kicker">09 · Meta-workflow patterns</div>
+      <h2>The threads that run across all stages.</h2>
+
+      <h3>Quality gates per stage</h3>
+      <p>
+        Each stage's "Done means" block above is the gate. Moving to the next stage is an explicit alignment moment — Chief reports done-status against the bullets, Blake confirms or pushes back. Skipping a gate is a real choice, made explicitly with a stated reason, never by accident.
+      </p>
+
+      <h3>Open questions surface immediately</h3>
+      <p>
+        When a decision is required, Chief surfaces it with options + recommendation + the cost of deferring. Blake answers; the answer goes into the relevant doc. We don't accumulate ten open questions and resolve them in a batch — that's how plans drift.
+      </p>
+
+      <h3>Cuts are explicit, not silent</h3>
+      <p>
+        When scope strains the deadline, the cut order is named in <code>EXECUTION-PLAN.md</code> §Risks. For Phase 1: SDoH first → AI-bonus polish → multi-source conflict count → AI-bonus core. <strong>Layer 3 harmonization is non-negotiable</strong> — without it the differentiation evaporates.
+      </p>
+
+      <h3>Sub-agents for parallel research</h3>
+      <p>
+        When research would otherwise stall the main thread, Chief spawns a focused sub-agent with a self-contained brief. The brief includes: what to find, where to write the output, what format, what NOT to do (e.g., copyright limits on quoting). Each sub-agent's output is reviewed and synthesized back into the active execution plan before next steps.
+      </p>
+
+      <h3>Provenance applies to our own work, too</h3>
+      <p>
+        Every architecture or strategy claim cites its source. When we say the Phase 1 rubric is 100 + 20 bonus, the source is the official EHI Ignite rules PDF. When we say no commercial vendor publishes EHI Export TSV ingestion, the source is the prior-art survey with its own caveats. When we say Mandel's redaction studio auto-suggests PII clusters, the source is the live-site walkthrough screenshot. This is the same provenance discipline we ship to clinicians; we apply it to our own narrative.
+      </p>
+
+      <h3>Public posture is the default</h3>
+      <p>
+        Repo is open from day one (MIT). Architecture docs are written for an external technical reader, not internal-only shorthand. The technical-deep-dive page is the document we'd hand to Mandel or any technical peer. This forces clarity earlier and makes attribution natural.
+      </p>
+
+      <div class="callout callout-teal">
+        <strong>The submission is the byproduct, not the goal.</strong> The goal is a working harmonization layer that produces a demonstrably better unified patient record. The submission narrative falls out of having that thing. If we focus on the narrative first, we end up with a good story about a thin demo. If we focus on the thing, the story writes itself.
+      </div>
+    </section>
+
+    <footer>
+      EHI Atlas (working name) · Development process · Updated 2026-04-29
+    </footer>
+  </div>
+</body>
+</html>

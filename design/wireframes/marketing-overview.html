@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>EHI Atlas — Patient Health Data, Harmonized</title>
+  <style>
+    :root {
+      --text: #111827;
+      --text-2: #374151;
+      --muted: #6b7280;
+      --muted-2: #9ca3af;
+      --border: #d9dee7;
+      --border-light: #edf0f5;
+      --surface: #ffffff;
+      --surface-2: #f7f9fc;
+      --surface-3: #f1f4f8;
+      --blue: #2f5fcb;
+      --blue-2: #153e8a;
+      --teal: #0f766e;
+      --green: #16794c;
+      --amber: #9a6700;
+      --slate: #334155;
+      --font: Inter, "Noto Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --mono: "SFMono-Regular", "Roboto Mono", "Cascadia Code", monospace;
+      --shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; color: var(--text); background: #eef2f7; font-family: var(--font); line-height: 1.55; }
+    .page { width: min(1080px, calc(100% - 40px)); margin: 0 auto; padding: 24px 0 80px; }
+    .bar { height: 56px; display: flex; align-items: center; justify-content: space-between; gap: 20px; border: 1px solid var(--border); background: var(--surface); padding: 0 18px; margin-bottom: 24px; box-shadow: var(--shadow); }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .mark { width: 30px; height: 30px; border-radius: 4px; background: var(--slate); color: white; display: grid; place-items: center; font-size: 11px; font-weight: 700; font-family: var(--mono); }
+    .brand strong { display: block; font-size: 14px; }
+    .brand span { display: block; color: var(--muted); font-size: 12px; }
+    .nav { display: flex; gap: 22px; color: var(--muted); font-size: 13px; }
+    .nav a { color: var(--text-2); text-decoration: none; }
+    .nav a:hover { color: var(--blue); }
+    .panel { background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow); }
+    .hero { padding: 60px 56px 56px; margin-bottom: 24px; }
+    .eyebrow { color: var(--teal); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; }
+    h1 { font-size: 40px; line-height: 1.15; margin: 14px 0 18px; font-weight: 700; letter-spacing: -0.01em; }
+    .lede { font-size: 18px; color: var(--text-2); max-width: 660px; line-height: 1.55; }
+    .ctas { display: flex; gap: 12px; margin-top: 28px; }
+    .btn { display: inline-flex; align-items: center; gap: 8px; padding: 11px 18px; border-radius: 6px; font-size: 14px; font-weight: 600; text-decoration: none; border: 1px solid transparent; cursor: pointer; }
+    .btn-primary { background: var(--slate); color: white; }
+    .btn-primary:hover { background: #1f2937; }
+    .btn-secondary { background: var(--surface); color: var(--text); border-color: var(--border); }
+    .btn-secondary:hover { border-color: var(--slate); }
+    .section { padding: 52px 56px; margin-bottom: 24px; }
+    .section h2 { font-size: 26px; line-height: 1.25; margin: 0 0 8px; font-weight: 700; letter-spacing: -0.005em; }
+    .section .kicker { color: var(--muted); font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; }
+    .section p { color: var(--text-2); max-width: 720px; }
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; margin-top: 32px; }
+    .stat { padding: 22px 20px; background: var(--surface-2); border: 1px solid var(--border-light); border-radius: 4px; }
+    .stat-num { font-size: 30px; font-weight: 700; color: var(--blue-2); font-family: var(--mono); letter-spacing: -0.02em; }
+    .stat-label { color: var(--muted); font-size: 13px; margin-top: 6px; line-height: 1.4; }
+    .pipeline { margin-top: 28px; padding: 26px; background: var(--surface-2); border: 1px dashed var(--border); border-radius: 4px; font-family: var(--mono); font-size: 13px; line-height: 1.7; color: var(--text-2); white-space: pre; overflow-x: auto; }
+    .features { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; margin-top: 32px; }
+    .feature { padding: 26px; background: var(--surface-2); border: 1px solid var(--border-light); border-radius: 4px; }
+    .feature h3 { margin: 0 0 8px; font-size: 16px; font-weight: 700; }
+    .feature .pill { display: inline-block; font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 3px; background: var(--surface-3); color: var(--slate); margin-bottom: 10px; font-family: var(--mono); }
+    .feature p { margin: 0; font-size: 14px; color: var(--text-2); }
+    .steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 28px; }
+    .step { padding: 22px 20px; background: var(--surface); border: 1px solid var(--border-light); border-radius: 4px; position: relative; }
+    .step-num { color: var(--teal); font-weight: 700; font-size: 13px; font-family: var(--mono); }
+    .step h4 { margin: 6px 0; font-size: 14px; font-weight: 700; }
+    .step p { margin: 0; font-size: 13px; color: var(--muted); }
+    .audience { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 28px; }
+    .audience-col { padding: 28px; background: var(--surface-2); border: 1px solid var(--border-light); border-radius: 4px; }
+    .audience-col h3 { margin: 0 0 12px; font-size: 18px; font-weight: 700; }
+    .audience-col ul { margin: 12px 0 0; padding-left: 20px; color: var(--text-2); }
+    .audience-col li { margin-bottom: 8px; font-size: 14px; }
+    .closing { padding: 48px 56px; text-align: center; }
+    .closing h2 { margin-bottom: 12px; }
+    .closing .lede { margin: 0 auto; }
+    footer { color: var(--muted); font-size: 12px; text-align: center; padding: 24px 0; }
+    .meta-flag { display: inline-block; font-size: 10px; padding: 2px 7px; border-radius: 2px; background: #fff8e1; color: var(--amber); border: 1px solid #f0e0a8; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; margin-left: 10px; vertical-align: middle; }
+  </style>
+</head>
+<body>
+  <div class="page">
+
+    <header class="bar">
+      <div class="brand">
+        <div class="mark">EA</div>
+        <div>
+          <strong>EHI Atlas <span class="meta-flag">working name</span></strong>
+          <span>Patient health data, harmonized</span>
+        </div>
+      </div>
+      <nav class="nav">
+        <a href="#problem">Problem</a>
+        <a href="#solution">What we do</a>
+        <a href="#difference">How we're different</a>
+        <a href="patient-guide.html">For patients</a>
+        <a href="technical-deep-dive.html">Technical</a>
+        <a href="development-process.html">Process</a>
+      </nav>
+    </header>
+
+    <section class="panel hero">
+      <div class="eyebrow">HHS EHI Ignite Challenge · Phase 1 submission</div>
+      <h1>Make sense of your health record.</h1>
+      <p class="lede">
+        Your health information lives in a dozen systems and a hundred PDFs. EHI Atlas pulls it all together into one trustworthy clinical view — every fact carrying the source it came from, ready for clinicians and patients to actually use.
+      </p>
+      <div class="ctas">
+        <a class="btn btn-primary" href="#flow">See how it works →</a>
+        <a class="btn btn-secondary" href="technical-deep-dive.html">Read the technical brief</a>
+      </div>
+    </section>
+
+    <section id="problem" class="panel section">
+      <div class="kicker">The problem</div>
+      <h2>EHI access is solved. EHI usability is not.</h2>
+      <p>
+        Bulk FHIR endpoints, TEFCA, and patient portals have made it possible to <em>get</em> your health data. They have not made it possible to <em>understand</em> it. Records arrive in five different formats, with overlapping facts, conflicting medication lists, and PDFs that no software can read. Clinicians spend half a visit reconstructing history; patients give up.
+      </p>
+      <div class="stats">
+        <div class="stat">
+          <div class="stat-num">5+</div>
+          <div class="stat-label">Average distinct systems holding an adult patient's records</div>
+        </div>
+        <div class="stat">
+          <div class="stat-num">552</div>
+          <div class="stat-label">Raw tables in a single Epic EHI Export, fragmented and undocumented</div>
+        </div>
+        <div class="stat">
+          <div class="stat-num">~50%</div>
+          <div class="stat-label">Of certified EHRs ship CCDs as their EHI Export, not the full record</div>
+        </div>
+        <div class="stat">
+          <div class="stat-num">0</div>
+          <div class="stat-label">Existing products that show clinicians where every fact came from</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="solution" class="panel section">
+      <div class="kicker">What we do</div>
+      <h2>The harmonization layer above the connectors.</h2>
+      <p>
+        Connectors get the data out of the EHR. They don't merge it, deconflict it, or make sense of the unstructured pieces. We do.
+      </p>
+      <div class="pipeline">Sources → 1. Ingest → 2. Standardize → 3. Harmonize → 4. Curate → 5. Interpret
+          (per-source     (everything       (cross-source      (SOF views,    (briefing,
+           adapters)       becomes           dedup, resolve,    enrichments)   Q&amp;A, AI)
+                           FHIR R4)          deconflict)
+
+           Embedded         Our work          Our work          Our work       Our work
+           (Mandel)         (Layer 2)         (Layer 3)         (Layer 4)      (Layer 5)</div>
+      <p style="margin-top: 24px;">
+        We embed Josh Mandel's open-source connector stack as the data ingress layer (with attribution and credit), and build the layers above it: standardization to FHIR R4, cross-source merge with full provenance, an analytics warehouse, and a 30-second clinical briefing UI.
+      </p>
+    </section>
+
+    <section id="difference" class="panel section">
+      <div class="kicker">How we're different</div>
+      <h2>Four things nobody else ships together.</h2>
+      <div class="features">
+        <div class="feature">
+          <span class="pill">PROVENANCE</span>
+          <h3>Click any fact. See where it came from.</h3>
+          <p>Every harmonized fact carries a FHIR Provenance edge back to the source. Click a medication; see the original record. Click a lab value; the source PDF page opens with the bounding box highlighted. Apple labels per-fact but doesn't merge transparently. We do both.</p>
+        </div>
+        <div class="feature">
+          <span class="pill">FIVE SOURCES, ONE RECORD</span>
+          <h3>FHIR + claims + EHI Export + CCDA + PDFs.</h3>
+          <p>Your hospital's FHIR API is one source. Your Medicare claims are another. Your Epic EHI Export TSV is a third. The CCDA from your last referral is a fourth. The lab report PDF is a fifth. We merge all of them — deduplicating, deconflicting, mapping codes — into one canonical patient record.</p>
+        </div>
+        <div class="feature">
+          <span class="pill">VISION EXTRACTION</span>
+          <h3>PDFs become structured data.</h3>
+          <p>Drop a lab report on the page. Vision-capable AI lifts the values into FHIR Observations with page-level provenance — the model's confidence, the source attachment, the page and bounding box. Cloud platforms ship document extraction; none connect it to a downstream FHIR record with this kind of lineage.</p>
+        </div>
+        <div class="feature">
+          <span class="pill">OPEN AND STANDARDS-NATIVE</span>
+          <h3>FHIR R4 + W3C Provenance, not a proprietary schema.</h3>
+          <p>We don't fork the FHIR schema or invent a vocabulary. Our work uses the published <code>Provenance</code> resource, US Core profiles, CARIN BB for claims, and standard Extensions for what FHIR doesn't cover. Reproducible, inspectable, and citable in the academic literature we extend.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="flow" class="panel section">
+      <div class="kicker">How it works</div>
+      <h2>From scattered records to one clinical view in four steps.</h2>
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">01</div>
+          <h4>Connect your EHRs</h4>
+          <p>Sign in to your hospital portals through the embedded Health Skillz connector. Records cache in your browser, never on our servers.</p>
+        </div>
+        <div class="step">
+          <div class="step-num">02</div>
+          <h4>Add your documents</h4>
+          <p>Upload PDFs, scanned faxes, EOBs, and CCDAs you've received from anywhere. Vision AI lifts them into structured form.</p>
+        </div>
+        <div class="step">
+          <div class="step-num">03</div>
+          <h4>Review and redact</h4>
+          <p>Browse your unified record. Apply named redaction profiles before sharing — original records are never modified.</p>
+        </div>
+        <div class="step">
+          <div class="step-num">04</div>
+          <h4>Use it</h4>
+          <p>30-second clinical briefings for surgeons. Conversational Q&amp;A grounded in your real data. Hand-off packets for new providers.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel section">
+      <div class="kicker">Who it's for</div>
+      <h2>Built for both sides of the encounter.</h2>
+      <div class="audience">
+        <div class="audience-col">
+          <h3>Clinicians</h3>
+          <ul>
+            <li>30-second pre-op briefing with explicit risk flags</li>
+            <li>Cross-source contradictions surfaced, not buried</li>
+            <li>Surgical risk score with the contributing factors named</li>
+            <li>Drug-drug interaction checks across every active medication</li>
+            <li>"What changed since last visit" diff with provenance</li>
+          </ul>
+        </div>
+        <div class="audience-col">
+          <h3>Patients</h3>
+          <ul>
+            <li>One unified view of records from every provider</li>
+            <li>Ask questions about your own data in plain language</li>
+            <li>Hand off to a new specialist in 30 seconds</li>
+            <li>Carry your records with you when you travel</li>
+            <li>Decide what to share, with whom, when</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel closing">
+      <div class="kicker">Open submission · MIT licensed</div>
+      <h2>Built on the published state of the art.</h2>
+      <p class="lede">
+        We extend MIMIC-IV-on-FHIR (Bennett et al., 2023), embed Josh Mandel's connector stack with attribution, and adopt the OHDSI vocabulary toolchain. Our contribution is the harmonization layer and the clinician-facing provenance UI nobody else ships. Phase 1 demonstrates the architecture on a worked example; Phase 2 productionizes for multi-vendor coverage.
+      </p>
+      <div class="ctas" style="justify-content: center;">
+        <a class="btn btn-primary" href="technical-deep-dive.html">Read the technical brief →</a>
+        <a class="btn btn-secondary" href="patient-guide.html">For patients</a>
+      </div>
+    </section>
+
+    <footer>
+      EHI Atlas (working name) · HHS EHI Ignite Challenge Phase 1 submission · Updated 2026-04-29
+    </footer>
+  </div>
+</body>
+</html>

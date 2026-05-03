@@ -24,6 +24,18 @@
       "runtimeExecutable": ".venv/bin/streamlit",
       "runtimeArgs": ["run", "fhir_explorer/app.py"],
       "port": 8502
+    },
+    {
+      "name": "Wireframes",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "8765", "--directory", "design/wireframes"],
+      "port": 8765
+    },
+    {
+      "name": "EHI Atlas Console",
+      "runtimeExecutable": ".venv/bin/streamlit",
+      "runtimeArgs": ["run", "ehi-atlas/app/streamlit_app.py", "--server.port", "8503"],
+      "port": 8503
     }
   ]
 }

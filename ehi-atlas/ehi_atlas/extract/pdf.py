@@ -54,6 +54,7 @@ Prompt and schema versioning policy
 from __future__ import annotations
 
 import base64
+import json
 import os
 from pathlib import Path
 from typing import Any, Protocol, Type, TypeVar
@@ -310,8 +311,51 @@ def extract_from_pdf(
         schema_json=output_schema.model_json_schema(),
     )
 
+    raw = _coerce_stringified_subobjects(raw)
+
     cache.put(key, raw)
     return output_schema.model_validate(raw)
+
+
+# ---------------------------------------------------------------------------
+# Response repair
+# ---------------------------------------------------------------------------
+
+
+def _coerce_stringified_subobjects(raw: dict[str, Any]) -> dict[str, Any]:
+    """Repair a known Claude tool-call quirk.
+
+    When the output schema uses a Pydantic discriminated union (e.g. our
+    ``ExtractionResult.document``), Claude occasionally emits the chosen
+    branch as a **stringified JSON** rather than a nested object — i.e.
+    ``{"document": "{\\"document_type\\": \\"lab-report\\", ...}"}`` instead
+    of ``{"document": {"document_type": "lab-report", ...}}``.
+
+    This helper walks the top-level keys and parses any string value that
+    looks like a JSON object/array. The transformation is intentionally
+    shallow: deeply-nested stringified JSON is much rarer and we'd rather
+    surface the validation error than silently coerce structure we don't
+    understand.
+
+    Returns a (possibly new) dict with stringified sub-objects parsed.
+    """
+    if not isinstance(raw, dict):
+        return raw
+
+    repaired: dict[str, Any] = {}
+    for k, v in raw.items():
+        if (
+            isinstance(v, str)
+            and len(v) > 1
+            and v.lstrip().startswith(("{", "["))
+        ):
+            try:
+                repaired[k] = json.loads(v)
+                continue
+            except (json.JSONDecodeError, ValueError):
+                pass
+        repaired[k] = v
+    return repaired
 
 
 # ---------------------------------------------------------------------------

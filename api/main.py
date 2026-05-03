@@ -18,6 +18,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
+from api.core.loader import warm_patient_indexes
 from api.core.sof_materialize import materialize_from_env
 from api.middleware.tracing import TracingMiddleware
 from api.routers import patients
@@ -61,6 +62,7 @@ def _materialize_sof_db() -> None:
     # The first app interaction needs /api/patients. Build that lightweight
     # index during startup so production users do not pay the corpus-cache
     # rebuild cost on the first page load after deploy.
+    warm_patient_indexes()
     patients.list_patients()
 
 app.add_middleware(

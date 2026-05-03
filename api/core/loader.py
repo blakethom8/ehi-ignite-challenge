@@ -51,14 +51,19 @@ def patient_id_from_path(path: Path) -> str:
 # Module-level cache: bare UUID → canonical filename stem.
 # Populated lazily on first UUID-lookup miss; never cleared during process lifetime.
 _uuid_to_stem: dict[str, str] | None = None
+_UUID_RE = re.compile(
+    r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+)
 
 
 def _build_uuid_index() -> dict[str, str]:
     """Build a map from FHIR Patient-resource id → canonical filename stem.
 
-    Two strategies, in preference order:
-    1. Read the corpus cache (fast, already has the mapping).
-    2. Scan each JSON file and extract the Patient resource id by reading
+    Strategies, in preference order:
+    1. Use the corpus catalog mapping from FHIR Patient id → filename.
+    2. Read the legacy corpus cache if present.
+    3. Use the UUID suffix embedded in the Synthea filename stem as a fallback.
+    4. Scan each JSON file and extract the Patient resource id by reading
        bundle entries until the first Patient resource is found (slower but
        works without a corpus cache).
     """
@@ -66,7 +71,24 @@ def _build_uuid_index() -> dict[str, str]:
 
     index: dict[str, str] = {}
 
-    # Strategy 1: use corpus cache (instant if fresh)
+    # Strategy 1: use the same compact corpus catalog that backs /api/patients.
+    # It stores the real FHIR Patient resource id, which can differ from the
+    # UUID suffix embedded in the Synthea filename.
+    try:
+        from lib.patient_catalog.corpus import load_corpus
+
+        catalog = load_corpus(_DATA_DIR)
+        for patient in catalog.patients:
+            patient_id = (patient.patient_id or "").lower()
+            file_name = patient.file_name or ""
+            if patient_id and file_name:
+                index[patient_id] = Path(file_name).stem
+        if index:
+            return index
+    except Exception:
+        pass
+
+    # Strategy 2: use legacy corpus cache if present
     _CORPUS_CACHE = _REPO_ROOT / "fhir_explorer" / "catalog" / ".corpus_cache.json"
     if _CORPUS_CACHE.exists():
         try:
@@ -81,9 +103,19 @@ def _build_uuid_index() -> dict[str, str]:
             if index:
                 return index
         except Exception:
-            pass  # Fall through to strategy 2
+            pass
 
-    # Strategy 2: scan bundles for Patient resource id
+    # Strategy 3: many Synthea filenames also end with a UUID. This does not
+    # always match the FHIR Patient id, but it is cheap and useful as fallback.
+    for path in _DATA_DIR.glob("*.json"):
+        stem = path.stem
+        maybe_uuid = stem.rsplit("_", 1)[-1].lower()
+        if _UUID_RE.match(maybe_uuid):
+            index[maybe_uuid] = stem
+    if index:
+        return index
+
+    # Strategy 4: scan bundles for Patient resource id
     for path in _DATA_DIR.glob("*.json"):
         stem = path.stem
         try:
@@ -126,6 +158,13 @@ def path_from_patient_id(patient_id: str) -> Path | None:
         return None
     resolved = _DATA_DIR / f"{stem}.json"
     return resolved if resolved.exists() else None
+
+
+def warm_patient_indexes() -> None:
+    """Build lightweight lookup indexes that should be ready before traffic."""
+    global _uuid_to_stem
+    if _uuid_to_stem is None:
+        _uuid_to_stem = _build_uuid_index()
 
 
 @lru_cache(maxsize=30)

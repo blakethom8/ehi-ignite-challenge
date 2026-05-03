@@ -1,12 +1,5 @@
 """Tests for the drug classifier and safety flag generator."""
 
-import sys
-from pathlib import Path
-
-# Add paths so imports resolve
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
 from lib.fhir_parser.models import MedicationRecord
 from lib.clinical.drug_classifier import DrugClassifier
 

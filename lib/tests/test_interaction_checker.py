@@ -1,14 +1,5 @@
 """Tests for the drug interaction checker."""
 
-import sys
-from pathlib import Path
-
-# Add paths for imports
-_REPO_ROOT = str(Path(__file__).parent.parent.parent)
-_APP_DIR = str(Path(__file__).parent.parent)
-sys.path.insert(0, _REPO_ROOT)
-sys.path.insert(0, _APP_DIR)
-
 from lib.fhir_parser.models import MedicationRecord
 from lib.clinical.interaction_checker import check_interactions, DrugInteraction
 from lib.clinical.drug_classifier import DrugClassifier

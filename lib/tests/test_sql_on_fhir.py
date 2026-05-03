@@ -10,30 +10,28 @@ We cover three layers:
 from __future__ import annotations
 
 import sqlite3
-import sys
 from pathlib import Path
 
 import pytest
 
-ROOT = Path(__file__).resolve().parents[1] / "core" / "sql_on_fhir"
-sys.path.insert(0, str(ROOT))
+ROOT = Path(__file__).resolve().parents[1] / "sql_on_fhir"
 
-from derived import (  # type: ignore  # noqa: E402
+from lib.sql_on_fhir.derived import (
     build_medication_episodes,
     build_observation_latest,
     default_derivations,
     medication_episode_derivation,
     observation_latest_derivation,
 )
-from enrich import (  # type: ignore  # noqa: E402
+from lib.sql_on_fhir.enrich import (
     default_enrichments,
     load_drug_classifier,
     medication_request_enrichment,
 )
-from fhirpath import evaluate  # type: ignore  # noqa: E402
-from runner import run_view  # type: ignore  # noqa: E402
-from sqlite_sink import materialize, materialize_all, open_db  # type: ignore  # noqa: E402
-from view_definition import ViewDefinition  # type: ignore  # noqa: E402
+from lib.sql_on_fhir.fhirpath import evaluate
+from lib.sql_on_fhir.runner import run_view
+from lib.sql_on_fhir.sqlite_sink import materialize, materialize_all, open_db
+from lib.sql_on_fhir.view_definition import ViewDefinition
 
 
 # ---------------------------------------------------------------------------
@@ -307,7 +305,7 @@ class TestSqliteSink:
 
 class TestBundledViews:
     def test_load_all_views(self):
-        views_dir = ROOT / "views"
+        views_dir = Path(__file__).resolve().parents[1] / "sql_on_fhir" / "views"
         paths = sorted(views_dir.glob("*.json"))
         assert len(paths) >= 5
         for path in paths:

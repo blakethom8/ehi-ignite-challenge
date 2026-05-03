@@ -59,7 +59,7 @@ class DrugClassifier:
 
     def __init__(self, mapping_path: Path | None = None) -> None:
         if mapping_path is None:
-            mapping_path = Path(__file__).parent.parent / "data" / "drug_classes.json"
+            mapping_path = Path(__file__).parent / "drug_classes.json"
         self._classes: dict[str, DrugClassInfo] = {}
         self._load_mapping(mapping_path)
 

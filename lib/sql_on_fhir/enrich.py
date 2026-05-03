@@ -69,10 +69,11 @@ DrugClassClassifier = Callable[[Optional[str], Optional[str]], Optional[str]]
 def _default_drug_classes_path() -> Path:
     """Return the canonical drug_classes.json path.
 
-    Lives next to ``patient-journey/data/`` so this module shares the
-    mapping file with ``core/drug_classifier.py``.
+    Shared with ``lib.clinical.drug_classifier`` so the warehouse-build
+    enrichment and the in-memory classifier read from the same mapping
+    file.
     """
-    return Path(__file__).resolve().parents[2] / "data" / "drug_classes.json"
+    return Path(__file__).resolve().parents[1] / "clinical" / "drug_classes.json"
 
 
 def load_drug_classifier(

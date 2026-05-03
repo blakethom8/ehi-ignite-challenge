@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 
 from lib.fhir_parser.models import MedicationRecord
 
-from core.drug_classifier import DrugClassifier
+from lib.clinical.drug_classifier import DrugClassifier
 
 
 # ---------------------------------------------------------------------------

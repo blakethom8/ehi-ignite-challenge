@@ -12,8 +12,7 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev
 
 # Copy application code
-COPY fhir_explorer/ ./fhir_explorer/
-COPY patient-journey/ ./patient-journey/
+COPY lib/ ./lib/
 COPY api/ ./api/
 COPY scripts/ ./scripts/
 COPY data/ ./data/

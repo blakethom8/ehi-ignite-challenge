@@ -19,7 +19,7 @@ _APP_DIR = str(Path(__file__).parent)
 sys.path.insert(0, _REPO_ROOT)
 sys.path.insert(0, _APP_DIR)
 
-from core.loader import (
+from lib.clinical.loader import (
     list_patient_files,
     load_patient_with_stats,
     patient_display_name,

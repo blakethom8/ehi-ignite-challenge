@@ -26,8 +26,8 @@ def _naive(dt: datetime | None) -> datetime | None:
 from lib.fhir_parser.models import PatientRecord
 from lib.patient_catalog.single_patient import PatientStats
 
-from core.drug_classifier import DrugClassifier
-from core.episode_detector import MedicationEpisode, detect_medication_episodes
+from lib.clinical.drug_classifier import DrugClassifier
+from lib.clinical.episode_detector import MedicationEpisode, detect_medication_episodes
 
 
 # Drug class → color mapping for Gantt bars

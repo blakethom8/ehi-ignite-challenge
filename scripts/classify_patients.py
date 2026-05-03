@@ -16,24 +16,15 @@ from collections import Counter, defaultdict
 from datetime import date
 from pathlib import Path
 
-# ---------------------------------------------------------------------------
-# Path setup — ensure repo root and patient-journey are importable
-# ---------------------------------------------------------------------------
-
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
-sys.path.insert(0, str(REPO_ROOT / "patient-journey"))
 
 from lib.fhir_parser.bundle_parser import parse_bundle
 from lib.patient_catalog.single_patient import compute_patient_stats
-from core.drug_classifier import DrugClassifier
-
-# ---------------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------------
+from lib.clinical.drug_classifier import DrugClassifier
 
 DATA_DIR = REPO_ROOT / "data" / "synthea-samples" / "synthea-r4-individual" / "fhir"
-DRUG_MAPPING = REPO_ROOT / "patient-journey" / "data" / "drug_classes.json"
+DRUG_MAPPING = REPO_ROOT / "lib" / "clinical" / "drug_classes.json"
 OUTPUT_PATH = REPO_ROOT / "scripts" / "patient_classifications.json"
 
 TODAY = date(2026, 4, 14)

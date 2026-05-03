@@ -23,15 +23,11 @@ Design principles:
 from __future__ import annotations
 
 import sqlite3
-import sys
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
-_PATIENT_JOURNEY = _REPO_ROOT / "patient-journey"
-if str(_PATIENT_JOURNEY) not in sys.path:
-    sys.path.insert(0, str(_PATIENT_JOURNEY))
 
 from api.core.loader import load_patient, patient_display_name, path_from_patient_id
 from api.core.sof_tools import DEFAULT_SOF_DB
@@ -243,8 +239,10 @@ def build_clinical_context(patient_id: str) -> ClinicalContext:
     patient_summary = f"{name}"
 
     # --- Safety flags from drug classifier ---
-    from core.drug_classifier import DrugClassifier
-    classifier = DrugClassifier(mapping_path=_PATIENT_JOURNEY / "data" / "drug_classes.json")
+    from lib.clinical.drug_classifier import DrugClassifier
+    classifier = DrugClassifier(
+        mapping_path=_REPO_ROOT / "lib" / "clinical" / "drug_classes.json"
+    )
     raw_flags = classifier.generate_safety_flags(record.medications)
 
     safety_flags: list[str] = []

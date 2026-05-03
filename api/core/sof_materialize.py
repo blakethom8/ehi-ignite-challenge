@@ -23,24 +23,18 @@ from __future__ import annotations
 
 import logging
 import os
-import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
-_PATIENT_JOURNEY = _REPO_ROOT / "patient-journey"
-_VIEWS_DIR = _PATIENT_JOURNEY / "core" / "sql_on_fhir" / "views"
+_VIEWS_DIR = _REPO_ROOT / "lib" / "sql_on_fhir" / "views"
 _DEFAULT_FHIR_DIR = (
     _REPO_ROOT / "data" / "synthea-samples" / "synthea-r4-individual" / "fhir"
 )
 _DEFAULT_DB_PATH = _REPO_ROOT / "data" / "sof.db"
 _DEFAULT_LIMIT = 200
-
-# Ensure `from core.sql_on_fhir...` imports resolve against patient-journey.
-if str(_PATIENT_JOURNEY) not in sys.path:
-    sys.path.insert(0, str(_PATIENT_JOURNEY))
 
 _log = logging.getLogger("api.sof_materialize")
 
@@ -109,12 +103,12 @@ def materialize_if_stale(
     Returns a ``MaterializeReport``. When ``built`` is False the DB was
     already fresh and nothing was touched on disk.
     """
-    from core.sql_on_fhir.loader import iter_all_resources  # type: ignore
-    from core.sql_on_fhir.sqlite_sink import (  # type: ignore
+    from lib.sql_on_fhir.loader import iter_all_resources  # type: ignore
+    from lib.sql_on_fhir.sqlite_sink import (  # type: ignore
         materialize_all,
         open_db,
     )
-    from core.sql_on_fhir.view_definition import ViewDefinition  # type: ignore
+    from lib.sql_on_fhir.view_definition import ViewDefinition  # type: ignore
 
     db_path = Path(db_path)
     fhir_dir = Path(fhir_dir)

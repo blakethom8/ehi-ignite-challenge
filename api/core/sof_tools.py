@@ -23,7 +23,6 @@ from __future__ import annotations
 import json
 import re
 import sqlite3
-import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -33,14 +32,8 @@ from typing import Any
 # ---------------------------------------------------------------------------
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
-_PATIENT_JOURNEY = _REPO_ROOT / "patient-journey"
-_VIEWS_DIR = _PATIENT_JOURNEY / "core" / "sql_on_fhir" / "views"
+_VIEWS_DIR = _REPO_ROOT / "lib" / "sql_on_fhir" / "views"
 DEFAULT_SOF_DB = _REPO_ROOT / "data" / "sof.db"
-
-# Make `from core.sql_on_fhir...` importable the same way the rest of `api/`
-# already reaches into the patient-journey package.
-if str(_PATIENT_JOURNEY) not in sys.path:
-    sys.path.insert(0, str(_PATIENT_JOURNEY))
 
 
 # ---------------------------------------------------------------------------
@@ -233,7 +226,7 @@ def run_sql(
 
 
 def _load_view_definitions() -> list[Any]:
-    from core.sql_on_fhir.view_definition import ViewDefinition  # type: ignore
+    from lib.sql_on_fhir.view_definition import ViewDefinition  # type: ignore
 
     views: list[Any] = []
     if not _VIEWS_DIR.exists():
@@ -269,19 +262,19 @@ def get_schemas_for_prompt() -> str:
     asks about treatment duration or active prescriptions.
     """
     try:
-        from core.sql_on_fhir.sqlite_sink import _sql_type  # type: ignore
+        from lib.sql_on_fhir.sqlite_sink import _sql_type  # type: ignore
     except ImportError:  # pragma: no cover — module always present in-tree
         def _sql_type(col):  # type: ignore
             return "TEXT"
 
     try:
-        from core.sql_on_fhir.enrich import default_enrichments  # type: ignore
+        from lib.sql_on_fhir.enrich import default_enrichments  # type: ignore
         enrichments = default_enrichments()
     except Exception:  # pragma: no cover — enrich module is in-tree
         enrichments = {}
 
     try:
-        from core.sql_on_fhir.derived import default_derivations  # type: ignore
+        from lib.sql_on_fhir.derived import default_derivations  # type: ignore
         derivations = default_derivations()
     except Exception:  # pragma: no cover — derived module is in-tree
         derivations = {}

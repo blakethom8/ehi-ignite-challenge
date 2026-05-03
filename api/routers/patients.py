@@ -5,7 +5,6 @@
 from __future__ import annotations
 
 import json
-import sys as _sys
 from collections import defaultdict
 from datetime import date, datetime
 from functools import lru_cache
@@ -76,15 +75,13 @@ from api.core.condition_ranker import ConditionRanker
 _condition_ranker = ConditionRanker()
 
 # ---------------------------------------------------------------------------
-# Drug classifier — imported from patient-journey module
+# Drug classifier
 # ---------------------------------------------------------------------------
 
-_PATIENT_JOURNEY = Path(__file__).parent.parent.parent / "patient-journey"
-if str(_PATIENT_JOURNEY) not in _sys.path:
-    _sys.path.insert(0, str(_PATIENT_JOURNEY))
-from core.drug_classifier import DrugClassifier, SafetyFlag as _SafetyFlag  # noqa: E402
+from lib.clinical.drug_classifier import DrugClassifier, SafetyFlag as _SafetyFlag
 
-_DRUG_MAPPING = _PATIENT_JOURNEY / "data" / "drug_classes.json"
+_REPO_ROOT = Path(__file__).parent.parent.parent
+_DRUG_MAPPING = _REPO_ROOT / "lib" / "clinical" / "drug_classes.json"
 _classifier = DrugClassifier(mapping_path=_DRUG_MAPPING)
 
 router = APIRouter(prefix="/patients", tags=["patients"])

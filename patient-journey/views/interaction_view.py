@@ -10,8 +10,8 @@ import streamlit as st
 from lib.fhir_parser.models import PatientRecord
 from lib.patient_catalog.single_patient import PatientStats
 
-from core.drug_classifier import DrugClassifier
-from core.interaction_checker import check_interactions, InteractionReport
+from lib.clinical.drug_classifier import DrugClassifier
+from lib.clinical.interaction_checker import check_interactions, InteractionReport
 
 
 _SEVERITY_ICONS = {

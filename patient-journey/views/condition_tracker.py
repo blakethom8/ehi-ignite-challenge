@@ -21,7 +21,7 @@ def _naive(dt: datetime | None) -> datetime | None:
 from lib.fhir_parser.models import PatientRecord
 from lib.patient_catalog.single_patient import PatientStats
 
-from core.episode_detector import ConditionEpisode, detect_condition_episodes
+from lib.clinical.episode_detector import ConditionEpisode, detect_condition_episodes
 
 
 def _format_date(dt: datetime | None) -> str:

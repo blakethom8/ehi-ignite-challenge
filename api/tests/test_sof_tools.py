@@ -9,17 +9,14 @@ read-only gate + run_sql happy path without depending on Synthea bundles.
 from __future__ import annotations
 
 import sqlite3
-import sys
 import unittest
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-PATIENT_JOURNEY = REPO_ROOT / "patient-journey"
-if str(PATIENT_JOURNEY) not in sys.path:
-    sys.path.insert(0, str(PATIENT_JOURNEY))
+VIEWS_DIR = REPO_ROOT / "lib" / "sql_on_fhir" / "views"
 
-from api.core import sof_tools  # noqa: E402
-from api.core.sof_tools import (  # noqa: E402
+from api.core import sof_tools
+from api.core.sof_tools import (
     MAX_ROWS,
     build_tool_description,
     get_schemas_for_prompt,
@@ -30,12 +27,11 @@ from api.core.sof_tools import (  # noqa: E402
 
 
 def _load_sample_views() -> list:
-    from core.sql_on_fhir.view_definition import ViewDefinition  # type: ignore
+    from lib.sql_on_fhir.view_definition import ViewDefinition
 
-    views_dir = PATIENT_JOURNEY / "core" / "sql_on_fhir" / "views"
     return [
         ViewDefinition.from_json_file(p)
-        for p in sorted(views_dir.glob("*.json"))
+        for p in sorted(VIEWS_DIR.glob("*.json"))
     ]
 
 
@@ -94,7 +90,7 @@ def _sample_resources() -> list[dict]:
 
 
 def _build_db(path: Path) -> None:
-    from core.sql_on_fhir.sqlite_sink import materialize_all, open_db  # type: ignore
+    from lib.sql_on_fhir.sqlite_sink import materialize_all, open_db  # type: ignore
 
     views = _load_sample_views()
     conn = open_db(path)

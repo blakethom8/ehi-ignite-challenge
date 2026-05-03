@@ -11,7 +11,6 @@ Design goals:
 from __future__ import annotations
 
 import re
-import sys as _sys
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -20,14 +19,10 @@ from typing import Any
 from api.core.condition_ranker import ConditionRanker
 from api.core.interaction_checker import check_interactions
 from api.core.loader import load_patient
+from lib.clinical.drug_classifier import DrugClassifier
 
-
-_PATIENT_JOURNEY = Path(__file__).parent.parent.parent / "patient-journey"
-if str(_PATIENT_JOURNEY) not in _sys.path:
-    _sys.path.insert(0, str(_PATIENT_JOURNEY))
-from core.drug_classifier import DrugClassifier  # noqa: E402
-
-_DRUG_MAPPING = _PATIENT_JOURNEY / "data" / "drug_classes.json"
+_REPO_ROOT = Path(__file__).parent.parent.parent
+_DRUG_MAPPING = _REPO_ROOT / "lib" / "clinical" / "drug_classes.json"
 _CLASSIFIER = DrugClassifier(mapping_path=_DRUG_MAPPING)
 _CONDITION_RANKER = ConditionRanker()
 

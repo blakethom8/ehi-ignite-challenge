@@ -10,8 +10,8 @@ sys.path.insert(0, _REPO_ROOT)
 sys.path.insert(0, _APP_DIR)
 
 from lib.fhir_parser.models import MedicationRecord
-from core.interaction_checker import check_interactions, DrugInteraction
-from core.drug_classifier import DrugClassifier
+from lib.clinical.interaction_checker import check_interactions, DrugInteraction
+from lib.clinical.drug_classifier import DrugClassifier
 
 
 def _make_med(display: str, status: str = "active", rxnorm: str = "") -> MedicationRecord:

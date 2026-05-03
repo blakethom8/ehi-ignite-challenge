@@ -68,9 +68,9 @@ export function PreOpOverview() {
         </div>
         <div className="mt-4 grid gap-3 md:grid-cols-3">
           {[
-            ["/explorer/clearance", "clearance", ClipboardCheck, "Clearance", "Readiness check"],
-            ["/explorer/safety", "medication-holds", ShieldAlert, "Medication Holds", "Medication safety review"],
-            ["/explorer/anesthesia", "anesthesia-handoff", Stethoscope, "Anesthesia Handoff", "Perioperative handoff"],
+            ["/preop/clearance", "clearance", ClipboardCheck, "Clearance", "Readiness check"],
+            ["/preop/medication-holds", "medication-holds", ShieldAlert, "Medication Holds", "Medication safety review"],
+            ["/preop/anesthesia-handoff", "anesthesia-handoff", Stethoscope, "Anesthesia Handoff", "Perioperative handoff"],
           ].map(([path, id, Icon, title, body]) => {
             const TypedIcon = Icon as LucideIcon;
             return (

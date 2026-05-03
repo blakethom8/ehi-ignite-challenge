@@ -63,6 +63,7 @@ interface ModuleMapItem {
   label: string;
   description: string;
   hash: string;
+  path?: string;
 }
 
 interface ModuleMapSection {
@@ -118,7 +119,7 @@ const MODULE_WORKSPACE_MAPS: ModuleWorkspaceMap[] = [
         description: "Understand readiness before surgery",
         icon: ClipboardCheck,
         items: [
-          { label: "Overview", description: "Module summary", hash: "overview" },
+          { label: "Overview", description: "Module summary", hash: "overview", path: "/preop" },
           { label: "Surgical brief", description: "30-second readiness view", hash: "surgical-brief" },
           { label: "Review boundary", description: "What the chart supports", hash: "review-boundary" },
         ],
@@ -129,9 +130,9 @@ const MODULE_WORKSPACE_MAPS: ModuleWorkspaceMap[] = [
         description: "Focused pre-op review areas",
         icon: FileJson2,
         items: [
-          { label: "Clearance", description: "Readiness check", hash: "clearance" },
-          { label: "Medication Holds", description: "Medication safety review", hash: "medication-holds" },
-          { label: "Anesthesia Handoff", description: "Perioperative handoff", hash: "anesthesia-handoff" },
+          { label: "Clearance", description: "Readiness check", hash: "clearance", path: "/preop/clearance" },
+          { label: "Medication Holds", description: "Medication safety review", hash: "medication-holds", path: "/preop/medication-holds" },
+          { label: "Anesthesia Handoff", description: "Perioperative handoff", hash: "anesthesia-handoff", path: "/preop/anesthesia-handoff" },
         ],
       },
       {
@@ -140,7 +141,7 @@ const MODULE_WORKSPACE_MAPS: ModuleWorkspaceMap[] = [
         description: "Prepare clinical output",
         icon: Share2,
         items: [
-          { label: "Anesthesia handoff", description: "Perioperative summary", hash: "anesthesia-handoff" },
+          { label: "Anesthesia handoff", description: "Perioperative summary", hash: "anesthesia-handoff", path: "/preop/anesthesia-handoff" },
           { label: "Future agent", description: "Dedicated surgical review agent", hash: "future-agent" },
         ],
       },
@@ -563,6 +564,17 @@ function getTopArea(environment: AppEnvironment): TopArea {
 
 function getActiveModuleMap(pathname: string): ModuleWorkspaceMap | null {
   return MODULE_WORKSPACE_MAPS.find((moduleMap) => pathname.startsWith(moduleMap.basePath)) ?? null;
+}
+
+function isModuleMapItemActive(moduleMap: ModuleWorkspaceMap, item: ModuleMapItem, pathname: string, hash: string): boolean {
+  if (item.path) return pathname === item.path;
+  return pathname === moduleMap.basePath && hash === `#${item.hash}`;
+}
+
+function getActiveModuleMapSectionIds(moduleMap: ModuleWorkspaceMap, pathname: string, hash: string): string[] {
+  return moduleMap.sections
+    .filter((section) => section.items.some((item) => isModuleMapItemActive(moduleMap, item, pathname, hash)))
+    .map((section) => section.id);
 }
 
 function StatusDot({ risk }: { risk: PatientRiskSummary | undefined }) {
@@ -1104,10 +1116,11 @@ export function Layout({ children }: LayoutProps) {
 
   useEffect(() => {
     if (!activeModuleMap) return;
+    const activeSectionIds = getActiveModuleMapSectionIds(activeModuleMap, location.pathname, location.hash);
     setModuleMapOpen(true);
-    setOpenModuleMapSections(new Set([activeModuleMap.sections[0]?.id].filter(Boolean) as string[]));
+    setOpenModuleMapSections(new Set((activeSectionIds.length ? activeSectionIds : [activeModuleMap.sections[0]?.id]).filter(Boolean) as string[]));
     setSidebarCollapsed(true);
-  }, [activeModuleMap?.basePath]);
+  }, [activeModuleMap, location.pathname, location.hash]);
 
   const toggleModuleMapSection = useCallback((sectionId: string) => {
     setOpenModuleMapSections((current) => {
@@ -1706,11 +1719,12 @@ export function Layout({ children }: LayoutProps) {
                           {sectionOpen && (
                             <div className="ml-4 mt-1 space-y-0.5 border-l border-[#dfe4ff] pl-2">
                               {section.items.map((item) => {
-                                const active = location.hash === `#${item.hash}`;
+                                const itemPath = item.path ?? `${activeModuleMap.basePath}#${item.hash}`;
+                                const active = isModuleMapItemActive(activeModuleMap, item, location.pathname, location.hash);
                                 return (
                                   <Link
                                     key={item.hash}
-                                    to={`${withPatientQuery(activeModuleMap.basePath, patientId)}#${item.hash}`}
+                                    to={item.path ? withPatientQuery(itemPath, patientId) : `${withPatientQuery(activeModuleMap.basePath, patientId)}#${item.hash}`}
                                     className={`block rounded-md px-2.5 py-2 no-underline transition-colors ${
                                       active ? "bg-[#eef1ff] text-[#5b76fe]" : "text-[#555a6a] hover:bg-[#f3f5ff] hover:text-[#1c1c1e]"
                                     }`}

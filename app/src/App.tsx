@@ -34,6 +34,7 @@ import { MarketplaceConcept } from "./pages/Modules/MarketplaceConcept";
 import { DataSharing } from "./pages/Modules/DataSharing";
 import { DataCatalog } from "./pages/Modules/DataCatalog";
 import { DataAggregator } from "./pages/Modules/DataAggregator";
+import { HarmonizeView } from "./pages/Modules/HarmonizeView";
 import { ClinicalInsights } from "./pages/Modules/ClinicalInsights";
 import { PatientContext } from "./pages/Modules/PatientContext";
 import { AggregationMethodology } from "./pages/Modules/AggregationMethodology";
@@ -63,7 +64,9 @@ export default function App() {
     { path: "/aggregate/sources", element: <DataAggregator /> },
     { path: "/aggregate/cleaning", element: <DataAggregator /> },
     { path: "/aggregate/context", element: <PatientContext /> },
+    { path: "/aggregate/harmonize", element: <HarmonizeView /> },
     { path: "/aggregate/publish", element: <DataAggregator /> },
+    { path: "/clinical-insights/overview", element: <ClinicalInsights /> },
     { path: "/clinical-insights", element: <ClinicalInsights /> },
     { path: "/clinical-insights/packages", element: <ClinicalInsights /> },
     { path: "/clinical-insights/context-library", element: <ClinicalInsights /> },

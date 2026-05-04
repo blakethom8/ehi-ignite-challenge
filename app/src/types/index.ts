@@ -814,3 +814,119 @@ export interface ClassificationsResponse {
     med_count_distribution: Record<string, number>;
   };
 }
+
+// ---------------------------------------------------------------------------
+// Harmonize endpoints — cross-source merge with FHIR Provenance
+// ---------------------------------------------------------------------------
+
+export interface HarmonizeCollection {
+  id: string;
+  name: string;
+  description: string;
+  source_count: number;
+}
+
+export interface HarmonizeCollectionsResponse {
+  collections: HarmonizeCollection[];
+}
+
+export interface HarmonizeSource {
+  id: string;
+  label: string;
+  kind: "fhir-pull" | "extracted-pdf" | string;
+  available: boolean;
+  document_reference: string | null;
+  resource_counts: Record<string, number>;
+  total_resources: number;
+}
+
+export interface HarmonizeSourceManifestResponse {
+  collection_id: string;
+  sources: HarmonizeSource[];
+}
+
+export interface HarmonizeObservationSource {
+  source_label: string;
+  source_observation_ref: string;
+  value: number | null;
+  unit: string | null;
+  raw_value: number | null;
+  raw_unit: string | null;
+  effective_date: string | null;
+  document_reference: string | null;
+}
+
+export interface HarmonizeLatestObservation {
+  value: number | null;
+  unit: string | null;
+  source_label: string;
+  effective_date: string | null;
+}
+
+export interface HarmonizeMergedObservation {
+  merged_ref: string | null;
+  canonical_name: string;
+  loinc_code: string | null;
+  canonical_unit: string | null;
+  source_count: number;
+  measurement_count: number;
+  has_conflict: boolean;
+  latest: HarmonizeLatestObservation | null;
+  sources: HarmonizeObservationSource[];
+}
+
+export interface HarmonizeObservationsResponse {
+  collection_id: string;
+  total: number;
+  cross_source: number;
+  merged: HarmonizeMergedObservation[];
+}
+
+export interface HarmonizeConditionSource {
+  source_label: string;
+  source_condition_ref: string;
+  display: string;
+  snomed: string | null;
+  icd10: string | null;
+  icd9: string | null;
+  clinical_status: string | null;
+  onset_date: string | null;
+  document_reference: string | null;
+}
+
+export interface HarmonizeMergedCondition {
+  merged_ref: string | null;
+  canonical_name: string;
+  snomed: string | null;
+  icd10: string | null;
+  icd9: string | null;
+  is_active: boolean;
+  source_count: number;
+  occurrence_count: number;
+  sources: HarmonizeConditionSource[];
+}
+
+export interface HarmonizeConditionsResponse {
+  collection_id: string;
+  total: number;
+  cross_source: number;
+  merged: HarmonizeMergedCondition[];
+}
+
+export interface HarmonizeProvenanceResponse {
+  collection_id: string;
+  merged_ref: string;
+  // FHIR Provenance dict — shape stable but free-form on the wire
+  provenance: {
+    resourceType: string;
+    target: { reference: string }[];
+    recorded: string;
+    activity: { coding: { system: string; code: string; display: string }[] };
+    agent: { type: { coding: { code: string; display: string }[] }; who: { display: string } }[];
+    entity: {
+      role: string;
+      what: { reference: string };
+      extension: { url: string; valueString: string }[];
+    }[];
+  };
+}

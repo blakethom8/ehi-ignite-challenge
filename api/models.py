@@ -929,3 +929,110 @@ class AggregationUploadResponse(BaseModel):
 class AggregationDeleteResponse(BaseModel):
     deleted: bool
     file_id: str
+
+
+# ---------------------------------------------------------------------------
+# Harmonize endpoints (cross-source merge + Provenance)
+# ---------------------------------------------------------------------------
+
+
+class HarmonizeCollection(BaseModel):
+    id: str
+    name: str
+    description: str
+    source_count: int
+
+
+class HarmonizeSource(BaseModel):
+    id: str
+    label: str
+    kind: str  # "fhir-pull" | "extracted-pdf"
+    available: bool
+    document_reference: str | None = None
+    resource_counts: dict[str, int]
+    total_resources: int
+
+
+class HarmonizeCollectionsResponse(BaseModel):
+    collections: list[HarmonizeCollection]
+
+
+class HarmonizeSourceManifestResponse(BaseModel):
+    collection_id: str
+    sources: list[HarmonizeSource]
+
+
+class HarmonizeObservationSource(BaseModel):
+    source_label: str
+    source_observation_ref: str
+    value: float | None
+    unit: str | None
+    raw_value: float | None
+    raw_unit: str | None
+    effective_date: str | None
+    document_reference: str | None
+
+
+class HarmonizeLatestObservation(BaseModel):
+    value: float | None
+    unit: str | None
+    source_label: str
+    effective_date: str | None
+
+
+class HarmonizeMergedObservation(BaseModel):
+    merged_ref: str | None
+    canonical_name: str
+    loinc_code: str | None
+    canonical_unit: str | None
+    source_count: int
+    measurement_count: int
+    has_conflict: bool
+    latest: HarmonizeLatestObservation | None
+    sources: list[HarmonizeObservationSource]
+
+
+class HarmonizeObservationsResponse(BaseModel):
+    collection_id: str
+    total: int
+    cross_source: int
+    merged: list[HarmonizeMergedObservation]
+
+
+class HarmonizeConditionSource(BaseModel):
+    source_label: str
+    source_condition_ref: str
+    display: str
+    snomed: str | None
+    icd10: str | None
+    icd9: str | None
+    clinical_status: str | None
+    onset_date: str | None
+    document_reference: str | None
+
+
+class HarmonizeMergedCondition(BaseModel):
+    merged_ref: str | None
+    canonical_name: str
+    snomed: str | None
+    icd10: str | None
+    icd9: str | None
+    is_active: bool
+    source_count: int
+    occurrence_count: int
+    sources: list[HarmonizeConditionSource]
+
+
+class HarmonizeConditionsResponse(BaseModel):
+    collection_id: str
+    total: int
+    cross_source: int
+    merged: list[HarmonizeMergedCondition]
+
+
+class HarmonizeProvenanceResponse(BaseModel):
+    """Pass-through of the FHIR Provenance dict — shape varies, so it's free-form."""
+
+    collection_id: str
+    merged_ref: str
+    provenance: dict

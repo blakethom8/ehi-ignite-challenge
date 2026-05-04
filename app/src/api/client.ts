@@ -28,6 +28,11 @@ import type {
   PatientContextTurnResponse,
   AggregationCleaningQueueResponse,
   AggregationDeleteResponse,
+  HarmonizeCollectionsResponse,
+  HarmonizeConditionsResponse,
+  HarmonizeObservationsResponse,
+  HarmonizeProvenanceResponse,
+  HarmonizeSourceManifestResponse,
   AggregationEnvironmentResponse,
   AggregationReadinessResponse,
   AggregationUploadPayload,
@@ -196,4 +201,46 @@ export const api = {
   /** Raw FHIR bundle JSON for a patient */
   getRawFhir: (patientId: string): Promise<Record<string, unknown>> =>
     http.get<Record<string, unknown>>(`/patients/${patientId}/fhir`).then((r) => r.data),
+
+  // -------------------------------------------------------------------------
+  // Harmonize — cross-source merge with FHIR Provenance
+  // -------------------------------------------------------------------------
+
+  getHarmonizeCollections: (): Promise<HarmonizeCollectionsResponse> =>
+    http.get<HarmonizeCollectionsResponse>("/harmonize/collections").then((r) => r.data),
+
+  getHarmonizeSources: (collectionId: string): Promise<HarmonizeSourceManifestResponse> =>
+    http
+      .get<HarmonizeSourceManifestResponse>(`/harmonize/${collectionId}/sources`)
+      .then((r) => r.data),
+
+  getHarmonizeObservations: (
+    collectionId: string,
+    crossSourceOnly = false,
+  ): Promise<HarmonizeObservationsResponse> =>
+    http
+      .get<HarmonizeObservationsResponse>(`/harmonize/${collectionId}/observations`, {
+        params: { cross_source_only: crossSourceOnly },
+      })
+      .then((r) => r.data),
+
+  getHarmonizeConditions: (
+    collectionId: string,
+    crossSourceOnly = false,
+  ): Promise<HarmonizeConditionsResponse> =>
+    http
+      .get<HarmonizeConditionsResponse>(`/harmonize/${collectionId}/conditions`, {
+        params: { cross_source_only: crossSourceOnly },
+      })
+      .then((r) => r.data),
+
+  getHarmonizeProvenance: (
+    collectionId: string,
+    mergedRef: string,
+  ): Promise<HarmonizeProvenanceResponse> =>
+    http
+      .get<HarmonizeProvenanceResponse>(
+        `/harmonize/${collectionId}/provenance/${encodeURIComponent(mergedRef)}`,
+      )
+      .then((r) => r.data),
 };

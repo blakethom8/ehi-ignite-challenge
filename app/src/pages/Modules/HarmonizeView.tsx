@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 import {
   Activity,
   AlertTriangle,
   FileText,
+  FileUp,
+  Inbox,
   Layers3,
   Link2,
   Loader2,
@@ -1306,6 +1309,10 @@ export function HarmonizeView() {
     },
   });
 
+  const isLoadingCollections = collectionsQuery.isLoading;
+  const hasNoCollections =
+    !isLoadingCollections && collections.length === 0;
+
   return (
     <div className="space-y-6">
       <header className="rounded-2xl bg-gradient-to-br from-[#5b76fe] to-[#3651e8] p-6 text-white shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
@@ -1324,6 +1331,56 @@ export function HarmonizeView() {
         </p>
       </header>
 
+      {isLoadingCollections && (
+        <div className="rounded-2xl bg-white p-8 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+          <p className="flex items-center gap-2 text-sm text-[#667085]">
+            <Loader2 size={14} className="animate-spin" />
+            Loading collections…
+          </p>
+        </div>
+      )}
+
+      {hasNoCollections && (
+        <div className="rounded-2xl bg-white p-8 text-center shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+          <div className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-full bg-[#eef2ff] text-[#5b76fe]">
+            <Inbox size={20} />
+          </div>
+          <h2 className="mt-4 text-lg font-semibold text-[#1c1c1e]">
+            No collections yet
+          </h2>
+          <p className="mt-2 mx-auto max-w-xl text-sm leading-6 text-[#667085]">
+            The harmonize layer needs at least one document collection to merge.
+            On a fresh checkout, the Synthea demo collection auto-registers from
+            the public sample data — if you're seeing this state, that bundle
+            wasn't found at <code className="text-xs">data/synthea-samples/</code>.
+          </p>
+          <p className="mt-3 mx-auto max-w-xl text-sm leading-6 text-[#667085]">
+            Either pull the Synthea sample data into{" "}
+            <code className="text-xs">data/synthea-samples/synthea-r4-individual/fhir/</code>,
+            or upload at least one document on the Data Aggregator page — uploads
+            automatically register as a harmonize collection.
+          </p>
+          <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+            <Link
+              to="/aggregate/sources"
+              className="inline-flex items-center gap-2 rounded-lg bg-[#5b76fe] px-4 py-2 text-sm font-semibold text-white hover:bg-[#4760e8]"
+            >
+              <FileUp size={14} />
+              Upload documents
+            </Link>
+            <a
+              href="https://github.com/synthetichealth/synthea#quick-start"
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-2 rounded-lg border border-[#dfe4ea] bg-white px-4 py-2 text-sm font-semibold text-[#555a6a]"
+            >
+              Synthea quick-start →
+            </a>
+          </div>
+        </div>
+      )}
+
+      {!isLoadingCollections && !hasNoCollections && (<>
       <div className="rounded-2xl bg-white p-5 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
         <div className="flex flex-wrap items-center gap-3">
           <label className="text-xs font-semibold uppercase tracking-wider text-[#667085]">
@@ -1489,13 +1546,17 @@ export function HarmonizeView() {
         </div>
       </div>
 
-      <p className="text-xs leading-5 text-[#667085]">
-        The Provenance graph is the Atlas wedge: every merged fact retains
-        pointers back to its sources via FHIR Provenance entities. Atlas
-        Extension URLs (<code>source-label</code>, <code>harmonize-activity</code>)
-        carry the lineage that downstream consumers (clinician UI, agent
-        assistant) read to render explainability.
-      </p>
+      </>)}
+
+      {!isLoadingCollections && !hasNoCollections && (
+        <p className="text-xs leading-5 text-[#667085]">
+          The Provenance graph is the Atlas wedge: every merged fact retains
+          pointers back to its sources via FHIR Provenance entities. Atlas
+          Extension URLs (<code>source-label</code>, <code>harmonize-activity</code>)
+          carry the lineage that downstream consumers (clinician UI, agent
+          assistant) read to render explainability.
+        </p>
+      )}
     </div>
   );
 }

@@ -25,6 +25,7 @@ data/traces.db
 data/traces.db-*
 data/aggregation-uploads/
 data/patient-context/
+data/harmonize-demo/
 data/sof.db
 data/sof.db-*
 data/sof.db.tmp

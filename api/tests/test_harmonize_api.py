@@ -38,6 +38,25 @@ class HarmonizeAPITests(unittest.TestCase):
         ids = {c["id"] for c in r.json()["collections"]}
         self.assertIn("blake-real", ids)
 
+    def test_synthea_demo_collection_self_bootstraps(self) -> None:
+        """Synthea demo collection appears whenever the public Synthea data
+        shipped with the repo is available — does not need Blake's data."""
+        r = self.client.get("/api/harmonize/collections")
+        ids = {c["id"] for c in r.json()["collections"]}
+        self.assertIn("synthea-demo", ids)
+        sources = self.client.get("/api/harmonize/synthea-demo/sources").json()
+        self.assertEqual(len(sources["sources"]), 2)
+        labels = {s["label"] for s in sources["sources"]}
+        self.assertEqual(labels, {"EHR snapshot · 2018", "EHR snapshot · 2024"})
+
+    def test_synthea_demo_has_cross_source_conditions(self) -> None:
+        """Chronic conditions carry across the temporal split → cross-source merges."""
+        r = self.client.get("/api/harmonize/synthea-demo/conditions")
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        self.assertGreater(body["total"], 5)
+        self.assertGreater(body["cross_source"], 0)
+
     def test_sources_for_blake_real_returns_five(self) -> None:
         r = self.client.get("/api/harmonize/blake-real/sources")
         self.assertEqual(r.status_code, 200)

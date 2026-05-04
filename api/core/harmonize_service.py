@@ -112,6 +112,163 @@ _BLAKE_DIR = (
 )
 
 
+# ---------------------------------------------------------------------------
+# Synthea demo collection — self-bootstrapping cross-source merge fixture
+# ---------------------------------------------------------------------------
+#
+# Goal: a fresh-clone reviewer who has no Blake-private data should still
+# see a working harmonize page. We synthesize a cross-source dataset by
+# splitting one rich Synthea patient bundle into two temporal snapshots
+# ("EHR snapshot 2018" / "EHR snapshot 2024") that share chronic
+# conditions / persistent meds / immunizations across the cutoff.
+#
+# Generation runs at module import time; output is cached under
+# ``data/harmonize-demo/synthea-demo/`` and is regenerated when the
+# source patient bundle changes.
+
+_SYNTHEA_DEMO_PATIENT = (
+    REPO_ROOT
+    / "data"
+    / "synthea-samples"
+    / "synthea-r4-individual"
+    / "fhir"
+    / "Adria871_Ankunding277_89d97565-2497-4d7b-91b0-90543c0e6a9c.json"
+)
+_SYNTHEA_DEMO_DIR = REPO_ROOT / "data" / "harmonize-demo" / "synthea-demo"
+_SYNTHEA_SPLIT_DATE = "2018-01-01"
+
+
+def _synthea_resource_date(resource: dict[str, Any]) -> str | None:
+    """Pull a representative date from a Synthea FHIR resource for splitting."""
+    for key in (
+        "effectiveDateTime",
+        "onsetDateTime",
+        "authoredOn",
+        "occurrenceDateTime",
+        "recordedDate",
+        "issued",
+    ):
+        v = resource.get(key)
+        if isinstance(v, str) and v:
+            return v[:10]
+    period = resource.get("period")
+    if isinstance(period, dict) and isinstance(period.get("start"), str):
+        return period["start"][:10]
+    return None
+
+
+def _ensure_synthea_demo_artifacts() -> tuple[Path, Path] | None:
+    """Generate the two temporal-snapshot bundles if they don't exist or are stale.
+
+    Returns ``(snapshot_2018_path, snapshot_2024_path)`` or ``None`` if the
+    source Synthea patient isn't checked out.
+    """
+    if not _SYNTHEA_DEMO_PATIENT.exists():
+        return None
+
+    early = _SYNTHEA_DEMO_DIR / "ehr-snapshot-2018.json"
+    late = _SYNTHEA_DEMO_DIR / "ehr-snapshot-2024.json"
+
+    src_mtime = _SYNTHEA_DEMO_PATIENT.stat().st_mtime
+    if (
+        early.exists()
+        and late.exists()
+        and early.stat().st_mtime >= src_mtime
+        and late.stat().st_mtime >= src_mtime
+    ):
+        return early, late
+
+    bundle = json.loads(_SYNTHEA_DEMO_PATIENT.read_text())
+    early_entries: list[dict[str, Any]] = []
+    late_entries: list[dict[str, Any]] = []
+
+    # The Patient resource (and other identity-anchoring resources) goes into
+    # both snapshots so each looks like a complete record.
+    persistent_types = {"Patient", "Practitioner", "Organization", "CareTeam"}
+
+    for entry in bundle.get("entry", []):
+        resource = entry.get("resource", {})
+        rt = resource.get("resourceType")
+        if rt in persistent_types:
+            early_entries.append(entry)
+            late_entries.append(entry)
+            continue
+        # Conditions are chronic state — if they onset before the cutoff
+        # they should appear in BOTH snapshots (the late snapshot has
+        # carried them forward as ongoing problems).
+        if rt == "Condition":
+            onset = _synthea_resource_date(resource)
+            if onset and onset < _SYNTHEA_SPLIT_DATE:
+                early_entries.append(entry)
+                late_entries.append(entry)
+                continue
+            # Conditions that onset after the cutoff only appear in late.
+            late_entries.append(entry)
+            continue
+        # MedicationRequests: a request authored before the cutoff with
+        # status active appears in both (carried prescription).
+        if rt == "MedicationRequest":
+            authored = _synthea_resource_date(resource)
+            status = resource.get("status")
+            if authored and authored < _SYNTHEA_SPLIT_DATE:
+                early_entries.append(entry)
+                if status == "active":
+                    late_entries.append(entry)
+                continue
+            late_entries.append(entry)
+            continue
+        # Everything else: split on the first available date.
+        dt = _synthea_resource_date(resource)
+        if dt and dt < _SYNTHEA_SPLIT_DATE:
+            early_entries.append(entry)
+        else:
+            late_entries.append(entry)
+
+    _SYNTHEA_DEMO_DIR.mkdir(parents=True, exist_ok=True)
+    early.write_text(
+        json.dumps({"resourceType": "Bundle", "type": "collection", "entry": early_entries}, indent=2)
+    )
+    late.write_text(
+        json.dumps({"resourceType": "Bundle", "type": "collection", "entry": late_entries}, indent=2)
+    )
+    return early, late
+
+
+def _synthea_demo_collection() -> CollectionDefinition | None:
+    paths = _ensure_synthea_demo_artifacts()
+    if paths is None:
+        return None
+    early, late = paths
+    return CollectionDefinition(
+        id="synthea-demo",
+        name="Synthea — demo patient (temporal split)",
+        description=(
+            "A synthetic single-patient record split into two temporal EHR "
+            "snapshots (pre-2018 and full record) so the harmonize layer has "
+            "two cross-referencing sources to merge. Use this when you don't "
+            "have your own data uploaded yet — every USCDI core resource "
+            "type contributes to both sources, and chronic conditions / "
+            "active meds / immunizations cross-source merge realistically."
+        ),
+        sources=(
+            SourceDefinition(
+                id="synthea-snapshot-2018",
+                label="EHR snapshot · 2018",
+                kind="fhir-pull",
+                path=early,
+                document_reference="DocumentReference/synthea-snapshot-2018",
+            ),
+            SourceDefinition(
+                id="synthea-snapshot-2024",
+                label="EHR snapshot · 2024",
+                kind="fhir-pull",
+                path=late,
+                document_reference="DocumentReference/synthea-snapshot-2024",
+            ),
+        ),
+    )
+
+
 _COLLECTIONS: dict[str, CollectionDefinition] = {
     "blake-real": CollectionDefinition(
         id="blake-real",
@@ -265,16 +422,35 @@ def _discover_upload_collections() -> dict[str, CollectionDefinition]:
     return out
 
 
+def _all_static_collections() -> dict[str, CollectionDefinition]:
+    """Public collections — Synthea demo if its source patient is checked out,
+    plus blake-real if any of its sources are present locally.
+
+    Conditional registration keeps fresh-clone reviewers from seeing an
+    empty blake-real collection. The Synthea demo bootstraps from public
+    Synthea data shipped with the repo, so it's available everywhere.
+    """
+    out: dict[str, CollectionDefinition] = {}
+    demo = _synthea_demo_collection()
+    if demo is not None:
+        out[demo.id] = demo
+    blake = _COLLECTIONS.get("blake-real")
+    if blake is not None and any(s.path.exists() for s in blake.sources):
+        out[blake.id] = blake
+    return out
+
+
 def list_collections() -> list[CollectionDefinition]:
-    """Static registry first, then any upload-derived collections."""
-    out: list[CollectionDefinition] = list(_COLLECTIONS.values())
+    """Static + Synthea demo first, then any upload-derived collections."""
+    out: list[CollectionDefinition] = list(_all_static_collections().values())
     out.extend(_discover_upload_collections().values())
     return out
 
 
 def get_collection(collection_id: str) -> CollectionDefinition | None:
-    if collection_id in _COLLECTIONS:
-        return _COLLECTIONS[collection_id]
+    static = _all_static_collections()
+    if collection_id in static:
+        return static[collection_id]
     return _discover_upload_collections().get(collection_id)
 
 

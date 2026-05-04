@@ -133,19 +133,25 @@ def _normalize_display(s: str | None) -> str:
     return (s or "").strip().lower()
 
 
-def facts_from_clientfullehr(payload: dict | list) -> list[Fact]:
-    """Walk a ClientFullEHR JSON and emit a Fact per clinically-meaningful resource.
+def _fhir_resources_by_type(resources_iter: Iterable[dict]) -> dict[str, list[dict]]:
+    """Bucket a flat list of FHIR resources by ``resourceType``."""
+    bucketed: dict[str, list[dict]] = {}
+    for res in resources_iter:
+        rt = res.get("resourceType")
+        if not rt:
+            continue
+        bucketed.setdefault(rt, []).append(res)
+    return bucketed
 
-    Accepts either the raw JSON (a list with one wrapper dict containing ``fhir``)
-    or just the wrapper dict itself.
+
+def facts_from_fhir_resources(fhir: dict[str, list[dict]]) -> list[Fact]:
+    """Walk a ``{ResourceType: [resources]}`` map and emit Facts.
+
+    Shared by :func:`facts_from_clientfullehr` and :func:`facts_from_bundle`.
+    Per-resource logic (terminology preference, display extraction, lab
+    category filter) lives here so both ground-truth and pipeline-output
+    paths produce comparable Facts.
     """
-    # Some Health Skillz exports wrap the bundle in a single-element list
-    if isinstance(payload, list):
-        if not payload:
-            return []
-        payload = payload[0]
-    fhir = payload.get("fhir", {}) if isinstance(payload, dict) else {}
-
     facts: list[Fact] = []
 
     # --- Conditions ---
@@ -166,14 +172,13 @@ def facts_from_clientfullehr(payload: dict | list) -> list[Fact]:
             )
         )
 
-    # --- Medications (via MedicationRequest.medicationReference.display + Medication.code) ---
+    # --- Medications via MedicationRequest (resolve medicationReference if available) ---
     medications_by_id = {m.get("id"): m for m in fhir.get("Medication", [])}
     for mr in fhir.get("MedicationRequest", []):
         med_ref = mr.get("medicationReference") or {}
         med_display = med_ref.get("display", "")
         med_codes: dict[str, str] = {}
         sys_short = code_value = None
-        # Try to resolve the Medication resource by id (strip the "Medication/" prefix)
         ref_str = med_ref.get("reference", "")
         med_id = ref_str.split("/", 1)[1] if "/" in ref_str else ""
         med = medications_by_id.get(med_id)
@@ -184,12 +189,10 @@ def facts_from_clientfullehr(payload: dict | list) -> list[Fact]:
             )
             if not med_display:
                 med_display = mc.get("text", "")
-        # MedicationCodeableConcept inline path
         mcc = mr.get("medicationCodeableConcept") or {}
         if mcc:
-            mc_text = mcc.get("text", "")
             if not med_display:
-                med_display = mc_text
+                med_display = mcc.get("text", "")
             sys2, code2, codes2 = _pick_code(
                 mcc.get("coding"), preferred=["rxnorm", "ndc"]
             )
@@ -243,7 +246,7 @@ def facts_from_clientfullehr(payload: dict | list) -> list[Fact]:
             )
         )
 
-    # --- Lab Observations only (skip social-history, vitals for now) ---
+    # --- Lab Observations only ---
     for obs in fhir.get("Observation", []):
         if not _is_laboratory(obs):
             continue
@@ -264,6 +267,41 @@ def facts_from_clientfullehr(payload: dict | list) -> list[Fact]:
         )
 
     return facts
+
+
+def facts_from_bundle(bundle: dict) -> list[Fact]:
+    """Walk a FHIR Bundle dict and emit Facts comparable to ground truth.
+
+    Used to score pipeline outputs (which return Bundles) against
+    ClientFullEHR ground truth. The bake-off harness is the primary
+    caller.
+
+    Note: by default we treat *every* Observation in the Bundle as
+    laboratory unless its ``category`` says otherwise, since
+    pipelines often emit lab observations without a category coding.
+    See :func:`_is_laboratory` for the precise rule (only excludes
+    observations explicitly tagged with a non-laboratory category).
+    """
+    entries = bundle.get("entry", []) or []
+    resources = [e.get("resource", {}) for e in entries if isinstance(e, dict)]
+    return facts_from_fhir_resources(_fhir_resources_by_type(resources))
+
+
+def facts_from_clientfullehr(payload: dict | list) -> list[Fact]:
+    """Walk a ClientFullEHR JSON and emit a Fact per clinically-meaningful resource.
+
+    Accepts either the raw JSON (a list with one wrapper dict containing ``fhir``)
+    or just the wrapper dict itself. Delegates per-resource extraction to
+    :func:`facts_from_fhir_resources`, which is also used by
+    :func:`facts_from_bundle` so ground truth and pipeline outputs go through
+    the same code path.
+    """
+    if isinstance(payload, list):
+        if not payload:
+            return []
+        payload = payload[0]
+    fhir = payload.get("fhir", {}) if isinstance(payload, dict) else {}
+    return facts_from_fhir_resources(fhir)
 
 
 def _best_display_from_coding(coding: list[dict] | None) -> str:
@@ -488,6 +526,58 @@ class EvalReport:
 
 
 _FACT_TYPES: list[FactType] = ["condition", "medication", "allergy", "immunization", "lab"]
+
+
+def evaluate_bundle(
+    ground_truth: dict | list,
+    bundle: dict,
+    *,
+    extraction_label: str = "",
+    ground_truth_label: str = "",
+    fuzzy_threshold: float = 0.5,
+) -> EvalReport:
+    """Evaluate a FHIR Bundle (pipeline output) against a ClientFullEHR ground truth.
+
+    Mirror of :func:`evaluate` but accepts the Bundle dict that pipelines
+    produce, instead of the legacy ``ExtractionResult``. Use this from
+    the bake-off harness and from any future pipeline-aware tooling.
+    """
+    return _evaluate_facts(
+        gt_facts=facts_from_clientfullehr(ground_truth),
+        ex_facts=facts_from_bundle(bundle),
+        extraction_label=extraction_label,
+        ground_truth_label=ground_truth_label,
+        fuzzy_threshold=fuzzy_threshold,
+    )
+
+
+def _evaluate_facts(
+    *,
+    gt_facts: list[Fact],
+    ex_facts: list[Fact],
+    extraction_label: str,
+    ground_truth_label: str,
+    fuzzy_threshold: float,
+) -> EvalReport:
+    """Per-fact-type matching shared by ``evaluate`` and ``evaluate_bundle``."""
+    by_type: dict[FactType, TypeReport] = {}
+    for ft in _FACT_TYPES:
+        gt_t = [f for f in gt_facts if f.fact_type == ft]
+        ex_t = [f for f in ex_facts if f.fact_type == ft]
+        matches, extras, missed = match_facts(ex_t, gt_t, threshold=fuzzy_threshold)
+        by_type[ft] = TypeReport(
+            fact_type=ft,
+            gt_count=len(gt_t),
+            extracted_count=len(ex_t),
+            matches=matches,
+            extras=extras,
+            missed=missed,
+        )
+    return EvalReport(
+        by_type=by_type,
+        extraction_label=extraction_label,
+        ground_truth_label=ground_truth_label,
+    )
 
 
 def evaluate(

@@ -43,7 +43,8 @@ __all__ = [
 # Adding a new pipeline = creating a new module here + adding an import below.
 # (Dynamic discovery via entry_points is a Phase-2 polish item.)
 
-# Pipelines will be registered as they land in K.2 / K.4 / K.5:
-# from . import single_pass_vision  # noqa: F401  (K.2)
+from . import single_pass_vision  # noqa: F401  (K.2 — baseline)
+
+# Pipelines will be registered as they land in K.4 / K.5:
 # from . import multipass_fhir      # noqa: F401  (K.4)
 # from . import ocr_then_extract    # noqa: F401  (K.5)

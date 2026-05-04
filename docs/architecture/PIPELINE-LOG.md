@@ -10,6 +10,7 @@ Best multipass-fhir result on Cedars Health Summary: **F1 0.70** (post-Move H, w
 
 | Date | Move | Subject | Headline result |
 |---|---|---|---|
+| 2026-05-03 | **U** | Async PDF extraction with job-polling pattern | POST /extract no longer blocks 30-90s. Returns 202 + job_id immediately; React page polls every 1.5s until complete. Cache-bust fans out to all 6 resource-type queries on completion. Live test: 134ms round-trip for the no-PDF case. |
 | 2026-05-03 | **T** | Empty-state + loading UI on the harmonize page | Three render branches now handle the previously-unreachable zero-collections state gracefully. Centered empty-state card explains what's missing and offers two CTAs (upload documents in-app, Synthea quick-start external). Closes the fresh-clone polish loop. |
 | 2026-05-03 | **S** | Synthea demo collection — fresh-clone reviewers get a working harmonize flow | Self-bootstrapping cross-source dataset from public Synthea data. One patient bundle split into 2 temporal EHR snapshots, persistent identity + chronic conditions carry forward. **9 conditions / 8 cross-source merged** without any private data. blake-real now registers conditionally so fresh clones don't see an empty collection. |
 | 2026-05-03 | **R** | Multi-source contribution diff — vision wins surface automatically | Per-source unique vs shared partitioning. **The 4 Cedars PDF unique conditions auto-emerge as exactly the vision wins from Move H** — manual triage replaced by a graph query. Function Health 2025-11-29 has 0 unique / 58 shared, automatically exposing it as a cross-source confirmation source rather than a unique-data source. |
@@ -55,6 +56,53 @@ Pipeline framework + eval harness shipped 2026-05-03 (commits: pipeline Protocol
 ```
 
 Each entry should be 200–500 words. Tables and code snippets welcome. **Honesty about negative results matters as much as wins** — knowing what *didn't* work prevents future re-litigation.
+
+---
+
+## 2026-05-03 · Move U — async PDF extraction with job-polling pattern
+
+**Agent:** Claude Opus 4.7
+
+**What:** Replaced the synchronous `POST /extract` with a background-job + polling pattern. The endpoint now enqueues a job, returns HTTP 202 with a job_id immediately, and the React page polls `GET /extract-jobs/{job_id}` every 1.5s until status flips to complete or failed. Cache-busting fans out to all six harmonize-scoped queries on completion so the merged tables refresh automatically.
+
+**Why:** Move N closed the upload→harmonize loop and the resulting flow worked, but a real-size Cedars PDF blocks `extract_pending_pdfs()` for 60–90s synchronously. The React mutation hung that whole time with a "Extracting…" spinner, no progress feedback, and an HTTP request held open against the API. That's an operational gap with three failure modes: (1) the user thinks the page is broken and refreshes, losing the running job; (2) reverse proxies time out the request; (3) the React tab gets backgrounded and Chrome throttles polling. Async fixes all three.
+
+**How:** In-memory ExtractJob store keyed by uuid4 job_id, thread-safe via a single Lock around dict reads/writes. `start_extract_job()` registers the job in pending state, spawns a daemon thread that wraps the existing `extract_pending_pdfs()` (so the synchronous logic is reused unchanged), flips to running on enter and complete/failed on exit. `get_extract_job()` is the polling endpoint backing.
+
+React side: the mutation just stashes the returned job_id; a `useQuery` polls with `refetchInterval` returning 1500ms while pending/running and false once terminal. React Query stops polling automatically without manual cleanup. A separate `useEffect` on `status === "complete"` invalidates all six resource-type query keys + sources + source-diff so the merged tables reflect the newly extracted facts in one paint.
+
+One subtle fix: the background thread imports `from ehi_atlas.extract.pipelines import get` at runtime, but `ehi-atlas/` isn't on the API process's `sys.path` by default. Fixed by appending it at module load time. Without this fix the API tests under TestClient passed (because they staged sessions with no PDFs to extract) but the live extraction would have failed with `ModuleNotFoundError`.
+
+**Result:** End-to-end live test on a fake upload session containing one FHIR JSON file (no PDFs):
+
+```
+POST /api/harmonize/upload-upload-test/extract       → HTTP 202
+{
+  "job_id": "39a56c1313ee4ca08ec52bfe3133c090",
+  "status": "running",
+  ...
+}
+
+(1 second later)
+
+GET /api/harmonize/extract-jobs/{job_id}             → HTTP 200
+{
+  "status": "complete",
+  "results": [],
+  "started_at":   "2026-05-03T21:19:20.530235",
+  "completed_at": "2026-05-03T21:19:20.664589",
+  ...
+}
+```
+
+134ms job round-trip for the no-PDF case. The POST returns instantly instead of holding the connection open. 153 tests green; TypeScript clean.
+
+**Conclusion:** The synchronous extract endpoint was the last piece of the harmonize flow that didn't behave well under operational load. With async + polling, the flow is production-shaped: kick off long work, render progress immediately, surface results when they land. The same pattern is reusable for any future long-running harmonize task (re-run with different prompt, batch-extract a corpus, regenerate after a model upgrade).
+
+**Next:**
+- Pairwise source diff: "what does A have that B doesn't" rather than "what does A have that nobody else has." Becomes useful with ≥3 contributors.
+- Mobile / tablet responsive pass — current layouts are desktop-tuned.
+- Persistent job store (Redis or sqlite) so jobs survive process restarts and multi-worker deployment becomes trivial. Currently in-memory.
 
 ---
 

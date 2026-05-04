@@ -10,6 +10,7 @@ Best multipass-fhir result on Cedars Health Summary: **F1 0.70** (post-Move H, w
 
 | Date | Move | Subject | Headline result |
 |---|---|---|---|
+| 2026-05-03 | **V** | Responsive breakpoints on the 6 merged-record tables | Targeted column-hiding at sm/md/lg per table. No more horizontal scrollbar on narrow viewports. Closes the harmonize feature's polish loop. |
 | 2026-05-03 | **U** | Async PDF extraction with job-polling pattern | POST /extract no longer blocks 30-90s. Returns 202 + job_id immediately; React page polls every 1.5s until complete. Cache-bust fans out to all 6 resource-type queries on completion. Live test: 134ms round-trip for the no-PDF case. |
 | 2026-05-03 | **T** | Empty-state + loading UI on the harmonize page | Three render branches now handle the previously-unreachable zero-collections state gracefully. Centered empty-state card explains what's missing and offers two CTAs (upload documents in-app, Synthea quick-start external). Closes the fresh-clone polish loop. |
 | 2026-05-03 | **S** | Synthea demo collection — fresh-clone reviewers get a working harmonize flow | Self-bootstrapping cross-source dataset from public Synthea data. One patient bundle split into 2 temporal EHR snapshots, persistent identity + chronic conditions carry forward. **9 conditions / 8 cross-source merged** without any private data. blake-real now registers conditionally so fresh clones don't see an empty collection. |

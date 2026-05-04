@@ -1,10 +1,23 @@
 # EHI Atlas — Development Zone
 
-The dev surface for the EHI Atlas data-aggregation platform. Active focus: the
-**PDF → FHIR** extraction pipeline. Reads from `lib/` and the production `data/`
-drops at the repo root; ships nothing to production directly. See
-[`CLAUDE.md`](CLAUDE.md) for zone conventions and `../CLAUDE.md` for the
-repo-level product strategy.
+The dev surface for the EHI Atlas data-aggregation platform. The platform is
+designed to ingest and harmonize heterogeneous patient health data — FHIR R4
+bundles, Epic EHI Export SQLite, C-CDA documents, payer claims, lab PDFs,
+clinical-note PDFs — into one canonical FHIR R4 record with full Provenance
+lineage. The cross-source merge / Provenance graph is the platform's
+defensible wedge ([`../docs/architecture/ATLAS-DATA-MODEL.md`](../docs/architecture/ATLAS-DATA-MODEL.md)).
+
+**Current development focus:** the **PDF → FHIR** ingestion path — the
+hardest single ingestion path and the one most directly relevant to the
+EHI Ignite Challenge Phase 1 deadline. Other ingestion paths (FHIR, EHI SQLite,
+C-CDA) and the harmonization layer (silver / gold / Provenance) are the next
+chapters; an early scaffold lives at
+[`../archive/ehi-atlas-5layer/`](../archive/ehi-atlas-5layer/) and will be
+rebuilt against the production parser when those phases activate.
+
+Reads from `lib/` and the production `data/` drops at the repo root; ships
+nothing to production directly. See [`CLAUDE.md`](CLAUDE.md) for zone
+conventions and `../CLAUDE.md` for the repo-level product strategy.
 
 ## Quickstart
 
@@ -44,14 +57,21 @@ code, deployment configs — lives at the repo root. See `../CLAUDE.md` for the
 full layout. This zone never imports from `api/` or `app/` and never writes
 into production `data/`.
 
-## Archived: 5-layer harmonization stack
+## Archived: 5-layer harmonization scaffold
 
-The original Atlas vision (per-source adapters → silver standardization →
-gold harmonization with Provenance) was archived in May 2026 once PDF → FHIR
-became the wedge. The full implementation — adapters, standardize,
-harmonize, terminology, the corresponding tests, notebooks, and Streamlit
-pages — lives at [`../archive/ehi-atlas-5layer/`](../archive/ehi-atlas-5layer/)
-for historical reference.
+The strategic vision is unchanged: cross-source merge with FHIR-native
+Provenance is still the Atlas wedge. What was archived in May 2026 is the
+**early Python scaffold** for that vision — per-source adapters, silver
+standardization, harmonize/orchestrator, terminology — built before the
+ingestion path had been stress-tested. Phase 1 demands one ingestion path
+that actually works under load (PDF → FHIR), and the scaffold's silver/gold
+output paths and Streamlit pages were getting in the way of that work.
+
+The full scaffold — adapters, standardize, harmonize, terminology, the
+corresponding tests, notebooks, and Streamlit pages — lives at
+[`../archive/ehi-atlas-5layer/`](../archive/ehi-atlas-5layer/) and will be
+rebuilt against the production parser once PDF ingestion stabilizes and the
+multi-source merge becomes the bottleneck.
 
 ## License
 

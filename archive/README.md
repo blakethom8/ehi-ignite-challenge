@@ -8,7 +8,7 @@ Streamlit prototypes that predated the FastAPI + React stack. Kept as **frozen r
 |---|---|---|
 | `fhir-explorer-streamlit/` | Internal data-review tool: corpus stats, field profiler, timeline, encounter hub | `app/src/pages/Explorer/` (React) |
 | `patient-journey-streamlit/` | Clinician-facing journey app: medication history, condition tracker, safety panel, interaction view, NL search | `app/src/pages/PatientJourney/` (React, partial) |
-| `ehi-atlas-5layer/` | Original Atlas vision: per-source adapters → silver standardization → gold harmonization with FHIR-native Provenance. Includes Python subsystems, tests, notebooks 02–09, Streamlit pages 02/06/07, the typer CLI, and showcase-patient gold/silver outputs. | `ehi-atlas/ehi_atlas/extract/` (PDF → FHIR pipeline) |
+| `ehi-atlas-5layer/` | Early Python scaffold for Atlas's multi-source harmonization layer: per-source adapters → silver standardization → gold harmonization with FHIR-native Provenance. Includes Python subsystems, tests, notebooks 02–09, Streamlit pages 02/06/07, the typer CLI, and showcase-patient gold/silver outputs. **Strategic wedge unchanged** — see [`docs/architecture/ATLAS-DATA-MODEL.md`](../docs/architecture/ATLAS-DATA-MODEL.md). Will be rebuilt when the harmonization phase reactivates. | Active focus moved to `ehi-atlas/ehi_atlas/extract/` (PDF → FHIR ingestion path) for Phase 1. |
 
 ## Status
 

@@ -1,6 +1,6 @@
 # CLAUDE.md — `ehi-atlas/` Development Zone
 
-> The development surface for the EHI Atlas data-aggregation platform. Active focus: **PDF → FHIR extraction**. Reads from `lib/` and the production `data/` drops; never modifies them.
+> The dev surface for the EHI Atlas data-aggregation platform. The platform's strategic wedge is **multi-source harmonization with FHIR-native Provenance** — ingesting heterogeneous patient data (FHIR bundles, Epic EHI SQLite, C-CDAs, payer claims, lab PDFs, clinical notes) and merging into one canonical record. **Active development focus:** the **PDF → FHIR** ingestion path. Reads from `lib/` and the production `data/` drops; never modifies them.
 
 ---
 
@@ -23,9 +23,11 @@
 - **Production runtime data.** `data/synthea-samples/`, `data/sof.db`, `data/patient-context/` belong to the production app and ship in Docker.
 - **Strategic narrative.** That's in the Chief vault. See cross-references below.
 
-## Archived: 5-layer harmonization stack
+## Archived: 5-layer harmonization scaffold
 
-The original Atlas vision (per-source adapters → silver standardization → gold harmonization with FHIR-native Provenance) was archived in May 2026 once PDF → FHIR became the wedge. The full implementation — `ehi_atlas/{adapters,standardize,harmonize,terminology,audit}/`, the typer CLI, the 5-layer Streamlit pages (Standardize, Harmonize, Gold & Provenance), notebooks 02–09, the showcase silver/gold outputs — lives at [`../archive/ehi-atlas-5layer/`](../archive/ehi-atlas-5layer/). Nothing live imports from there.
+**The strategic wedge is unchanged** — multi-source harmonization with FHIR-native Provenance is still the Atlas direction. What was archived in May 2026 is the early Python *scaffold* for that vision (per-source adapters → silver standardization → gold harmonization), built before the ingestion path had been stress-tested. Phase 1 demands one ingestion path that actually works under load (PDF → FHIR), and the scaffold's silver/gold output paths and Streamlit pages were entangling that work.
+
+The full scaffold — `ehi_atlas/{adapters,standardize,harmonize,terminology,audit}/`, the typer CLI, the 5-layer Streamlit pages (Standardize, Harmonize, Gold & Provenance), notebooks 02–09, the showcase silver/gold outputs — lives at [`../archive/ehi-atlas-5layer/`](../archive/ehi-atlas-5layer/). Nothing live imports from there. It will be rebuilt against the production parser once PDF ingestion stabilizes and multi-source merge becomes the next-priority bottleneck.
 
 ## Promotion path
 
@@ -67,4 +69,4 @@ The legacy Streamlit shells in `archive/fhir-explorer-streamlit/` and `archive/p
 
 *"Clinicians don't need more records. They need the right 5 facts in 30 seconds."*
 
-The Atlas wedge is high-fidelity ingestion — turning unstructured clinical PDFs into FHIR R4 resources with measurable F1. Once that flows reliably, the cross-source merge / Provenance graph layer (currently archived) becomes the next chapter. Don't drift into building a generic FHIR browser or a chat-only assistant.
+Atlas's defensible wedge is the multi-source Provenance graph — every fact in the canonical record knows where it came from across heterogeneous source formats. The active build focus right now is the PDF → FHIR ingestion path because it's the hardest single ingestion path and the most relevant to Phase 1; once that flows reliably the cross-source merge (silver / gold / Provenance) becomes the next-priority phase. Don't drift into building a generic FHIR browser or a chat-only assistant.

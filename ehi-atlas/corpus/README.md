@@ -1,127 +1,111 @@
 # Corpus
 
-> The data layer of EHI Atlas. Bronze (per-source raw), silver (FHIR-standardized), gold (cross-source merged + Provenance). All paths under this directory are owned by the harmonizer; the existing app reads only `gold/`.
+The data bench for EHI Atlas. The platform is designed to ingest and harmonize
+heterogeneous patient health data — FHIR R4 bundles, Epic EHI Export SQLite,
+C-CDA documents, payer claims, lab PDFs, clinical-note PDFs. This directory
+holds raw source materials (`_sources/`), staged canonical artifacts (`bronze/`),
+and terminology snapshots (`reference/`).
+
+> **Current development focus:** the PDF → FHIR ingestion path. The cross-source
+> harmonization implementation (silver / gold / Provenance graph) is the
+> platform's defensible wedge and remains the long-horizon target — see
+> [`../../docs/architecture/ATLAS-DATA-MODEL.md`](../../docs/architecture/ATLAS-DATA-MODEL.md).
+> The early 5-layer scaffold lives at
+> [`../../archive/ehi-atlas-5layer/`](../../archive/ehi-atlas-5layer/) and will
+> be rebuilt against the production parser once PDF ingestion stabilizes.
 
 ## Layout
 
 ```
 corpus/
-├── README.md                # this file
-├── _sources/                # raw source materials, per-source
-│   ├── synthea/
-│   ├── josh-epic-ehi/
-│   ├── josh-ccdas/
-│   ├── cms-blue-button/
-│   ├── blake-cedars/        # personal — gitignored at raw/
-│   ├── devon-cedars/        # personal — gitignored at raw/
-│   ├── cedars-portal-pdfs/  # personal — gitignored at raw/
-│   └── synthesized-lab-pdf/ # constructed
-├── bronze/                  # canonical staging (Layer 1 output)
-├── silver/                  # FHIR Bundles per source (Layer 2 output)
-├── gold/                    # merged FHIR + Provenance (Layer 3 output, ext interface)
-└── reference/               # terminology snapshots (UMLS, RxNorm, LOINC)
+├── README.md                       # this file
+├── _sources/                       # raw source materials, per-source
+│   ├── synthea/                    # open: Synthea-generated FHIR R4 bundles
+│   ├── josh-epic-ehi/              # open: Mandel's Epic EHI Export SQLite samples
+│   ├── josh-ccdas/                 # open: Mandel's C-CDA fixtures (~12 vendors)
+│   ├── synthesized-lab-pdf/        # constructed: rhett759 Quest lab fixture
+│   ├── synthetic-pdf-fixtures/     # constructed: lab / med-rec / radiology PDFs
+│   ├── uploads/                    # ad-hoc PDFs uploaded via the Streamlit UI
+│   ├── blake-cedars/               # personal — gitignored
+│   ├── devon-cedars/               # personal — gitignored
+│   └── cedars-portal-pdfs/         # personal — gitignored
+├── bronze/                         # canonical staged artifacts
+│   └── clinical-portfolios/        # Cedars PDFs + Health-Skillz FHIR ground truth
+└── reference/                      # terminology snapshots (LOINC, RxNorm); see VERSIONS.md
 ```
 
-## Reproduction recipe
+## What the live pipeline reads
 
-To rebuild the corpus from scratch on a fresh checkout. The "open" portion (Synthea + Mandel + synthesized lab PDF + CCDA) reproduces fully; personal sources (Blake's, Devon's, Cedars portal) require Blake's portal credentials and are not generally reproducible.
+The PDF → FHIR pipeline (`ehi_atlas/extract/`, exposed via the Streamlit
+console) reads from:
 
-### Step 1 — Install dependencies
+| Path | Used by |
+|---|---|
+| `_sources/synthesized-lab-pdf/raw/lab-report-2025-09-12-quest.pdf` | Pipeline Bakeoff: rhett759 Quest CMP fixture |
+| `_sources/synthetic-pdf-fixtures/raw/*.pdf` | Bake-off fixtures (lab, med-rec, radiology) |
+| `_sources/uploads/<sha>/` | PDF Lab + Bakeoff: ad-hoc uploads |
+| `bronze/clinical-portfolios/blake_records/HealthSummary_*/...PDF` | Bake-off: Cedars health-summary PDF |
+| `bronze/clinical-portfolios/blake_records/cedars-healthskillz-download/health-records.json` | Bake-off: ClientFullEHR ground truth |
+| `reference/loinc/`, `reference/rxnorm/` | Terminology lookups (LOINC subset, RxNorm CUI bridge) |
 
-```bash
-cd ehi-atlas
-uv sync --all-extras
-```
+## Privacy gate
 
-This installs `reportlab` (for the synthesized lab PDF generator), `pdfplumber` (for vision-extraction layout analysis), `instructor` (for schema-constrained LLM extraction), `fhir.resources` (FHIR R4 Pydantic models), and the rest of the stack documented in `pyproject.toml`.
+Personal sources never get committed in raw form. The gate enforces:
 
-### Step 2 — Clone Mandel's open repos at pinned SHAs
+- `_sources/blake-cedars/`, `devon-cedars/`, `cedars-portal-pdfs/` directories
+  are gitignored at the dir level (raw, JSON, ZIP all blocked).
+- `bronze/` is entirely gitignored — staged artifacts are reproducible from
+  `_sources/` and shouldn't enter git history.
+- `reference/loinc/`, `reference/rxnorm/`, `reference/snomed/`, `reference/umls/`
+  are gitignored (large terminology snapshots); only `reference/VERSIONS.md`
+  is tracked.
+
+Verify: `make validate-gate` (runs `scripts/validate-privacy-gate.sh`).
+
+## How to acquire the open sources
+
+The "open" portion of the corpus reproduces fully on a fresh checkout. Personal
+sources require Blake's portal credentials and aren't in the public reproduction
+path.
+
+### Synthea (already vendored at the repo root)
+
+Used by both this dev zone and the production app. Lives at
+`../../data/synthea-samples/synthea-r4-individual/fhir/` (1,180 individual
+FHIR bundles); a copy of the showcase patient is symlinked or referenced from
+`_sources/synthea/` as needed.
+
+### Mandel's Epic EHI + CCDA samples
 
 ```bash
 cd corpus/_sources/
 
-# Epic EHI Export pipeline + redacted SQLite dump
 git clone --depth 1 https://github.com/jmandel/my-health-data-ehi-wip josh-epic-ehi/raw
 cd josh-epic-ehi/raw && git checkout 188d93814515636afd9f027f2d5efebfd00260c7 && cd ../..
 
-# CC BY 4.0 CCDA fixtures across ~12 vendors
 git clone --depth 1 https://github.com/jmandel/sample_ccdas josh-ccdas/raw
 cd josh-ccdas/raw && git checkout 39aab8a882cd166bbbeff7f79995c7f09eb588bc && cd ../..
 ```
 
-Pinned SHAs are also stored at `_sources/josh-epic-ehi/PINNED-SHA.txt` and `_sources/josh-ccdas/PINNED-SHA.txt`.
+Pinned SHAs are also recorded at `_sources/josh-epic-ehi/PINNED-SHA.txt` and
+`_sources/josh-ccdas/PINNED-SHA.txt`.
 
-### Step 3 — Synthesize the constructed lab PDF (Artifact 5)
+### Synthesized lab PDF (rhett759 Quest fixture)
 
 ```bash
 cd ehi-atlas
 uv run python corpus/_sources/synthesized-lab-pdf/generator.py
 ```
 
-Produces `corpus/_sources/synthesized-lab-pdf/raw/lab-report-2025-09-12-quest.pdf`. Deterministic via `SOURCE_DATE_EPOCH=946684800`. Verify integrity:
+Produces `_sources/synthesized-lab-pdf/raw/lab-report-2025-09-12-quest.pdf`.
+Deterministic via `SOURCE_DATE_EPOCH=946684800`; expected MD5
+`cd7124966b5be8b7974684a5bd533b63`.
 
-```bash
-md5 -q corpus/_sources/synthesized-lab-pdf/raw/lab-report-2025-09-12-quest.pdf
-# expected: cd7124966b5be8b7974684a5bd533b63
-```
+### Personal sources
 
-### Step 4 — (Optional) Acquire personal sources
+See per-source READMEs (each documents privacy gate + acquisition):
 
-These are not in the public reproduction path. See per-source READMEs:
-
-- `_sources/blake-cedars/README.md` — SMART-on-FHIR pull via Health Skillz
-- `_sources/devon-cedars/README.md` — same workflow, Devon's consent required
-- `_sources/cedars-portal-pdfs/README.md` — manual portal download
-
-### Step 5 — (Optional) CMS Blue Button 2.0 sandbox
-
-Requires Blake's sandbox app registration. See `_sources/cms-blue-button/README.md`. After registration:
-
-```bash
-# .env file at ehi-atlas/.env
-echo "BB_CLIENT_ID=<value>" >> .env
-echo "BB_CLIENT_SECRET=<value>" >> .env
-
-uv run ehi-atlas ingest --source blue-button --beneficiary <synthetic-bene-id>
-```
-
-### Step 6 — Stage to bronze
-
-```bash
-uv run ehi-atlas corpus build
-```
-
-This will run the staging sequence for each registered adapter. (Note: as of 2026-04-29 the adapters are not yet implemented — Stage 2 work; this command is currently a stub.)
-
-### Step 7 — Verify
-
-```bash
-uv run ehi-atlas corpus status      # shows what's present and missing
-make validate-gate                    # privacy-gate check; should print "✓ privacy gate clean"
-```
-
-## Pinned showcase fixtures
-
-| Source | Fixture | Notes |
-|---|---|---|
-| Synthea | `Rhett759_Rohan584_cd64ff18-472b-4d58-b73c-2a04a2bf3e61` | from `~/Repo/ehi-ignite-challenge/data/synthea-samples/synthea-r4-individual/fhir/` |
-| Mandel Epic EHI | `db.sqlite.dump` (1.6 MB, 415 SQLite tables, 7,294 rows) | at `_sources/josh-epic-ehi/raw/db.sqlite.dump` |
-| Mandel CCDA | `Cerner Samples/Transition_of_Care_Referral_Summary.xml` | 92 KB, 13 sections |
-| Synthesized lab PDF | `lab-report-2025-09-12-quest.pdf` | MD5 `cd7124966b5be8b7974684a5bd533b63`, creatinine on `page=2;bbox=72,574,540,590` |
-| CMS Blue Button | _pending acquisition (task 1.8)_ | requires sandbox app reg |
-
-The recipe is "anyone can rebuild the open parts; Blake re-runs personal acquisition if they're needed."
-
-## Privacy gate
-
-`make validate-gate` runs `scripts/validate-privacy-gate.sh` which fails the build if:
-
-- Any `_sources/*/raw/` content is staged for commit when the source is `personal`
-- Any `bronze/` / `silver/` / `gold/` directory contents are staged for commit (these are reproducible; never commit)
-- Any file under a personal source's `raw-redacted/` lacks the marker `# REDACTED via <profile-name>` in its content or filename
-
-The gate runs as a pre-commit hook and as part of `make integrate`.
-
-## Status
-
-See `BUILD-TRACKER.md` Stage 1 for current state of corpus assembly.
+- `_sources/blake-cedars/README.md` — SMART-on-FHIR pull via Health Skillz.
+  Live data lives at `bronze/clinical-portfolios/blake_records/`.
+- `_sources/devon-cedars/README.md` — same workflow, Devon's consent.
+- `_sources/cedars-portal-pdfs/README.md` — manual portal download.

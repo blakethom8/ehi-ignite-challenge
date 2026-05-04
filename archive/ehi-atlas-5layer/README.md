@@ -1,8 +1,8 @@
-# Archived: EHI Atlas 5-Layer Harmonization Stack
+# Archived: EHI Atlas 5-Layer Harmonization Scaffold
 
-**Archived May 2026.** The original Atlas vision — per-source adapters → silver standardization → gold harmonization with FHIR-native Provenance — was the foundational idea but was set aside once **PDF → FHIR extraction** became the project's wedge. Live development moved to `ehi-atlas/ehi_atlas/extract/` and the Streamlit console at `ehi-atlas/app/`.
+**Archived May 2026.** The strategic wedge is unchanged — multi-source harmonization with FHIR-native Provenance is still the Atlas direction (see [`../../docs/architecture/ATLAS-DATA-MODEL.md`](../../docs/architecture/ATLAS-DATA-MODEL.md)). What was archived is the **early Python scaffold** for that vision — per-source adapters → silver standardization → gold harmonization, built before the ingestion path had been stress-tested. Phase 1 demanded one ingestion path that actually worked under load (PDF → FHIR), and the scaffold's silver/gold output paths and Streamlit pages were entangling that work.
 
-This directory preserves the full implementation as a historical record. None of this code is imported by anything live.
+This directory preserves the full scaffold as a reference for when the harmonization phase reactivates. Nothing live imports from here.
 
 ## What's here
 
@@ -64,11 +64,17 @@ archive/ehi-atlas-5layer/
 
 ## Why it was archived
 
-The PDF → FHIR pipeline (single-pass vision → multi-pass FHIR) reached an evaluable F1 baseline (0.70 weighted F1 on the Cedars health-summary fixture, May 2026) and validated that vision-LLM extraction is the highest-leverage wedge for the EHI Ignite Challenge submission. The 5-layer harmonization vision (cross-source merge, Provenance graph) remains the long-horizon Atlas direction, but is not on the Phase 1 critical path.
+This was a *scoping* decision, not a strategic pivot:
 
-The strategic rationale lives in:
-- `../../docs/architecture/PDF-PROCESSOR.md` — why vision-first extraction won
-- `../../docs/architecture/ATLAS-DATA-MODEL.md` — long-horizon harmonization plan
+- **Strategic wedge — unchanged:** multi-source harmonization with the Provenance graph is still the Atlas direction. The full design lives at `../../docs/architecture/ATLAS-DATA-MODEL.md`.
+- **Phase 1 demands depth on one ingestion path.** The PDF → FHIR pipeline reached an evaluable F1 baseline (0.70 weighted F1 on the Cedars health-summary fixture, May 2026); that's the path most directly relevant to the EHI Ignite Challenge submission.
+- **The scaffold was getting in the way.** Silver/gold output paths assumed a five-source bronze world that wasn't being kept in sync; the harmonize/orchestrator was stub-heavy; the Streamlit pages displayed silver/gold tiers that the live PDF flow doesn't produce.
+
+When the harmonization phase reactivates (after Phase 1, or once a second ingestion path matures), this scaffold is the reference for shape and Provenance Extension URLs — but the implementation will be rebuilt against the production parser, not lifted wholesale.
+
+Strategic / decision context:
+- `../../docs/architecture/ATLAS-DATA-MODEL.md` — full harmonization plan, Provenance as wedge
+- `../../docs/architecture/PDF-PROCESSOR.md` — why vision-first extraction won the current phase
 - `../../docs/architecture/PIPELINE-LOG.md` — experimental evidence
 
 ## How to revive any of it

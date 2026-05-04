@@ -354,6 +354,62 @@ Total: ~17-20 hours. Output: multiple working pipelines + an empirical compariso
 
 ---
 
+## First bake-off result — 2026-05-03
+
+`single-pass-vision` (baseline, current ExtractionResult-shaped path) vs
+`multipass-fhir` (Decisions 1–4 implementation) on Blake's Cedars Health
+Summary PDF (25 pages, 189 ground-truth facts in the ClientFullEHR JSON):
+
+| pipeline | weighted F1 | latency | bundle entries |
+|---|---:|---:|---:|
+| `single-pass-vision` | **0.03** | 1.3s (cache hit) | 3 |
+| `multipass-fhir`     | **0.64** | 93.7s            | 156 |
+
+Per-resource breakdown for `multipass-fhir`:
+
+| type | ground truth | extracted | precision | recall | F1 |
+|---|---:|---:|---:|---:|---:|
+| condition    |  28 |   3 | 1.00 | 0.11 | 0.19 |
+| medication   |   7 |   6 | 1.00 | 0.86 | **0.92** |
+| allergy      |   1 |   1 | 1.00 | 1.00 | **1.00** |
+| immunization |  10 |   8 | 1.00 | 0.80 | **0.89** |
+| lab          | 143 | 138 | 0.71 | 0.69 | 0.70 |
+
+**Findings.**
+
+1. **The architecture hypothesis holds.** Schema-direct multi-pass
+   produced a **21× weighted-F1 improvement** over the bespoke
+   intermediate format on the same PDF — driven entirely by closing
+   the schema gaps in Decisions 1 + 3. Medications, allergies,
+   immunizations went from `SCHEMA GAP — 0/N` to F1 ≥ 0.89.
+2. **Conditions stayed at 0.11 recall on both pipelines** — same model,
+   same prompt baseline, same input. This is **not a schema-gap finding;
+   it's a prompt-quality finding for the conditions pass specifically**.
+   Health Summary PDFs decompose conditions across visit-section
+   subheadings ("Active Problems," "Past Medical History,"
+   "Reason for Visit"); the conditions prompt needs to nudge the model
+   toward all of those.
+3. **Lab precision is 0.71, not 1.00.** The 40 false-positives are the
+   "vision wins or hallucinations" bucket. Manual review pending; some
+   are likely real findings the FHIR Bundle doesn't code (textual lab
+   mentions in clinical notes that never become coded Observations
+   server-side).
+4. **Cost trade is real.** Multi-pass costs ~$0.30 per 25-page PDF
+   vs ~$0.05 baseline. F1 0.64 vs 0.03 is worth it; per-pass downgrade
+   to Gemma 4 (per Decision 4) is the natural next experiment to
+   reduce cost without surrendering quality.
+
+**Decisions made:**
+- `multipass-fhir` is the new default architecture for the PDF processor.
+- `single-pass-vision` retained as a baseline + regression detector.
+- Next investigation: prompt tuning for the conditions pass (target:
+  push condition recall above 0.6 on the same PDF).
+- Next experiment: per-pass model swap for the high-volume tabular
+  passes (medications, immunizations, lab observations) to Gemma 4 —
+  measure F1 + cost + latency delta.
+
+---
+
 ## Open questions
 
 These are not blockers; they're decisions we'll revisit as data accumulates.

@@ -53,8 +53,8 @@ The app shows a warning banner if the gold tier hasn't been built yet.
 | Overview | `streamlit_app.py` | Landing: 5-layer pipeline diagram, per-stage metrics, pipeline status |
 | Sources & Bronze | `pages/01_Sources_and_Bronze.py` | Layer 1 outputs: source table, per-source drill-down (FHIR viewer, SQLite preview, PDF pages) |
 | Standardize | `pages/02_Standardize.py` | Layer 2 outputs: silver tier viewer, tags + profiles per source, L2 status per source |
-| Harmonize | `pages/05_Harmonize.py` | Layer 3: merge visualization — Artifact 1 (hyperlipidemia), Artifact 2 (statin conflict), Artifact 5 (creatinine cross-format) |
-| Gold & Provenance | `pages/06_Gold_and_Provenance.py` | Final unified record + Provenance.ndjson lineage walker |
+| Harmonize | `pages/06_Harmonize.py` | Layer 3: merge visualization — Artifact 1 (hyperlipidemia), Artifact 2 (statin conflict), Artifact 5 (creatinine cross-format) |
+| Gold & Provenance | `pages/07_Gold_and_Provenance.py` | Final unified record + Provenance.ndjson lineage walker |
 
 ---
 

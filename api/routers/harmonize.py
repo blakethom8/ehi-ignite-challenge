@@ -34,6 +34,7 @@ from api.models import (
     HarmonizeContributionsResponse,
     HarmonizeContributionTotals,
     HarmonizeExtractItem,
+    HarmonizeExtractJobResponse,
     HarmonizeExtractResponse,
     HarmonizeImmunizationsResponse,
     HarmonizeMedicationsResponse,
@@ -204,29 +205,50 @@ def get_immunizations(
 
 @router.post(
     "/{collection_id}/extract",
-    response_model=HarmonizeExtractResponse,
+    response_model=HarmonizeExtractJobResponse,
+    status_code=202,
 )
-def extract_collection(collection_id: str) -> HarmonizeExtractResponse:
-    """Run the multipass-fhir pipeline on every uploaded PDF in this collection
-    that lacks a cached extraction. Static demo collections are read-only and
-    return 400.
+def extract_collection(collection_id: str) -> HarmonizeExtractJobResponse:
+    """Enqueue an extraction job over every uploaded PDF in this collection
+    that lacks a cached extraction.
 
-    Synchronous: returns once every pending PDF has been extracted and the
-    in-process cache has been busted. PDFs typically take 30–90s each;
-    callers should expect long-running responses or run this off the
-    request thread for production use.
+    Returns immediately with HTTP 202 + a job_id. PDFs typically take 30-90s
+    each; the React page should poll
+    ``GET /api/harmonize/extract-jobs/{job_id}`` for completion. Static demo
+    collections are read-only and return 400.
     """
     if harmonize_service.get_collection(collection_id) is None:
         raise HTTPException(status_code=404, detail=f"Collection not found: {collection_id}")
-    results = harmonize_service.extract_pending_pdfs(collection_id)
-    if results is None:
+    job = harmonize_service.start_extract_job(collection_id)
+    if job is None:
         raise HTTPException(
             status_code=400,
             detail=f"Collection {collection_id} doesn't support extraction (static demo).",
         )
-    return HarmonizeExtractResponse(
-        collection_id=collection_id,
-        extracted=[HarmonizeExtractItem(**vars(r)) for r in results],
+    return _job_to_response(job)
+
+
+@router.get(
+    "/extract-jobs/{job_id}",
+    response_model=HarmonizeExtractJobResponse,
+)
+def get_extract_job(job_id: str) -> HarmonizeExtractJobResponse:
+    """Poll a previously-enqueued extraction job. 404s for unknown jobs."""
+    job = harmonize_service.get_extract_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail=f"Extract job not found: {job_id}")
+    return _job_to_response(job)
+
+
+def _job_to_response(job: harmonize_service.ExtractJob) -> HarmonizeExtractJobResponse:
+    return HarmonizeExtractJobResponse(
+        job_id=job.job_id,
+        collection_id=job.collection_id,
+        status=job.status,  # type: ignore[arg-type]
+        results=[HarmonizeExtractItem(**vars(r)) for r in job.results],
+        error=job.error,
+        started_at=job.started_at,
+        completed_at=job.completed_at,
     )
 
 

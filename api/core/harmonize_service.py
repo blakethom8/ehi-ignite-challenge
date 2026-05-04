@@ -57,6 +57,16 @@ UPLOADS_ROOT = Path(
     os.getenv("AGGREGATION_UPLOAD_STORE_PATH", REPO_ROOT / "data" / "aggregation-uploads")
 )
 
+# Make the extraction pipeline registry (lib in the dev zone) importable
+# from this API process. Without this, background extract jobs fail with
+# "ModuleNotFoundError: No module named 'ehi_atlas'" because the dev zone
+# isn't on sys.path by default.
+import sys as _sys
+
+_EHI_ATLAS_DEV_ROOT = REPO_ROOT / "ehi-atlas"
+if _EHI_ATLAS_DEV_ROOT.exists() and str(_EHI_ATLAS_DEV_ROOT) not in _sys.path:
+    _sys.path.insert(0, str(_EHI_ATLAS_DEV_ROOT))
+
 
 # ---------------------------------------------------------------------------
 # Collection registry
@@ -763,6 +773,103 @@ class ExtractResult:
     cache_hit: bool
     entry_count: int
     elapsed_seconds: float
+
+
+# ---------------------------------------------------------------------------
+# Async extract job store
+# ---------------------------------------------------------------------------
+#
+# Extraction takes 30-90s per PDF and blocks the request thread when run
+# synchronously. We hand the React page a job_id immediately and let the
+# extraction run in a background thread; the page polls the job for
+# completion. The store is in-memory because:
+#
+#   * Jobs never need to survive process restart — a restart implies the
+#     cache files might already be stale anyway.
+#   * The job result is just a list of ExtractResult; the canonical state
+#     lives on disk (the .extracted.json files next to each PDF).
+#   * Single-process deployment for now; if/when we move to multi-worker,
+#     this lifts cleanly to Redis with the same shape.
+
+import threading
+import uuid
+
+
+@dataclass
+class ExtractJob:
+    """Background-executed extraction over the PDFs in one collection."""
+
+    job_id: str
+    collection_id: str
+    status: str  # "pending" | "running" | "complete" | "failed"
+    results: list[ExtractResult]
+    error: str | None
+    started_at: datetime
+    completed_at: datetime | None
+
+
+_EXTRACT_JOBS: dict[str, ExtractJob] = {}
+_EXTRACT_JOBS_LOCK = threading.Lock()
+
+
+def _set_job_state(job: ExtractJob) -> None:
+    with _EXTRACT_JOBS_LOCK:
+        _EXTRACT_JOBS[job.job_id] = job
+
+
+def get_extract_job(job_id: str) -> ExtractJob | None:
+    with _EXTRACT_JOBS_LOCK:
+        return _EXTRACT_JOBS.get(job_id)
+
+
+def _run_extract_job(job_id: str, collection_id: str) -> None:
+    """Background entry point — invoked from a daemon thread."""
+    job = get_extract_job(job_id)
+    if job is None:
+        return
+    job.status = "running"
+    _set_job_state(job)
+    try:
+        results = extract_pending_pdfs(collection_id) or []
+        job.results = list(results)
+        job.status = "complete"
+    except Exception as exc:
+        job.status = "failed"
+        job.error = f"{type(exc).__name__}: {exc}"
+    finally:
+        job.completed_at = datetime.now()
+        _set_job_state(job)
+
+
+def start_extract_job(collection_id: str) -> ExtractJob | None:
+    """Enqueue an extraction job over a collection, return immediately.
+
+    Returns ``None`` when the collection doesn't support extraction (static
+    demo collections, unknown id) so the caller can 400/404 appropriately.
+    """
+    coll = get_collection(collection_id)
+    if coll is None:
+        return None
+    if not collection_id.startswith("upload-"):
+        return None
+    job = ExtractJob(
+        job_id=uuid.uuid4().hex,
+        collection_id=collection_id,
+        status="pending",
+        results=[],
+        error=None,
+        started_at=datetime.now(),
+        completed_at=None,
+    )
+    _set_job_state(job)
+    thread = threading.Thread(
+        target=_run_extract_job,
+        args=(job.job_id, collection_id),
+        daemon=True,
+        name=f"harmonize-extract-{job.job_id[:8]}",
+    )
+    thread.start()
+    return job
 
 
 def extract_pending_pdfs(collection_id: str) -> list[ExtractResult] | None:

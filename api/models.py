@@ -1188,3 +1188,13 @@ class HarmonizeSourceDiffSource(BaseModel):
 class HarmonizeSourceDiffResponse(BaseModel):
     collection_id: str
     sources: list[HarmonizeSourceDiffSource]
+
+
+class HarmonizeExtractJobResponse(BaseModel):
+    job_id: str
+    collection_id: str
+    status: Literal["pending", "running", "complete", "failed"]
+    results: list[HarmonizeExtractItem]
+    error: str | None
+    started_at: datetime
+    completed_at: datetime | None

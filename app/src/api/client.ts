@@ -32,6 +32,7 @@ import type {
   HarmonizeCollectionsResponse,
   HarmonizeConditionsResponse,
   HarmonizeContributionsResponse,
+  HarmonizeExtractJobResponse,
   HarmonizeExtractResponse,
   HarmonizeSourceDiffResponse,
   HarmonizeImmunizationsResponse,
@@ -297,8 +298,17 @@ export const api = {
       .get<HarmonizeSourceDiffResponse>(`/harmonize/${collectionId}/source-diff`)
       .then((r) => r.data),
 
-  extractHarmonizeCollection: (collectionId: string): Promise<HarmonizeExtractResponse> =>
+  /**
+   * Start a background extraction job. Returns immediately with job_id;
+   * poll `getHarmonizeExtractJob(jobId)` until status is complete/failed.
+   */
+  extractHarmonizeCollection: (collectionId: string): Promise<HarmonizeExtractJobResponse> =>
     http
-      .post<HarmonizeExtractResponse>(`/harmonize/${collectionId}/extract`)
+      .post<HarmonizeExtractJobResponse>(`/harmonize/${collectionId}/extract`)
+      .then((r) => r.data),
+
+  getHarmonizeExtractJob: (jobId: string): Promise<HarmonizeExtractJobResponse> =>
+    http
+      .get<HarmonizeExtractJobResponse>(`/harmonize/extract-jobs/${jobId}`)
       .then((r) => r.data),
 };

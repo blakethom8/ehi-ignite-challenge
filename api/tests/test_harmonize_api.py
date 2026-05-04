@@ -303,6 +303,34 @@ class UploadCollectionDiscoveryTests(unittest.TestCase):
         r = self.client.post("/api/harmonize/blake-real/extract")
         self.assertEqual(r.status_code, 400)
 
+    def test_extract_starts_async_job_with_no_pdfs(self) -> None:
+        """When upload directory contains only FHIR JSON (no PDFs), the job
+        completes immediately with empty results."""
+        self._stage_session("zen-extract")
+        # Remove the PDF stub so the extract has nothing to do (the test
+        # fixture's empty-bytes PDF would otherwise fail extraction).
+        (self._tmp / "zen-extract" / "report.pdf").unlink()
+        r = self.client.post("/api/harmonize/upload-zen-extract/extract")
+        self.assertEqual(r.status_code, 202)
+        body = r.json()
+        self.assertIn(body["status"], ("pending", "running", "complete"))
+        job_id = body["job_id"]
+
+        # Poll until complete (the no-PDFs case finishes in milliseconds).
+        import time
+        deadline = time.time() + 10
+        while time.time() < deadline:
+            poll = self.client.get(f"/api/harmonize/extract-jobs/{job_id}").json()
+            if poll["status"] in ("complete", "failed"):
+                break
+            time.sleep(0.05)
+        self.assertEqual(poll["status"], "complete")
+        self.assertEqual(poll["results"], [])
+
+    def test_extract_job_unknown_id_404s(self) -> None:
+        r = self.client.get("/api/harmonize/extract-jobs/does-not-exist")
+        self.assertEqual(r.status_code, 404)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1298,16 +1298,49 @@ export function HarmonizeView() {
   const activeCollection = collections.find((c) => c.id === activeId) ?? null;
   const isUploadCollection = activeId.startsWith("upload-");
 
+  // Async extract: kick off a background job, then poll until complete.
+  // The mutation just starts the job; the polling query owns the lifecycle.
+  const [activeExtractJobId, setActiveExtractJobId] = useState<string | null>(null);
   const extractMutation = useMutation({
     mutationFn: () => api.extractHarmonizeCollection(activeId),
-    onSuccess: () => {
-      // Bust every harmonize-scoped query so source counts and merged
-      // tables reflect the just-extracted PDFs.
+    onSuccess: (job) => {
+      setActiveExtractJobId(job.job_id);
+    },
+  });
+
+  const extractJobQuery = useQuery({
+    queryKey: ["harmonize-extract-job", activeExtractJobId],
+    queryFn: () => api.getHarmonizeExtractJob(activeExtractJobId as string),
+    enabled: !!activeExtractJobId,
+    // Poll every 1.5s while the job is still running. Once complete or
+    // failed, refetchInterval returns false and React Query stops.
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      if (status === "complete" || status === "failed") return false;
+      return 1500;
+    },
+  });
+
+  // When the job completes, bust dependent caches once and clear the job.
+  useEffect(() => {
+    const status = extractJobQuery.data?.status;
+    if (status === "complete") {
       queryClient.invalidateQueries({ queryKey: ["harmonize-sources", activeId] });
       queryClient.invalidateQueries({ queryKey: ["harmonize-observations", activeId] });
       queryClient.invalidateQueries({ queryKey: ["harmonize-conditions", activeId] });
-    },
-  });
+      queryClient.invalidateQueries({ queryKey: ["harmonize-medications", activeId] });
+      queryClient.invalidateQueries({ queryKey: ["harmonize-allergies", activeId] });
+      queryClient.invalidateQueries({ queryKey: ["harmonize-immunizations", activeId] });
+      queryClient.invalidateQueries({ queryKey: ["harmonize-source-diff", activeId] });
+    }
+  }, [extractJobQuery.data?.status, activeId, queryClient]);
+
+  const extractInProgress =
+    extractMutation.isPending ||
+    (!!activeExtractJobId &&
+      (extractJobQuery.data?.status === "pending" ||
+        extractJobQuery.data?.status === "running"));
+  const extractJob = extractJobQuery.data ?? null;
 
   const isLoadingCollections = collectionsQuery.isLoading;
   const hasNoCollections =
@@ -1391,6 +1424,7 @@ export function HarmonizeView() {
             onChange={(e) => {
               setCollectionId(e.target.value);
               extractMutation.reset();
+              setActiveExtractJobId(null);
             }}
             className="rounded-lg border border-[#dfe4ea] bg-white px-3 py-1.5 text-sm text-[#1c1c1e]"
           >
@@ -1408,18 +1442,21 @@ export function HarmonizeView() {
           {isUploadCollection && (
             <button
               type="button"
-              disabled={extractMutation.isPending}
+              disabled={extractInProgress}
               onClick={() => extractMutation.mutate()}
               className={cls(
                 "ml-auto inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
-                extractMutation.isPending
+                extractInProgress
                   ? "bg-[#dfe4ea] text-[#667085]"
                   : "bg-[#5b76fe] text-white hover:bg-[#4760e8]",
               )}
             >
-              {extractMutation.isPending ? (
+              {extractInProgress ? (
                 <>
-                  <Loader2 size={14} className="animate-spin" /> Extracting…
+                  <Loader2 size={14} className="animate-spin" />
+                  {extractJob?.status === "running"
+                    ? "Extracting (this may take a minute)…"
+                    : "Starting…"}
                 </>
               ) : (
                 <>
@@ -1434,27 +1471,39 @@ export function HarmonizeView() {
             {activeCollection.description}
           </p>
         )}
-        {extractMutation.data && (
+        {extractJob?.status === "complete" && (
           <div className="mt-3 rounded-lg border border-[#dfe4ea] bg-[#f7f9fc] p-3 text-sm">
             <p className="font-semibold text-[#1c1c1e]">
-              Extracted {extractMutation.data.extracted.length} PDF
-              {extractMutation.data.extracted.length === 1 ? "" : "s"}
+              Extracted {extractJob.results.length} PDF
+              {extractJob.results.length === 1 ? "" : "s"}
             </p>
-            <ul className="mt-2 space-y-1 text-xs text-[#667085]">
-              {extractMutation.data.extracted.map((e) => (
-                <li key={e.source_id}>
-                  <span className="font-medium text-[#1c1c1e]">{e.label}</span>
-                  {": "}
-                  {e.entry_count} resources
-                  {e.cache_hit ? " (cached)" : ` (${e.elapsed_seconds.toFixed(1)}s)`}
-                </li>
-              ))}
-            </ul>
+            {extractJob.results.length > 0 ? (
+              <ul className="mt-2 space-y-1 text-xs text-[#667085]">
+                {extractJob.results.map((e) => (
+                  <li key={e.source_id}>
+                    <span className="font-medium text-[#1c1c1e]">{e.label}</span>
+                    {": "}
+                    {e.entry_count} resources
+                    {e.cache_hit ? " (cached)" : ` (${e.elapsed_seconds.toFixed(1)}s)`}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-1 text-xs text-[#667085]">
+                No pending PDFs — every uploaded PDF already had a cached
+                extraction.
+              </p>
+            )}
           </div>
         )}
-        {extractMutation.error && (
+        {extractJob?.status === "failed" && (
           <p className="mt-3 text-sm text-red-700">
-            Extraction failed:{" "}
+            Extraction failed: {extractJob.error ?? "unknown error"}
+          </p>
+        )}
+        {extractMutation.error && !extractJob && (
+          <p className="mt-3 text-sm text-red-700">
+            Couldn't start extract job:{" "}
             {(extractMutation.error as Error).message ?? "unknown error"}
           </p>
         )}

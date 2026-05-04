@@ -1063,6 +1063,16 @@ export interface HarmonizeExtractResponse {
   extracted: HarmonizeExtractItem[];
 }
 
+export interface HarmonizeExtractJobResponse {
+  job_id: string;
+  collection_id: string;
+  status: "pending" | "running" | "complete" | "failed";
+  results: HarmonizeExtractItem[];
+  error: string | null;
+  started_at: string;
+  completed_at: string | null;
+}
+
 export interface HarmonizeProvenanceResponse {
   collection_id: string;
   merged_ref: string;

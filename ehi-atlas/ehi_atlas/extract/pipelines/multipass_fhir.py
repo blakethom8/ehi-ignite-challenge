@@ -212,39 +212,58 @@ The document_type field is required — pick the closest match from the enum."""
 
 
 _CONDITIONS_PROMPT = """You are extracting EVERY clinical condition or
-diagnosis recorded in this medical document. Be comprehensive.
+diagnosis recorded in this medical document. Be exhaustive.
 
-Health Summary PDFs and chart exports decompose conditions across many
-sections. Look in ALL of these — each is a valid source of conditions:
+A "condition" in FHIR includes ALL of these — extract each one:
 
+  1. **Diseases / disorders** (e.g. 'Allergic rhinitis', 'Hyperlipidemia')
+  2. **Symptoms** treated as diagnoses (e.g. 'Sinus congestion R09.81',
+     'Pain R52', 'Sinus pressure J34.89')
+  3. **Injuries** with episode-of-care codes (e.g. 'Sprain of left foot
+     S93.602A', 'Closed fracture of phalanx S92.512S sequela')
+  4. **Z-codes for encounters** — these ARE conditions in FHIR:
+     - Z00.00 Annual physical exam
+     - Z11.59 Special screening for viral disease
+     - Z12.83 Screening exam for skin cancer
+     - Z23 Need for vaccination
+     - Z85.x History of cancer
+     Treat every Z-code printed in the document as a condition entry.
+  5. **R-codes** — symptoms-coded-as-findings. Always emit when a code
+     is printed. Don't filter "this is just a symptom not a real diagnosis."
+  6. **D-codes** for neoplasms / lesions, including benign (e.g. D22.9
+     multiple nevi, D49.2 skin neoplasm, L82.1 seborrheic keratoses)
+  7. **Resolved conditions** (mark clinical_status=resolved)
+  8. **Past medical history** entries, including remote ones
+
+Sources to scan in chart-export documents:
   - Problem list / Active Problems
   - Past Medical History
-  - Past Surgical History (for the underlying condition that prompted
-    the surgery, e.g. 'Appendectomy 2015' implies prior appendicitis —
-    only extract if document treats it as a Condition entry)
-  - Assessment & Plan (encounter-by-encounter diagnoses)
-  - Encounter Diagnoses / Visit Diagnoses (often per-visit)
-  - Reason for Visit / Chief Complaint
-  - Screening exams (Z-codes for screening exams ARE conditions)
-  - Health maintenance items flagged as patient diagnoses
-  - Resolved conditions (extract; mark clinical_status=resolved)
+  - Encounter Diagnoses / Visit Diagnoses (PER ENCOUNTER — yes, the
+    same condition appearing in 4 visits should be emitted, but only
+    ONCE; we'll dedupe by code)
+  - Reason for Visit / Chief Complaint coded with an ICD code
+  - Health maintenance / preventive care items with Z-codes
+  - Surgical history (the underlying condition, e.g. 'Appendectomy
+    2015' → only emit appendicitis if document explicitly codes it)
 
 Rules:
-- Extract every distinct condition you see. If the same condition appears
-  multiple times across sections, emit it ONCE with its most-recent status.
-- Include ICD-10-CM and SNOMED-CT codes ONLY when printed on the document.
-  Never fabricate codes. Null is correct when no code is shown.
-- Use the display name VERBATIM from the document. Don't paraphrase
-  (e.g. emit 'Allergic rhinitis due to American house dust mite' verbatim,
-  not 'allergic rhinitis').
-- clinical_status: 'active' by default; 'resolved' if document says so;
-  'remission'/'recurrence'/'relapse' only when explicit.
+- Extract every UNIQUE condition. If the same code appears multiple times
+  (problem list + 3 encounter diagnoses), emit it ONCE.
+- Different codes for related conditions are SEPARATE entries (e.g.
+  J30.1 'Allergic rhinitis due to pollen' and J30.81 'Allergic rhinitis
+  due to dust mite' are two different facts — emit both).
+- Include ICD-10-CM and SNOMED-CT codes ONLY when printed in the document.
+  Never fabricate. Null is correct when no code is shown.
+- Use the display name VERBATIM from the document.
+- clinical_status: 'active' by default; 'resolved' if document says so.
 - Set page to the 1-indexed page where the condition first appeared.
-- Include source_text: ≤120 char verbatim excerpt showing context.
-- Skip conditions in family history attributed to RELATIVES only.
-- On a comprehensive chart export with medical content, finding zero
-  conditions is unusual — be thorough. If you find none, return empty
-  but double-check first."""
+- Include source_text: ≤120 char verbatim excerpt.
+- Skip conditions in family history attributed only to RELATIVES.
+
+A typical comprehensive chart export has 10–30 distinct conditions.
+If you return fewer than 8 from a multi-page chart, you're probably
+under-extracting — re-scan for Z-codes, R-codes, and encounter-level
+diagnoses you may have skipped."""
 
 
 _MEDICATIONS_PROMPT = """You are extracting medications from a medical document.
@@ -310,10 +329,12 @@ _PASSES: list[ExtractionPass] = [
         name="conditions",
         schema=ConditionExtraction,
         system_prompt=_CONDITIONS_PROMPT,
-        # v2 (2026-05-03): prompt rewrite for comprehensiveness on chart
-        # exports. v1 had 0.11 recall on Cedars Health Summary because it
-        # didn't enumerate the section types where conditions hide.
-        prompt_version="v2",
+        # v3 (2026-05-03): explicit Z/R/S/D-code enumeration with concrete
+        # examples. v2 (section enumeration) helped but model still skipped
+        # encounter-level diagnoses and screening Z-codes. v3 adds
+        # "extract every printed ICD code" with example codes for each
+        # category — should pull recall from 0.16 toward 0.6+ on Cedars.
+        prompt_version="v3",
     ),
     ExtractionPass(
         name="medications",

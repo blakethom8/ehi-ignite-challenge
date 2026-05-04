@@ -607,6 +607,36 @@ def _is_findable(fact: Fact, pdf_text_lower: str, pdf_tokens: set[str]) -> bool:
     return len(overlap) / len(fact_tokens) >= 0.5
 
 
+def dedupe_gt_facts(facts: list[Fact]) -> list[Fact]:
+    """Collapse ground-truth duplicates that share the same code.
+
+    Cedars FHIR (and many EHRs) emit a separate Condition resource per
+    encounter, so the same diagnosis can appear 4 times for a patient
+    seen 4 times for it. For pipeline scoring, we want to count unique
+    clinical facts, not encounter-level multiplicities. The model
+    correctly emits each condition once.
+
+    Dedup strategy per fact_type:
+      - If primary_code is set → key on (fact_type, primary_code_system,
+        primary_code). Same code across all systems = one fact.
+      - Else → key on (fact_type, normalized display). Last resort.
+
+    Preserves the first occurrence; later duplicates are dropped.
+    """
+    seen: set[tuple] = set()
+    out: list[Fact] = []
+    for fact in facts:
+        if fact.primary_code:
+            key = (fact.fact_type, fact.primary_code_system, fact.primary_code)
+        else:
+            key = (fact.fact_type, fact.display)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(fact)
+    return out
+
+
 def evaluate_bundle(
     ground_truth: dict | list,
     bundle: dict,
@@ -616,6 +646,7 @@ def evaluate_bundle(
     fuzzy_threshold: float = 0.5,
     pdf_path: "Path | None" = None,
     findable_only: bool = False,
+    dedupe_gt: bool = True,
 ) -> EvalReport:
     """Evaluate a FHIR Bundle (pipeline output) against a ClientFullEHR ground truth.
 
@@ -639,6 +670,8 @@ def evaluate_bundle(
     gt_facts = facts_from_clientfullehr(ground_truth)
     if findable_only and pdf_path is not None:
         gt_facts, _unfindable = filter_gt_to_findable_in_pdf(gt_facts, pdf_path)
+    if dedupe_gt:
+        gt_facts = dedupe_gt_facts(gt_facts)
     return _evaluate_facts(
         gt_facts=gt_facts,
         ex_facts=facts_from_bundle(bundle),

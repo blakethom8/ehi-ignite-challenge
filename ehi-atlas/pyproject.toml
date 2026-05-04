@@ -35,10 +35,6 @@ dependencies = [
 
     # XML / CCDA + HL7 v2
     "lxml>=5.2.0",
-
-    # CLI
-    "typer>=0.12.0",
-    "rich>=13.7.0",
 ]
 
 [dependency-groups]
@@ -49,9 +45,6 @@ dev = [
     "jupyter>=1.0.0",
     "ruff>=0.5.0",
 ]
-
-[project.scripts]
-ehi-atlas = "ehi_atlas.cli:app"
 
 [build-system]
 requires = ["hatchling"]
@@ -67,6 +60,3 @@ target-version = "py311"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
-markers = [
-    "integration: marks tests as end-to-end integration tests that run the full orchestrator (deselect with '-m not integration' for fast loops)",
-]

@@ -793,8 +793,6 @@ dependencies = [
     { name = "pypdfium2" },
     { name = "python-dotenv" },
     { name = "reportlab" },
-    { name = "rich" },
-    { name = "typer" },
 ]
 
 [package.dev-dependencies]
@@ -823,8 +821,6 @@ requires-dist = [
     { name = "pypdfium2", specifier = ">=4.30.0" },
     { name = "python-dotenv", specifier = ">=1.0.0" },
     { name = "reportlab", specifier = ">=4.0.0" },
-    { name = "rich", specifier = ">=13.7.0" },
-    { name = "typer", specifier = ">=0.12.0" },
 ]
 
 [package.metadata.requires-dev]

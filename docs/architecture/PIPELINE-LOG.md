@@ -10,6 +10,7 @@ Best multipass-fhir result on Cedars Health Summary: **F1 0.70** (post-Move H, w
 
 | Date | Move | Subject | Headline result |
 |---|---|---|---|
+| 2026-05-03 | **R** | Multi-source contribution diff — vision wins surface automatically | Per-source unique vs shared partitioning. **The 4 Cedars PDF unique conditions auto-emerge as exactly the vision wins from Move H** — manual triage replaced by a graph query. Function Health 2025-11-29 has 0 unique / 58 shared, automatically exposing it as a cross-source confirmation source rather than a unique-data source. |
 | 2026-05-03 | **Q** | Bidirectional Provenance walk | New endpoint + clickable Sources rows. From any DocumentReference, see every merged fact it contributed. **Cedars FHIR contributes 207 facts; Cedars PDF contributes 160** on blake-real, broken down per resource type. The Atlas Provenance wedge is now directly demoable from both directions. |
 | 2026-05-03 | **P** | Allergies + Immunizations matchers — USCDI clinical core complete | 4th and 5th resource types ported. **1/1 allergies + 8/10 immunization events cross-source merged** on Cedars FHIR + PDF. Five tabs in the React app now: Labs / Conditions / Medications / Allergies / Immunizations. |
 | 2026-05-03 | **O** | Medications matcher + Medications tab | Third resource type ported. RxNorm overlap → drug-name canonicalize → drug-name bridge → passthrough. **6 of 7 medications cross-source merged** on Cedars FHIR + PDF (only flu vaccine misses — it's in FHIR but not the PDF). |
@@ -52,6 +53,42 @@ Pipeline framework + eval harness shipped 2026-05-03 (commits: pipeline Protocol
 ```
 
 Each entry should be 200–500 words. Tables and code snippets welcome. **Honesty about negative results matters as much as wins** — knowing what *didn't* work prevents future re-litigation.
+
+---
+
+## 2026-05-03 · Move R — multi-source contribution diff (vision wins surface automatically)
+
+**Agent:** Claude Opus 4.7
+
+**What:** Per-source partitioning of merged facts into *unique* (only this source contributed) vs *shared* (this source plus at least one other contributed). New `GET /api/harmonize/{id}/source-diff` endpoint; new Unique / Shared / Total-raw columns in the React Sources panel; new "Unique only" toggle on the contribution drill-down.
+
+**Why:** The bidirectional Provenance walk (Move Q) answered "what did each source contribute total?" That conflates two very different signals. A source that adds 50 facts none of which any other source has is a *unique-data* source. A source that adds the *same* 50 facts another source has is a *cross-source confirmation* source. Both are useful — but they're useful in different ways, and a flat contribution count hides which is which.
+
+**How:** For each source label, walk all five merged-record lists; a record is *unique to S* iff `len({s.source_label for s in record.sources}) == 1` and that one label is `S`. Otherwise it's shared with whoever else contributed. The implementation is a fan-out over the same merged-record arrays the contribution endpoint already computes — no new graph, just a different query.
+
+**Result:** Live numbers on `blake-real`:
+
+```
+source                       unique   shared
+  Cedars-Sinai (FHIR)         156       51
+  Cedars-Sinai (PDF)          103       57
+  Function Health · 2024-07-26   24        0
+  Function Health · 2024-07-29   21       65
+  Function Health · 2025-11-29    0       58
+```
+
+The first headline finding: **the 4 Cedars PDF unique conditions are exactly the vision wins from Move H** (Bilateral inferior turbinate hypertrophy, Bipartite tibial sesamoid, Chronic 2nd-toe fracture, Marginal osteophyte at left 1st MTP joint) — clinical findings the structured Cedars FHIR pull never coded. In Move H I identified these by manually triaging the 4 condition "FPs" against the GT. Move R surfaces them automatically as the diff between PDF and FHIR. The vision-wins concept goes from "audit-time discovery" to "runtime UI element."
+
+The second finding: **Function Health · 2025-11-29 has 0 unique, 58 shared.** Every lab in that draw is also somewhere else (Cedars FHIR + earlier Function Health). Removing it would lose nothing, but would lose 58 cross-source confirmations. That's a different argument for keeping it than "this source carries unique data" — and the UI now distinguishes the two cases explicitly with an amber callout.
+
+3 new API tests; 149 tests total. TypeScript clean. Vision wins now surface in production UI without any per-fact prompting or manual triage.
+
+**Conclusion:** Two passes over the Provenance graph — the per-fact lineage walk (Move L), the per-source contribution walk (Move Q), and now the per-source unique-vs-shared partition (Move R) — answer the three core clinician questions about source value: *where did this fact come from*, *what did this source give us*, and *what would I lose by removing it*.
+
+**Next:**
+- Async extract: still synchronous; 60–90s blocks the React mutation. Background task + polling.
+- Synthetic Synthea demo collection so a fresh-clone reviewer has something pre-staged.
+- Pairwise source diff: "what does Source A have that Source B doesn't" — symmetric difference between two specific sources, not just one-vs-all-others. Becomes useful once you have ≥3 sources contributing the same resource type.
 
 ---
 

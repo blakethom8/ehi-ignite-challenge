@@ -20,7 +20,10 @@ Immunizations follow the same shape but are not yet implemented.
 
 from __future__ import annotations
 
+from .conditions import merge_conditions
 from .models import (
+    ConditionSource,
+    MergedCondition,
     MergedObservation,
     ObservationSource,
     ProvenanceEdge,
@@ -30,10 +33,13 @@ from .provenance import mint_provenance, mint_provenance_bundle
 
 __all__ = [
     "merge_observations",
+    "merge_conditions",
     "mint_provenance",
     "mint_provenance_bundle",
     "MergedObservation",
+    "MergedCondition",
     "ObservationSource",
+    "ConditionSource",
     "ProvenanceEdge",
     "SourceBundle",
 ]

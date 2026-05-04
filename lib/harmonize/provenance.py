@@ -22,7 +22,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from .models import MergedObservation
+from .models import MergedCondition, MergedObservation
 
 
 SOURCE_LABEL_URL = (
@@ -33,8 +33,10 @@ HARMONIZE_ACTIVITY_URL = (
 )
 
 
-def mint_provenance(merged: MergedObservation) -> dict[str, Any]:
-    """Produce a FHIR Provenance resource for one merged Observation.
+def mint_provenance(merged: MergedObservation | MergedCondition) -> dict[str, Any]:
+    """Produce a FHIR Provenance resource for one merged record.
+
+    Accepts both ``MergedObservation`` and ``MergedCondition``.
 
     The resource follows FHIR R4 ``Provenance``:
 
@@ -68,11 +70,15 @@ def mint_provenance(merged: MergedObservation) -> dict[str, Any]:
             }
         )
 
-    # Activity: roll up the strongest activity across edges. loinc-match
-    # beats name-match beats unit-normalize beats passthrough.
+    # Activity: roll up the strongest activity across edges. Coded matches
+    # beat name matches; unit-normalize beats passthrough.
     rank = {
-        "loinc-match": 4,
+        "loinc-match": 5,
+        "snomed-match": 5,
+        "icd10-match": 4,
+        "icd9-match": 3,
         "name-match": 3,
+        "name-bridge": 3,
         "unit-normalize": 2,
         "passthrough": 1,
     }
@@ -112,9 +118,12 @@ def mint_provenance(merged: MergedObservation) -> dict[str, Any]:
     }
 
 
-def mint_provenance_bundle(merged_list: list[MergedObservation]) -> list[dict[str, Any]]:
-    """Mint Provenance resources for a list of merged Observations.
+def mint_provenance_bundle(
+    merged_list: list[MergedObservation] | list[MergedCondition],
+) -> list[dict[str, Any]]:
+    """Mint Provenance resources for a list of merged records.
 
+    Accepts a list of either ``MergedObservation`` or ``MergedCondition``.
     Returns a flat list of FHIR Provenance dicts. Wrap them into a
     ``Bundle`` of type ``collection`` if you need a transmissible package.
     """

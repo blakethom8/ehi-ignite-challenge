@@ -83,6 +83,79 @@ class ProvenanceEdge:
     """When the edge was minted."""
 
 
+@dataclass(frozen=True)
+class ConditionSource:
+    """One source Condition backing a merged condition.
+
+    Conditions don't carry numeric values, so the merged shape differs
+    slightly from Observations: the source-level fields are coding +
+    clinical status + onset date.
+    """
+
+    source_label: str
+    """Human-readable source name."""
+
+    source_condition_ref: str
+    """FHIR reference to the originating Condition."""
+
+    display: str
+    """The free-text label as it appeared in the source."""
+
+    snomed: str | None
+    icd10: str | None
+    icd9: str | None
+    """Codes the source attached. None for any code system the source omitted."""
+
+    clinical_status: str | None
+    """``active`` / ``recurrence`` / ``relapse`` / ``inactive`` / ``remission`` /
+    ``resolved`` per FHIR. None when the source didn't record one."""
+
+    onset_date: datetime | None
+    """When the condition was first noted, from ``onsetDateTime`` or
+    ``recordedDate``. None for conditions without a date stamp."""
+
+    document_reference: str | None = None
+
+
+@dataclass
+class MergedCondition:
+    """A canonical condition, optionally backed by multiple sources.
+
+    Identity is keyed on SNOMED → ICD-10 → ICD-9 → normalized name (in
+    that priority). Sources contribute coding incrementally — a
+    SNOMED-only source plus an ICD-10-only source produces a merged
+    record with both codes filled in.
+    """
+
+    canonical_name: str
+    """The display name we surface — the source's text, or a code if no
+    text was present."""
+
+    snomed: str | None
+    icd10: str | None
+    icd9: str | None
+
+    sources: list[ConditionSource] = field(default_factory=list)
+    provenance: list[ProvenanceEdge] = field(default_factory=list)
+
+    @property
+    def is_active(self) -> bool:
+        """Whether any source still considers the condition active.
+
+        Conservative: returns True if any source has clinical_status of
+        active/recurrence/relapse, OR if no source recorded a status
+        (most PDF-extracted conditions lack clinical_status).
+        """
+        seen_any_status = False
+        for s in self.sources:
+            if not s.clinical_status:
+                continue
+            seen_any_status = True
+            if s.clinical_status in ("active", "recurrence", "relapse"):
+                return True
+        return not seen_any_status
+
+
 @dataclass
 class MergedObservation:
     """A canonical fact, optionally backed by multiple sources.

@@ -5,9 +5,9 @@ group of source documents the user is harmonizing together) and run the
 matchers, returning shaped response objects the router can hand to the
 React app.
 
-Collections are deliberately decoupled from "patient" — a collection is
+Collections started as deliberately decoupled from "patient" — a collection is
 "these documents the user uploaded / pulled," and harmonization runs over
-that bag. The registry has two halves:
+that bag. The registry now has three halves:
 
 1. **Static registry** — one well-known demo collection (``blake-real``)
    backed by the corpus drop in
@@ -21,7 +21,10 @@ that bag. The registry has two halves:
 
 This makes the application document-agnostic: any user can upload any
 documents and the harmonizer surfaces a per-upload-session merged record
-without code changes.
+   without code changes.
+3. **Patient workspaces** — dynamic ``workspace-<patient_id>`` collections
+   that treat the selected Synthea bundle as the baseline source and attach
+   any uploads for that same patient workspace.
 """
 
 from __future__ import annotations
@@ -34,6 +37,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
+from api.core.loader import path_from_patient_id, patient_display_name
 from lib.harmonize import (
     SourceBundle,
     merge_allergies,
@@ -432,6 +436,81 @@ def _discover_upload_collections() -> dict[str, CollectionDefinition]:
     return out
 
 
+# ---------------------------------------------------------------------------
+# Patient workspace collections
+# ---------------------------------------------------------------------------
+
+
+def _safe_upload_segment(value: str) -> str:
+    """Mirror the aggregation upload-store path sanitization."""
+    import re
+
+    return re.sub(r"[^A-Za-z0-9_.-]+", "-", value).strip(".-")[:120] or "patient"
+
+
+def workspace_collection_id(patient_id: str) -> str:
+    """Stable collection id for the selected patient's canonical workspace."""
+    return f"workspace-{_safe_upload_segment(patient_id)}"
+
+
+def _patient_id_from_workspace_collection(collection_id: str) -> str | None:
+    if not collection_id.startswith("workspace-"):
+        return None
+    return collection_id.removeprefix("workspace-")
+
+
+def patient_workspace_collection(patient_id: str) -> CollectionDefinition | None:
+    """Build the harmonize collection for one selected patient workspace.
+
+    The Synthea patient bundle is the baseline source for development users.
+    Any uploaded files under the same patient workspace are additional sources
+    that can be extracted and merged on top.
+    """
+    safe_id = _safe_upload_segment(patient_id)
+    sources: list[SourceDefinition] = []
+
+    patient_path = path_from_patient_id(patient_id)
+    if patient_path is not None:
+        sources.append(
+            SourceDefinition(
+                id="synthea-fhir",
+                label="Synthea FHIR patient bundle",
+                kind="fhir-pull",
+                path=patient_path,
+                document_reference=f"DocumentReference/synthea-baseline-{safe_id}",
+            )
+        )
+
+    upload_collection = _upload_session_to_collection(UPLOADS_ROOT / safe_id)
+    if upload_collection is not None:
+        sources.extend(
+            SourceDefinition(
+                id=f"upload-{source.id}",
+                label=source.label,
+                kind=source.kind,
+                path=source.path,
+                document_reference=source.document_reference,
+            )
+            for source in upload_collection.sources
+        )
+
+    if not sources:
+        return None
+
+    patient_label = patient_display_name(patient_path) if patient_path is not None else patient_id
+    upload_count = max(0, len(sources) - (1 if patient_path is not None else 0))
+    return CollectionDefinition(
+        id=workspace_collection_id(patient_id),
+        name=f"{patient_label} — patient workspace",
+        description=(
+            "The selected patient's baseline FHIR bundle plus any uploaded "
+            f"source files staged in Source Intake. {upload_count} uploaded "
+            f"source{'s' if upload_count != 1 else ''} attached."
+        ),
+        sources=tuple(sources),
+    )
+
+
 def _all_static_collections() -> dict[str, CollectionDefinition]:
     """Public collections — Synthea demo if its source patient is checked out,
     plus blake-real if any of its sources are present locally.
@@ -458,6 +537,9 @@ def list_collections() -> list[CollectionDefinition]:
 
 
 def get_collection(collection_id: str) -> CollectionDefinition | None:
+    workspace_patient_id = _patient_id_from_workspace_collection(collection_id)
+    if workspace_patient_id:
+        return patient_workspace_collection(workspace_patient_id)
     static = _all_static_collections()
     if collection_id in static:
         return static[collection_id]
@@ -885,7 +967,7 @@ def start_extract_job(collection_id: str) -> ExtractJob | None:
     coll = get_collection(collection_id)
     if coll is None:
         return None
-    if not collection_id.startswith("upload-"):
+    if not (collection_id.startswith("upload-") or collection_id.startswith("workspace-")):
         return None
     job = ExtractJob(
         job_id=uuid.uuid4().hex,
@@ -919,9 +1001,9 @@ def extract_pending_pdfs(collection_id: str) -> list[ExtractResult] | None:
     coll = get_collection(collection_id)
     if coll is None:
         return None
-    # Only upload-derived collections support extraction. The static demo
-    # registry's ``path`` fields point at pre-staged extractions.
-    if not collection_id.startswith("upload-"):
+    # Only upload-derived and patient workspace collections support extraction.
+    # Static demo registry paths point at pre-staged extractions.
+    if not (collection_id.startswith("upload-") or collection_id.startswith("workspace-")):
         return None
 
     # Lazy import — keeps the api/ surface free of the heavy
@@ -933,20 +1015,15 @@ def extract_pending_pdfs(collection_id: str) -> list[ExtractResult] | None:
     PipelineCls = get_pipeline("multipass-fhir")
     pipeline = PipelineCls()
 
-    session = collection_id.removeprefix("upload-")
-    session_dir = UPLOADS_ROOT / session
-
     results: list[ExtractResult] = []
     for src in coll.sources:
         if src.kind != "extracted-pdf":
             continue
         # ``src.path`` is the *extracted* JSON path (which may not exist yet).
-        # The actual PDF is in the upload directory; find it by stripping
-        # the ``.extracted.json`` suffix off the filename and looking under
-        # ``session_dir``.
+        # The actual PDF is next to it; strip the ``.extracted.json`` suffix.
         extracted_json = src.path
         pdf_name = extracted_json.name.removesuffix(".extracted.json")
-        pdf_path = session_dir / pdf_name
+        pdf_path = extracted_json.with_name(pdf_name)
         if not pdf_path.exists():
             continue
         if extracted_json.exists():

@@ -28,6 +28,7 @@ import type {
   PatientContextTurnResponse,
   AggregationCleaningQueueResponse,
   AggregationDeleteResponse,
+  HarmonizeCollection,
   HarmonizeAllergiesResponse,
   HarmonizeCollectionsResponse,
   HarmonizeConditionsResponse,
@@ -225,6 +226,11 @@ export const api = {
 
   getHarmonizeCollections: (): Promise<HarmonizeCollectionsResponse> =>
     http.get<HarmonizeCollectionsResponse>("/harmonize/collections").then((r) => r.data),
+
+  getHarmonizeWorkspace: (patientId: string): Promise<HarmonizeCollection> =>
+    http
+      .get<HarmonizeCollection>(`/harmonize/workspaces/${encodeURIComponent(patientId)}`)
+      .then((r) => r.data),
 
   getHarmonizeSources: (collectionId: string): Promise<HarmonizeSourceManifestResponse> =>
     http

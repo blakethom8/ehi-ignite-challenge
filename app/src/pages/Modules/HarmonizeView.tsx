@@ -847,10 +847,11 @@ function ProvenanceWorkspace({ collectionId }: { collectionId: string }) {
 }
 
 function useCrossSourceFilter(collectionId: string) {
-  const [crossOnly, setCrossOnly] = useState(() => !collectionId.startsWith("upload-"));
+  const shouldDefaultCrossOnly = (id: string) => !id.startsWith("upload-") && !id.startsWith("workspace-");
+  const [crossOnly, setCrossOnly] = useState(() => shouldDefaultCrossOnly(collectionId));
 
   useEffect(() => {
-    setCrossOnly(!collectionId.startsWith("upload-"));
+    setCrossOnly(shouldDefaultCrossOnly(collectionId));
   }, [collectionId]);
 
   return [crossOnly, setCrossOnly] as const;
@@ -1665,25 +1666,37 @@ export function HarmonizeView() {
     queryKey: ["harmonize-collections"],
     queryFn: () => api.getHarmonizeCollections(),
   });
+  const workspaceQuery = useQuery({
+    queryKey: ["harmonize-workspace", patientId],
+    queryFn: () => api.getHarmonizeWorkspace(patientId as string),
+    enabled: Boolean(patientId),
+  });
   const patientsQuery = useQuery({
     queryKey: ["patients"],
     queryFn: api.listPatients,
     staleTime: Infinity,
   });
   const collections = collectionsQuery.data?.collections ?? [];
-  const collectionIdsKey = collections.map((collection) => collection.id).join("|");
+  const patientWorkspace = workspaceQuery.data ?? null;
+  const collectionIdsKey = [
+    patientWorkspace?.id ?? "",
+    ...collections.map((collection) => collection.id),
+  ].join("|");
   const selectedPatient = patientsQuery.data?.find((patient) => patient.id === patientId) ?? null;
   const uploadCollectionId = patientId ? `upload-${safeUploadSessionId(patientId)}` : "";
   const patientUploadCollection = uploadCollectionId
     ? collections.find((collection) => collection.id === uploadCollectionId) ?? null
     : null;
-  const requestedValidCollection = requestedCollection && collections.some((collection) => collection.id === requestedCollection)
+  const requestedValidCollection = requestedCollection && (
+    collections.some((collection) => collection.id === requestedCollection) ||
+    requestedCollection === patientWorkspace?.id
+  )
     ? requestedCollection
     : "";
   const defaultFixtureCollection =
     collections.find((collection) => collection.id === "synthea-demo") ?? collections[0] ?? null;
   const autoCollectionId =
-    patientUploadCollection?.id || requestedValidCollection || defaultFixtureCollection?.id || "";
+    patientWorkspace?.id || patientUploadCollection?.id || requestedValidCollection || defaultFixtureCollection?.id || "";
   const [manualCollectionId, setManualCollectionId] = useState<string>("");
   const [developerPickerOpen, setDeveloperPickerOpen] = useState(false);
   const [activeExtractJobId, setActiveExtractJobId] = useState<string | null>(null);
@@ -1696,9 +1709,11 @@ export function HarmonizeView() {
 
   const activeId =
     manualCollectionId || autoCollectionId;
-  const activeCollection = collections.find((c) => c.id === activeId) ?? null;
+  const activeCollection =
+    activeId === patientWorkspace?.id ? patientWorkspace : collections.find((c) => c.id === activeId) ?? null;
+  const isPatientWorkspace = activeId === patientWorkspace?.id && !!patientWorkspace;
   const isUploadCollection = activeId === uploadCollectionId && !!patientUploadCollection;
-  const isDeveloperFixture = !!activeId && !isUploadCollection;
+  const isDeveloperFixture = !!activeId && !isPatientWorkspace && !isUploadCollection;
 
   // Async extract: kick off a background job, then poll until complete.
   // The mutation just starts the job; the polling query owns the lifecycle.
@@ -1743,9 +1758,9 @@ export function HarmonizeView() {
         extractJobQuery.data?.status === "running"));
   const extractJob = extractJobQuery.data ?? null;
 
-  const isLoadingCollections = collectionsQuery.isLoading;
+  const isLoadingCollections = collectionsQuery.isLoading || (Boolean(patientId) && workspaceQuery.isLoading);
   const hasNoCollections =
-    !isLoadingCollections && collections.length === 0;
+    !isLoadingCollections && collections.length === 0 && !patientWorkspace;
 
   return (
     <div className="space-y-4">
@@ -1830,7 +1845,7 @@ export function HarmonizeView() {
             <p className="mt-1 max-w-4xl text-sm leading-6 text-[#667085]">
               {isDeveloperFixture
                 ? "No upload-backed harmonize collection is available for the selected patient workspace yet, so this view is using a curated development fixture. Add files in Source Intake to create a patient-specific harmonized record."
-                : activeCollection?.description ?? "Uploaded and prepared sources from Source Intake are feeding this harmonized record."}
+                : activeCollection?.description ?? "The selected patient's baseline and uploaded source files are feeding this harmonized record."}
             </p>
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-2">
@@ -1862,7 +1877,7 @@ export function HarmonizeView() {
             </label>
             <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
               <select
-                value={activeId}
+                value={manualCollectionId || defaultFixtureCollection?.id || ""}
                 onChange={(e) => {
                   setManualCollectionId(e.target.value);
                   extractMutation.reset();
@@ -1945,7 +1960,7 @@ export function HarmonizeView() {
       {activeId && workspaceTab === "sources" && (
         <SourcesPanel
           collectionId={activeId}
-          canExtract={isUploadCollection}
+          canExtract={isUploadCollection || isPatientWorkspace}
           extractInProgress={extractInProgress}
           onExtract={() => extractMutation.mutate()}
         />

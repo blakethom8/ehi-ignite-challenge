@@ -270,6 +270,14 @@ class UploadCollectionDiscoveryTests(unittest.TestCase):
         (sess / "report.pdf").write_bytes(b"%PDF-1.4 stub")
         return sess
 
+    def _sample_patient_id(self) -> str:
+        from api.core.loader import list_patient_files, patient_id_from_path
+
+        files = list_patient_files()
+        if not files:
+            self.skipTest("Synthea sample patient files not present")
+        return patient_id_from_path(files[0])
+
     def test_discovery_lists_upload_collection(self) -> None:
         self._stage_session("alice-2026")
         r = self.client.get("/api/harmonize/collections")
@@ -297,6 +305,34 @@ class UploadCollectionDiscoveryTests(unittest.TestCase):
         # The single FHIR-shaped JSON has one Observation (A1C).
         self.assertEqual(body["total"], 1)
         self.assertEqual(body["merged"][0]["loinc_code"], "4548-4")
+
+    def test_patient_workspace_uses_synthea_bundle_as_baseline_source(self) -> None:
+        patient_id = self._sample_patient_id()
+        r = self.client.get(f"/api/harmonize/workspaces/{patient_id}")
+        self.assertEqual(r.status_code, 200)
+        workspace = r.json()
+        self.assertEqual(workspace["id"], f"workspace-{patient_id}")
+        self.assertEqual(workspace["source_count"], 1)
+
+        sources = self.client.get(f"/api/harmonize/{workspace['id']}/sources").json()["sources"]
+        self.assertEqual(len(sources), 1)
+        self.assertEqual(sources[0]["id"], "synthea-fhir")
+        self.assertEqual(sources[0]["kind"], "fhir-pull")
+        self.assertEqual(sources[0]["status"], "structured")
+
+    def test_patient_workspace_attaches_upload_sources(self) -> None:
+        patient_id = self._sample_patient_id()
+        self._stage_session(patient_id)
+        r = self.client.get(f"/api/harmonize/workspaces/{patient_id}")
+        self.assertEqual(r.status_code, 200)
+        workspace = r.json()
+        self.assertEqual(workspace["source_count"], 3)
+
+        sources = self.client.get(f"/api/harmonize/{workspace['id']}/sources").json()["sources"]
+        labels = {source["label"] for source in sources}
+        self.assertIn("Synthea FHIR patient bundle", labels)
+        self.assertIn("labs.json", labels)
+        self.assertIn("report.pdf", labels)
 
     def test_extract_endpoint_rejects_static_collection(self) -> None:
         # blake-real is static; extraction must 400

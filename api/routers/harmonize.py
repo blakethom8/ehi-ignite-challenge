@@ -72,6 +72,19 @@ def get_collections() -> HarmonizeCollectionsResponse:
     )
 
 
+@router.get("/workspaces/{patient_id}", response_model=HarmonizeCollection)
+def get_patient_workspace(patient_id: str) -> HarmonizeCollection:
+    collection = harmonize_service.patient_workspace_collection(patient_id)
+    if collection is None:
+        raise HTTPException(status_code=404, detail=f"Patient workspace not found: {patient_id}")
+    return HarmonizeCollection(
+        id=collection.id,
+        name=collection.name,
+        description=collection.description,
+        source_count=len(collection.sources),
+    )
+
+
 @router.get("/{collection_id}/sources", response_model=HarmonizeSourceManifestResponse)
 def get_sources(collection_id: str) -> HarmonizeSourceManifestResponse:
     manifest = harmonize_service.collection_source_manifest(collection_id)

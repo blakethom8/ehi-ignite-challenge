@@ -270,15 +270,23 @@ class GoogleAIStudioBackend:
     # See _rasterize() docstring for the bug this prevents.
     _RASTERIZE_LOCK = threading.Lock()
 
+    # Page-count threshold above which extract() chunks the PDF into
+    # multiple smaller API calls. The Google AI Studio API returned
+    # HTTP 400 INVALID_ARGUMENT on a 25-page Cedars Health Summary
+    # (~5 MB of inline images); 8 pages per chunk reliably succeeds.
+    DEFAULT_MAX_PAGES_PER_CHUNK = 8
+
     def __init__(
         self,
         model: str = DEFAULT_GOOGLE_MODEL,
         api_key: str | None = None,
         dpi: int = GOOGLE_GEMMA_RASTER_DPI,
+        max_pages_per_chunk: int | None = None,
     ) -> None:
         self.model = model
         self.dpi = dpi
         self._api_key = api_key
+        self.max_pages_per_chunk = max_pages_per_chunk or self.DEFAULT_MAX_PAGES_PER_CHUNK
 
     @property
     def api_key(self) -> str:
@@ -301,15 +309,80 @@ class GoogleAIStudioBackend:
     ) -> dict[str, Any]:
         page_images = self._rasterize(pdf_bytes)
 
+        # Long-PDF chunking: Google AI Studio rejects requests with too
+        # many inline images at once (HTTP 400 INVALID_ARGUMENT on the
+        # 25-page Cedars Health Summary, ~5 MB of base64 PNGs). Split
+        # into max_pages_per_chunk-sized batches, run each, merge.
+        if len(page_images) > self.max_pages_per_chunk:
+            return self._extract_chunked(
+                page_images=page_images,
+                system_prompt=system_prompt,
+                schema_json=schema_json,
+                max_tokens=max_tokens,
+            )
+
+        return self._extract_single_request(
+            page_images=page_images,
+            system_prompt=system_prompt,
+            schema_json=schema_json,
+            max_tokens=max_tokens,
+            chunk_label=None,
+        )
+
+    def _extract_chunked(
+        self,
+        *,
+        page_images: list[bytes],
+        system_prompt: str,
+        schema_json: dict[str, Any],
+        max_tokens: int,
+    ) -> dict[str, Any]:
+        """Split page_images into chunks, run sequentially, merge responses.
+
+        Sequential, not parallel: the outer pipeline already runs N passes
+        in parallel via ThreadPoolExecutor, so adding chunk-level
+        parallelism could over-saturate the API. Chunking inside one pass
+        is purely about request-size compliance.
+        """
+        chunk_size = self.max_pages_per_chunk
+        chunks = [
+            page_images[i : i + chunk_size]
+            for i in range(0, len(page_images), chunk_size)
+        ]
+        chunk_responses: list[dict[str, Any]] = []
+        for idx, chunk in enumerate(chunks, start=1):
+            label = f"chunk {idx}/{len(chunks)} (pages {(idx - 1) * chunk_size + 1}-{(idx - 1) * chunk_size + len(chunk)})"
+            response = self._extract_single_request(
+                page_images=chunk,
+                system_prompt=system_prompt,
+                schema_json=schema_json,
+                max_tokens=max_tokens,
+                chunk_label=label,
+            )
+            chunk_responses.append(response)
+
+        return _merge_chunk_responses(chunk_responses, schema_json)
+
+    def _extract_single_request(
+        self,
+        *,
+        page_images: list[bytes],
+        system_prompt: str,
+        schema_json: dict[str, Any],
+        max_tokens: int,
+        chunk_label: str | None,
+    ) -> dict[str, Any]:
+        """One Gemini API call against ``page_images`` (which may be a chunk)."""
         gemini_schema = _pydantic_schema_to_gemini(schema_json)
 
         # Gemma uses Gemini's content-parts API. System prompt is concatenated
         # into the user message because Gemma doesn't honor systemInstruction.
+        chunk_note = f" (this batch covers {chunk_label})" if chunk_label else ""
         parts: list[dict[str, Any]] = [
             {
                 "text": (
                     f"{system_prompt}\n\n"
-                    "Extract this document into the structured schema. "
+                    f"Extract this document into the structured schema{chunk_note}. "
                     "Pages follow as separate images."
                 )
             }
@@ -407,6 +480,75 @@ class GoogleAIStudioBackend:
 # ---------------------------------------------------------------------------
 # Schema dialect translation: Pydantic JSON Schema → Gemini responseSchema
 # ---------------------------------------------------------------------------
+
+
+def _merge_chunk_responses(
+    responses: list[dict[str, Any]],
+    schema_json: dict[str, Any],
+) -> dict[str, Any]:
+    """Combine multiple per-chunk model responses into a single dict.
+
+    Used by :meth:`GoogleAIStudioBackend._extract_chunked` to coalesce
+    responses across page-chunks. Field-level rules:
+
+    - **Array fields** (the schema declares ``"type": "array"``):
+      concatenate values across chunks. Order preserved.
+    - **Scalar / object fields**: take the first non-null value across
+      chunks. Page-1 chunks tend to contain document-level metadata
+      (patient name, encounter date) so first-non-null is the right
+      heuristic for fields like ``DocumentContext``.
+
+    Schema-driven so it works for any pass schema. Fields not declared
+    in the schema fall through (taken from the first response that has
+    them) — keeps unknown auxiliary fields rather than dropping them.
+    """
+    if not responses:
+        return {}
+    if len(responses) == 1:
+        return responses[0]
+
+    properties = schema_json.get("properties", {}) or {}
+    merged: dict[str, Any] = {}
+
+    # Schema-declared fields first
+    for field_name, field_def in properties.items():
+        if _is_array_field(field_def):
+            merged[field_name] = []
+            for resp in responses:
+                if isinstance(resp, dict) and isinstance(resp.get(field_name), list):
+                    merged[field_name].extend(resp[field_name])
+        else:
+            for resp in responses:
+                if isinstance(resp, dict) and resp.get(field_name) is not None:
+                    merged[field_name] = resp[field_name]
+                    break
+
+    # Carry through any fields the model emitted that aren't in the schema
+    for resp in responses:
+        if not isinstance(resp, dict):
+            continue
+        for k, v in resp.items():
+            if k not in merged:
+                merged[k] = v
+
+    return merged
+
+
+def _is_array_field(field_def: dict) -> bool:
+    """Return True when a schema property declares an array type."""
+    if not isinstance(field_def, dict):
+        return False
+    t = field_def.get("type")
+    if t == "array":
+        return True
+    if isinstance(t, list) and "array" in t:
+        return True
+    # anyOf/oneOf with an array branch (Pydantic Optional[list[...]])
+    for key in ("anyOf", "oneOf"):
+        for branch in field_def.get(key, []) or []:
+            if isinstance(branch, dict) and branch.get("type") == "array":
+                return True
+    return False
 
 
 def _pydantic_schema_to_gemini(schema: dict[str, Any]) -> dict[str, Any]:

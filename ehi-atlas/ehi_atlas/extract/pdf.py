@@ -417,7 +417,12 @@ class GoogleAIStudioBackend:
             headers={"Content-Type": "application/json"},
         )
         try:
-            with urllib.request.urlopen(req, timeout=180) as resp:
+            # Long timeout (10 min) accommodates chunked extraction passes that
+            # iterate sequentially through 4+ Gemma calls per pass. Caught a
+            # urllib TimeoutError at 180s on the labs pass during chunked
+            # Move F — labs is the densest output and Gemma generation can
+            # legitimately take several minutes on a 25-page PDF chunk.
+            with urllib.request.urlopen(req, timeout=600) as resp:
                 body = json.loads(resp.read())
         except urllib.error.HTTPError as e:
             err_text = e.read().decode("utf-8", errors="replace")

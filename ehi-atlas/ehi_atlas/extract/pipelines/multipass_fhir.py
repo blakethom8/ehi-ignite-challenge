@@ -186,14 +186,19 @@ class LabObservationExtraction(BaseModel):
 class ExtractionPass:
     """Declarative description of one extraction pass.
 
-    Each pass has its own prompt, schema, and (eventually) backend. Adding
-    a new fact type is a new ExtractionPass + a converter function in
-    :func:`_resource_converters`.
+    Each pass has its own prompt, schema, prompt_version, and backend.
+    Adding a new fact type is a new ExtractionPass + a converter function.
+
+    Bumping ``prompt_version`` for a single pass invalidates only that
+    pass's cache — other passes' cached output is unaffected. This makes
+    A/B prompt iteration fast and cheap. Track each prompt-version delta
+    in `docs/architecture/PIPELINE-LOG.md`.
     """
 
     name: str
     schema: Type[BaseModel]
     system_prompt: str
+    prompt_version: str = "v1"
     backend_name: str = "anthropic"
     model: str | None = None
 
@@ -206,21 +211,40 @@ Be conservative. If a field isn't clearly visible, return null for that field.
 The document_type field is required — pick the closest match from the enum."""
 
 
-_CONDITIONS_PROMPT = """You are extracting clinical conditions/diagnoses from a
-medical document.
+_CONDITIONS_PROMPT = """You are extracting EVERY clinical condition or
+diagnosis recorded in this medical document. Be comprehensive.
+
+Health Summary PDFs and chart exports decompose conditions across many
+sections. Look in ALL of these — each is a valid source of conditions:
+
+  - Problem list / Active Problems
+  - Past Medical History
+  - Past Surgical History (for the underlying condition that prompted
+    the surgery, e.g. 'Appendectomy 2015' implies prior appendicitis —
+    only extract if document treats it as a Condition entry)
+  - Assessment & Plan (encounter-by-encounter diagnoses)
+  - Encounter Diagnoses / Visit Diagnoses (often per-visit)
+  - Reason for Visit / Chief Complaint
+  - Screening exams (Z-codes for screening exams ARE conditions)
+  - Health maintenance items flagged as patient diagnoses
+  - Resolved conditions (extract; mark clinical_status=resolved)
 
 Rules:
-- Extract every condition/diagnosis explicitly mentioned (problem list, past
-  medical history, assessment, ICD-coded diagnoses).
-- Include ICD-10-CM and SNOMED-CT codes when they're printed on the document
-  alongside the condition. If a code isn't shown, set it to null — never
-  fabricate codes.
-- Use the condition's display name verbatim from the document.
-- Set clinical_status based on context: active by default, resolved if the
-  document says so, remission/recurrence/relapse only when explicitly stated.
-- Include source_text — a short verbatim excerpt (≤120 chars) showing where
-  this condition appeared.
-- If no conditions are present, return an empty list. Do not invent."""
+- Extract every distinct condition you see. If the same condition appears
+  multiple times across sections, emit it ONCE with its most-recent status.
+- Include ICD-10-CM and SNOMED-CT codes ONLY when printed on the document.
+  Never fabricate codes. Null is correct when no code is shown.
+- Use the display name VERBATIM from the document. Don't paraphrase
+  (e.g. emit 'Allergic rhinitis due to American house dust mite' verbatim,
+  not 'allergic rhinitis').
+- clinical_status: 'active' by default; 'resolved' if document says so;
+  'remission'/'recurrence'/'relapse' only when explicit.
+- Set page to the 1-indexed page where the condition first appeared.
+- Include source_text: ≤120 char verbatim excerpt showing context.
+- Skip conditions in family history attributed to RELATIVES only.
+- On a comprehensive chart export with medical content, finding zero
+  conditions is unusual — be thorough. If you find none, return empty
+  but double-check first."""
 
 
 _MEDICATIONS_PROMPT = """You are extracting medications from a medical document.
@@ -286,26 +310,34 @@ _PASSES: list[ExtractionPass] = [
         name="conditions",
         schema=ConditionExtraction,
         system_prompt=_CONDITIONS_PROMPT,
+        # v2 (2026-05-03): prompt rewrite for comprehensiveness on chart
+        # exports. v1 had 0.11 recall on Cedars Health Summary because it
+        # didn't enumerate the section types where conditions hide.
+        prompt_version="v2",
     ),
     ExtractionPass(
         name="medications",
         schema=MedicationExtraction,
         system_prompt=_MEDICATIONS_PROMPT,
+        prompt_version="v1",
     ),
     ExtractionPass(
         name="allergies",
         schema=AllergyExtraction,
         system_prompt=_ALLERGIES_PROMPT,
+        prompt_version="v1",
     ),
     ExtractionPass(
         name="immunizations",
         schema=ImmunizationExtraction,
         system_prompt=_IMMUNIZATIONS_PROMPT,
+        prompt_version="v1",
     ),
     ExtractionPass(
         name="lab_observations",
         schema=LabObservationExtraction,
         system_prompt=_LAB_OBSERVATIONS_PROMPT,
+        prompt_version="v1",
     ),
 ]
 
@@ -342,11 +374,27 @@ class MultiPassFHIRPipeline:
         patient_id: str = "unknown",
         backend_name: str = "anthropic",
         model: str | None = None,
+        pass_overrides: dict[str, dict[str, str]] | None = None,
         max_workers: int = 6,
     ) -> None:
+        """Construct a MultiPassFHIRPipeline.
+
+        Args:
+            patient_id: Patient FHIR ID for emitted resources.
+            backend_name: Default backend for every pass when no override.
+            model: Default model for every pass when no override.
+            pass_overrides: Per-pass backend/model overrides. Format:
+                ``{"pass_name": {"backend": "gemma-google-ai-studio",
+                                 "model": "gemma-4-31b-it"}, ...}``.
+                Used to test "cheap models for tabular passes" hypotheses
+                without subclassing. Pass names match the ``name`` field
+                in :data:`_PASSES`.
+            max_workers: Concurrency for the per-resource passes. Default 6.
+        """
         self._patient_id = patient_id
         self._backend_name = backend_name
         self._model = model
+        self._pass_overrides = pass_overrides or {}
         self._max_workers = max_workers
         self._cache = ExtractionCache()
 
@@ -397,6 +445,7 @@ class MultiPassFHIRPipeline:
                     pdf_hash=pdf_hash,
                     skip_cache=skip_cache,
                     extra_user_text=None,
+                    prompt_version=p.prompt_version,
                 ): p
                 for p in _PASSES
             }
@@ -436,13 +485,23 @@ class MultiPassFHIRPipeline:
         pdf_hash: str,
         skip_cache: bool,
         extra_user_text: str | None,
+        prompt_version: str = "v1",
     ) -> BaseModel:
         """Execute one pass with caching + validation."""
-        backend = get_backend(name=self._backend_name, model=self._model)
+        # Per-pass override resolution: pipeline ctor accepts a dict of
+        # {pass_name: {backend, model}} that overrides the defaults.
+        # Unspecified passes fall through to the pipeline's default backend.
+        override = self._pass_overrides.get(pass_name, {})
+        backend_name = override.get("backend") or self._backend_name
+        model = override.get("model") or self._model
+        backend = get_backend(name=backend_name, model=model)
         cache_model_id = f"multipass-fhir/{pass_name}/{backend.name}/{backend.model}"
+        # Per-pass prompt version: bumping the prompt for one pass only
+        # invalidates that pass's cache, not the others.
+        full_prompt_version = f"{_PROMPT_VERSION}/{pass_name}@{prompt_version}"
         key = CacheKey(
             file_sha256=pdf_hash,
-            prompt_version=_PROMPT_VERSION,
+            prompt_version=full_prompt_version,
             schema_version=_SCHEMA_VERSION,
             model_name=cache_model_id,
         )
@@ -457,11 +516,6 @@ class MultiPassFHIRPipeline:
                     # treat as miss and re-extract.
                     pass
 
-        raw = backend.extract(
-            pdf_bytes=pdf_bytes,
-            system_prompt=system_prompt,
-            schema_json=schema.model_json_schema(),
-        )
         # Apply the same coercions extract_from_pdf uses, in case backends
         # emit string-wrapped sub-objects or extra envelope keys.
         from ehi_atlas.extract.pdf import (
@@ -469,11 +523,35 @@ class MultiPassFHIRPipeline:
             _unwrap_extraction_envelope,
         )
 
-        raw = _coerce_stringified_subobjects(raw)
-        raw = _unwrap_extraction_envelope(raw)
-        validated = schema.model_validate(raw)
-        self._cache.put(key, raw)
-        return validated
+        # One retry on validation failure. Anthropic's API occasionally
+        # returns an empty tool_use input under concurrent load (we hit this
+        # in the K.4 → Move A bake-off — same prompt + PDF + model that
+        # worked moments earlier returned `{}`). A single retry is cheap
+        # insurance; persistent failures still surface as exceptions.
+        last_error: Exception | None = None
+        for attempt in range(2):
+            try:
+                raw = backend.extract(
+                    pdf_bytes=pdf_bytes,
+                    system_prompt=system_prompt,
+                    schema_json=schema.model_json_schema(),
+                )
+                raw = _coerce_stringified_subobjects(raw)
+                raw = _unwrap_extraction_envelope(raw)
+                validated = schema.model_validate(raw)
+                self._cache.put(key, raw)
+                return validated
+            except Exception as e:
+                last_error = e
+                if attempt == 0:
+                    # Brief pause before retry helps with rate-limit smoothing
+                    import time
+
+                    time.sleep(1.5)
+                    continue
+                raise
+        # Should never reach here — the loop either returns or raises
+        raise RuntimeError(f"_run_pass exhausted retries: {last_error}")
 
     def _safe_extract_layout(self, pdf_path: Path):
         """Return DocumentLayout or None if the PDF has no extractable text layer."""
@@ -782,3 +860,59 @@ class MultiPassFHIRPipeline:
         elif doc_context.encounter_date:
             resource["effectiveDateTime"] = doc_context.encounter_date
         return resource
+
+
+# ---------------------------------------------------------------------------
+# Mixed-backend variant — Move B experiment
+# ---------------------------------------------------------------------------
+
+
+@register
+class MultiPassFHIRGemmaTabularPipeline(MultiPassFHIRPipeline):
+    """multipass-fhir variant: Claude for narrative passes, Gemma 4 31B for
+    tabular passes (medications, immunizations, lab observations).
+
+    Hypothesis from PDF-PROCESSOR.md decision 4: tabular extraction is
+    Gemma's strength. If F1 holds while cost drops 50–70%, this becomes
+    the new default.
+    """
+
+    metadata = PipelineMetadata(
+        name="multipass-fhir-gemma-tabular",
+        description=(
+            "Same as multipass-fhir, but tabular passes (medications, "
+            "immunizations, lab observations) run on Gemma 4 31B while "
+            "narrative passes (conditions, allergies, document_context) "
+            "stay on Claude. Cost-optimization experiment per decision 4."
+        ),
+        architecture="multipass-vision",
+        primary_backends=["anthropic", "gemma-google-ai-studio"],
+        estimated_cost_per_pdf_usd=0.12,  # rough — narrative passes Claude, tabular Gemma
+    )
+
+    def __init__(
+        self,
+        *,
+        patient_id: str = "unknown",
+        max_workers: int = 6,
+    ) -> None:
+        super().__init__(
+            patient_id=patient_id,
+            backend_name="anthropic",
+            model=None,  # default Claude Opus
+            max_workers=max_workers,
+            pass_overrides={
+                "medications": {
+                    "backend": "gemma-google-ai-studio",
+                    "model": "gemma-4-31b-it",
+                },
+                "immunizations": {
+                    "backend": "gemma-google-ai-studio",
+                    "model": "gemma-4-31b-it",
+                },
+                "lab_observations": {
+                    "backend": "gemma-google-ai-studio",
+                    "model": "gemma-4-31b-it",
+                },
+            },
+        )

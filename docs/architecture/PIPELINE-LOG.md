@@ -10,6 +10,9 @@ Best multipass-fhir result on Cedars Health Summary: **F1 0.70** (post-Move H, w
 
 | Date | Move | Subject | Headline result |
 |---|---|---|---|
+| 2026-05-03 | **L** | Harmonization layer wired into FastAPI + React app | `/aggregate/harmonize` ships in the production app. 350 merged Observations / 65 cross-source · 19 Conditions / 3 cross-source against `blake-real` collection (Cedars FHIR + Cedars PDF + 3 Function Health PDFs) |
+| 2026-05-03 | **K** | Conditions merge in `lib/harmonize/` | SNOMED → ICD-10 → ICD-9 → name-bridge identity resolution. Code-promotion across sources. 11 tests green; merges Cedars FHIR (28 SNOMED-coded) + Cedars PDF (7 text-only) Conditions via display-text bridge. |
+| 2026-05-03 | **J** | Harmonization layer v1 (Observations) | `lib/harmonize/` ships: LOINC + name-bridge matcher, unit normalization (mg/dL ⇄ mmol/L), FHIR Provenance minter. 17 tests; smoke run on Cedars + Function Health → 251 merged facts, 33 cross-source merges, 0 conflicts. **HDL trajectory 81→67 mg/dL** visible across sources for the first time. |
 | 2026-05-03 | **H** | Conditions prompt v3 + GT dedup | F1 **0.67 → 0.70**; 4 condition "FPs" classified as **vision wins** (clinical findings in PDF that Cedars FHIR never coded) |
 | 2026-05-03 | **I** | Lab "FPs" diagnostic | 41/41 are correctly-extracted IgE allergen panel; matching issue (GT display="class"), not pipeline error |
 | 2026-05-03 | **F** | Page chunking for long PDFs | Gemma-tabular F1 0.55, 352s; 12 pts below all-Claude, 3.7× slower. Decision: keep all-Claude as default |
@@ -44,6 +47,102 @@ Pipeline framework + eval harness shipped 2026-05-03 (commits: pipeline Protocol
 ```
 
 Each entry should be 200–500 words. Tables and code snippets welcome. **Honesty about negative results matters as much as wins** — knowing what *didn't* work prevents future re-litigation.
+
+---
+
+## 2026-05-03 · Move L — harmonization layer wired into FastAPI + React app
+
+**Agent:** Claude Opus 4.7
+
+**What:** Harmonization graduates from the Streamlit prototype into the production app surface. New FastAPI router (`api/routers/harmonize.py`) exposes five collection-scoped endpoints; new React module (`app/src/pages/Modules/HarmonizeView.tsx`) renders sources panel + tabbed Labs/Conditions tables + per-fact Provenance graph at `/aggregate/harmonize`.
+
+**Why:** The Streamlit page is fast for prototyping but invisible to reviewers. Harmonization is the strategic Atlas wedge — described in `ATLAS-DATA-MODEL.md` since the start but with no live application surface. Phase 1 demands a demo path inside the React app the reviewer actually opens.
+
+**How:** Built three layers:
+
+1. `api/core/harmonize_service.py` — collection registry + source loader (mtime-cached) + serialization helpers. One demo collection registered: `blake-real`, 5 sources (Cedars FHIR + Cedars HealthSummary PDF + 3 Function Health PDFs). The registry is open — future collections will be created when the upload flow materializes new source bundles.
+2. `api/routers/harmonize.py` — `GET /collections`, `GET /{id}/sources`, `GET /{id}/observations[?cross_source_only]`, `GET /{id}/conditions[?cross_source_only]`, `GET /{id}/provenance/{merged_ref}`. Pydantic response models in `api/models.py`.
+3. `app/src/pages/Modules/HarmonizeView.tsx` (~620 lines, Miro-styled) — React Query against the new endpoints, cross-source-only toggle, fact-row click → detail card + Provenance lineage panel + raw FHIR Provenance JSON expander.
+
+**Result:** Live numbers on `blake-real`:
+
+| | Observations | Conditions |
+|---|---:|---:|
+| Total canonical facts | **350** | **19** |
+| Cross-source merges | **65** | **3** |
+| Sources contributing | 5 | 2 |
+
+8 API tests in `api/tests/test_harmonize_api.py` (all green). TypeScript compiles clean. Vite serves `/aggregate/harmonize` at HTTP 200, no compile errors.
+
+The route sits naturally between `/aggregate/cleaning` and `/aggregate/publish` in the existing Data Aggregator workflow, so the harmonization step appears in the same flow as document upload.
+
+**Conclusion:** Harmonize is now demoable inside the app. The reviewer opens the URL, picks the `blake-real` collection, sees the merged Observations table, clicks HDL Cholesterol, watches the longitudinal trajectory + Provenance panel populate.
+
+**Next:**
+- Wire upload-flow → new collection creation (right now there's only `blake-real` baked in; uploads should produce new collections).
+- Conflict UI: when `has_conflict` fires, surface the per-source values + delta breakdown prominently. Currently the React page just shows a triangle icon.
+- Bidirectional Provenance walk: from a DocumentReference, list every fact derived from it. One query, new card on the fact-detail panel.
+- Medications + Allergies + Immunizations follow the same matcher shape — port them.
+
+---
+
+## 2026-05-03 · Move K — Conditions merge in `lib/harmonize/`
+
+**Agent:** Claude Opus 4.7
+
+**What:** Extended the harmonization layer from Observations-only to Conditions, mirroring the matcher architecture. New `lib/harmonize/conditions.py` + `MergedCondition`/`ConditionSource` models. Identity strategies: SNOMED → ICD-10 → ICD-9 → normalized-name. Adds a name-bridge fallback: when a Condition has no codes (typical of vision-extracted PDFs) and its display text matches an already-merged coded Condition, attach onto that record (`activity = name-bridge`) rather than create a duplicate text-keyed record.
+
+**Why:** Cedars FHIR Conditions are triple-coded (SNOMED + ICD-9 + ICD-10) but the same Conditions extracted from the matching Cedars HealthSummary PDF arrive as text-only. Without the bridge, all 7 PDF Conditions ended up in a separate name-keyspace from the 28 FHIR Conditions and no cross-source merges happened.
+
+**How:** Smoke run against Blake's two Cedars sources after each iteration. Wrote 11 unit tests covering SNOMED/ICD/name match, code-promotion (later sources fill in missing codes), `is_active` rollup, and Provenance minting on Conditions.
+
+**Result:**
+
+| | First impl (no bridge) | With name-bridge |
+|---|---:|---:|
+| Cedars FHIR Conditions in | 28 | 28 |
+| Cedars PDF Conditions in | 7 | 7 |
+| Cross-source merges | **0** | **3** |
+
+The 3 cross-source merges are: *Allergic rhinitis due to American house dust mite*, *Non-seasonal allergic rhinitis due to pollen*, and *Sinus congestion* — each retains the full triple-coded SNOMED/ICD-10/ICD-9 from the FHIR source plus a `name-bridge` edge from the PDF source.
+
+**Conclusion:** Display-text bridge is the right pragmatic call for v1. A SNOMED ↔ ICD-10 cross-walk via UMLS would be more rigorous but far higher-effort, and most US clinical sources emit both code systems side-by-side anyway, so the gap that bridge would fill is rare in practice.
+
+**Next:**
+- Bridge tightening: today the bridge only fires on identical normalized text. Fuzzy-match (Levenshtein, embedding similarity) would catch synonyms like "Hyperlipidemia" vs "High cholesterol" — but introduces false-positive risk worth measuring before shipping.
+- Code-system promotion is one-way (later sources add missing codes; earlier sources can't be retroactively updated). Two-pass matching would make this symmetric. Likely worth doing if/when ingestion grows beyond two sources.
+
+---
+
+## 2026-05-03 · Move J — harmonization layer v1 (Observations)
+
+**Agent:** Claude Opus 4.7
+
+**What:** First vertical slice of the harmonization layer. New `lib/harmonize/` package with: `observations.py` (matcher), `loinc_bridge.py` (hand-curated ~50-lab name→LOINC table), `units.py` (LOINC-aware mg/dL ⇄ mmol/L conversion with cholesterol vs glucose factor disambiguation), `provenance.py` (FHIR Provenance minter using Atlas-canonical Extension URLs), `models.py` (`MergedObservation`, `ObservationSource`, `ProvenanceEdge`).
+
+**Why:** Atlas's defensible wedge has always been multi-source merge with the Provenance graph (`ATLAS-DATA-MODEL.md`). The 5-layer scaffold from earlier in the project was archived because it predated a working ingestion path; now that PDF→FHIR reaches measurable F1, the next-priority layer is the merge that turns N source bundles into one canonical record.
+
+**How:** Three identity strategies in priority order:
+
+1. **LOINC code match** — both sources share a LOINC code.
+2. **Name-bridge lookup** — one source has only a free-text label; the bridge resolves to LOINC.
+3. **Normalized-name passthrough** — neither source has LOINC; merge by normalized name string.
+
+Same-day cross-source >10% spread flags `has_conflict`. Longitudinal change does not. Unit conversion fires when source unit ≠ canonical unit; conversion factor pulled from a LOINC-aware table (Glucose 18.0156 vs Cholesterol 38.67 for the same `mmol/L → mg/dL` pair).
+
+**Result:** 17 tests; smoke run on Blake's Cedars (234 Observations, 2025-11-07) + Function Health (169 Observations across 3 PDFs, 2024-07–2025-11):
+
+- 251 canonical facts merged from 403 source observations.
+- 33 cross-source merges.
+- 0 conflicts (no same-day disagreement >10%).
+
+The clinical signal: HDL Cholesterol **dropped 81 → 67 mg/dL over 16 months**, Triglycerides doubled 70 → 147 mg/dL, A1C drift 5.4 → 5.1 → 5.2%. None of these trajectories are visible in any single source.
+
+Worked example written up at `docs/architecture/HARMONIZATION-WORKED-EXAMPLE.md`.
+
+**Conclusion:** Vertical slice strategy validated. Going deep on Observations first (rather than broad-but-shallow across all resource types) produced a demo-able artifact in one iteration. Conditions/Medications/Allergies follow the same shape and become mechanical.
+
+**Next:** Move K (Conditions merge), then Move L (wire into the FastAPI + React app).
 
 ---
 

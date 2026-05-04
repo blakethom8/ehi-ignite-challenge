@@ -10,6 +10,7 @@ Best multipass-fhir result on Cedars Health Summary: **F1 0.70** (post-Move H, w
 
 | Date | Move | Subject | Headline result |
 |---|---|---|---|
+| 2026-05-03 | **N** | Closed upload→harmonize loop in the app | DataAggregator gets a "Harmonize N uploads" CTA; HarmonizeView reads `?collection=<id>` to pre-select. End-to-end clinician flow: upload → click → extract → merged record. Each step one click. |
 | 2026-05-03 | **M** | Document-agnostic collections + manual extract endpoint | Upload sessions auto-register as harmonize collections; `POST /api/harmonize/{id}/extract` runs multipass-fhir on uploaded PDFs. App is no longer hardcoded to blake-real. End-to-end fake-upload smoke test passes with zero code changes. |
 | 2026-05-03 | **L** | Harmonization layer wired into FastAPI + React app | `/aggregate/harmonize` ships in the production app. 350 merged Observations / 65 cross-source · 19 Conditions / 3 cross-source against `blake-real` collection (Cedars FHIR + Cedars PDF + 3 Function Health PDFs) |
 | 2026-05-03 | **K** | Conditions merge in `lib/harmonize/` | SNOMED → ICD-10 → ICD-9 → name-bridge identity resolution. Code-promotion across sources. 11 tests green; merges Cedars FHIR (28 SNOMED-coded) + Cedars PDF (7 text-only) Conditions via display-text bridge. |
@@ -48,6 +49,35 @@ Pipeline framework + eval harness shipped 2026-05-03 (commits: pipeline Protocol
 ```
 
 Each entry should be 200–500 words. Tables and code snippets welcome. **Honesty about negative results matters as much as wins** — knowing what *didn't* work prevents future re-litigation.
+
+---
+
+## 2026-05-03 · Move N — closed upload→harmonize loop in the app
+
+**Agent:** Claude Opus 4.7
+
+**What:** Wired the existing Data Aggregator upload UI into the Harmonize page so the clinician flow is one continuous path. Two narrow changes: a "Harmonize N uploads" CTA button that appears in the Submitted Files header when uploads exist, linking to `/aggregate/harmonize?collection=upload-<patientId>`; and `?collection=` URL-param honoring on the harmonize page so the linked-to collection is pre-selected on arrival.
+
+**Why:** Move M made the app document-agnostic at the API layer but left the user flow split — uploads land on `/aggregate/sources`, harmonize lives at `/aggregate/harmonize`, and there was no bridge. A clinician would have had to know the collection-id naming convention (`upload-<patient_id>`) and type it into the picker. That's the kind of seam reviewers notice in a 5-minute demo.
+
+**How:** The `?collection=<id>` sync uses a `hasSyncedFromUrl` flag so it runs exactly once on first render — picker changes after that aren't overwritten. The button only renders when `sources.uploaded_files.length > 0`, so the affordance is invisible until it's useful.
+
+**Result:** Three click flow ships:
+
+```
+1. /aggregate/sources           → upload PDF / FHIR JSON
+2. click "Harmonize N uploads"  → /aggregate/harmonize?collection=upload-...
+3. click "Extract uploaded PDFs" (if PDFs present) → merged record renders
+```
+
+TypeScript clean; 120 tests pass; Vite serves the updated HarmonizeView with `useSearchParams` resolved.
+
+**Conclusion:** The harmonize layer is now demoable as a real workflow, not just a debug surface. Anyone can land on the Data Aggregator with no Blake-specific data, upload their own documents, and watch the merged record assemble.
+
+**Next:**
+- Async extract: 90s synchronous extract calls in the route handler aren't great — the React mutation just hangs while a PDF is processing. Should move to a background task with a polling endpoint, or at least surface a real progress indicator.
+- Bidirectional Provenance walk: from a DocumentReference, list every fact derived from it. New card on the fact-detail panel.
+- Medications + Allergies + Immunizations matchers — same shape as Observations/Conditions, mostly mechanical.
 
 ---
 

@@ -133,11 +133,12 @@ You don't need to rebuild any of this:
 
 | Module | What it gives you |
 |---|---|
-| [`ehi_atlas.extract.pdf`](../pdf.py) | `VisionBackend` Protocol, `AnthropicBackend`, `GoogleAIStudioBackend`, `get_backend()` selector, response-coercion helpers (`_coerce_stringified_subobjects`, `_unwrap_extraction_envelope`), bbox calibration via pdfplumber (`_calibrate_bboxes_via_layout`). Use these. |
+| [`ehi_atlas.extract.pdf`](../pdf.py) | `VisionBackend` Protocol, `AnthropicBackend`, `GoogleAIStudioBackend` (with automatic page chunking for long PDFs), `get_backend()` selector, response-coercion helpers (`_coerce_stringified_subobjects`, `_unwrap_extraction_envelope`), bbox calibration via pdfplumber (`_calibrate_bboxes_via_layout`). Use these. |
 | [`ehi_atlas.extract.layout`](../layout.py) | PDF rasterization + per-page text+bbox extraction via pdfplumber. The `extract_layout()` function returns a `DocumentLayout` you can use to look up bboxes for any text on any page. |
 | [`ehi_atlas.extract.cache`](../cache.py) | Content-hash cache, atomic writes, deterministic-replay guarantee. |
 | [`ehi_atlas.extract.uploads`](../uploads.py) | If you need to round-trip arbitrary PDFs through the corpus. |
-| [`ehi_atlas.extract.eval`](../eval.py) | The eval harness — what the bake-off uses to score you. Worth reading to see what your output gets compared against. |
+| [`ehi_atlas.extract.eval`](../eval.py) | The eval harness — what the bake-off uses to score you. Includes `filter_gt_to_findable_in_pdf()` so recall is measured against facts actually in the PDF, not the patient's full chart history. Worth reading to see what your output gets compared against. |
+| [`ehi_atlas.extract.bake_off`](../bake_off.py) | The bake-off harness. `bake_off(pipelines, pairs, findable_only=True)` runs every (pipeline × pdf) cell, scores against ground truth, returns a list of `BakeoffCell` ready for markdown rendering or Streamlit display. |
 
 ---
 

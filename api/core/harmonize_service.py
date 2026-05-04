@@ -7,16 +7,27 @@ React app.
 
 Collections are deliberately decoupled from "patient" — a collection is
 "these documents the user uploaded / pulled," and harmonization runs over
-that bag. The current registry includes one well-known demo collection
-(``blake-real``) backed by the corpus drop in
-``ehi-atlas/corpus/bronze/clinical-portfolios/blake_records/``; future
-collections will be registered the same way once the upload-flow side
-materializes them under ``data/aggregation-uploads/``.
+that bag. The registry has two halves:
+
+1. **Static registry** — one well-known demo collection (``blake-real``)
+   backed by the corpus drop in
+   ``ehi-atlas/corpus/bronze/clinical-portfolios/blake_records/``.
+2. **Upload-derived collections** — one per subdirectory under
+   ``data/aggregation-uploads/<upload_session>/``. Each ``.json`` upload
+   becomes a fhir-pull source; each ``.pdf`` upload becomes an
+   extracted-pdf source whose extraction lives at
+   ``<file>.extracted.json`` next to it (produced by the manual
+   extract endpoint or pre-staged out-of-band).
+
+This makes the application document-agnostic: any user can upload any
+documents and the harmonizer surfaces a per-upload-session merged record
+without code changes.
 """
 
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass
 from datetime import datetime
 from functools import lru_cache
@@ -33,6 +44,9 @@ from lib.harmonize.models import MergedCondition, MergedObservation
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+UPLOADS_ROOT = Path(
+    os.getenv("AGGREGATION_UPLOAD_STORE_PATH", REPO_ROOT / "data" / "aggregation-uploads")
+)
 
 
 # ---------------------------------------------------------------------------
@@ -147,12 +161,112 @@ _COLLECTIONS: dict[str, CollectionDefinition] = {
 }
 
 
+# ---------------------------------------------------------------------------
+# Upload-derived collection discovery
+# ---------------------------------------------------------------------------
+#
+# Each subdirectory under ``data/aggregation-uploads/<upload_session>/``
+# becomes one collection. A subdirectory's source list is built from the
+# files inside it:
+#
+#   foo.pdf                 → extracted-pdf source (extraction at
+#                             foo.extracted.json if cached)
+#   bar.json                → fhir-pull source (if FHIR-shaped)
+#
+# The collection ID is ``upload-<session>``. The ``session`` segment is
+# whatever the upload flow chose to key on (currently the patient_id, but
+# the harmonizer doesn't care).
+
+
+def _looks_like_fhir(path: Path) -> bool:
+    """Cheap structural check: does this JSON look like FHIR?"""
+    if path.suffix.lower() != ".json":
+        return False
+    try:
+        with path.open() as fh:
+            head = fh.read(4096)
+        # Accept both the Health-Skillz envelope and plain Bundles.
+        return (
+            '"resourceType"' in head
+            or '"fhir"' in head
+            or '"providers"' in head
+        )
+    except OSError:
+        return False
+
+
+def _upload_session_to_collection(session_dir: Path) -> CollectionDefinition | None:
+    """Synthesize a CollectionDefinition from one upload-session directory."""
+    if not session_dir.is_dir():
+        return None
+    sources: list[SourceDefinition] = []
+    for entry in sorted(session_dir.iterdir()):
+        if not entry.is_file():
+            continue
+        # Skip metadata sidecars and extraction-cache files.
+        if entry.name.endswith((".metadata.json", ".extracted.json")):
+            continue
+        suffix = entry.suffix.lower()
+        if suffix == ".pdf":
+            sources.append(
+                SourceDefinition(
+                    id=f"pdf-{entry.stem}",
+                    label=entry.name,
+                    kind="extracted-pdf",
+                    # The extracted JSON is conventionally written next to
+                    # the PDF as ``<basename>.extracted.json``. The loader
+                    # will return an empty dict if the extraction hasn't
+                    # been run yet — the manifest reflects that.
+                    path=entry.with_suffix(entry.suffix + ".extracted.json"),
+                    document_reference=f"DocumentReference/upload-{entry.stem}",
+                )
+            )
+        elif suffix == ".json" and _looks_like_fhir(entry):
+            sources.append(
+                SourceDefinition(
+                    id=f"fhir-{entry.stem}",
+                    label=entry.name,
+                    kind="fhir-pull",
+                    path=entry,
+                    document_reference=f"DocumentReference/upload-{entry.stem}",
+                )
+            )
+    if not sources:
+        return None
+    return CollectionDefinition(
+        id=f"upload-{session_dir.name}",
+        name=f"Uploaded session · {session_dir.name}",
+        description=(
+            f"Documents uploaded under session ``{session_dir.name}``: "
+            f"{sum(1 for s in sources if s.kind == 'extracted-pdf')} PDF(s), "
+            f"{sum(1 for s in sources if s.kind == 'fhir-pull')} FHIR file(s)."
+        ),
+        sources=tuple(sources),
+    )
+
+
+def _discover_upload_collections() -> dict[str, CollectionDefinition]:
+    if not UPLOADS_ROOT.exists():
+        return {}
+    out: dict[str, CollectionDefinition] = {}
+    for sub in sorted(UPLOADS_ROOT.iterdir()):
+        coll = _upload_session_to_collection(sub)
+        if coll is not None:
+            out[coll.id] = coll
+    return out
+
+
 def list_collections() -> list[CollectionDefinition]:
-    return list(_COLLECTIONS.values())
+    """Static registry first, then any upload-derived collections."""
+    out: list[CollectionDefinition] = list(_COLLECTIONS.values())
+    out.extend(_discover_upload_collections().values())
+    return out
 
 
 def get_collection(collection_id: str) -> CollectionDefinition | None:
-    return _COLLECTIONS.get(collection_id)
+    if collection_id in _COLLECTIONS:
+        return _COLLECTIONS[collection_id]
+    return _discover_upload_collections().get(collection_id)
 
 
 # ---------------------------------------------------------------------------
@@ -340,6 +454,95 @@ def serialize_condition(m: MergedCondition) -> dict[str, Any]:
             for s in m.sources
         ],
     }
+
+
+# ---------------------------------------------------------------------------
+# Manual extraction trigger (PDFs in upload-derived collections)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class ExtractResult:
+    source_id: str
+    label: str
+    extracted_path: str
+    cache_hit: bool
+    entry_count: int
+    elapsed_seconds: float
+
+
+def extract_pending_pdfs(collection_id: str) -> list[ExtractResult] | None:
+    """Run the multipass-fhir pipeline on every uploaded PDF in this collection
+    that doesn't yet have a cached extraction next to it.
+
+    Returns one ``ExtractResult`` per PDF processed (empty list if all PDFs
+    already had cached extractions). Returns ``None`` when the collection
+    doesn't exist or doesn't support extraction (the static demo collections
+    are read-only).
+    """
+    coll = get_collection(collection_id)
+    if coll is None:
+        return None
+    # Only upload-derived collections support extraction. The static demo
+    # registry's ``path`` fields point at pre-staged extractions.
+    if not collection_id.startswith("upload-"):
+        return None
+
+    # Lazy import — keeps the api/ surface free of the heavy
+    # extraction stack at module-load time.
+    import time
+
+    from ehi_atlas.extract.pipelines import get as get_pipeline
+
+    PipelineCls = get_pipeline("multipass-fhir")
+    pipeline = PipelineCls()
+
+    session = collection_id.removeprefix("upload-")
+    session_dir = UPLOADS_ROOT / session
+
+    results: list[ExtractResult] = []
+    for src in coll.sources:
+        if src.kind != "extracted-pdf":
+            continue
+        # ``src.path`` is the *extracted* JSON path (which may not exist yet).
+        # The actual PDF is in the upload directory; find it by stripping
+        # the ``.extracted.json`` suffix off the filename and looking under
+        # ``session_dir``.
+        extracted_json = src.path
+        pdf_name = extracted_json.name.removesuffix(".extracted.json")
+        pdf_path = session_dir / pdf_name
+        if not pdf_path.exists():
+            continue
+        if extracted_json.exists():
+            results.append(
+                ExtractResult(
+                    source_id=src.id,
+                    label=src.label,
+                    extracted_path=str(extracted_json),
+                    cache_hit=True,
+                    entry_count=len(json.loads(extracted_json.read_text()).get("entry", [])),
+                    elapsed_seconds=0.0,
+                )
+            )
+            continue
+        t0 = time.time()
+        bundle = pipeline.extract(pdf_path)
+        elapsed = time.time() - t0
+        extracted_json.write_text(json.dumps(bundle, indent=2))
+        results.append(
+            ExtractResult(
+                source_id=src.id,
+                label=src.label,
+                extracted_path=str(extracted_json),
+                cache_hit=False,
+                entry_count=len(bundle.get("entry", [])),
+                elapsed_seconds=elapsed,
+            )
+        )
+    # Bust the resource-loading cache so the next manifest/observations call
+    # picks up the freshly-extracted JSON.
+    _cached_load.cache_clear()
+    return results
 
 
 def find_merged_record(collection_id: str, merged_ref: str):

@@ -913,6 +913,20 @@ export interface HarmonizeConditionsResponse {
   merged: HarmonizeMergedCondition[];
 }
 
+export interface HarmonizeExtractItem {
+  source_id: string;
+  label: string;
+  extracted_path: string;
+  cache_hit: boolean;
+  entry_count: number;
+  elapsed_seconds: number;
+}
+
+export interface HarmonizeExtractResponse {
+  collection_id: string;
+  extracted: HarmonizeExtractItem[];
+}
+
 export interface HarmonizeProvenanceResponse {
   collection_id: string;
   merged_ref: string;

@@ -30,6 +30,8 @@ from api.models import (
     HarmonizeCollection,
     HarmonizeCollectionsResponse,
     HarmonizeConditionsResponse,
+    HarmonizeExtractItem,
+    HarmonizeExtractResponse,
     HarmonizeMergedCondition,
     HarmonizeMergedObservation,
     HarmonizeObservationsResponse,
@@ -113,6 +115,34 @@ def get_conditions(
             HarmonizeMergedCondition(**harmonize_service.serialize_condition(m))
             for m in visible
         ],
+    )
+
+
+@router.post(
+    "/{collection_id}/extract",
+    response_model=HarmonizeExtractResponse,
+)
+def extract_collection(collection_id: str) -> HarmonizeExtractResponse:
+    """Run the multipass-fhir pipeline on every uploaded PDF in this collection
+    that lacks a cached extraction. Static demo collections are read-only and
+    return 400.
+
+    Synchronous: returns once every pending PDF has been extracted and the
+    in-process cache has been busted. PDFs typically take 30–90s each;
+    callers should expect long-running responses or run this off the
+    request thread for production use.
+    """
+    if harmonize_service.get_collection(collection_id) is None:
+        raise HTTPException(status_code=404, detail=f"Collection not found: {collection_id}")
+    results = harmonize_service.extract_pending_pdfs(collection_id)
+    if results is None:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Collection {collection_id} doesn't support extraction (static demo).",
+        )
+    return HarmonizeExtractResponse(
+        collection_id=collection_id,
+        extracted=[HarmonizeExtractItem(**vars(r)) for r in results],
     )
 
 

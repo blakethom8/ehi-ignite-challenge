@@ -1036,3 +1036,17 @@ class HarmonizeProvenanceResponse(BaseModel):
     collection_id: str
     merged_ref: str
     provenance: dict
+
+
+class HarmonizeExtractItem(BaseModel):
+    source_id: str
+    label: str
+    extracted_path: str
+    cache_hit: bool
+    entry_count: int
+    elapsed_seconds: float
+
+
+class HarmonizeExtractResponse(BaseModel):
+    collection_id: str
+    extracted: list[HarmonizeExtractItem]

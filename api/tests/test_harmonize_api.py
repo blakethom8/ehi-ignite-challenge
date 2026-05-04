@@ -1,15 +1,22 @@
 """Tests for /api/harmonize endpoints.
 
-The tests rely on the demo collection ``blake-real`` whose source files
-live in the corpus drop. They're skipped when the source files aren't
-available so the suite still passes on a fresh checkout without the
-private data.
+The blake-real tests rely on demo collection source files living in the
+corpus drop; they skip gracefully when the source files aren't available
+so the suite still passes on a fresh checkout without the private data.
+
+The upload-derived collection tests use a tempdir override so they run
+on any checkout without external state.
 """
 
 from __future__ import annotations
 
+import json
+import os
+import shutil
+import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
@@ -102,6 +109,92 @@ class HarmonizeAPITests(unittest.TestCase):
             "/api/harmonize/blake-real/provenance/Observation/merged-loinc-9999999-9"
         )
         self.assertEqual(r.status_code, 404)
+
+
+class UploadCollectionDiscoveryTests(unittest.TestCase):
+    """Verify the registry surfaces upload-session directories as collections."""
+
+    def setUp(self) -> None:
+        self._tmp = Path(tempfile.mkdtemp(prefix="harmonize-test-"))
+        # Patch the UPLOADS_ROOT module global so discovery scans our tempdir.
+        from api.core import harmonize_service
+
+        self._old_root = harmonize_service.UPLOADS_ROOT
+        harmonize_service.UPLOADS_ROOT = self._tmp
+        # Bust caches so discovery reads from the new root.
+        harmonize_service._cached_load.cache_clear()
+        self.client = TestClient(app)
+
+    def tearDown(self) -> None:
+        from api.core import harmonize_service
+
+        harmonize_service.UPLOADS_ROOT = self._old_root
+        harmonize_service._cached_load.cache_clear()
+        shutil.rmtree(self._tmp, ignore_errors=True)
+
+    def _stage_session(self, session_id: str) -> Path:
+        """Create one upload session with a FHIR JSON + a PDF (no extraction yet)."""
+        sess = self._tmp / session_id
+        sess.mkdir(parents=True, exist_ok=True)
+        # Minimal FHIR-shaped JSON
+        (sess / "labs.json").write_text(
+            json.dumps(
+                {
+                    "resourceType": "Bundle",
+                    "entry": [
+                        {
+                            "resource": {
+                                "resourceType": "Observation",
+                                "code": {
+                                    "coding": [
+                                        {"system": "http://loinc.org", "code": "4548-4"}
+                                    ],
+                                    "text": "A1C",
+                                },
+                                "valueQuantity": {"value": 5.2, "unit": "%"},
+                                "effectiveDateTime": "2025-11-29",
+                            }
+                        }
+                    ],
+                }
+            )
+        )
+        # Empty stub PDF (won't be extracted in this test; just shape coverage)
+        (sess / "report.pdf").write_bytes(b"%PDF-1.4 stub")
+        return sess
+
+    def test_discovery_lists_upload_collection(self) -> None:
+        self._stage_session("alice-2026")
+        r = self.client.get("/api/harmonize/collections")
+        self.assertEqual(r.status_code, 200)
+        ids = {c["id"] for c in r.json()["collections"]}
+        self.assertIn("upload-alice-2026", ids)
+
+    def test_upload_collection_sources_count_pdfs_and_jsons(self) -> None:
+        self._stage_session("bob-001")
+        r = self.client.get("/api/harmonize/upload-bob-001/sources")
+        self.assertEqual(r.status_code, 200)
+        srcs = r.json()["sources"]
+        kinds = {s["kind"] for s in srcs}
+        self.assertEqual(kinds, {"fhir-pull", "extracted-pdf"})
+        # PDF source unavailable until extraction is run; FHIR source available.
+        by_kind = {s["kind"]: s for s in srcs}
+        self.assertTrue(by_kind["fhir-pull"]["available"])
+        self.assertFalse(by_kind["extracted-pdf"]["available"])
+
+    def test_upload_collection_observations_include_fhir_source(self) -> None:
+        self._stage_session("carol-x")
+        r = self.client.get("/api/harmonize/upload-carol-x/observations")
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        # The single FHIR-shaped JSON has one Observation (A1C).
+        self.assertEqual(body["total"], 1)
+        self.assertEqual(body["merged"][0]["loinc_code"], "4548-4")
+
+    def test_extract_endpoint_rejects_static_collection(self) -> None:
+        # blake-real is static; extraction must 400
+        r = self.client.post("/api/harmonize/blake-real/extract")
+        self.assertEqual(r.status_code, 400)
 
 
 if __name__ == "__main__":

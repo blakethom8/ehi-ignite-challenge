@@ -30,6 +30,7 @@ import type {
   AggregationDeleteResponse,
   HarmonizeCollectionsResponse,
   HarmonizeConditionsResponse,
+  HarmonizeExtractResponse,
   HarmonizeObservationsResponse,
   HarmonizeProvenanceResponse,
   HarmonizeSourceManifestResponse,
@@ -242,5 +243,10 @@ export const api = {
       .get<HarmonizeProvenanceResponse>(
         `/harmonize/${collectionId}/provenance/${encodeURIComponent(mergedRef)}`,
       )
+      .then((r) => r.data),
+
+  extractHarmonizeCollection: (collectionId: string): Promise<HarmonizeExtractResponse> =>
+    http
+      .post<HarmonizeExtractResponse>(`/harmonize/${collectionId}/extract`)
       .then((r) => r.data),
 };

@@ -1,6 +1,15 @@
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Layers3, Link2, FileText, Activity, Stethoscope, AlertTriangle } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  Activity,
+  AlertTriangle,
+  FileText,
+  Layers3,
+  Link2,
+  Loader2,
+  Sparkles,
+  Stethoscope,
+} from "lucide-react";
 import { api } from "../../api/client";
 import type {
   HarmonizeMergedCondition,
@@ -506,6 +515,7 @@ function ConditionsTab({ collectionId }: { collectionId: string }) {
 
 export function HarmonizeView() {
   const [tab, setTab] = useState<ResourceTab>("labs");
+  const queryClient = useQueryClient();
 
   const collectionsQuery = useQuery({
     queryKey: ["harmonize-collections"],
@@ -516,6 +526,18 @@ export function HarmonizeView() {
   const activeId =
     collectionId || collections[0]?.id || "";
   const activeCollection = collections.find((c) => c.id === activeId) ?? null;
+  const isUploadCollection = activeId.startsWith("upload-");
+
+  const extractMutation = useMutation({
+    mutationFn: () => api.extractHarmonizeCollection(activeId),
+    onSuccess: () => {
+      // Bust every harmonize-scoped query so source counts and merged
+      // tables reflect the just-extracted PDFs.
+      queryClient.invalidateQueries({ queryKey: ["harmonize-sources", activeId] });
+      queryClient.invalidateQueries({ queryKey: ["harmonize-observations", activeId] });
+      queryClient.invalidateQueries({ queryKey: ["harmonize-conditions", activeId] });
+    },
+  });
 
   return (
     <div className="space-y-6">
@@ -542,7 +564,10 @@ export function HarmonizeView() {
           </label>
           <select
             value={activeId}
-            onChange={(e) => setCollectionId(e.target.value)}
+            onChange={(e) => {
+              setCollectionId(e.target.value);
+              extractMutation.reset();
+            }}
             className="rounded-lg border border-[#dfe4ea] bg-white px-3 py-1.5 text-sm text-[#1c1c1e]"
           >
             {collections.map((c) => (
@@ -556,10 +581,57 @@ export function HarmonizeView() {
               {activeCollection.source_count} sources
             </span>
           )}
+          {isUploadCollection && (
+            <button
+              type="button"
+              disabled={extractMutation.isPending}
+              onClick={() => extractMutation.mutate()}
+              className={cls(
+                "ml-auto inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
+                extractMutation.isPending
+                  ? "bg-[#dfe4ea] text-[#667085]"
+                  : "bg-[#5b76fe] text-white hover:bg-[#4760e8]",
+              )}
+            >
+              {extractMutation.isPending ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" /> Extracting…
+                </>
+              ) : (
+                <>
+                  <Sparkles size={14} /> Extract uploaded PDFs
+                </>
+              )}
+            </button>
+          )}
         </div>
         {activeCollection && (
           <p className="mt-2 text-sm leading-6 text-[#667085]">
             {activeCollection.description}
+          </p>
+        )}
+        {extractMutation.data && (
+          <div className="mt-3 rounded-lg border border-[#dfe4ea] bg-[#f7f9fc] p-3 text-sm">
+            <p className="font-semibold text-[#1c1c1e]">
+              Extracted {extractMutation.data.extracted.length} PDF
+              {extractMutation.data.extracted.length === 1 ? "" : "s"}
+            </p>
+            <ul className="mt-2 space-y-1 text-xs text-[#667085]">
+              {extractMutation.data.extracted.map((e) => (
+                <li key={e.source_id}>
+                  <span className="font-medium text-[#1c1c1e]">{e.label}</span>
+                  {": "}
+                  {e.entry_count} resources
+                  {e.cache_hit ? " (cached)" : ` (${e.elapsed_seconds.toFixed(1)}s)`}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {extractMutation.error && (
+          <p className="mt-3 text-sm text-red-700">
+            Extraction failed:{" "}
+            {(extractMutation.error as Error).message ?? "unknown error"}
           </p>
         )}
       </div>

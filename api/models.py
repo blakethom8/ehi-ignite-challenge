@@ -1077,3 +1077,63 @@ class HarmonizeMedicationsResponse(BaseModel):
     total: int
     cross_source: int
     merged: list[HarmonizeMergedMedication]
+
+
+class HarmonizeAllergySource(BaseModel):
+    source_label: str
+    source_allergy_ref: str
+    display: str
+    snomed: str | None
+    rxnorm: str | None
+    criticality: str | None
+    clinical_status: str | None
+    recorded_date: str | None
+    document_reference: str | None
+
+
+class HarmonizeMergedAllergy(BaseModel):
+    merged_ref: str | None
+    canonical_name: str
+    snomed: str | None
+    rxnorm: str | None
+    is_active: bool
+    highest_criticality: str | None
+    source_count: int
+    occurrence_count: int
+    sources: list[HarmonizeAllergySource]
+
+
+class HarmonizeAllergiesResponse(BaseModel):
+    collection_id: str
+    total: int
+    cross_source: int
+    merged: list[HarmonizeMergedAllergy]
+
+
+class HarmonizeImmunizationSource(BaseModel):
+    source_label: str
+    source_immunization_ref: str
+    display: str
+    cvx: str | None
+    ndc: str | None
+    occurrence_date: str | None
+    status: str | None
+    document_reference: str | None
+
+
+class HarmonizeMergedImmunization(BaseModel):
+    merged_ref: str | None
+    canonical_name: str
+    cvx: str | None
+    ndc: str | None
+    occurrence_date: str | None
+    source_count: int
+    occurrence_count: int
+    sources: list[HarmonizeImmunizationSource]
+
+
+class HarmonizeImmunizationsResponse(BaseModel):
+    collection_id: str
+    total: int
+    cross_source: int
+    merged: list[HarmonizeMergedImmunization]

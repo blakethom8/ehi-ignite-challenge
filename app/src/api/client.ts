@@ -28,9 +28,11 @@ import type {
   PatientContextTurnResponse,
   AggregationCleaningQueueResponse,
   AggregationDeleteResponse,
+  HarmonizeAllergiesResponse,
   HarmonizeCollectionsResponse,
   HarmonizeConditionsResponse,
   HarmonizeExtractResponse,
+  HarmonizeImmunizationsResponse,
   HarmonizeMedicationsResponse,
   HarmonizeObservationsResponse,
   HarmonizeProvenanceResponse,
@@ -242,6 +244,26 @@ export const api = {
   ): Promise<HarmonizeMedicationsResponse> =>
     http
       .get<HarmonizeMedicationsResponse>(`/harmonize/${collectionId}/medications`, {
+        params: { cross_source_only: crossSourceOnly },
+      })
+      .then((r) => r.data),
+
+  getHarmonizeAllergies: (
+    collectionId: string,
+    crossSourceOnly = false,
+  ): Promise<HarmonizeAllergiesResponse> =>
+    http
+      .get<HarmonizeAllergiesResponse>(`/harmonize/${collectionId}/allergies`, {
+        params: { cross_source_only: crossSourceOnly },
+      })
+      .then((r) => r.data),
+
+  getHarmonizeImmunizations: (
+    collectionId: string,
+    crossSourceOnly = false,
+  ): Promise<HarmonizeImmunizationsResponse> =>
+    http
+      .get<HarmonizeImmunizationsResponse>(`/harmonize/${collectionId}/immunizations`, {
         params: { cross_source_only: crossSourceOnly },
       })
       .then((r) => r.data),

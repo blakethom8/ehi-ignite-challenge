@@ -20,12 +20,18 @@ Immunizations follow the same shape but are not yet implemented.
 
 from __future__ import annotations
 
+from .allergies import merge_allergies
 from .conditions import merge_conditions
+from .immunizations import merge_immunizations
 from .medications import canonical_drug_name, merge_medications
 from .models import (
+    AllergySource,
     ConditionSource,
+    ImmunizationSource,
     MedicationSource,
+    MergedAllergy,
     MergedCondition,
+    MergedImmunization,
     MergedMedication,
     MergedObservation,
     ObservationSource,
@@ -38,15 +44,21 @@ __all__ = [
     "merge_observations",
     "merge_conditions",
     "merge_medications",
+    "merge_allergies",
+    "merge_immunizations",
     "canonical_drug_name",
     "mint_provenance",
     "mint_provenance_bundle",
     "MergedObservation",
     "MergedCondition",
     "MergedMedication",
+    "MergedAllergy",
+    "MergedImmunization",
     "ObservationSource",
     "ConditionSource",
     "MedicationSource",
+    "AllergySource",
+    "ImmunizationSource",
     "ProvenanceEdge",
     "SourceBundle",
 ]

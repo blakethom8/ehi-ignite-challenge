@@ -214,6 +214,102 @@ class MergedMedication:
         return not seen_any_status
 
 
+@dataclass(frozen=True)
+class AllergySource:
+    """One source AllergyIntolerance backing a merged allergy."""
+
+    source_label: str
+    source_allergy_ref: str
+    display: str
+    snomed: str | None
+    rxnorm: str | None
+    """Drug allergies code by RxNorm; food/environmental by SNOMED."""
+
+    criticality: str | None
+    """``low`` / ``high`` / ``unable-to-assess``."""
+
+    clinical_status: str | None
+    """``active`` / ``inactive`` / ``resolved``."""
+
+    recorded_date: datetime | None
+    document_reference: str | None = None
+
+
+@dataclass
+class MergedAllergy:
+    """A canonical allergy, optionally backed by multiple sources.
+
+    Allergies are chronic-state — the same allergy across sources
+    collapses onto one merged record regardless of when it was noted.
+    Identity priority: SNOMED → RxNorm → normalized name → name-bridge.
+    """
+
+    canonical_name: str
+    snomed: str | None
+    rxnorm: str | None
+
+    sources: list[AllergySource] = field(default_factory=list)
+    provenance: list[ProvenanceEdge] = field(default_factory=list)
+
+    @property
+    def is_active(self) -> bool:
+        seen_any_status = False
+        for s in self.sources:
+            if not s.clinical_status:
+                continue
+            seen_any_status = True
+            if s.clinical_status in ("active",):
+                return True
+        return not seen_any_status
+
+    @property
+    def highest_criticality(self) -> str | None:
+        """Return the strictest criticality across sources (``high`` > ``low``)."""
+        rank = {"high": 2, "low": 1, "unable-to-assess": 0}
+        best: tuple[int, str] | None = None
+        for s in self.sources:
+            if not s.criticality:
+                continue
+            r = rank.get(s.criticality, 0)
+            if best is None or r > best[0]:
+                best = (r, s.criticality)
+        return best[1] if best else None
+
+
+@dataclass(frozen=True)
+class ImmunizationSource:
+    """One source Immunization backing a merged immunization event."""
+
+    source_label: str
+    source_immunization_ref: str
+    display: str
+    cvx: str | None
+    ndc: str | None
+    occurrence_date: datetime | None
+    status: str | None
+    """``completed`` / ``entered-in-error`` / ``not-done`` per FHIR."""
+
+    document_reference: str | None = None
+
+
+@dataclass
+class MergedImmunization:
+    """A canonical immunization event (one specific shot on one date).
+
+    Unlike Conditions/Allergies which are chronic state, an Immunization
+    is an *event*: same vaccine on different dates = different events.
+    Match key is ``(vaccine_code, date)`` — bucketing at YYYY-MM-DD.
+    """
+
+    canonical_name: str
+    cvx: str | None
+    ndc: str | None
+    occurrence_date: datetime | None
+
+    sources: list[ImmunizationSource] = field(default_factory=list)
+    provenance: list[ProvenanceEdge] = field(default_factory=list)
+
+
 @dataclass
 class MergedObservation:
     """A canonical fact, optionally backed by multiple sources.

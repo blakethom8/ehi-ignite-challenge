@@ -100,6 +100,25 @@ class HarmonizeAPITests(unittest.TestCase):
         self.assertIn("rxnorm_codes", first)
         self.assertIn("is_active", first)
 
+    def test_allergies_endpoint(self) -> None:
+        r = self.client.get("/api/harmonize/blake-real/allergies")
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        # Cedars FHIR + Cedars PDF each have one "No Known Allergies" record;
+        # they merge via name-bridge.
+        self.assertGreaterEqual(body["total"], 1)
+
+    def test_immunizations_endpoint(self) -> None:
+        r = self.client.get("/api/harmonize/blake-real/immunizations")
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        # Cedars FHIR has 10 Immunizations; PDF has 8; cross-source merges should
+        # cover the same-day pairs across both sources.
+        self.assertGreater(body["total"], 5)
+        self.assertGreaterEqual(body["cross_source"], 5)
+        # Spot-check shape: occurrence_date is required for the chronological view.
+        self.assertTrue(any(m.get("occurrence_date") for m in body["merged"]))
+
     def test_provenance_for_known_merged_obs_ref(self) -> None:
         # First find any cross-source merged observation
         obs = self.client.get(

@@ -22,7 +22,13 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from .models import MergedCondition, MergedMedication, MergedObservation
+from .models import (
+    MergedAllergy,
+    MergedCondition,
+    MergedImmunization,
+    MergedMedication,
+    MergedObservation,
+)
 
 
 SOURCE_LABEL_URL = (
@@ -34,11 +40,17 @@ HARMONIZE_ACTIVITY_URL = (
 
 
 def mint_provenance(
-    merged: MergedObservation | MergedCondition | MergedMedication,
+    merged: (
+        MergedObservation
+        | MergedCondition
+        | MergedMedication
+        | MergedAllergy
+        | MergedImmunization
+    ),
 ) -> dict[str, Any]:
     """Produce a FHIR Provenance resource for one merged record.
 
-    Accepts ``MergedObservation``, ``MergedCondition``, or ``MergedMedication``.
+    Accepts every ``Merged*`` model in ``lib.harmonize.models``.
 
     The resource follows FHIR R4 ``Provenance``:
 
@@ -78,6 +90,7 @@ def mint_provenance(
         "loinc-match": 5,
         "snomed-match": 5,
         "rxnorm-match": 5,
+        "cvx-match": 5,
         "icd10-match": 4,
         "icd9-match": 3,
         "name-match": 3,
@@ -124,7 +137,13 @@ def mint_provenance(
 
 
 def mint_provenance_bundle(
-    merged_list: list[MergedObservation] | list[MergedCondition] | list[MergedMedication],
+    merged_list: (
+        list[MergedObservation]
+        | list[MergedCondition]
+        | list[MergedMedication]
+        | list[MergedAllergy]
+        | list[MergedImmunization]
+    ),
 ) -> list[dict[str, Any]]:
     """Mint Provenance resources for a list of merged records.
 

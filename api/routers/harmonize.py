@@ -27,13 +27,17 @@ from fastapi import APIRouter, HTTPException
 
 from api.core import harmonize_service
 from api.models import (
+    HarmonizeAllergiesResponse,
     HarmonizeCollection,
     HarmonizeCollectionsResponse,
     HarmonizeConditionsResponse,
     HarmonizeExtractItem,
     HarmonizeExtractResponse,
+    HarmonizeImmunizationsResponse,
     HarmonizeMedicationsResponse,
+    HarmonizeMergedAllergy,
     HarmonizeMergedCondition,
+    HarmonizeMergedImmunization,
     HarmonizeMergedMedication,
     HarmonizeMergedObservation,
     HarmonizeObservationsResponse,
@@ -139,6 +143,54 @@ def get_medications(
         cross_source=len(cross),
         merged=[
             HarmonizeMergedMedication(**harmonize_service.serialize_medication(m))
+            for m in visible
+        ],
+    )
+
+
+@router.get(
+    "/{collection_id}/allergies",
+    response_model=HarmonizeAllergiesResponse,
+)
+def get_allergies(
+    collection_id: str,
+    cross_source_only: bool = False,
+) -> HarmonizeAllergiesResponse:
+    if harmonize_service.get_collection(collection_id) is None:
+        raise HTTPException(status_code=404, detail=f"Collection not found: {collection_id}")
+    merged = harmonize_service.merged_allergies(collection_id)
+    cross = [m for m in merged if len({s.source_label for s in m.sources}) > 1]
+    visible = cross if cross_source_only else merged
+    return HarmonizeAllergiesResponse(
+        collection_id=collection_id,
+        total=len(merged),
+        cross_source=len(cross),
+        merged=[
+            HarmonizeMergedAllergy(**harmonize_service.serialize_allergy(m))
+            for m in visible
+        ],
+    )
+
+
+@router.get(
+    "/{collection_id}/immunizations",
+    response_model=HarmonizeImmunizationsResponse,
+)
+def get_immunizations(
+    collection_id: str,
+    cross_source_only: bool = False,
+) -> HarmonizeImmunizationsResponse:
+    if harmonize_service.get_collection(collection_id) is None:
+        raise HTTPException(status_code=404, detail=f"Collection not found: {collection_id}")
+    merged = harmonize_service.merged_immunizations(collection_id)
+    cross = [m for m in merged if len({s.source_label for s in m.sources}) > 1]
+    visible = cross if cross_source_only else merged
+    return HarmonizeImmunizationsResponse(
+        collection_id=collection_id,
+        total=len(merged),
+        cross_source=len(cross),
+        merged=[
+            HarmonizeMergedImmunization(**harmonize_service.serialize_immunization(m))
             for m in visible
         ],
     )

@@ -940,6 +940,66 @@ export interface HarmonizeMedicationsResponse {
   merged: HarmonizeMergedMedication[];
 }
 
+export interface HarmonizeAllergySource {
+  source_label: string;
+  source_allergy_ref: string;
+  display: string;
+  snomed: string | null;
+  rxnorm: string | null;
+  criticality: string | null;
+  clinical_status: string | null;
+  recorded_date: string | null;
+  document_reference: string | null;
+}
+
+export interface HarmonizeMergedAllergy {
+  merged_ref: string | null;
+  canonical_name: string;
+  snomed: string | null;
+  rxnorm: string | null;
+  is_active: boolean;
+  highest_criticality: string | null;
+  source_count: number;
+  occurrence_count: number;
+  sources: HarmonizeAllergySource[];
+}
+
+export interface HarmonizeAllergiesResponse {
+  collection_id: string;
+  total: number;
+  cross_source: number;
+  merged: HarmonizeMergedAllergy[];
+}
+
+export interface HarmonizeImmunizationSource {
+  source_label: string;
+  source_immunization_ref: string;
+  display: string;
+  cvx: string | null;
+  ndc: string | null;
+  occurrence_date: string | null;
+  status: string | null;
+  document_reference: string | null;
+}
+
+export interface HarmonizeMergedImmunization {
+  merged_ref: string | null;
+  canonical_name: string;
+  cvx: string | null;
+  ndc: string | null;
+  occurrence_date: string | null;
+  source_count: number;
+  occurrence_count: number;
+  sources: HarmonizeImmunizationSource[];
+}
+
+export interface HarmonizeImmunizationsResponse {
+  collection_id: string;
+  total: number;
+  cross_source: number;
+  merged: HarmonizeMergedImmunization[];
+}
+
 export interface HarmonizeExtractItem {
   source_id: string;
   label: string;

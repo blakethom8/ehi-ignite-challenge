@@ -36,12 +36,20 @@ from typing import Any
 
 from lib.harmonize import (
     SourceBundle,
+    merge_allergies,
     merge_conditions,
+    merge_immunizations,
     merge_medications,
     merge_observations,
     mint_provenance,
 )
-from lib.harmonize.models import MergedCondition, MergedMedication, MergedObservation
+from lib.harmonize.models import (
+    MergedAllergy,
+    MergedCondition,
+    MergedImmunization,
+    MergedMedication,
+    MergedObservation,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -386,6 +394,14 @@ def merged_conditions(collection_id: str) -> list[MergedCondition]:
     return merge_conditions(_bundles_for(collection_id, "Condition"))
 
 
+def merged_allergies(collection_id: str) -> list[MergedAllergy]:
+    return merge_allergies(_bundles_for(collection_id, "AllergyIntolerance"))
+
+
+def merged_immunizations(collection_id: str) -> list[MergedImmunization]:
+    return merge_immunizations(_bundles_for(collection_id, "Immunization"))
+
+
 def merged_medications(collection_id: str) -> list[MergedMedication]:
     """Merge MedicationRequests across sources.
 
@@ -449,6 +465,58 @@ def serialize_observation(m: MergedObservation) -> dict[str, Any]:
                 "raw_value": s.raw_value,
                 "raw_unit": s.raw_unit,
                 "effective_date": _iso(s.effective_date),
+                "document_reference": s.document_reference,
+            }
+            for s in m.sources
+        ],
+    }
+
+
+def serialize_allergy(m: MergedAllergy) -> dict[str, Any]:
+    return {
+        "merged_ref": getattr(m, "_merged_ref", None),
+        "canonical_name": m.canonical_name,
+        "snomed": m.snomed,
+        "rxnorm": m.rxnorm,
+        "is_active": m.is_active,
+        "highest_criticality": m.highest_criticality,
+        "source_count": len({s.source_label for s in m.sources}),
+        "occurrence_count": len(m.sources),
+        "sources": [
+            {
+                "source_label": s.source_label,
+                "source_allergy_ref": s.source_allergy_ref,
+                "display": s.display,
+                "snomed": s.snomed,
+                "rxnorm": s.rxnorm,
+                "criticality": s.criticality,
+                "clinical_status": s.clinical_status,
+                "recorded_date": _iso(s.recorded_date),
+                "document_reference": s.document_reference,
+            }
+            for s in m.sources
+        ],
+    }
+
+
+def serialize_immunization(m: MergedImmunization) -> dict[str, Any]:
+    return {
+        "merged_ref": getattr(m, "_merged_ref", None),
+        "canonical_name": m.canonical_name,
+        "cvx": m.cvx,
+        "ndc": m.ndc,
+        "occurrence_date": _iso(m.occurrence_date),
+        "source_count": len({s.source_label for s in m.sources}),
+        "occurrence_count": len(m.sources),
+        "sources": [
+            {
+                "source_label": s.source_label,
+                "source_immunization_ref": s.source_immunization_ref,
+                "display": s.display,
+                "cvx": s.cvx,
+                "ndc": s.ndc,
+                "occurrence_date": _iso(s.occurrence_date),
+                "status": s.status,
                 "document_reference": s.document_reference,
             }
             for s in m.sources
@@ -607,6 +675,14 @@ def find_merged_record(collection_id: str, merged_ref: str):
                 return m
     if merged_ref.startswith("MedicationRequest/"):
         for m in merged_medications(collection_id):
+            if getattr(m, "_merged_ref", "") == merged_ref:
+                return m
+    if merged_ref.startswith("AllergyIntolerance/"):
+        for m in merged_allergies(collection_id):
+            if getattr(m, "_merged_ref", "") == merged_ref:
+                return m
+    if merged_ref.startswith("Immunization/"):
+        for m in merged_immunizations(collection_id):
             if getattr(m, "_merged_ref", "") == merged_ref:
                 return m
     return None

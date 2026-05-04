@@ -44,7 +44,7 @@ __all__ = [
 # (Dynamic discovery via entry_points is a Phase-2 polish item.)
 
 from . import single_pass_vision  # noqa: F401  (K.2 — baseline)
+from . import multipass_fhir      # noqa: F401  (K.4 — schema-direct multi-pass)
 
-# Pipelines will be registered as they land in K.4 / K.5:
-# from . import multipass_fhir      # noqa: F401  (K.4)
+# Pipelines will be registered as they land in K.5:
 # from . import ocr_then_extract    # noqa: F401  (K.5)

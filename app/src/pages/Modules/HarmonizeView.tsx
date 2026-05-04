@@ -96,12 +96,12 @@ function SourcesPanel({ collectionId }: { collectionId: string }) {
           (click a row to see what it contributed)
         </span>
       </div>
-      <div className="overflow-hidden rounded-xl border border-[#dfe4ea]">
+      <div className="overflow-x-auto rounded-xl border border-[#dfe4ea]">
         <table className="w-full text-sm">
           <thead className="bg-[#f7f9fc] text-left text-xs font-semibold uppercase tracking-wider text-[#667085]">
             <tr>
               <th className="px-4 py-2">Source</th>
-              <th className="px-4 py-2">Kind</th>
+              <th className="px-4 py-2 hidden sm:table-cell">Kind</th>
               <th
                 className="px-4 py-2 text-right"
                 title="Facts only this source contributed — the high-signal set"
@@ -109,12 +109,12 @@ function SourcesPanel({ collectionId }: { collectionId: string }) {
                 Unique
               </th>
               <th
-                className="px-4 py-2 text-right"
+                className="px-4 py-2 text-right hidden md:table-cell"
                 title="Facts shared with at least one other source"
               >
                 Shared
               </th>
-              <th className="px-4 py-2 text-right">Total raw</th>
+              <th className="px-4 py-2 text-right hidden lg:table-cell">Total raw</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[#eef0f4] bg-white">
@@ -146,7 +146,7 @@ function SourcesPanel({ collectionId }: { collectionId: string }) {
                   )}
                 >
                   <td className="px-4 py-2 font-medium text-[#1c1c1e]">{s.label}</td>
-                  <td className="px-4 py-2">
+                  <td className="px-4 py-2 hidden sm:table-cell">
                     <span
                       className={cls(
                         "rounded-full px-2 py-0.5 text-xs font-medium",
@@ -164,10 +164,10 @@ function SourcesPanel({ collectionId }: { collectionId: string }) {
                   >
                     {diffQuery.isLoading ? "…" : unique}
                   </td>
-                  <td className="px-4 py-2 text-right tabular-nums text-[#667085]">
+                  <td className="px-4 py-2 text-right tabular-nums text-[#667085] hidden md:table-cell">
                     {diffQuery.isLoading ? "…" : shared}
                   </td>
-                  <td className="px-4 py-2 text-right tabular-nums text-[#a5a8b5]">
+                  <td className="px-4 py-2 text-right tabular-nums text-[#a5a8b5] hidden lg:table-cell">
                     {s.total_resources}
                   </td>
                 </tr>
@@ -533,8 +533,8 @@ function LabsTab({ collectionId }: { collectionId: string }) {
                 <thead className="sticky top-0 bg-[#f7f9fc] text-left text-xs font-semibold uppercase tracking-wider text-[#667085]">
                   <tr>
                     <th className="px-4 py-2">Lab</th>
-                    <th className="px-4 py-2">LOINC</th>
-                    <th className="px-4 py-2 text-right">Sources</th>
+                    <th className="px-4 py-2 hidden md:table-cell">LOINC</th>
+                    <th className="px-4 py-2 text-right hidden sm:table-cell">Sources</th>
                     <th className="px-4 py-2 text-right">Latest</th>
                     <th className="px-4 py-2"></th>
                   </tr>
@@ -556,10 +556,10 @@ function LabsTab({ collectionId }: { collectionId: string }) {
                             ? m.canonical_name.slice(0, 50) + "…"
                             : m.canonical_name}
                         </td>
-                        <td className="px-4 py-2 text-[#667085]">
+                        <td className="px-4 py-2 text-[#667085] hidden md:table-cell">
                           <code className="text-xs">{m.loinc_code ?? "—"}</code>
                         </td>
-                        <td className="px-4 py-2 text-right tabular-nums text-[#1c1c1e]">
+                        <td className="px-4 py-2 text-right tabular-nums text-[#1c1c1e] hidden sm:table-cell">
                           {m.source_count}
                         </td>
                         <td className="px-4 py-2 text-right tabular-nums text-[#1c1c1e]">
@@ -693,9 +693,9 @@ function ConditionsTab({ collectionId }: { collectionId: string }) {
                 <thead className="sticky top-0 bg-[#f7f9fc] text-left text-xs font-semibold uppercase tracking-wider text-[#667085]">
                   <tr>
                     <th className="px-4 py-2">Condition</th>
-                    <th className="px-4 py-2">SNOMED</th>
-                    <th className="px-4 py-2">ICD-10</th>
-                    <th className="px-4 py-2 text-right">Sources</th>
+                    <th className="px-4 py-2 hidden md:table-cell">SNOMED</th>
+                    <th className="px-4 py-2 hidden lg:table-cell">ICD-10</th>
+                    <th className="px-4 py-2 text-right hidden sm:table-cell">Sources</th>
                     <th className="px-4 py-2"></th>
                   </tr>
                 </thead>
@@ -716,13 +716,13 @@ function ConditionsTab({ collectionId }: { collectionId: string }) {
                             ? m.canonical_name.slice(0, 60) + "…"
                             : m.canonical_name}
                         </td>
-                        <td className="px-4 py-2 text-[#667085]">
+                        <td className="px-4 py-2 text-[#667085] hidden md:table-cell">
                           <code className="text-xs">{m.snomed ?? "—"}</code>
                         </td>
-                        <td className="px-4 py-2 text-[#667085]">
+                        <td className="px-4 py-2 text-[#667085] hidden lg:table-cell">
                           <code className="text-xs">{m.icd10 ?? "—"}</code>
                         </td>
-                        <td className="px-4 py-2 text-right tabular-nums text-[#1c1c1e]">
+                        <td className="px-4 py-2 text-right tabular-nums text-[#1c1c1e] hidden sm:table-cell">
                           {m.source_count}
                         </td>
                         <td className="px-4 py-2 text-center">
@@ -859,8 +859,8 @@ function MedicationsTab({ collectionId }: { collectionId: string }) {
                 <thead className="sticky top-0 bg-[#f7f9fc] text-left text-xs font-semibold uppercase tracking-wider text-[#667085]">
                   <tr>
                     <th className="px-4 py-2">Medication</th>
-                    <th className="px-4 py-2">RxNorm</th>
-                    <th className="px-4 py-2 text-right">Sources</th>
+                    <th className="px-4 py-2 hidden md:table-cell">RxNorm</th>
+                    <th className="px-4 py-2 text-right hidden sm:table-cell">Sources</th>
                     <th className="px-4 py-2 text-center">Active</th>
                   </tr>
                 </thead>
@@ -881,13 +881,13 @@ function MedicationsTab({ collectionId }: { collectionId: string }) {
                             ? m.canonical_name.slice(0, 50) + "…"
                             : m.canonical_name}
                         </td>
-                        <td className="px-4 py-2 text-[#667085]">
+                        <td className="px-4 py-2 text-[#667085] hidden md:table-cell">
                           <code className="text-xs">
                             {m.rxnorm_codes[0] ?? "—"}
                             {m.rxnorm_codes.length > 1 && ` +${m.rxnorm_codes.length - 1}`}
                           </code>
                         </td>
-                        <td className="px-4 py-2 text-right tabular-nums text-[#1c1c1e]">
+                        <td className="px-4 py-2 text-right tabular-nums text-[#1c1c1e] hidden sm:table-cell">
                           {m.source_count}
                         </td>
                         <td className="px-4 py-2 text-center">
@@ -1023,9 +1023,9 @@ function AllergiesTab({ collectionId }: { collectionId: string }) {
                 <thead className="sticky top-0 bg-[#f7f9fc] text-left text-xs font-semibold uppercase tracking-wider text-[#667085]">
                   <tr>
                     <th className="px-4 py-2">Allergy</th>
-                    <th className="px-4 py-2">SNOMED</th>
+                    <th className="px-4 py-2 hidden md:table-cell">SNOMED</th>
                     <th className="px-4 py-2">Criticality</th>
-                    <th className="px-4 py-2 text-right">Sources</th>
+                    <th className="px-4 py-2 text-right hidden sm:table-cell">Sources</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#eef0f4] bg-white">
@@ -1045,7 +1045,7 @@ function AllergiesTab({ collectionId }: { collectionId: string }) {
                             ? m.canonical_name.slice(0, 50) + "…"
                             : m.canonical_name}
                         </td>
-                        <td className="px-4 py-2 text-[#667085]">
+                        <td className="px-4 py-2 text-[#667085] hidden md:table-cell">
                           <code className="text-xs">{m.snomed ?? "—"}</code>
                         </td>
                         <td className="px-4 py-2">
@@ -1061,7 +1061,7 @@ function AllergiesTab({ collectionId }: { collectionId: string }) {
                             <span className="text-xs text-[#a5a8b5]">—</span>
                           )}
                         </td>
-                        <td className="px-4 py-2 text-right tabular-nums text-[#1c1c1e]">
+                        <td className="px-4 py-2 text-right tabular-nums text-[#1c1c1e] hidden sm:table-cell">
                           {m.source_count}
                         </td>
                       </tr>
@@ -1183,8 +1183,8 @@ function ImmunizationsTab({ collectionId }: { collectionId: string }) {
                   <tr>
                     <th className="px-4 py-2">Date</th>
                     <th className="px-4 py-2">Vaccine</th>
-                    <th className="px-4 py-2">CVX</th>
-                    <th className="px-4 py-2 text-right">Sources</th>
+                    <th className="px-4 py-2 hidden md:table-cell">CVX</th>
+                    <th className="px-4 py-2 text-right hidden sm:table-cell">Sources</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#eef0f4] bg-white">
@@ -1207,10 +1207,10 @@ function ImmunizationsTab({ collectionId }: { collectionId: string }) {
                             ? m.canonical_name.slice(0, 50) + "…"
                             : m.canonical_name}
                         </td>
-                        <td className="px-4 py-2 text-[#667085]">
+                        <td className="px-4 py-2 text-[#667085] hidden md:table-cell">
                           <code className="text-xs">{m.cvx ?? "—"}</code>
                         </td>
-                        <td className="px-4 py-2 text-right tabular-nums text-[#1c1c1e]">
+                        <td className="px-4 py-2 text-right tabular-nums text-[#1c1c1e] hidden sm:table-cell">
                           {m.source_count}
                         </td>
                       </tr>

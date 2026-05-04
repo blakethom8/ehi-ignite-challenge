@@ -72,6 +72,21 @@ Overall F1: **0.03** (only the Claude passes succeeded).
 - ⏳ **If Gemma fails on small PDFs too:** the issue is in the schema/prompt/structure, not page count — investigate the request payload.
 - ⏳ Once Gemma-tabular works at all, measure F1 + cost vs Claude on equivalent PDFs.
 
+### 2026-05-03 · Move B follow-up: rhett759 (3 pages)
+
+**Result:** `multipass-fhir-gemma-tabular × rhett759-quest-cmp (3 pages)` — **succeeded** in 49.8s, produced 17 bundle entries (2 Conditions + 15 Observations).
+
+Comparable to `multipass-fhir × rhett759-quest-cmp` (all-Claude) from Move C: 17 entries, ~20s.
+
+**Confirmed:** Gemma 4 31B works at small PDF sizes. The 25-page Cedars failure is specifically about long-PDF / large-image-payload constraint in the Google AI Studio API. **Architectural integrity intact**; the issue is API-layer.
+
+**Surprising finding:** Gemma was *slower* than Claude on rhett759 (50s vs 20s wall-clock). Per-call Gemma latency on small PDFs is ~30–50s, vs Claude's ~10s. Cost win is real (~$0.12 vs ~$0.30 estimated) but **the speed advantage we expected from "smaller, cheaper model" doesn't materialize** at this PDF size.
+
+**Updated decisions:**
+- `multipass-fhir-gemma-tabular` is **not** the new default. Cost-only wins on small PDFs; broken on long PDFs.
+- Reasonable to keep as a registered variant for cost-constrained dev workflows on small inputs.
+- Real next step for cost-optimization: **page chunking on `GoogleAIStudioBackend`** so 25-page PDFs can split into 5-page chunks. Until then, Gemma-tabular is unfit for chart-export documents.
+
 ---
 
 ## 2026-05-03 · Move A — conditions prompt v1 → v2 on Cedars

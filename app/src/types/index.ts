@@ -940,6 +940,28 @@ export interface HarmonizeMedicationsResponse {
   merged: HarmonizeMergedMedication[];
 }
 
+export interface HarmonizeContributionTotals {
+  observations: number;
+  conditions: number;
+  medications: number;
+  allergies: number;
+  immunizations: number;
+  all: number;
+}
+
+export interface HarmonizeContributionsResponse {
+  collection_id: string;
+  document_reference: string;
+  label: string | null;
+  kind: string | null;
+  observations: HarmonizeMergedObservation[];
+  conditions: HarmonizeMergedCondition[];
+  medications: HarmonizeMergedMedication[];
+  allergies: HarmonizeMergedAllergy[];
+  immunizations: HarmonizeMergedImmunization[];
+  totals: HarmonizeContributionTotals;
+}
+
 export interface HarmonizeAllergySource {
   source_label: string;
   source_allergy_ref: string;

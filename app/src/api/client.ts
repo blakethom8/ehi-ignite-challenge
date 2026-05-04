@@ -31,6 +31,7 @@ import type {
   HarmonizeAllergiesResponse,
   HarmonizeCollectionsResponse,
   HarmonizeConditionsResponse,
+  HarmonizeContributionsResponse,
   HarmonizeExtractResponse,
   HarmonizeImmunizationsResponse,
   HarmonizeMedicationsResponse,
@@ -275,6 +276,16 @@ export const api = {
     http
       .get<HarmonizeProvenanceResponse>(
         `/harmonize/${collectionId}/provenance/${encodeURIComponent(mergedRef)}`,
+      )
+      .then((r) => r.data),
+
+  getHarmonizeContributions: (
+    collectionId: string,
+    documentReference: string,
+  ): Promise<HarmonizeContributionsResponse> =>
+    http
+      .get<HarmonizeContributionsResponse>(
+        `/harmonize/${collectionId}/contributions/${encodeURIComponent(documentReference)}`,
       )
       .then((r) => r.data),
 

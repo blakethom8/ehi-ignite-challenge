@@ -663,6 +663,83 @@ def extract_pending_pdfs(collection_id: str) -> list[ExtractResult] | None:
     return results
 
 
+# ---------------------------------------------------------------------------
+# Bidirectional Provenance walk — "what did this source document contribute?"
+# ---------------------------------------------------------------------------
+
+
+def facts_for_document_reference(
+    collection_id: str, document_reference: str
+) -> dict[str, Any] | None:
+    """Reverse-walk the Provenance graph: list every merged fact whose
+    sources include the given DocumentReference.
+
+    Returns a dict shaped:
+
+        {
+          "document_reference": "DocumentReference/...",
+          "label": "Cedars-Sinai (FHIR)",
+          "kind": "fhir-pull",
+          "observations": [serialized MergedObservation, ...],
+          "conditions":   [serialized MergedCondition,   ...],
+          "medications":  [serialized MergedMedication,  ...],
+          "allergies":    [serialized MergedAllergy,     ...],
+          "immunizations":[serialized MergedImmunization,...],
+          "totals": {"observations": N, ...},
+        }
+
+    Each merged record appears in the list of resources of the right
+    type if at least one of its sources points at this DocumentReference.
+    Returns ``None`` for unknown collections.
+    """
+    coll = get_collection(collection_id)
+    if coll is None:
+        return None
+
+    # Find the matching SourceDefinition (label + kind) for the doc ref.
+    matching_label: str | None = None
+    matching_kind: str | None = None
+    for s in coll.sources:
+        if s.document_reference == document_reference:
+            matching_label = s.label
+            matching_kind = s.kind
+            break
+
+    def _has_doc_ref(sources: list, attr: str = "document_reference") -> bool:
+        return any(getattr(s, attr, None) == document_reference for s in sources)
+
+    obs_hits = [m for m in merged_observations(collection_id) if _has_doc_ref(m.sources)]
+    cond_hits = [m for m in merged_conditions(collection_id) if _has_doc_ref(m.sources)]
+    med_hits = [m for m in merged_medications(collection_id) if _has_doc_ref(m.sources)]
+    allergy_hits = [m for m in merged_allergies(collection_id) if _has_doc_ref(m.sources)]
+    im_hits = [m for m in merged_immunizations(collection_id) if _has_doc_ref(m.sources)]
+
+    return {
+        "document_reference": document_reference,
+        "label": matching_label,
+        "kind": matching_kind,
+        "observations": [serialize_observation(m) for m in obs_hits],
+        "conditions": [serialize_condition(m) for m in cond_hits],
+        "medications": [serialize_medication(m) for m in med_hits],
+        "allergies": [serialize_allergy(m) for m in allergy_hits],
+        "immunizations": [serialize_immunization(m) for m in im_hits],
+        "totals": {
+            "observations": len(obs_hits),
+            "conditions": len(cond_hits),
+            "medications": len(med_hits),
+            "allergies": len(allergy_hits),
+            "immunizations": len(im_hits),
+            "all": (
+                len(obs_hits)
+                + len(cond_hits)
+                + len(med_hits)
+                + len(allergy_hits)
+                + len(im_hits)
+            ),
+        },
+    }
+
+
 def find_merged_record(collection_id: str, merged_ref: str):
     """Look up a merged record by its synthetic ref ID across all resource types."""
     if merged_ref.startswith("Observation/"):

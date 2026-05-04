@@ -119,6 +119,33 @@ class HarmonizeAPITests(unittest.TestCase):
         # Spot-check shape: occurrence_date is required for the chronological view.
         self.assertTrue(any(m.get("occurrence_date") for m in body["merged"]))
 
+    def test_contributions_for_cedars_fhir_document_reference(self) -> None:
+        # The blake-real registry attaches this DocumentReference to the
+        # Cedars-Sinai FHIR pull, which is the heaviest source in the bundle.
+        r = self.client.get(
+            "/api/harmonize/blake-real/contributions/DocumentReference/cedars-healthskillz-2025-11-07"
+        )
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        self.assertEqual(body["label"], "Cedars-Sinai (FHIR)")
+        self.assertEqual(body["kind"], "fhir-pull")
+        # Cedars FHIR contributes to most resource types.
+        totals = body["totals"]
+        self.assertGreater(totals["observations"], 50)
+        self.assertGreater(totals["conditions"], 5)
+        self.assertGreaterEqual(totals["medications"], 7)
+        self.assertGreaterEqual(totals["allergies"], 1)
+        self.assertGreaterEqual(totals["immunizations"], 5)
+        self.assertGreater(totals["all"], 60)
+
+    def test_contributions_for_unknown_document_returns_zero_facts(self) -> None:
+        r = self.client.get(
+            "/api/harmonize/blake-real/contributions/DocumentReference/does-not-exist"
+        )
+        self.assertEqual(r.status_code, 200)
+        totals = r.json()["totals"]
+        self.assertEqual(totals["all"], 0)
+
     def test_provenance_for_known_merged_obs_ref(self) -> None:
         # First find any cross-source merged observation
         obs = self.client.get(

@@ -31,6 +31,8 @@ from api.models import (
     HarmonizeCollection,
     HarmonizeCollectionsResponse,
     HarmonizeConditionsResponse,
+    HarmonizeContributionsResponse,
+    HarmonizeContributionTotals,
     HarmonizeExtractItem,
     HarmonizeExtractResponse,
     HarmonizeImmunizationsResponse,
@@ -221,6 +223,47 @@ def extract_collection(collection_id: str) -> HarmonizeExtractResponse:
     return HarmonizeExtractResponse(
         collection_id=collection_id,
         extracted=[HarmonizeExtractItem(**vars(r)) for r in results],
+    )
+
+
+@router.get(
+    "/{collection_id}/contributions/{document_reference:path}",
+    response_model=HarmonizeContributionsResponse,
+)
+def get_contributions(
+    collection_id: str,
+    document_reference: str,
+) -> HarmonizeContributionsResponse:
+    """Reverse Provenance walk — list every merged fact whose sources
+    include the given DocumentReference.
+
+    Answers "what did this source document actually contribute?" — the
+    other direction of the Provenance graph from the per-fact lineage
+    panel. Useful when a clinician wants to understand the relative
+    information density of one source vs another, or audit which facts
+    came from a specific PDF before removing it.
+    """
+    if harmonize_service.get_collection(collection_id) is None:
+        raise HTTPException(status_code=404, detail=f"Collection not found: {collection_id}")
+    payload = harmonize_service.facts_for_document_reference(
+        collection_id, document_reference
+    )
+    if payload is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Collection not found: {collection_id}",
+        )
+    return HarmonizeContributionsResponse(
+        collection_id=collection_id,
+        document_reference=payload["document_reference"],
+        label=payload["label"],
+        kind=payload["kind"],
+        observations=[HarmonizeMergedObservation(**m) for m in payload["observations"]],
+        conditions=[HarmonizeMergedCondition(**m) for m in payload["conditions"]],
+        medications=[HarmonizeMergedMedication(**m) for m in payload["medications"]],
+        allergies=[HarmonizeMergedAllergy(**m) for m in payload["allergies"]],
+        immunizations=[HarmonizeMergedImmunization(**m) for m in payload["immunizations"]],
+        totals=HarmonizeContributionTotals(**payload["totals"]),
     )
 
 

@@ -61,6 +61,8 @@ function MetricCard({
 }
 
 function SourcesPanel({ collectionId }: { collectionId: string }) {
+  const [selectedDocRef, setSelectedDocRef] = useState<string | null>(null);
+
   const { data, isLoading, error } = useQuery({
     queryKey: ["harmonize-sources", collectionId],
     queryFn: () => api.getHarmonizeSources(collectionId),
@@ -77,6 +79,9 @@ function SourcesPanel({ collectionId }: { collectionId: string }) {
         <h3 className="text-sm font-semibold text-[#1c1c1e]">
           Sources in this collection
         </h3>
+        <span className="ml-2 text-xs text-[#a5a8b5]">
+          (click a row to see what it contributed)
+        </span>
       </div>
       <div className="overflow-hidden rounded-xl border border-[#dfe4ea]">
         <table className="w-full text-sm">
@@ -92,8 +97,25 @@ function SourcesPanel({ collectionId }: { collectionId: string }) {
           <tbody className="divide-y divide-[#eef0f4] bg-white">
             {data.sources.map((s) => {
               const badge = kindBadge(s.kind);
+              const clickable = !!s.document_reference;
+              const isSelected =
+                clickable && selectedDocRef === s.document_reference;
               return (
-                <tr key={s.id} className={cls(!s.available && "opacity-50")}>
+                <tr
+                  key={s.id}
+                  onClick={() =>
+                    clickable
+                      ? setSelectedDocRef(
+                          isSelected ? null : s.document_reference,
+                        )
+                      : undefined
+                  }
+                  className={cls(
+                    !s.available && "opacity-50",
+                    clickable && "cursor-pointer hover:bg-[#f7f9fc]",
+                    isSelected && "bg-[#eef2ff]",
+                  )}
+                >
                   <td className="px-4 py-2 font-medium text-[#1c1c1e]">{s.label}</td>
                   <td className="px-4 py-2">
                     <span
@@ -120,6 +142,152 @@ function SourcesPanel({ collectionId }: { collectionId: string }) {
           </tbody>
         </table>
       </div>
+      {selectedDocRef && (
+        <ContributionsPanel
+          collectionId={collectionId}
+          documentReference={selectedDocRef}
+          onClose={() => setSelectedDocRef(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+
+function ContributionsPanel({
+  collectionId,
+  documentReference,
+  onClose,
+}: {
+  collectionId: string;
+  documentReference: string;
+  onClose: () => void;
+}) {
+  const { data, isLoading } = useQuery({
+    queryKey: ["harmonize-contributions", collectionId, documentReference],
+    queryFn: () =>
+      api.getHarmonizeContributions(collectionId, documentReference),
+  });
+
+  return (
+    <div className="mt-4 rounded-xl border border-[#dfe4ea] bg-[#fafbfd] p-4">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-[#5b76fe]">
+            Reverse Provenance walk
+          </p>
+          <p className="mt-1 text-sm font-semibold text-[#1c1c1e]">
+            What did <span className="font-mono">{data?.label ?? "this source"}</span> contribute?
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded-lg border border-[#dfe4ea] bg-white px-2 py-1 text-xs text-[#667085]"
+        >
+          Close
+        </button>
+      </div>
+
+      {isLoading || !data ? (
+        <p className="mt-3 text-sm text-[#667085]">Walking the Provenance graph…</p>
+      ) : (
+        <>
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
+            <ContributionStat label="Labs" value={data.totals.observations} />
+            <ContributionStat label="Conditions" value={data.totals.conditions} />
+            <ContributionStat label="Medications" value={data.totals.medications} />
+            <ContributionStat label="Allergies" value={data.totals.allergies} />
+            <ContributionStat label="Immunizations" value={data.totals.immunizations} />
+          </div>
+          <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
+            <ContributionList
+              title="Conditions"
+              items={data.conditions.map((c) => ({
+                primary: c.canonical_name,
+                secondary: c.snomed
+                  ? `SCT ${c.snomed}`
+                  : c.icd10
+                    ? `ICD-10 ${c.icd10}`
+                    : "text-only",
+              }))}
+            />
+            <ContributionList
+              title="Medications"
+              items={data.medications.map((m) => ({
+                primary: m.canonical_name,
+                secondary:
+                  m.rxnorm_codes.length > 0
+                    ? `RxNorm ${m.rxnorm_codes[0]}${m.rxnorm_codes.length > 1 ? ` +${m.rxnorm_codes.length - 1}` : ""}`
+                    : "text-only",
+              }))}
+            />
+            <ContributionList
+              title="Immunizations"
+              items={data.immunizations.map((i) => ({
+                primary: i.canonical_name,
+                secondary: `${i.occurrence_date?.slice(0, 10) ?? "—"}${i.cvx ? ` · CVX ${i.cvx}` : ""}`,
+              }))}
+            />
+            <ContributionList
+              title="Allergies"
+              items={data.allergies.map((a) => ({
+                primary: a.canonical_name,
+                secondary: a.snomed
+                  ? `SCT ${a.snomed}`
+                  : a.rxnorm
+                    ? `RxNorm ${a.rxnorm}`
+                    : "text-only",
+              }))}
+            />
+          </div>
+          {data.totals.observations > 0 && (
+            <p className="mt-3 text-xs text-[#a5a8b5]">
+              + {data.totals.observations} lab observation
+              {data.totals.observations === 1 ? "" : "s"} contributed (open the
+              Labs tab to drill in).
+            </p>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function ContributionStat({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-lg border border-[#dfe4ea] bg-white p-2 text-center">
+      <p className="text-xs font-semibold uppercase tracking-wider text-[#667085]">
+        {label}
+      </p>
+      <p className="mt-0.5 text-lg font-semibold tabular-nums text-[#1c1c1e]">
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function ContributionList({
+  title,
+  items,
+}: {
+  title: string;
+  items: { primary: string; secondary: string }[];
+}) {
+  if (items.length === 0) return null;
+  return (
+    <div className="rounded-lg border border-[#dfe4ea] bg-white p-3">
+      <p className="text-xs font-semibold uppercase tracking-wider text-[#667085]">
+        {title} · {items.length}
+      </p>
+      <ul className="mt-2 space-y-1 text-sm">
+        {items.map((it, i) => (
+          <li key={i} className="flex items-start justify-between gap-2">
+            <span className="truncate font-medium text-[#1c1c1e]">{it.primary}</span>
+            <span className="shrink-0 text-xs text-[#667085]">{it.secondary}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

@@ -1137,3 +1137,27 @@ class HarmonizeImmunizationsResponse(BaseModel):
     total: int
     cross_source: int
     merged: list[HarmonizeMergedImmunization]
+
+
+class HarmonizeContributionTotals(BaseModel):
+    observations: int
+    conditions: int
+    medications: int
+    allergies: int
+    immunizations: int
+    all: int
+
+
+class HarmonizeContributionsResponse(BaseModel):
+    """Reverse Provenance walk: what did this DocumentReference contribute?"""
+
+    collection_id: str
+    document_reference: str
+    label: str | None
+    kind: str | None
+    observations: list[HarmonizeMergedObservation]
+    conditions: list[HarmonizeMergedCondition]
+    medications: list[HarmonizeMergedMedication]
+    allergies: list[HarmonizeMergedAllergy]
+    immunizations: list[HarmonizeMergedImmunization]
+    totals: HarmonizeContributionTotals

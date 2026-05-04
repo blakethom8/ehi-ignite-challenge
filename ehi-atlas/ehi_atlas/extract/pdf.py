@@ -57,6 +57,7 @@ import base64
 import io
 import json
 import os
+import threading
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -265,6 +266,10 @@ class GoogleAIStudioBackend:
 
     name = "gemma-google-ai-studio"
 
+    # Class-level lock that serializes pypdfium2 rasterization across threads.
+    # See _rasterize() docstring for the bug this prevents.
+    _RASTERIZE_LOCK = threading.Lock()
+
     def __init__(
         self,
         model: str = DEFAULT_GOOGLE_MODEL,
@@ -372,17 +377,30 @@ class GoogleAIStudioBackend:
             ) from e
 
     def _rasterize(self, pdf_bytes: bytes) -> list[bytes]:
-        """Render each PDF page to PNG bytes via pypdfium2."""
+        """Render each PDF page to PNG bytes via pypdfium2.
+
+        Serialized via a class-level lock because pypdfium2 surfaces a race
+        when multiple threads open ``PdfDocument`` on the same byte buffer
+        concurrently — caught this in Move B (parallel multipass) where
+        three Gemma-routed passes all called ``_rasterize`` simultaneously
+        and pypdfium2 returned ``"PdfiumError: Failed to load document
+        (PDFium: Success)"`` (paradoxical but real).
+
+        The lock only serializes the rasterization step, not the API call.
+        Three concurrent passes still get parallel API throughput; they
+        just queue at the rasterization step (which is ~1s for typical PDFs).
+        """
         import pypdfium2 as pdfium  # lazy import — only Google backend needs it
 
-        doc = pdfium.PdfDocument(io.BytesIO(pdf_bytes))
-        scale = self.dpi / 72.0
-        out: list[bytes] = []
-        for page in doc:
-            pil = page.render(scale=scale).to_pil()
-            buf = io.BytesIO()
-            pil.save(buf, format="PNG")
-            out.append(buf.getvalue())
+        with GoogleAIStudioBackend._RASTERIZE_LOCK:
+            doc = pdfium.PdfDocument(io.BytesIO(pdf_bytes))
+            scale = self.dpi / 72.0
+            out: list[bytes] = []
+            for page in doc:
+                pil = page.render(scale=scale).to_pil()
+                buf = io.BytesIO()
+                pil.save(buf, format="PNG")
+                out.append(buf.getvalue())
         return out
 
 

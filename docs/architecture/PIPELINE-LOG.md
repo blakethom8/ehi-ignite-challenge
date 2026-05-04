@@ -10,6 +10,7 @@ Best multipass-fhir result on Cedars Health Summary: **F1 0.70** (post-Move H, w
 
 | Date | Move | Subject | Headline result |
 |---|---|---|---|
+| 2026-05-03 | **S** | Synthea demo collection — fresh-clone reviewers get a working harmonize flow | Self-bootstrapping cross-source dataset from public Synthea data. One patient bundle split into 2 temporal EHR snapshots, persistent identity + chronic conditions carry forward. **9 conditions / 8 cross-source merged** without any private data. blake-real now registers conditionally so fresh clones don't see an empty collection. |
 | 2026-05-03 | **R** | Multi-source contribution diff — vision wins surface automatically | Per-source unique vs shared partitioning. **The 4 Cedars PDF unique conditions auto-emerge as exactly the vision wins from Move H** — manual triage replaced by a graph query. Function Health 2025-11-29 has 0 unique / 58 shared, automatically exposing it as a cross-source confirmation source rather than a unique-data source. |
 | 2026-05-03 | **Q** | Bidirectional Provenance walk | New endpoint + clickable Sources rows. From any DocumentReference, see every merged fact it contributed. **Cedars FHIR contributes 207 facts; Cedars PDF contributes 160** on blake-real, broken down per resource type. The Atlas Provenance wedge is now directly demoable from both directions. |
 | 2026-05-03 | **P** | Allergies + Immunizations matchers — USCDI clinical core complete | 4th and 5th resource types ported. **1/1 allergies + 8/10 immunization events cross-source merged** on Cedars FHIR + PDF. Five tabs in the React app now: Labs / Conditions / Medications / Allergies / Immunizations. |
@@ -53,6 +54,45 @@ Pipeline framework + eval harness shipped 2026-05-03 (commits: pipeline Protocol
 ```
 
 Each entry should be 200–500 words. Tables and code snippets welcome. **Honesty about negative results matters as much as wins** — knowing what *didn't* work prevents future re-litigation.
+
+---
+
+## 2026-05-03 · Move S — self-bootstrapping Synthea demo collection
+
+**Agent:** Claude Opus 4.7
+
+**What:** Fresh-clone reviewers can now experience the harmonize workflow without any private data. A `synthea-demo` collection auto-registers from the public Synthea bundle shipped with the repo and produces realistic cross-source merges. `blake-real` registration is now conditional on its source files being present locally so a fresh clone doesn't see an empty placeholder collection.
+
+**Why:** Move N closed the upload→harmonize loop and Move M made the registry document-agnostic, but a reviewer who clones the repo cleanly has zero uploads and no Cedars / Function Health data. The first impression of the Atlas wedge would have been an empty collection picker. The demo flow needs to "just work" on day-1 of a checkout.
+
+**How:** A real two-source dataset doesn't exist in the public corpus, so we synthesize one by splitting a single Synthea patient bundle along a temporal cutoff:
+
+1. Pick `Adria871_Ankunding277_…` — diverse USCDI coverage (12 conditions, 10 meds, 11 immunizations, 100 obs).
+2. Split at `2018-01-01`. Persistent identity resources (Patient, Practitioner, Organization, CareTeam) go to **both** snapshots.
+3. **Conditions** are chronic state — onset before the cutoff appears in BOTH (chronic carry-forward); after the cutoff only in the late snapshot.
+4. **Active MedicationRequests** authored before the cutoff appear in both (carried prescription).
+5. Everything else splits on the first-available date.
+
+The output is cached under `data/harmonize-demo/synthea-demo/` with mtime invalidation against the source bundle. Cache files are gitignored — the demo is fully regenerable from the repo's public Synthea data.
+
+**Result:** Live numbers on `synthea-demo`:
+
+```
+source                       unique   shared
+  EHR snapshot · 2018          25        18
+  EHR snapshot · 2024          23        18
+```
+
+9 conditions, **8 of 9 cross-source merged.** The merged conditions are realistic chronic states (Chronic sinusitis, BMI 30+ obesity, Acute viral pharyngitis, etc.) — not just "same string" but actual same-fact-different-snapshots semantics. 38 observations, 10 cross-source merged (recurring vitals). Medications and immunizations don't cross-merge because Synthea models stopped→active transitions as new MedicationRequest IDs and immunizations are per-event, which is the right clinical behavior.
+
+2 new tests — collection self-bootstraps + cross-source conditions exist. 151 tests total. blake-real now disappears from a fresh checkout's collection list since its private files aren't present, leaving synthea-demo as the only registered collection.
+
+**Conclusion:** The Atlas harmonize wedge is now fully self-contained — a reviewer can clone the repo, `npm run dev`, navigate to `/aggregate/harmonize`, and experience the cross-source merge / Provenance lineage / unique-vs-shared diff against a synthetic-but-realistic dataset before ever uploading anything of their own.
+
+**Next:**
+- Async extract: still synchronous; bigger PDFs block 60–90s. Background task + polling endpoint.
+- Pairwise source diff: "what does A have that B doesn't" rather than just "what does A have that nobody else has."
+- Empty-state copy on the React page when zero collections register (hasn't been seen since blake-real was hardcoded — it's an actual reachable state now).
 
 ---
 

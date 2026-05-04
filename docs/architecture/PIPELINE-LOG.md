@@ -10,6 +10,7 @@ Best multipass-fhir result on Cedars Health Summary: **F1 0.70** (post-Move H, w
 
 | Date | Move | Subject | Headline result |
 |---|---|---|---|
+| 2026-05-03 | **M** | Document-agnostic collections + manual extract endpoint | Upload sessions auto-register as harmonize collections; `POST /api/harmonize/{id}/extract` runs multipass-fhir on uploaded PDFs. App is no longer hardcoded to blake-real. End-to-end fake-upload smoke test passes with zero code changes. |
 | 2026-05-03 | **L** | Harmonization layer wired into FastAPI + React app | `/aggregate/harmonize` ships in the production app. 350 merged Observations / 65 cross-source · 19 Conditions / 3 cross-source against `blake-real` collection (Cedars FHIR + Cedars PDF + 3 Function Health PDFs) |
 | 2026-05-03 | **K** | Conditions merge in `lib/harmonize/` | SNOMED → ICD-10 → ICD-9 → name-bridge identity resolution. Code-promotion across sources. 11 tests green; merges Cedars FHIR (28 SNOMED-coded) + Cedars PDF (7 text-only) Conditions via display-text bridge. |
 | 2026-05-03 | **J** | Harmonization layer v1 (Observations) | `lib/harmonize/` ships: LOINC + name-bridge matcher, unit normalization (mg/dL ⇄ mmol/L), FHIR Provenance minter. 17 tests; smoke run on Cedars + Function Health → 251 merged facts, 33 cross-source merges, 0 conflicts. **HDL trajectory 81→67 mg/dL** visible across sources for the first time. |
@@ -47,6 +48,52 @@ Pipeline framework + eval harness shipped 2026-05-03 (commits: pipeline Protocol
 ```
 
 Each entry should be 200–500 words. Tables and code snippets welcome. **Honesty about negative results matters as much as wins** — knowing what *didn't* work prevents future re-litigation.
+
+---
+
+## 2026-05-03 · Move M — document-agnostic collections + manual extract endpoint
+
+**Agent:** Claude Opus 4.7
+
+**What:** The harmonize collection registry stops being a static dict. Any subdirectory under `data/aggregation-uploads/<session>/` now becomes a harmonize collection automatically. Plus a `POST /api/harmonize/{collection_id}/extract` endpoint runs the multipass-fhir pipeline on every uploaded PDF that lacks a cached extraction; the React surface shows an "Extract uploaded PDFs" button when an upload-derived collection is selected.
+
+**Why:** Move L wired harmonize into the React app but left one collection (`blake-real`) hardcoded. The user's framing was "the application should be agnostic if it's my documents or other documents" — meaning anyone uploads documents and the merged record renders without code changes. This move closes that gap.
+
+**How:** Three changes:
+
+1. `_discover_upload_collections()` in `api/core/harmonize_service.py` scans `UPLOADS_ROOT` (env-overridable for tests). Each subdir becomes a `CollectionDefinition` with id `upload-<session>`. PDF files become `extracted-pdf` sources whose extracted JSON lives at `<basename>.extracted.json` next to them; FHIR-shaped JSON files (cheap structural check: contains `"resourceType"` / `"fhir"` / `"providers"`) become `fhir-pull` sources directly.
+2. `extract_pending_pdfs()` runs `multipass-fhir.extract()` on every PDF lacking a cached extraction, writes the bundle next to the PDF, busts the source-load cache. 400s for static demo collections.
+3. React: extract mutation with React Query, invalidates sources/observations/conditions on success so tables refresh automatically. Pending state with spinner; success state surfaces per-PDF entry-count + elapsed time.
+
+**Result:**
+
+End-to-end smoke run with a freshly-staged upload session under `/tmp/harm-int/upload-test-1/labs.json`:
+
+```
+=== list collections ===
+  blake-real:           5 sources — Blake Thomson — real EHI exports
+  upload-upload-test-1: 1 sources — Uploaded session · upload-test-1
+
+=== upload session sources ===
+  labs.json (fhir-pull) avail=True obs=2
+
+=== upload session observations ===
+  total=2 cross=0
+  HDL Cholesterol [Mass/volume] in Serum or Plasma (LOINC 2085-9) — latest 81.0 mg/dL
+  Hemoglobin A1c/Hemoglobin.total in Blood (LOINC 4548-4)        — latest 5.4 %
+```
+
+The new collection appears in the listing, its FHIR JSON is parsed, observations resolve through the LOINC bridge — all without writing any new code per upload.
+
+4 new tests in `UploadCollectionDiscoveryTests` use a tempdir override + `_cached_load.cache_clear()` to verify discovery, kind classification, and the static-collection guard on extract. 12 API tests now pass total.
+
+**Conclusion:** The application is genuinely document-agnostic. The remaining gap to a clean demo is wiring the existing `POST /api/aggregation/uploads/{patient_id}` upload flow into a React UI affordance that lands files in the right directory under `aggregation-uploads/`. Today this is staged manually; the upload UI in DataAggregator.tsx already exists but doesn't redirect users to `/aggregate/harmonize` when uploads complete.
+
+**Next:**
+- Wire DataAggregator upload-success handler to navigate to `/aggregate/harmonize` with the new collection auto-selected.
+- Async extract: 90s synchronous calls in the route handler aren't great. Move extraction to a background task or job queue so the React page can poll for completion.
+- Bidirectional Provenance walk: from a DocumentReference, list every fact derived from it. Useful when the user wants to know "what did this PDF actually contribute?"
+- Medications + Allergies + Immunizations matchers — same shape as Observations/Conditions, mostly mechanical.
 
 ---
 

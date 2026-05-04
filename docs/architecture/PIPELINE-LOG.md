@@ -10,6 +10,7 @@ Best multipass-fhir result on Cedars Health Summary: **F1 0.70** (post-Move H, w
 
 | Date | Move | Subject | Headline result |
 |---|---|---|---|
+| 2026-05-03 | **P** | Allergies + Immunizations matchers — USCDI clinical core complete | 4th and 5th resource types ported. **1/1 allergies + 8/10 immunization events cross-source merged** on Cedars FHIR + PDF. Five tabs in the React app now: Labs / Conditions / Medications / Allergies / Immunizations. |
 | 2026-05-03 | **O** | Medications matcher + Medications tab | Third resource type ported. RxNorm overlap → drug-name canonicalize → drug-name bridge → passthrough. **6 of 7 medications cross-source merged** on Cedars FHIR + PDF (only flu vaccine misses — it's in FHIR but not the PDF). |
 | 2026-05-03 | **N** | Closed upload→harmonize loop in the app | DataAggregator gets a "Harmonize N uploads" CTA; HarmonizeView reads `?collection=<id>` to pre-select. End-to-end clinician flow: upload → click → extract → merged record. Each step one click. |
 | 2026-05-03 | **M** | Document-agnostic collections + manual extract endpoint | Upload sessions auto-register as harmonize collections; `POST /api/harmonize/{id}/extract` runs multipass-fhir on uploaded PDFs. App is no longer hardcoded to blake-real. End-to-end fake-upload smoke test passes with zero code changes. |
@@ -50,6 +51,38 @@ Pipeline framework + eval harness shipped 2026-05-03 (commits: pipeline Protocol
 ```
 
 Each entry should be 200–500 words. Tables and code snippets welcome. **Honesty about negative results matters as much as wins** — knowing what *didn't* work prevents future re-litigation.
+
+---
+
+## 2026-05-03 · Move P — Allergies + Immunizations matchers (USCDI clinical core complete)
+
+**Agent:** Claude Opus 4.7
+
+**What:** Fourth and fifth resource types ported into the harmonization layer. With Observations + Conditions + Medications already shipped, this completes the USCDI v3 clinical-summary core in the harmonized record.
+
+**Why:** USCDI is the FHIR-shaped MVP for "what a clinician expects in a patient summary" — labs, problems, meds, allergies, immunizations. Each missing resource type would have been a visible gap in the demo. Two more matchers, both mechanical, knocks both gaps out at once.
+
+**How:** Allergies follow the Conditions shape almost exactly (SNOMED → RxNorm → name → name-bridge). Immunizations need a different identity model — they're *events*, not chronic state, so the match key is `(vaccine_code, occurrence_date)` rather than just `vaccine_code`. Two flu shots in different years stay as two separate events; a flu shot recorded by both Cedars FHIR and the extracted PDF on the same day collapses onto one merged event.
+
+The immunization name-bridge fallback handles the case where PDF text-only records arrive after a CVX-keyed record has already been built for the same date and matching display.
+
+**Result:** Live numbers on `blake-real` (Cedars FHIR + Cedars HealthSummary PDF):
+
+| | FHIR | PDF | merged | cross-source |
+|---|---:|---:|---:|---:|
+| Allergies | 1 | 1 | **1** | **1** |
+| Immunizations | 10 | 8 | **10** | **8** |
+
+The 2 single-source immunizations are the COVID-19 Pfizer 2021 doses (in FHIR, not in the PDF — the PDF dataset starts at the 2023 booster). Every other shot — 5 flu vaccines, both MMR doses, the 2023 COVID booster, and the Tdap — merges cleanly via CVX + date.
+
+13 unit tests (4 allergies + 9 immunizations) + 2 API tests; 144 tests total now. TypeScript clean. The React HarmonizeView grew from 3 to 5 tabs in one commit.
+
+**Conclusion:** The pattern proves out for every USCDI core resource type: same matcher shape, swap the identity-priority list. Resource-type-specific design only matters when the *lifecycle* differs (Immunizations as events vs chronic-state for everything else); coding-system priorities are otherwise straight enumeration.
+
+**Next:**
+- Async extract: `POST /extract` is still synchronous; 60–90s blocks the React mutation. Background task + polling endpoint.
+- Bidirectional Provenance walk: from a DocumentReference, list every fact derived from it. Useful as a "what did this PDF actually contribute?" panel.
+- Multi-patient demo: collection registry currently has one demo + dynamic upload-derived. A reviewer who clones fresh has only the upload path. Consider a synthetic-Synthea demo collection for the empty-state experience.
 
 ---
 

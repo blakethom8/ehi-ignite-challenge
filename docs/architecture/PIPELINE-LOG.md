@@ -30,6 +30,60 @@ Each entry should be 200–500 words. Tables and code snippets welcome. **Honest
 
 ---
 
+## 2026-05-03 · Move F — page chunking unblocks Gemma-tabular on long PDFs
+
+**Agent:** Claude Opus 4.7
+
+**What:** Added page chunking to `GoogleAIStudioBackend` (default 8 pages per chunk). When a PDF exceeds the threshold, `extract()` splits the rasterized images into chunks, calls the API per chunk sequentially, merges responses with cross-chunk deduplication. Plus three follow-on fixes from real failures during the work: markdown-fence stripping (Gemma sometimes wraps JSON in `` ```json … ``` `` despite `responseMimeType=application/json`), code-based dedup signature in the merger (cross-chunk dups when the same medication appears on pages 4 and 12), and a urlopen timeout bump (180s → 600s, dense passes can legitimately take minutes).
+
+**Why:** Move B failed on the 25-page Cedars PDF with `HTTP 400 INVALID_ARGUMENT`. We needed Gemma to handle long documents to make per-pass cost optimization viable.
+
+**How:** `multipass-fhir-gemma-tabular × cedars-health-summary`, 25-page PDF, 4 chunks per Gemma pass, 600s timeout, `findable_only=True`, all 5 passes ran (2 Claude + 3 Gemma + Pass 0).
+
+**Result:**
+
+| type | findable GT | extracted | TP | precision | recall | F1 | route |
+|---|---:|---:|---:|---:|---:|---:|---|
+| condition | 19 | 3 | 3 | 1.00 | 0.16 | 0.27 | Claude |
+| medication | 7 | 7 | 6 | 0.86 | 0.86 | 0.86 | Gemma chunked |
+| allergy | 1 | 1 | 1 | 1.00 | 1.00 | 1.00 | Claude |
+| immunization | 10 | 7 | 7 | 1.00 | 0.70 | 0.82 | Gemma chunked |
+| lab | 143 | **55** | 55 | 1.00 | **0.38** | 0.56 | Gemma chunked |
+
+**Overall F1: 0.55 weighted, 352s wall-clock.**
+
+**Side-by-side vs all-Claude multipass:**
+
+| metric | all-Claude | Gemma-tabular (chunked) | delta |
+|---|---:|---:|---|
+| weighted F1 | **0.67** | 0.55 | **-12 pts** |
+| latency | **95s** | 352s | **+3.7×** |
+| est. cost / PDF | $0.30 | $0.12 | -60% |
+| medications F1 | 0.92 | 0.86 | -6 |
+| immunizations F1 | 0.89 | 0.82 | -7 |
+| **labs F1** | **0.70** | **0.56** | **-14** |
+
+**Conclusion:**
+
+1. **Chunking works at the architecture level.** Long PDFs no longer fail with HTTP 400; medications and immunizations recover proper recall via chunked Gemma. The bugs caught along the way (fence stripping, dedup, timeout) are now fixed in the framework — they'd benefit any future chunking caller.
+2. **Gemma-tabular is currently inferior on every dimension except cost.** Slower (3.7×), lower F1 (12 points), worse on the highest-volume task (labs F1 0.56 vs 0.70). Cost win is real but the latency penalty makes it unattractive for interactive workflows.
+3. **The lab gap is the dominant story.** Gemma extracted 55 of 143 labs vs Claude's 138. Likely causes: (a) chunks miss the cross-page table-continuation context Claude sees in one shot; (b) Gemma is genuinely less aggressive at extracting all rows from dense tables; (c) cross-chunk overlap loses some rows.
+4. **Real bugs caught.** The fence-stripper, the dedup signature, the urlopen timeout — all generic infrastructure improvements that benefit anyone using `GoogleAIStudioBackend` with long PDFs going forward.
+
+**Decisions made:**
+
+- **`multipass-fhir` (all-Claude) remains the default.** Gemma-tabular variant kept registered for cost-constrained workflows on small PDFs, with the `chunked-but-slow-and-lossier` caveat documented.
+- **Don't pursue parallel chunk dispatch yet** — the latency penalty is real, but parallel chunks would still be slower than all-Claude on chart documents (rate limits, sequential per-pass) and the F1 gap suggests Gemma is the wrong tool for dense tables, not just chunking.
+- **Real cost-optimization story** is probably "different model entirely" rather than "smaller model on subset of passes." Claude Haiku 4.5 might be a better experiment than Gemma 4 31B for the cost-constrained path.
+
+**Next:**
+
+- ⏳ Try `multipass-fhir-haiku` (Haiku 4.5 for tabular passes) — Anthropic's cheap tier likely outperforms Gemma 4 on document-density tasks.
+- ⏳ Investigate why Gemma's lab recall is ~50% — does it skip rows? Does the chunked extraction miss tables that span a chunk boundary?
+- ⏳ Conditions still at 0.16 recall with 16 findable misses. Real prompt-tuning room exists; on the backlog after we know what other architectures look like.
+
+---
+
 ## 2026-05-03 · Move D — findable-in-PDF GT filter
 
 **Agent:** Claude Opus 4.7

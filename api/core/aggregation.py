@@ -14,7 +14,7 @@ import uuid
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import BinaryIO
+from typing import Any, BinaryIO
 
 from api.core.loader import load_patient, patient_display_name, path_from_patient_id
 from api.core.patient_context import private_cedars_available
@@ -23,11 +23,14 @@ from api.models import (
     AggregationDeleteResponse,
     AggregationCleaningQueueResponse,
     AggregationEnvironmentResponse,
+    AggregationPreparedPreviewItem,
+    AggregationPreparedPreviewResponse,
     AggregationReadinessItem,
     AggregationReadinessResponse,
     AggregationSourceCard,
     AggregationUploadedFile,
     AggregationUploadResponse,
+    PatientListItem,
 )
 
 
@@ -66,6 +69,11 @@ def _upload_file_path(patient_id: str, upload: AggregationUploadedFile) -> Path:
     return _patient_root(patient_id) / f"{upload.file_id}-{upload.file_name}"
 
 
+def _derived_extraction_path(file_path: Path) -> Path:
+    """Return the conventional extracted-bundle path for an uploaded source file."""
+    return file_path.with_suffix(file_path.suffix + ".extracted.json")
+
+
 def _infer_confidence(upload: AggregationUploadedFile) -> str:
     name = upload.file_name.lower()
     if upload.content_type in {"application/json", "text/csv"} or name.endswith((".json", ".ndjson", ".csv")):
@@ -75,6 +83,47 @@ def _infer_confidence(upload: AggregationUploadedFile) -> str:
     if name.endswith((".jpg", ".jpeg", ".png", ".heic")):
         return "low"
     return "unknown"
+
+
+def _with_processing_state(patient_id: str, upload: AggregationUploadedFile) -> AggregationUploadedFile:
+    """Decorate stored upload metadata with derived processing status.
+
+    Metadata files are intentionally simple and durable. Processing state is
+    computed from the file and derived artifacts on disk so re-extraction,
+    deletion, and manual cache writes are reflected without rewriting every
+    metadata sidecar.
+    """
+    file_path = _upload_file_path(patient_id, upload)
+    name = upload.file_name.lower()
+    content_type = upload.content_type.lower()
+    derived: list[str] = []
+
+    if name.endswith((".json", ".ndjson")) or content_type in {"application/json", "application/fhir+json"}:
+        parse_status = "structured"
+        next_step = "Ready for harmonization as structured source data."
+    elif name.endswith(".pdf") or content_type == "application/pdf":
+        extracted_path = _derived_extraction_path(file_path)
+        if extracted_path.exists():
+            parse_status = "extracted"
+            derived.append(str(extracted_path))
+            next_step = "Extracted candidate facts are ready for harmonization review."
+        else:
+            parse_status = "ready_to_extract"
+            next_step = "Run PDF extraction before this file contributes structured facts."
+    elif name.endswith((".xml", ".csv", ".txt")) or content_type in {"text/csv", "text/xml", "application/xml"}:
+        parse_status = "stored"
+        next_step = "Stored as source material; parser support is planned for this format."
+    else:
+        parse_status = "unsupported"
+        next_step = "Stored locally, but this file type cannot be parsed yet."
+
+    return upload.model_copy(
+        update={
+            "parse_status": parse_status,
+            "next_step": next_step,
+            "derived_artifacts": derived,
+        }
+    )
 
 
 def _source_card_for_upload(upload: AggregationUploadedFile) -> AggregationSourceCard:
@@ -110,10 +159,287 @@ def _load_uploaded_files(patient_id: str) -> list[AggregationUploadedFile]:
     files: list[AggregationUploadedFile] = []
     for path in sorted(root.glob("*.metadata.json")):
         try:
-            files.append(AggregationUploadedFile.model_validate(json.loads(path.read_text(encoding="utf-8"))))
+            upload = AggregationUploadedFile.model_validate(json.loads(path.read_text(encoding="utf-8")))
+            files.append(_with_processing_state(patient_id, upload))
         except (OSError, json.JSONDecodeError, ValueError):
             continue
     return files
+
+
+def list_upload_workspaces() -> list[PatientListItem]:
+    """Expose upload-backed workspaces to the global patient/workspace picker.
+
+    Synthea patients come from the corpus catalog. Upload sessions are local
+    workspaces keyed by the same patient id used by Source Intake, so surfacing
+    them here lets the selector drive Source Intake and Harmonized Record from
+    the same top-level context.
+    """
+    if not STORE_ROOT.exists():
+        return []
+
+    items: list[PatientListItem] = []
+    for session_dir in sorted(STORE_ROOT.iterdir()):
+        if not session_dir.is_dir():
+            continue
+        uploads = _load_uploaded_files(session_dir.name)
+        if not uploads:
+            continue
+        prepared = sum(1 for upload in uploads if upload.parse_status in {"structured", "extracted"})
+        label = _patient_label(session_dir.name)
+        if label == session_dir.name:
+            label = f"Uploaded workspace · {session_dir.name[:8]}"
+        items.append(
+            PatientListItem(
+                id=session_dir.name,
+                name=label,
+                age_years=0,
+                gender="workspace",
+                complexity_tier="upload",
+                complexity_score=0,
+                total_resources=sum(1 for _ in uploads),
+                encounter_count=0,
+                active_condition_count=0,
+                active_med_count=0,
+                workspace_type="upload",
+                source_count=len(uploads),
+                prepared_source_count=prepared,
+            )
+        )
+    return items
+
+
+def _load_upload(patient_id: str, file_id: str) -> AggregationUploadedFile:
+    metadata = _upload_metadata_path(patient_id, file_id)
+    if not metadata.exists():
+        raise FileNotFoundError(file_id)
+    upload = AggregationUploadedFile.model_validate(json.loads(metadata.read_text(encoding="utf-8")))
+    return _with_processing_state(patient_id, upload)
+
+
+def _coding_display(resource: dict) -> str:
+    code = resource.get("code")
+    if isinstance(code, dict):
+        if isinstance(code.get("text"), str) and code["text"]:
+            return code["text"]
+        coding = code.get("coding")
+        if isinstance(coding, list):
+            for item in coding:
+                if isinstance(item, dict) and item.get("display"):
+                    return str(item["display"])
+    if resource.get("display"):
+        return str(resource["display"])
+    return str(resource.get("resourceType") or "FHIR resource")
+
+
+def _resource_value(resource: dict) -> str:
+    value_quantity = resource.get("valueQuantity")
+    if isinstance(value_quantity, dict):
+        value = value_quantity.get("value")
+        unit = value_quantity.get("unit") or value_quantity.get("code") or ""
+        return f"{value} {unit}".strip() if value is not None else str(unit)
+    value_string = resource.get("valueString")
+    if value_string:
+        return str(value_string)
+    value_codeable = resource.get("valueCodeableConcept")
+    if isinstance(value_codeable, dict):
+        return str(value_codeable.get("text") or "")
+    return ""
+
+
+def _resource_date(resource: dict) -> str:
+    for key in ("effectiveDateTime", "issued", "authoredOn", "recordedDate", "occurrenceDateTime", "onsetDateTime"):
+        value = resource.get(key)
+        if value:
+            return str(value)
+    return ""
+
+
+def _date_sort_key(value: str) -> tuple[int, str]:
+    if not value:
+        return (1, "")
+    candidate = value.strip()
+    try:
+        parsed = datetime.fromisoformat(candidate.replace("Z", "+00:00"))
+        return (0, parsed.isoformat())
+    except ValueError:
+        return (0, candidate)
+
+
+def _resource_date_range(resources: list[dict]) -> tuple[str, str]:
+    dates = sorted(
+        (_resource_date(resource) for resource in resources),
+        key=_date_sort_key,
+    )
+    dates = [date for date in dates if date]
+    if not dates:
+        return "", ""
+    return dates[0], dates[-1]
+
+
+def _json_preview(payload: object, resources: list[dict]) -> dict[str, Any] | None:
+    preview_count = min(3, len(resources))
+    if isinstance(payload, dict) and payload.get("resourceType") == "Bundle":
+        entries = payload.get("entry") if isinstance(payload.get("entry"), list) else []
+        return {
+            "resourceType": "Bundle",
+            "type": payload.get("type"),
+            "total": payload.get("total") or len(resources),
+            "entry": entries[:preview_count],
+            "_preview": {
+                "shown_entries": min(preview_count, len(entries)),
+                "total_resources": len(resources),
+                "truncated": len(entries) > preview_count,
+            },
+        }
+    if isinstance(payload, dict) and isinstance(payload.get("fhir"), dict):
+        grouped: dict[str, list[dict]] = {}
+        for resource in resources[:preview_count]:
+            resource_type = str(resource.get("resourceType") or "Unknown")
+            grouped.setdefault(resource_type, []).append(resource)
+        return {
+            "fhir": grouped,
+            "_preview": {
+                "shown_resources": preview_count,
+                "total_resources": len(resources),
+                "truncated": len(resources) > preview_count,
+            },
+        }
+    if resources:
+        return {
+            "resources": resources[:preview_count],
+            "_preview": {
+                "shown_resources": preview_count,
+                "total_resources": len(resources),
+                "truncated": len(resources) > preview_count,
+            },
+        }
+    return None
+
+
+def _iter_prepared_resources(payload: object) -> list[dict]:
+    if isinstance(payload, dict) and payload.get("resourceType") == "Bundle":
+        resources: list[dict] = []
+        for entry in payload.get("entry", []):
+            if isinstance(entry, dict) and isinstance(entry.get("resource"), dict):
+                resources.append(entry["resource"])
+        return resources
+
+    if isinstance(payload, dict) and isinstance(payload.get("fhir"), dict):
+        resources = []
+        for values in payload["fhir"].values():
+            if isinstance(values, list):
+                resources.extend(item for item in values if isinstance(item, dict))
+        return resources
+
+    if isinstance(payload, list):
+        resources = []
+        for item in payload:
+            if isinstance(item, dict) and isinstance(item.get("resource"), dict):
+                resources.append(item["resource"])
+            elif isinstance(item, dict) and item.get("resourceType"):
+                resources.append(item)
+        return resources
+
+    if isinstance(payload, dict) and payload.get("resourceType"):
+        return [payload]
+
+    return []
+
+
+def _preview_from_payload(
+    patient_id: str,
+    upload: AggregationUploadedFile,
+    payload: object,
+    *,
+    output_type: str,
+    message: str,
+) -> AggregationPreparedPreviewResponse:
+    resources = _iter_prepared_resources(payload)
+    counts = Counter(str(resource.get("resourceType") or "Unknown") for resource in resources)
+    date_start, date_end = _resource_date_range(resources)
+    preview_items = [
+        AggregationPreparedPreviewItem(
+            resource_type=str(resource.get("resourceType") or "Unknown"),
+            label=_coding_display(resource),
+            value=_resource_value(resource),
+            date=_resource_date(resource),
+            status=str(resource.get("status") or ""),
+        )
+        for resource in resources[:8]
+    ]
+    return AggregationPreparedPreviewResponse(
+        patient_id=patient_id,
+        file_id=upload.file_id,
+        file_name=upload.file_name,
+        parse_status=upload.parse_status,
+        output_type=output_type,
+        total_resources=len(resources),
+        resource_counts=dict(sorted(counts.items())),
+        artifact_paths=upload.derived_artifacts,
+        date_start=date_start,
+        date_end=date_end,
+        json_preview=_json_preview(payload, resources),
+        preview_items=preview_items,
+        message=message,
+    )
+
+
+def upload_preview(patient_id: str, file_id: str) -> AggregationPreparedPreviewResponse:
+    upload = _load_upload(patient_id, file_id)
+
+    if upload.parse_status == "extracted" and upload.derived_artifacts:
+        artifact = Path(upload.derived_artifacts[0])
+        if artifact.exists():
+            payload = json.loads(artifact.read_text(encoding="utf-8"))
+            return _preview_from_payload(
+                patient_id,
+                upload,
+                payload,
+                output_type="Extracted FHIR candidate bundle",
+                message="PDF extraction has produced candidate FHIR resources for harmonization review.",
+            )
+
+    if upload.parse_status == "structured":
+        source_path = _upload_file_path(patient_id, upload)
+        if source_path.exists():
+            payload = json.loads(source_path.read_text(encoding="utf-8"))
+            return _preview_from_payload(
+                patient_id,
+                upload,
+                payload,
+                output_type="Structured source resources",
+                message="Structured data is ready to feed the harmonized record.",
+            )
+
+    return AggregationPreparedPreviewResponse(
+        patient_id=patient_id,
+        file_id=upload.file_id,
+        file_name=upload.file_name,
+        parse_status=upload.parse_status,
+        output_type="No prepared output yet",
+        artifact_paths=upload.derived_artifacts,
+        message=upload.next_step or "This source has not produced structured preview data yet.",
+    )
+
+
+def upload_prepared_json(patient_id: str, file_id: str) -> dict[str, Any]:
+    upload = _load_upload(patient_id, file_id)
+
+    if upload.parse_status == "extracted" and upload.derived_artifacts:
+        artifact = Path(upload.derived_artifacts[0])
+        if artifact.exists():
+            payload = json.loads(artifact.read_text(encoding="utf-8"))
+            if isinstance(payload, dict):
+                return payload
+
+    if upload.parse_status == "structured":
+        source_path = _upload_file_path(patient_id, upload)
+        if source_path.exists():
+            payload = json.loads(source_path.read_text(encoding="utf-8"))
+            if isinstance(payload, dict):
+                return payload
+
+    raise FileNotFoundError(f"No prepared JSON exists for upload {file_id}")
 
 
 def _resource_counts(patient_id: str) -> dict[str, int]:
@@ -515,10 +841,11 @@ def save_upload(
         encoding="utf-8",
     )
 
+    upload_with_state = _with_processing_state(patient_id, upload)
     return AggregationUploadResponse(
-        file=upload,
+        file=upload_with_state,
         storage_posture="Stored locally under ignored data/aggregation-uploads/. Not merged into chart facts.",
-        source_card=_source_card_for_upload(upload),
+        source_card=_source_card_for_upload(upload_with_state),
     )
 
 
@@ -528,6 +855,7 @@ def delete_upload(patient_id: str, file_id: str) -> AggregationDeleteResponse:
         raise FileNotFoundError(f"Uploaded file not found: {file_id}")
     upload = AggregationUploadedFile.model_validate(json.loads(metadata.read_text(encoding="utf-8")))
     file_path = _upload_file_path(patient_id, upload)
+    _derived_extraction_path(file_path).unlink(missing_ok=True)
     file_path.unlink(missing_ok=True)
     metadata.unlink(missing_ok=True)
     return AggregationDeleteResponse(deleted=True, file_id=file_id)

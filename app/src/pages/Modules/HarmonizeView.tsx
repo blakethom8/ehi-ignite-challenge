@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import {
   Activity,
   AlertTriangle,
+  CheckCircle2,
   FileText,
   FileUp,
   Inbox,
@@ -17,6 +18,7 @@ import {
   Stethoscope,
   Syringe,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { api } from "../../api/client";
 import type {
   HarmonizeMergedAllergy,
@@ -34,8 +36,18 @@ type ResourceTab =
   | "allergies"
   | "immunizations";
 
+type WorkspaceTab =
+  | "record"
+  | "review"
+  | "sources"
+  | "provenance";
+
 function cls(...parts: (string | false | null | undefined)[]): string {
   return parts.filter(Boolean).join(" ");
+}
+
+function safeUploadSessionId(value: string): string {
+  return value.replace(/[^A-Za-z0-9_.-]+/g, "-").replace(/^[.-]+|[.-]+$/g, "").slice(0, 120) || "patient";
 }
 
 /** Source kind → small badge label/color. */
@@ -43,6 +55,13 @@ function kindBadge(kind: string): { label: string; color: string } {
   if (kind === "fhir-pull") return { label: "FHIR pull", color: "bg-emerald-100 text-emerald-800" };
   if (kind === "extracted-pdf") return { label: "PDF extraction", color: "bg-amber-100 text-amber-800" };
   return { label: kind, color: "bg-slate-100 text-slate-700" };
+}
+
+function sourceStatusClass(status: string): string {
+  if (status === "structured" || status === "extracted") return "bg-emerald-100 text-emerald-800";
+  if (status === "pending_extraction") return "bg-amber-100 text-amber-800";
+  if (status === "empty_extraction" || status === "unparsed_structured") return "bg-amber-100 text-amber-800";
+  return "bg-red-50 text-red-700";
 }
 
 function MetricCard({
@@ -55,15 +74,71 @@ function MetricCard({
   detail?: string;
 }) {
   return (
-    <div className="rounded-xl bg-white p-4 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+    <div className="rounded-lg border border-[#dfe4ea] bg-[#f7f9fc] px-3 py-2.5">
       <p className="text-xs font-semibold uppercase tracking-wider text-[#667085]">{label}</p>
-      <p className="mt-2 text-2xl font-semibold text-[#1c1c1e]">{value}</p>
-      {detail && <p className="mt-1 text-sm leading-5 text-[#667085]">{detail}</p>}
+      <p className="mt-1 text-xl font-semibold text-[#1c1c1e]">{value}</p>
+      {detail && <p className="mt-0.5 text-xs leading-5 text-[#667085]">{detail}</p>}
     </div>
   );
 }
 
-function SourcesPanel({ collectionId }: { collectionId: string }) {
+const workspaceTabs: {
+  id: WorkspaceTab;
+  label: string;
+  icon: LucideIcon;
+}[] = [
+  { id: "record", label: "Record", icon: Layers3 },
+  { id: "review", label: "Review Queue", icon: AlertTriangle },
+  { id: "sources", label: "Source Contributions", icon: FileText },
+  { id: "provenance", label: "Provenance", icon: Link2 },
+];
+
+function WorkspaceTabs({
+  active,
+  onChange,
+}: {
+  active: WorkspaceTab;
+  onChange: (tab: WorkspaceTab) => void;
+}) {
+  return (
+    <div className="overflow-hidden rounded-lg border border-[#dfe4ea] bg-white">
+      <div className="flex flex-wrap items-center gap-1 border-b border-[#eef0f4] px-3 py-2">
+        {workspaceTabs.map((item) => {
+          const Icon = item.icon;
+          const selected = active === item.id;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => onChange(item.id)}
+              className={cls(
+                "inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-colors",
+                selected
+                  ? "bg-[#eef2ff] text-[#5b76fe]"
+                  : "text-[#667085] hover:bg-[#f7f9fc] hover:text-[#1c1c1e]",
+              )}
+            >
+              <Icon size={14} />
+              {item.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function SourcesPanel({
+  collectionId,
+  canExtract = false,
+  extractInProgress = false,
+  onExtract,
+}: {
+  collectionId: string;
+  canExtract?: boolean;
+  extractInProgress?: boolean;
+  onExtract?: () => void;
+}) {
   const [selectedDocRef, setSelectedDocRef] = useState<string | null>(null);
   const [selectedSourceLabel, setSelectedSourceLabel] = useState<string | null>(null);
 
@@ -84,24 +159,77 @@ function SourcesPanel({ collectionId }: { collectionId: string }) {
   const diffByLabel = new Map(
     (diffQuery.data?.sources ?? []).map((s) => [s.label, s]),
   );
+  const staged = data.sources.length;
+  const structured = data.sources.filter((s) => s.status === "structured").length;
+  const extracted = data.sources.filter((s) => s.status === "extracted").length;
+  const pending = data.sources.filter((s) => s.status === "pending_extraction").length;
+  const failures = data.sources.filter((s) => s.status === "missing").length;
+  const sourceContributions = diffQuery.data?.sources.reduce(
+    (sum, source) => sum + source.totals.unique.all + source.totals.shared.all,
+    0,
+  ) ?? 0;
 
   return (
-    <div className="rounded-2xl bg-white p-5 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
-      <div className="mb-3 flex items-center gap-2">
-        <FileText size={16} className="text-[#5b76fe]" />
-        <h3 className="text-sm font-semibold text-[#1c1c1e]">
-          Sources in this collection
-        </h3>
-        <span className="ml-2 text-xs text-[#a5a8b5]">
-          (click a row to see what it contributed)
-        </span>
+    <div className="rounded-lg border border-[#dfe4ea] bg-white p-4">
+      <div className="mb-4 rounded-lg border border-[#dfe4ea] bg-[#f7f9fc] px-3 py-2.5">
+        <div className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-5">
+          {[
+            ["Files staged", staged, "Sources in collection"],
+            ["Structured", structured, "FHIR-like ready"],
+            ["Prepared PDFs", extracted, "Candidate facts"],
+            ["Needs prep", pending, "Waiting on extraction"],
+            ["Contributions", diffQuery.isLoading ? "…" : sourceContributions, `${failures} source issues`],
+          ].map(([label, value, detail]) => (
+            <div key={label} className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-wider text-[#667085]">{label}</p>
+              <p className="mt-1 text-xl font-semibold text-[#1c1c1e]">{value}</p>
+              <p className="mt-0.5 truncate text-xs text-[#8d92a3]">{detail}</p>
+            </div>
+          ))}
+        </div>
       </div>
-      <div className="overflow-x-auto rounded-xl border border-[#dfe4ea]">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <FileText size={16} className="text-[#5b76fe]" />
+          <h3 className="text-sm font-semibold text-[#1c1c1e]">
+            Sources in this collection
+          </h3>
+          <span className="ml-2 text-xs text-[#a5a8b5]">
+            (click a row to see what it contributed)
+          </span>
+        </div>
+        {canExtract && pending > 0 && onExtract && (
+          <button
+            type="button"
+            disabled={extractInProgress}
+            onClick={onExtract}
+            className={cls(
+              "inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
+              extractInProgress
+                ? "bg-[#dfe4ea] text-[#667085]"
+                : "bg-[#5b76fe] text-white hover:bg-[#4760e8]",
+            )}
+          >
+            {extractInProgress ? (
+              <>
+                <Loader2 size={14} className="animate-spin" />
+                Preparing…
+              </>
+            ) : (
+              <>
+                <Sparkles size={14} /> Prepare pending sources
+              </>
+            )}
+          </button>
+        )}
+      </div>
+      <div className="overflow-x-auto rounded-lg border border-[#dfe4ea]">
         <table className="w-full text-sm">
           <thead className="bg-[#f7f9fc] text-left text-xs font-semibold uppercase tracking-wider text-[#667085]">
             <tr>
               <th className="px-4 py-2">Source</th>
               <th className="px-4 py-2 hidden sm:table-cell">Kind</th>
+              <th className="px-4 py-2 hidden md:table-cell">Status</th>
               <th
                 className="px-4 py-2 text-right"
                 title="Facts only this source contributed — the high-signal set"
@@ -156,6 +284,11 @@ function SourcesPanel({ collectionId }: { collectionId: string }) {
                       {badge.label}
                     </span>
                   </td>
+                  <td className="px-4 py-2 hidden md:table-cell">
+                    <span className={cls("rounded-full px-2 py-0.5 text-xs font-medium", sourceStatusClass(s.status))}>
+                      {s.status_label || s.status.replace("_", " ")}
+                    </span>
+                  </td>
                   <td
                     className={cls(
                       "px-4 py-2 text-right tabular-nums",
@@ -192,6 +325,76 @@ function SourcesPanel({ collectionId }: { collectionId: string }) {
         />
       )}
     </div>
+  );
+}
+
+function ReviewQueuePanel({ collectionId }: { collectionId: string }) {
+  const sourcesQuery = useQuery({
+    queryKey: ["harmonize-sources", collectionId],
+    queryFn: () => api.getHarmonizeSources(collectionId),
+    enabled: !!collectionId,
+  });
+  const observationsQuery = useQuery({
+    queryKey: ["harmonize-observations", collectionId, "review"],
+    queryFn: () => api.getHarmonizeObservations(collectionId, false),
+    enabled: !!collectionId,
+  });
+
+  const sources = sourcesQuery.data?.sources ?? [];
+  const sourceIssues = sources.filter(
+    (source) =>
+      source.status !== "structured" &&
+      source.status !== "extracted",
+  );
+  const labConflicts =
+    observationsQuery.data?.merged.filter((item) => item.has_conflict).length ?? 0;
+  const crossSourceLabs = observationsQuery.data?.cross_source ?? 0;
+  const reviewItems = sourceIssues.length + labConflicts;
+  const isLoading = sourcesQuery.isLoading || observationsQuery.isLoading;
+
+  return (
+    <section className="rounded-lg border border-[#dfe4ea] bg-white p-4">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            {reviewItems > 0 ? (
+              <AlertTriangle size={16} className="text-amber-600" />
+            ) : (
+              <CheckCircle2 size={16} className="text-emerald-600" />
+            )}
+            <h2 className="text-sm font-semibold text-[#1c1c1e]">Review queue</h2>
+          </div>
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-[#667085]">
+            Review is part of the harmonized record. It only fills up when a
+            source cannot be prepared, a PDF needs extraction, or a merged fact
+            has a conflict that needs human judgment.
+          </p>
+        </div>
+        <div className="grid min-w-full gap-2 sm:grid-cols-3 lg:min-w-[520px]">
+          <MetricCard
+            label="Open review"
+            value={isLoading ? "…" : reviewItems}
+            detail="Blocking source or fact issues"
+          />
+          <MetricCard
+            label="Lab conflicts"
+            value={isLoading ? "…" : labConflicts}
+            detail="Same-day value spread"
+          />
+          <MetricCard
+            label="Shared facts"
+            value={isLoading ? "…" : crossSourceLabs}
+            detail="Cross-source evidence"
+          />
+        </div>
+      </div>
+      {!isLoading && sourceIssues.length > 0 && (
+        <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          {sourceIssues.length} source{sourceIssues.length === 1 ? "" : "s"} need
+          attention before this collection is publish-ready.
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -470,8 +673,191 @@ function ProvenancePanel({
   );
 }
 
+function RecordWorkspace({
+  collectionId,
+  tab,
+  onTabChange,
+}: {
+  collectionId: string;
+  tab: ResourceTab;
+  onTabChange: (tab: ResourceTab) => void;
+}) {
+  return (
+    <div className="overflow-hidden rounded-lg border border-[#dfe4ea] bg-white">
+      <div className="flex flex-wrap items-center gap-2 border-b border-[#eef0f4] px-4">
+        <button
+          type="button"
+          onClick={() => onTabChange("labs")}
+          className={cls(
+            "flex items-center gap-2 border-b-2 px-3 py-3 text-sm font-medium",
+            tab === "labs"
+              ? "border-[#5b76fe] text-[#5b76fe]"
+              : "border-transparent text-[#667085] hover:text-[#1c1c1e]",
+          )}
+        >
+          <Activity size={14} />
+          Labs
+        </button>
+        <button
+          type="button"
+          onClick={() => onTabChange("conditions")}
+          className={cls(
+            "flex items-center gap-2 border-b-2 px-3 py-3 text-sm font-medium",
+            tab === "conditions"
+              ? "border-[#5b76fe] text-[#5b76fe]"
+              : "border-transparent text-[#667085] hover:text-[#1c1c1e]",
+          )}
+        >
+          <Stethoscope size={14} />
+          Conditions
+        </button>
+        <button
+          type="button"
+          onClick={() => onTabChange("medications")}
+          className={cls(
+            "flex items-center gap-2 border-b-2 px-3 py-3 text-sm font-medium",
+            tab === "medications"
+              ? "border-[#5b76fe] text-[#5b76fe]"
+              : "border-transparent text-[#667085] hover:text-[#1c1c1e]",
+          )}
+        >
+          <Pill size={14} />
+          Medications
+        </button>
+        <button
+          type="button"
+          onClick={() => onTabChange("allergies")}
+          className={cls(
+            "flex items-center gap-2 border-b-2 px-3 py-3 text-sm font-medium",
+            tab === "allergies"
+              ? "border-[#5b76fe] text-[#5b76fe]"
+              : "border-transparent text-[#667085] hover:text-[#1c1c1e]",
+          )}
+        >
+          <ShieldAlert size={14} />
+          Allergies
+        </button>
+        <button
+          type="button"
+          onClick={() => onTabChange("immunizations")}
+          className={cls(
+            "flex items-center gap-2 border-b-2 px-3 py-3 text-sm font-medium",
+            tab === "immunizations"
+              ? "border-[#5b76fe] text-[#5b76fe]"
+              : "border-transparent text-[#667085] hover:text-[#1c1c1e]",
+          )}
+        >
+          <Syringe size={14} />
+          Immunizations
+        </button>
+      </div>
+      <div className="p-5">
+        {tab === "labs" ? (
+          <LabsTab collectionId={collectionId} />
+        ) : tab === "conditions" ? (
+          <ConditionsTab collectionId={collectionId} />
+        ) : tab === "medications" ? (
+          <MedicationsTab collectionId={collectionId} />
+        ) : tab === "allergies" ? (
+          <AllergiesTab collectionId={collectionId} />
+        ) : (
+          <ImmunizationsTab collectionId={collectionId} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ProvenanceWorkspace({ collectionId }: { collectionId: string }) {
+  const [selectedRef, setSelectedRef] = useState<string | null>(null);
+  const { data, isLoading } = useQuery({
+    queryKey: ["harmonize-observations", collectionId, "provenance"],
+    queryFn: () => api.getHarmonizeObservations(collectionId, false),
+    enabled: !!collectionId,
+  });
+
+  const facts: HarmonizeMergedObservation[] = data?.merged ?? [];
+  const selected = useMemo(
+    () => facts.find((item) => item.merged_ref === selectedRef) ?? facts[0] ?? null,
+    [facts, selectedRef],
+  );
+
+  useEffect(() => {
+    if (!selectedRef && selected?.merged_ref) setSelectedRef(selected.merged_ref);
+  }, [selected?.merged_ref, selectedRef]);
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-[minmax(0,420px)_1fr]">
+      <section className="rounded-lg border border-[#dfe4ea] bg-white">
+        <div className="border-b border-[#eef0f4] px-4 py-3">
+          <p className="text-sm font-semibold text-[#1c1c1e]">Canonical facts</p>
+          <p className="mt-1 text-xs leading-5 text-[#667085]">
+            Select a merged lab fact to inspect the FHIR Provenance edges. Other
+            resource types can use this same pattern as the provenance UI matures.
+          </p>
+        </div>
+        {isLoading ? (
+          <p className="p-4 text-sm text-[#667085]">Loading canonical facts…</p>
+        ) : facts.length === 0 ? (
+          <p className="p-4 text-sm text-[#667085]">No facts available for provenance review.</p>
+        ) : (
+          <div className="max-h-[620px] overflow-y-auto">
+            {facts.slice(0, 80).map((fact) => {
+              const selectedFact = selected?.merged_ref === fact.merged_ref;
+              return (
+                <button
+                  key={fact.merged_ref ?? fact.canonical_name}
+                  type="button"
+                  onClick={() => setSelectedRef(fact.merged_ref)}
+                  className={cls(
+                    "block w-full border-b border-[#eef0f4] px-4 py-3 text-left last:border-b-0 hover:bg-[#f7f9fc]",
+                    selectedFact && "bg-[#eef2ff]",
+                  )}
+                >
+                  <span className="block truncate text-sm font-semibold text-[#1c1c1e]">
+                    {fact.canonical_name}
+                  </span>
+                  <span className="mt-1 block text-xs text-[#667085]">
+                    {fact.source_count} source{fact.source_count === 1 ? "" : "s"}
+                    {fact.loinc_code ? ` · LOINC ${fact.loinc_code}` : ""}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      <section className="rounded-lg border border-[#dfe4ea] bg-white p-4">
+        <div className="mb-4">
+          <p className="text-xs font-semibold uppercase tracking-wider text-[#5b76fe]">
+            Provenance lineage
+          </p>
+          <h2 className="mt-1 text-lg font-semibold text-[#1c1c1e]">
+            {selected?.canonical_name ?? "Select a canonical fact"}
+          </h2>
+        </div>
+        <ProvenancePanel
+          collectionId={collectionId}
+          mergedRef={selected?.merged_ref ?? null}
+        />
+      </section>
+    </div>
+  );
+}
+
+function useCrossSourceFilter(collectionId: string) {
+  const [crossOnly, setCrossOnly] = useState(() => !collectionId.startsWith("upload-"));
+
+  useEffect(() => {
+    setCrossOnly(!collectionId.startsWith("upload-"));
+  }, [collectionId]);
+
+  return [crossOnly, setCrossOnly] as const;
+}
+
 function LabsTab({ collectionId }: { collectionId: string }) {
-  const [crossOnly, setCrossOnly] = useState(true);
+  const [crossOnly, setCrossOnly] = useCrossSourceFilter(collectionId);
   const [selectedRef, setSelectedRef] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
@@ -522,7 +908,7 @@ function LabsTab({ collectionId }: { collectionId: string }) {
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="lg:col-span-2 overflow-hidden rounded-2xl bg-white shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+        <div className="lg:col-span-2 overflow-hidden rounded-lg border border-[#dfe4ea] bg-white">
           {isLoading ? (
             <p className="p-6 text-sm text-[#667085]">Loading labs…</p>
           ) : merged.length === 0 ? (
@@ -586,7 +972,7 @@ function LabsTab({ collectionId }: { collectionId: string }) {
         </div>
 
         <div className="space-y-4">
-          <div className="rounded-2xl bg-white p-4 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+          <div className="rounded-lg border border-[#dfe4ea] bg-white p-3">
             <h4 className="text-sm font-semibold text-[#1c1c1e]">
               {selected?.canonical_name ?? "—"}
             </h4>
@@ -615,7 +1001,7 @@ function LabsTab({ collectionId }: { collectionId: string }) {
               </ul>
             )}
           </div>
-          <div className="rounded-2xl bg-white p-4 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+          <div className="rounded-lg border border-[#dfe4ea] bg-white p-3">
             <h4 className="mb-2 text-sm font-semibold text-[#1c1c1e]">
               Provenance lineage
             </h4>
@@ -631,7 +1017,7 @@ function LabsTab({ collectionId }: { collectionId: string }) {
 }
 
 function ConditionsTab({ collectionId }: { collectionId: string }) {
-  const [crossOnly, setCrossOnly] = useState(true);
+  const [crossOnly, setCrossOnly] = useCrossSourceFilter(collectionId);
   const [selectedRef, setSelectedRef] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
@@ -682,7 +1068,7 @@ function ConditionsTab({ collectionId }: { collectionId: string }) {
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="lg:col-span-2 overflow-hidden rounded-2xl bg-white shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+        <div className="lg:col-span-2 overflow-hidden rounded-lg border border-[#dfe4ea] bg-white">
           {isLoading ? (
             <p className="p-6 text-sm text-[#667085]">Loading conditions…</p>
           ) : merged.length === 0 ? (
@@ -742,7 +1128,7 @@ function ConditionsTab({ collectionId }: { collectionId: string }) {
         </div>
 
         <div className="space-y-4">
-          <div className="rounded-2xl bg-white p-4 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+          <div className="rounded-lg border border-[#dfe4ea] bg-white p-3">
             <h4 className="text-sm font-semibold text-[#1c1c1e]">
               {selected?.canonical_name ?? "—"}
             </h4>
@@ -781,7 +1167,7 @@ function ConditionsTab({ collectionId }: { collectionId: string }) {
               </ul>
             )}
           </div>
-          <div className="rounded-2xl bg-white p-4 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+          <div className="rounded-lg border border-[#dfe4ea] bg-white p-3">
             <h4 className="mb-2 text-sm font-semibold text-[#1c1c1e]">
               Provenance lineage
             </h4>
@@ -797,7 +1183,7 @@ function ConditionsTab({ collectionId }: { collectionId: string }) {
 }
 
 function MedicationsTab({ collectionId }: { collectionId: string }) {
-  const [crossOnly, setCrossOnly] = useState(true);
+  const [crossOnly, setCrossOnly] = useCrossSourceFilter(collectionId);
   const [selectedRef, setSelectedRef] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
@@ -848,7 +1234,7 @@ function MedicationsTab({ collectionId }: { collectionId: string }) {
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="lg:col-span-2 overflow-hidden rounded-2xl bg-white shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+        <div className="lg:col-span-2 overflow-hidden rounded-lg border border-[#dfe4ea] bg-white">
           {isLoading ? (
             <p className="p-6 text-sm text-[#667085]">Loading medications…</p>
           ) : merged.length === 0 ? (
@@ -907,7 +1293,7 @@ function MedicationsTab({ collectionId }: { collectionId: string }) {
         </div>
 
         <div className="space-y-4">
-          <div className="rounded-2xl bg-white p-4 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+          <div className="rounded-lg border border-[#dfe4ea] bg-white p-3">
             <h4 className="text-sm font-semibold text-[#1c1c1e]">
               {selected?.canonical_name ?? "—"}
             </h4>
@@ -945,7 +1331,7 @@ function MedicationsTab({ collectionId }: { collectionId: string }) {
               </ul>
             )}
           </div>
-          <div className="rounded-2xl bg-white p-4 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+          <div className="rounded-lg border border-[#dfe4ea] bg-white p-3">
             <h4 className="mb-2 text-sm font-semibold text-[#1c1c1e]">
               Provenance lineage
             </h4>
@@ -961,7 +1347,7 @@ function MedicationsTab({ collectionId }: { collectionId: string }) {
 }
 
 function AllergiesTab({ collectionId }: { collectionId: string }) {
-  const [crossOnly, setCrossOnly] = useState(true);
+  const [crossOnly, setCrossOnly] = useCrossSourceFilter(collectionId);
   const [selectedRef, setSelectedRef] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
@@ -1012,7 +1398,7 @@ function AllergiesTab({ collectionId }: { collectionId: string }) {
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="lg:col-span-2 overflow-hidden rounded-2xl bg-white shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+        <div className="lg:col-span-2 overflow-hidden rounded-lg border border-[#dfe4ea] bg-white">
           {isLoading ? (
             <p className="p-6 text-sm text-[#667085]">Loading allergies…</p>
           ) : merged.length === 0 ? (
@@ -1074,7 +1460,7 @@ function AllergiesTab({ collectionId }: { collectionId: string }) {
         </div>
 
         <div className="space-y-4">
-          <div className="rounded-2xl bg-white p-4 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+          <div className="rounded-lg border border-[#dfe4ea] bg-white p-3">
             <h4 className="text-sm font-semibold text-[#1c1c1e]">
               {selected?.canonical_name ?? "—"}
             </h4>
@@ -1100,7 +1486,7 @@ function AllergiesTab({ collectionId }: { collectionId: string }) {
               </ul>
             )}
           </div>
-          <div className="rounded-2xl bg-white p-4 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+          <div className="rounded-lg border border-[#dfe4ea] bg-white p-3">
             <h4 className="mb-2 text-sm font-semibold text-[#1c1c1e]">
               Provenance lineage
             </h4>
@@ -1116,7 +1502,7 @@ function AllergiesTab({ collectionId }: { collectionId: string }) {
 }
 
 function ImmunizationsTab({ collectionId }: { collectionId: string }) {
-  const [crossOnly, setCrossOnly] = useState(true);
+  const [crossOnly, setCrossOnly] = useCrossSourceFilter(collectionId);
   const [selectedRef, setSelectedRef] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
@@ -1171,7 +1557,7 @@ function ImmunizationsTab({ collectionId }: { collectionId: string }) {
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="lg:col-span-2 overflow-hidden rounded-2xl bg-white shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+        <div className="lg:col-span-2 overflow-hidden rounded-lg border border-[#dfe4ea] bg-white">
           {isLoading ? (
             <p className="p-6 text-sm text-[#667085]">Loading immunizations…</p>
           ) : merged.length === 0 ? (
@@ -1223,7 +1609,7 @@ function ImmunizationsTab({ collectionId }: { collectionId: string }) {
         </div>
 
         <div className="space-y-4">
-          <div className="rounded-2xl bg-white p-4 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+          <div className="rounded-lg border border-[#dfe4ea] bg-white p-3">
             <h4 className="text-sm font-semibold text-[#1c1c1e]">
               {selected?.canonical_name ?? "—"}
             </h4>
@@ -1252,7 +1638,7 @@ function ImmunizationsTab({ collectionId }: { collectionId: string }) {
               </ul>
             )}
           </div>
-          <div className="rounded-2xl bg-white p-4 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+          <div className="rounded-lg border border-[#dfe4ea] bg-white p-3">
             <h4 className="mb-2 text-sm font-semibold text-[#1c1c1e]">
               Provenance lineage
             </h4>
@@ -1269,38 +1655,53 @@ function ImmunizationsTab({ collectionId }: { collectionId: string }) {
 
 export function HarmonizeView() {
   const [tab, setTab] = useState<ResourceTab>("labs");
+  const [workspaceTab, setWorkspaceTab] = useState<WorkspaceTab>("record");
   const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
+  const patientId = searchParams.get("patient");
   const requestedCollection = searchParams.get("collection");
 
   const collectionsQuery = useQuery({
     queryKey: ["harmonize-collections"],
     queryFn: () => api.getHarmonizeCollections(),
   });
+  const patientsQuery = useQuery({
+    queryKey: ["patients"],
+    queryFn: api.listPatients,
+    staleTime: Infinity,
+  });
   const collections = collectionsQuery.data?.collections ?? [];
-  const [collectionId, setCollectionId] = useState<string>("");
+  const collectionIdsKey = collections.map((collection) => collection.id).join("|");
+  const selectedPatient = patientsQuery.data?.find((patient) => patient.id === patientId) ?? null;
+  const uploadCollectionId = patientId ? `upload-${safeUploadSessionId(patientId)}` : "";
+  const patientUploadCollection = uploadCollectionId
+    ? collections.find((collection) => collection.id === uploadCollectionId) ?? null
+    : null;
+  const requestedValidCollection = requestedCollection && collections.some((collection) => collection.id === requestedCollection)
+    ? requestedCollection
+    : "";
+  const defaultFixtureCollection =
+    collections.find((collection) => collection.id === "synthea-demo") ?? collections[0] ?? null;
+  const autoCollectionId =
+    patientUploadCollection?.id || requestedValidCollection || defaultFixtureCollection?.id || "";
+  const [manualCollectionId, setManualCollectionId] = useState<string>("");
+  const [developerPickerOpen, setDeveloperPickerOpen] = useState(false);
+  const [activeExtractJobId, setActiveExtractJobId] = useState<string | null>(null);
 
-  // Honor ?collection=<id> on first load — but only if the requested
-  // collection actually exists in the registry. Otherwise fall back to
-  // the first collection. We track sync via a flag so user picker
-  // changes aren't overwritten on every render.
-  const [hasSyncedFromUrl, setHasSyncedFromUrl] = useState(false);
   useEffect(() => {
-    if (hasSyncedFromUrl || collections.length === 0) return;
-    if (requestedCollection && collections.some((c) => c.id === requestedCollection)) {
-      setCollectionId(requestedCollection);
-    }
-    setHasSyncedFromUrl(true);
-  }, [collections, requestedCollection, hasSyncedFromUrl]);
+    setManualCollectionId(requestedValidCollection);
+    setDeveloperPickerOpen(false);
+    setActiveExtractJobId(null);
+  }, [patientId, requestedValidCollection, collectionIdsKey]);
 
   const activeId =
-    collectionId || collections[0]?.id || "";
+    manualCollectionId || autoCollectionId;
   const activeCollection = collections.find((c) => c.id === activeId) ?? null;
-  const isUploadCollection = activeId.startsWith("upload-");
+  const isUploadCollection = activeId === uploadCollectionId && !!patientUploadCollection;
+  const isDeveloperFixture = !!activeId && !isUploadCollection;
 
   // Async extract: kick off a background job, then poll until complete.
   // The mutation just starts the job; the polling query owns the lifecycle.
-  const [activeExtractJobId, setActiveExtractJobId] = useState<string | null>(null);
   const extractMutation = useMutation({
     mutationFn: () => api.extractHarmonizeCollection(activeId),
     onSuccess: (job) => {
@@ -1347,25 +1748,26 @@ export function HarmonizeView() {
     !isLoadingCollections && collections.length === 0;
 
   return (
-    <div className="space-y-6">
-      <header className="rounded-2xl bg-gradient-to-br from-[#5b76fe] to-[#3651e8] p-6 text-white shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
-        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider opacity-90">
-          <Layers3 size={14} />
-          <span>Harmonize · Cross-source merge</span>
+    <div className="space-y-4">
+      <header className="rounded-lg border border-[#dfe4ea] bg-white px-5 py-4">
+        <div className="max-w-4xl">
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#5b76fe]">
+              <Layers3 size={14} />
+              <span>Harmonized record</span>
+            </div>
+            <h1 className="mt-2 text-2xl font-semibold text-[#1c1c1e]">
+              Merge, review, and trace the canonical record
+            </h1>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-[#667085]">
+              Native FHIR pulls and vision-extracted PDFs become one
+              longitudinal record. Source contributions, review exceptions, and
+              provenance stay inside this workspace.
+            </p>
         </div>
-        <h1 className="mt-2 text-2xl font-semibold">
-          Build one canonical record from heterogeneous sources
-        </h1>
-        <p className="mt-2 max-w-3xl text-sm leading-6 opacity-90">
-          The harmonization layer takes per-source FHIR resources from native
-          pulls and vision-extracted PDFs, identity-resolves them by code or
-          name bridge, and surfaces a longitudinal merged record with FHIR
-          Provenance pointing back to every source observation.
-        </p>
       </header>
 
       {isLoadingCollections && (
-        <div className="rounded-2xl bg-white p-8 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+        <div className="rounded-lg border border-[#dfe4ea] bg-white p-5">
           <p className="flex items-center gap-2 text-sm text-[#667085]">
             <Loader2 size={14} className="animate-spin" />
             Loading collections…
@@ -1374,7 +1776,7 @@ export function HarmonizeView() {
       )}
 
       {hasNoCollections && (
-        <div className="rounded-2xl bg-white p-8 text-center shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+        <div className="rounded-lg border border-[#dfe4ea] bg-white p-8 text-center">
           <div className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-full bg-[#eef2ff] text-[#5b76fe]">
             <Inbox size={20} />
           </div>
@@ -1414,62 +1816,79 @@ export function HarmonizeView() {
       )}
 
       {!isLoadingCollections && !hasNoCollections && (<>
-      <div className="rounded-2xl bg-white p-5 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
-        <div className="flex flex-wrap items-center gap-3">
-          <label className="text-xs font-semibold uppercase tracking-wider text-[#667085]">
-            Collection
-          </label>
-          <select
-            value={activeId}
-            onChange={(e) => {
-              setCollectionId(e.target.value);
-              extractMutation.reset();
-              setActiveExtractJobId(null);
-            }}
-            className="rounded-lg border border-[#dfe4ea] bg-white px-3 py-1.5 text-sm text-[#1c1c1e]"
-          >
-            {collections.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-          {activeCollection && (
-            <span className="text-xs text-[#667085]">
-              {activeCollection.source_count} sources
-            </span>
-          )}
-          {isUploadCollection && (
+      <div className="rounded-lg border border-[#dfe4ea] bg-white px-4 py-3">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-wider text-[#5b76fe]">
+              {isDeveloperFixture ? "Developer fixture" : "Workspace sources"}
+            </p>
+            <h2 className="mt-1 text-base font-semibold text-[#1c1c1e]">
+              {isDeveloperFixture
+                ? activeCollection?.name ?? "No source set selected"
+                : selectedPatient?.name ?? activeCollection?.name ?? "Selected patient workspace"}
+            </h2>
+            <p className="mt-1 max-w-4xl text-sm leading-6 text-[#667085]">
+              {isDeveloperFixture
+                ? "No upload-backed harmonize collection is available for the selected patient workspace yet, so this view is using a curated development fixture. Add files in Source Intake to create a patient-specific harmonized record."
+                : activeCollection?.description ?? "Uploaded and prepared sources from Source Intake are feeding this harmonized record."}
+            </p>
+          </div>
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            {activeCollection && (
+              <span className="rounded-full bg-[#f7f9fc] px-2.5 py-1 text-xs font-semibold text-[#667085]">
+                {activeCollection.source_count} sources
+              </span>
+            )}
+            <Link
+              to={`/aggregate/sources${patientId ? `?patient=${encodeURIComponent(patientId)}` : ""}`}
+              className="inline-flex items-center gap-2 rounded-lg border border-[#dfe4ea] bg-white px-3 py-2 text-sm font-semibold text-[#555a6a] hover:border-[#5b76fe] hover:text-[#5b76fe]"
+            >
+              <FileUp size={14} />
+              Manage sources
+            </Link>
             <button
               type="button"
-              disabled={extractInProgress}
-              onClick={() => extractMutation.mutate()}
-              className={cls(
-                "ml-auto inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
-                extractInProgress
-                  ? "bg-[#dfe4ea] text-[#667085]"
-                  : "bg-[#5b76fe] text-white hover:bg-[#4760e8]",
-              )}
+              onClick={() => setDeveloperPickerOpen((open) => !open)}
+              className="rounded-lg border border-[#dfe4ea] bg-white px-3 py-2 text-sm font-semibold text-[#555a6a] hover:border-[#5b76fe] hover:text-[#5b76fe]"
             >
-              {extractInProgress ? (
-                <>
-                  <Loader2 size={14} className="animate-spin" />
-                  {extractJob?.status === "running"
-                    ? "Extracting (this may take a minute)…"
-                    : "Starting…"}
-                </>
-              ) : (
-                <>
-                  <Sparkles size={14} /> Extract uploaded PDFs
-                </>
-              )}
+              Developer dataset
             </button>
-          )}
+          </div>
         </div>
-        {activeCollection && (
-          <p className="mt-2 text-sm leading-6 text-[#667085]">
-            {activeCollection.description}
-          </p>
+        {developerPickerOpen && (
+          <div className="mt-3 rounded-lg border border-[#dfe4ea] bg-[#f7f9fc] p-3">
+            <label className="text-xs font-semibold uppercase tracking-wider text-[#667085]">
+              Development fixture
+            </label>
+            <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
+              <select
+                value={activeId}
+                onChange={(e) => {
+                  setManualCollectionId(e.target.value);
+                  extractMutation.reset();
+                  setActiveExtractJobId(null);
+                }}
+                className="min-w-0 rounded-lg border border-[#dfe4ea] bg-white px-3 py-2 text-sm text-[#1c1c1e] sm:min-w-[360px]"
+              >
+                {collections.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => {
+                  setManualCollectionId("");
+                  extractMutation.reset();
+                  setActiveExtractJobId(null);
+                }}
+                className="rounded-lg border border-[#dfe4ea] bg-white px-3 py-2 text-sm font-semibold text-[#667085]"
+              >
+                Use selected patient workspace
+              </button>
+            </div>
+          </div>
         )}
         {extractJob?.status === "complete" && (
           <div className="mt-3 rounded-lg border border-[#dfe4ea] bg-[#f7f9fc] p-3 text-sm">
@@ -1509,91 +1928,32 @@ export function HarmonizeView() {
         )}
       </div>
 
-      {activeId && <SourcesPanel collectionId={activeId} />}
+      <WorkspaceTabs active={workspaceTab} onChange={setWorkspaceTab} />
 
-      <div className="rounded-2xl bg-white shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
-        <div className="flex items-center gap-2 border-b border-[#eef0f4] px-4">
-          <button
-            type="button"
-            onClick={() => setTab("labs")}
-            className={cls(
-              "flex items-center gap-2 border-b-2 px-3 py-3 text-sm font-medium",
-              tab === "labs"
-                ? "border-[#5b76fe] text-[#5b76fe]"
-                : "border-transparent text-[#667085] hover:text-[#1c1c1e]",
-            )}
-          >
-            <Activity size={14} />
-            Labs
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab("conditions")}
-            className={cls(
-              "flex items-center gap-2 border-b-2 px-3 py-3 text-sm font-medium",
-              tab === "conditions"
-                ? "border-[#5b76fe] text-[#5b76fe]"
-                : "border-transparent text-[#667085] hover:text-[#1c1c1e]",
-            )}
-          >
-            <Stethoscope size={14} />
-            Conditions
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab("medications")}
-            className={cls(
-              "flex items-center gap-2 border-b-2 px-3 py-3 text-sm font-medium",
-              tab === "medications"
-                ? "border-[#5b76fe] text-[#5b76fe]"
-                : "border-transparent text-[#667085] hover:text-[#1c1c1e]",
-            )}
-          >
-            <Pill size={14} />
-            Medications
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab("allergies")}
-            className={cls(
-              "flex items-center gap-2 border-b-2 px-3 py-3 text-sm font-medium",
-              tab === "allergies"
-                ? "border-[#5b76fe] text-[#5b76fe]"
-                : "border-transparent text-[#667085] hover:text-[#1c1c1e]",
-            )}
-          >
-            <ShieldAlert size={14} />
-            Allergies
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab("immunizations")}
-            className={cls(
-              "flex items-center gap-2 border-b-2 px-3 py-3 text-sm font-medium",
-              tab === "immunizations"
-                ? "border-[#5b76fe] text-[#5b76fe]"
-                : "border-transparent text-[#667085] hover:text-[#1c1c1e]",
-            )}
-          >
-            <Syringe size={14} />
-            Immunizations
-          </button>
-        </div>
-        <div className="p-5">
-          {activeId &&
-            (tab === "labs" ? (
-              <LabsTab collectionId={activeId} />
-            ) : tab === "conditions" ? (
-              <ConditionsTab collectionId={activeId} />
-            ) : tab === "medications" ? (
-              <MedicationsTab collectionId={activeId} />
-            ) : tab === "allergies" ? (
-              <AllergiesTab collectionId={activeId} />
-            ) : (
-              <ImmunizationsTab collectionId={activeId} />
-            ))}
-        </div>
-      </div>
+      {activeId && workspaceTab === "record" && (
+        <RecordWorkspace
+          collectionId={activeId}
+          tab={tab}
+          onTabChange={setTab}
+        />
+      )}
+
+      {activeId && workspaceTab === "review" && (
+        <ReviewQueuePanel collectionId={activeId} />
+      )}
+
+      {activeId && workspaceTab === "sources" && (
+        <SourcesPanel
+          collectionId={activeId}
+          canExtract={isUploadCollection}
+          extractInProgress={extractInProgress}
+          onExtract={() => extractMutation.mutate()}
+        />
+      )}
+
+      {activeId && workspaceTab === "provenance" && (
+        <ProvenanceWorkspace collectionId={activeId} />
+      )}
 
       </>)}
 

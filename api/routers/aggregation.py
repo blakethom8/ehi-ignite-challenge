@@ -6,11 +6,20 @@ import json
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
-from api.core.aggregation import cleaning_queue, delete_upload, readiness, save_upload, source_inventory
+from api.core.aggregation import (
+    cleaning_queue,
+    delete_upload,
+    readiness,
+    save_upload,
+    source_inventory,
+    upload_prepared_json,
+    upload_preview,
+)
 from api.models import (
     AggregationCleaningQueueResponse,
     AggregationDeleteResponse,
     AggregationEnvironmentResponse,
+    AggregationPreparedPreviewResponse,
     AggregationReadinessResponse,
     AggregationUploadResponse,
 )
@@ -32,6 +41,22 @@ def get_cleaning_queue(patient_id: str) -> AggregationCleaningQueueResponse:
 @router.get("/readiness/{patient_id}", response_model=AggregationReadinessResponse)
 def get_readiness(patient_id: str) -> AggregationReadinessResponse:
     return readiness(patient_id)
+
+
+@router.get("/uploads/{patient_id}/{file_id}/preview", response_model=AggregationPreparedPreviewResponse)
+def get_upload_preview(patient_id: str, file_id: str) -> AggregationPreparedPreviewResponse:
+    try:
+        return upload_preview(patient_id, file_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get("/uploads/{patient_id}/{file_id}/prepared-json")
+def get_upload_prepared_json(patient_id: str, file_id: str) -> dict:
+    try:
+        return upload_prepared_json(patient_id, file_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @router.post("/uploads/{patient_id}", response_model=AggregationUploadResponse)

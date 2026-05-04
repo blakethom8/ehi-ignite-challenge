@@ -20,6 +20,7 @@ from api.core.loader import (
     load_patient,
     data_dir,
 )
+from api.core.aggregation import list_upload_workspaces
 from api.models import (
     PatientListItem,
     PatientOverview,
@@ -260,7 +261,13 @@ def _limit_evidence(items: list[str], limit: int = 5) -> list[str]:
 
 @router.get("", response_model=list[PatientListItem])
 def list_patients() -> list[PatientListItem]:
-    return _cached_patient_list()
+    synthea_items = _cached_patient_list()
+    synthea_ids = {patient.id for patient in synthea_items}
+    upload_items = [
+        item for item in list_upload_workspaces()
+        if item.id not in synthea_ids
+    ]
+    return upload_items + synthea_items
 
 
 @lru_cache(maxsize=1)
@@ -284,6 +291,7 @@ def _cached_patient_list() -> list[PatientListItem]:
                 encounter_count=idx.encounter_count,
                 active_condition_count=idx.active_condition_count,
                 active_med_count=idx.active_med_count,
+                workspace_type="synthea",
             )
             for idx in catalog.patients
         ]
@@ -302,6 +310,7 @@ def _cached_patient_list() -> list[PatientListItem]:
                 encounter_count=0,
                 active_condition_count=0,
                 active_med_count=0,
+                workspace_type="synthea",
             )
             for path in files
         ]

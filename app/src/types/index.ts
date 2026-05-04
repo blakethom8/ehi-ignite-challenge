@@ -11,6 +11,9 @@ export interface PatientListItem {
   encounter_count: number;
   active_condition_count: number;
   active_med_count: number;
+  workspace_type?: "synthea" | "upload" | "demo";
+  source_count?: number;
+  prepared_source_count?: number;
 }
 
 export interface ConditionRow {
@@ -677,6 +680,33 @@ export interface AggregationUploadedFile {
   context_notes: string;
   extraction_confidence: "high" | "medium" | "low" | "unknown";
   storage_path: string;
+  parse_status: "stored" | "ready_to_extract" | "extracted" | "structured" | "unsupported";
+  next_step: string;
+  derived_artifacts: string[];
+}
+
+export interface AggregationPreparedPreviewItem {
+  resource_type: string;
+  label: string;
+  value: string;
+  date: string;
+  status: string;
+}
+
+export interface AggregationPreparedPreviewResponse {
+  patient_id: string;
+  file_id: string;
+  file_name: string;
+  parse_status: AggregationUploadedFile["parse_status"];
+  output_type: string;
+  total_resources: number;
+  resource_counts: Record<string, number>;
+  artifact_paths: string[];
+  date_start: string;
+  date_end: string;
+  json_preview: Record<string, unknown> | null;
+  preview_items: AggregationPreparedPreviewItem[];
+  message: string;
 }
 
 export interface AggregationSourceCard {
@@ -838,6 +868,8 @@ export interface HarmonizeSource {
   document_reference: string | null;
   resource_counts: Record<string, number>;
   total_resources: number;
+  status: "structured" | "unparsed_structured" | "pending_extraction" | "extracted" | "empty_extraction" | "missing";
+  status_label: string;
 }
 
 export interface HarmonizeSourceManifestResponse {

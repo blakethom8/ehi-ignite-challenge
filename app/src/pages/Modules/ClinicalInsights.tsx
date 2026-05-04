@@ -553,6 +553,155 @@ function ClinicalInsightsInfoPage({
   );
 }
 
+function ClinicalInsightsOverviewPage({ patientId }: { patientId: string | null }) {
+  const pillars = [
+    {
+      icon: MessageSquareText,
+      title: "LLM Review",
+      body: "The conversational review space for chart-grounded questions. It uses patient data plus selected context packages, and keeps model behavior, attached prompts, and logs visible in the chat workspace.",
+      to: "/explorer/assistant",
+      action: "Open chat",
+    },
+    {
+      icon: Layers3,
+      title: "Context Library",
+      body: "Reusable Markdown packages for guidelines, disease-specific review rules, local style preferences, escalation rules, and patient-context prompts. These packages can be attached to LLM Review or reused by clinical modules.",
+      to: "/clinical-insights/context-library",
+      action: "Manage context",
+    },
+    {
+      icon: Activity,
+      title: "Clinical Modules",
+      body: "Prepared clinical products that go beyond chat: surgical readiness, medication safety, dashboards, handoff packets, and focused review workflows with their own screens and navigation.",
+      to: "/clinical-insights",
+      action: "Explore modules",
+    },
+  ];
+
+  const comparisonRows = [
+    ["Primary job", "Answer clinician questions with transparent context.", "Run a prepared review, dashboard, or workflow."],
+    ["Input model", "FHIR chart evidence plus manually selected context packages.", "FHIR chart evidence plus module-specific rules, templates, and section logic."],
+    ["Output", "Cited answer, follow-up questions, tool logs, and session-level rationale.", "Structured brief, table, dashboard, checklist, packet, or focused module workspace."],
+    ["Best use", "Flexible investigation when the clinician is deciding what to ask next.", "Repeatable clinical tasks where the expected workflow and output format are already known."],
+  ];
+
+  return (
+    <main className="mx-auto max-w-7xl space-y-4 p-4 lg:p-5">
+      <section className="rounded-2xl bg-white p-5 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="max-w-3xl">
+            <p className="inline-flex items-center gap-2 rounded-full bg-[#fff1df] px-3 py-1 text-xs font-semibold uppercase tracking-wider text-[#9a5a16]">
+              <Activity size={13} />
+              Clinical Insights overview
+            </p>
+            <h1 className="mt-3 text-2xl font-semibold tracking-tight text-[#1c1c1e] lg:text-3xl">
+              Turn the patient-owned chart into focused clinical review
+            </h1>
+            <p className="mt-2 text-sm leading-6 text-[#667085]">
+              Clinical Insights is the private chart-review workspace. It separates flexible LLM Review from prepared
+              clinical modules, with the Context Library acting as the reusable instruction layer between them.
+            </p>
+          </div>
+          <div className="rounded-xl bg-[#fff8f1] p-4 shadow-[rgb(246_223_201)_0px_0px_0px_1px] lg:max-w-[360px]">
+            <div className="flex items-center gap-2">
+              <ShieldAlert size={16} className="text-[#9a5a16]" />
+              <p className="text-sm font-semibold text-[#1c1c1e]">Private review boundary</p>
+            </div>
+            <p className="mt-2 text-xs leading-5 text-[#667085]">
+              These tools should stay inside the PHI-controlled workspace unless a separate sharing or marketplace
+              workflow explicitly asks the patient what leaves the record.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section className="grid gap-4 lg:grid-cols-3">
+        {pillars.map((pillar) => {
+          const Icon = pillar.icon;
+          return (
+            <Link
+              key={pillar.title}
+              to={withPatient(pillar.to, patientId)}
+              className="rounded-2xl bg-white p-5 no-underline shadow-[rgb(224_226_232)_0px_0px_0px_1px] hover:bg-[#fffdf9]"
+            >
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#fff1df] text-[#9a5a16]">
+                <Icon size={18} />
+              </div>
+              <h2 className="mt-4 text-base font-semibold text-[#1c1c1e]">{pillar.title}</h2>
+              <p className="mt-2 min-h-[96px] text-sm leading-6 text-[#667085]">{pillar.body}</p>
+              <span className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-[#9a5a16]">
+                {pillar.action}
+                <ArrowRight size={15} />
+              </span>
+            </Link>
+          );
+        })}
+      </section>
+
+      <section className="rounded-2xl bg-white p-5 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+        <div className="grid gap-5 lg:grid-cols-[0.85fr_1.15fr]">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-[#9a5a16]">Product separation</p>
+            <h2 className="mt-1 text-xl font-semibold text-[#1c1c1e]">LLM Review and Clinical Modules should stay distinct</h2>
+            <p className="mt-2 text-sm leading-6 text-[#667085]">
+              The chat surface is for adaptive reasoning and transparent context selection. Clinical modules are reusable
+              products with a stronger shape: inputs, rules, screens, expected outputs, and module-specific navigation.
+            </p>
+          </div>
+          <div className="overflow-hidden rounded-xl border border-[#eef0f5]">
+            <table className="w-full border-collapse text-sm">
+              <thead>
+                <tr className="bg-[#fafafa] text-left text-[10px] font-semibold uppercase tracking-wider text-[#8d92a3]">
+                  <th className="border-b border-[#eef0f5] px-3 py-2">Dimension</th>
+                  <th className="border-b border-[#eef0f5] px-3 py-2">LLM Review</th>
+                  <th className="border-b border-[#eef0f5] px-3 py-2">Clinical Modules</th>
+                </tr>
+              </thead>
+              <tbody>
+                {comparisonRows.map(([dimension, llmReview, clinicalModules]) => (
+                  <tr key={dimension} className="border-b border-[#f2f4f8] last:border-b-0">
+                    <td className="bg-[#fafafa] px-3 py-3 text-xs font-semibold uppercase tracking-wider text-[#667085]">
+                      {dimension}
+                    </td>
+                    <td className="px-3 py-3 text-[#555a6a]">{llmReview}</td>
+                    <td className="px-3 py-3 text-[#555a6a]">{clinicalModules}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-2">
+        {[
+          {
+            icon: BookMarked,
+            title: "Context packages are not modules",
+            body: "They are reusable instruction sets: guidelines, scripts, local rules, and review preferences that can travel into a chat or module.",
+          },
+          {
+            icon: Stethoscope,
+            title: "Modules can use context packages",
+            body: "A module can consume one or more packages, but it also owns workflow, layout, outputs, and review boundaries.",
+          },
+        ].map((item) => {
+          const Icon = item.icon;
+          return (
+            <article key={item.title} className="rounded-2xl bg-white p-5 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#fff1df] text-[#9a5a16]">
+                <Icon size={18} />
+              </div>
+              <h2 className="mt-4 text-base font-semibold text-[#1c1c1e]">{item.title}</h2>
+              <p className="mt-2 text-sm leading-6 text-[#667085]">{item.body}</p>
+            </article>
+          );
+        })}
+      </section>
+    </main>
+  );
+}
+
 function ClinicalInsightsContextLibraryPage() {
   const [packages, setPackages] = useState(initialContextPackages);
   const [selectedPackageId, setSelectedPackageId] = useState(initialContextPackages[0]?.id ?? "");
@@ -920,6 +1069,10 @@ export function ClinicalInsights() {
 
   if (location.pathname.endsWith("/packages") || location.pathname.endsWith("/context-library")) {
     return <ClinicalInsightsContextLibraryPage />;
+  }
+
+  if (location.pathname.endsWith("/overview")) {
+    return <ClinicalInsightsOverviewPage patientId={patientId} />;
   }
 
   if (location.pathname.endsWith("/favorites")) {

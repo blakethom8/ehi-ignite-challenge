@@ -33,7 +33,6 @@ import type {
   HarmonizeConditionsResponse,
   HarmonizeContributionsResponse,
   HarmonizeExtractJobResponse,
-  HarmonizeExtractResponse,
   HarmonizeSourceDiffResponse,
   HarmonizeImmunizationsResponse,
   HarmonizeMedicationsResponse,
@@ -41,6 +40,7 @@ import type {
   HarmonizeProvenanceResponse,
   HarmonizeSourceManifestResponse,
   AggregationEnvironmentResponse,
+  AggregationPreparedPreviewResponse,
   AggregationReadinessResponse,
   AggregationUploadPayload,
   AggregationUploadResponse,
@@ -196,6 +196,16 @@ export const api = {
 
   deleteAggregationFile: (patientId: string, fileId: string): Promise<AggregationDeleteResponse> =>
     http.delete<AggregationDeleteResponse>(`/aggregation/uploads/${patientId}/${fileId}`).then((r) => r.data),
+
+  getAggregationUploadPreview: (patientId: string, fileId: string): Promise<AggregationPreparedPreviewResponse> =>
+    http
+      .get<AggregationPreparedPreviewResponse>(`/aggregation/uploads/${patientId}/${fileId}/preview`)
+      .then((r) => r.data),
+
+  getAggregationUploadJson: (patientId: string, fileId: string): Promise<Record<string, unknown>> =>
+    http
+      .get<Record<string, unknown>>(`/aggregation/uploads/${patientId}/${fileId}/prepared-json`)
+      .then((r) => r.data),
 
   /** Assistant settings — available modes, models, current config */
   getAssistantSettings: (): Promise<AssistantSettings> =>

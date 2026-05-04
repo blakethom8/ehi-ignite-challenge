@@ -62,7 +62,7 @@ export default function App() {
     { path: "/aggregate", element: <AggregationMethodology /> },
     { path: "/aggregate/methodology", element: <AggregationMethodology /> },
     { path: "/aggregate/sources", element: <DataAggregator /> },
-    { path: "/aggregate/cleaning", element: <DataAggregator /> },
+    { path: "/aggregate/cleaning", element: <HarmonizeView /> },
     { path: "/aggregate/context", element: <PatientContext /> },
     { path: "/aggregate/harmonize", element: <HarmonizeView /> },
     { path: "/aggregate/publish", element: <DataAggregator /> },

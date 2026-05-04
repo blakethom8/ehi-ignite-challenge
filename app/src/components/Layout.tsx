@@ -15,6 +15,7 @@ import {
   DatabaseZap,
   FileJson2,
   FileSearch,
+  FileUp,
   GraduationCap,
   Heart,
   Layers3,
@@ -312,9 +313,9 @@ const DATA_AGGREGATOR_NAV_GROUPS: NavGroup[] = [
   {
     label: "Data Aggregator",
     items: [
-      { to: "/aggregate", label: "Module Overview", icon: DatabaseZap, description: "Patient collection guide" },
-      { to: "/aggregate/sources", label: "Source Inventory", icon: FileJson2, description: "Portal and file checklist" },
-      { to: "/aggregate/cleaning", label: "Cleaning Queue", icon: SlidersHorizontal, description: "Normalization workbench" },
+      { to: "/aggregate", label: "Overview", icon: DatabaseZap, description: "Aggregation guide" },
+      { to: "/aggregate/sources", label: "Source Intake", icon: FileJson2, description: "Upload and source checklist" },
+      { to: "/aggregate/harmonize", label: "Harmonized Record", icon: Layers3, description: "Merge, review, provenance" },
       { to: "/aggregate/context", label: "Patient Context", icon: MessageSquareText, description: "Guided patient intake" },
       { to: "/aggregate/publish", label: "Publish Readiness", icon: ClipboardCheck, description: "Chart activation gates" },
     ],
@@ -491,7 +492,7 @@ function getWorkspaceCopy(environment: AppEnvironment): { title: string; sidebar
     return {
       title: "Data Aggregator",
       sidebarTitle: "Data Aggregator",
-      subtitle: "Guided collection, cleaning, and chart publishing",
+      subtitle: "Guided intake, harmonization, and chart publishing",
       icon: DatabaseZap,
     };
   }
@@ -592,11 +593,13 @@ function PatientPickerModal({
   open,
   selectedId,
   onSelect,
+  onCreateWorkspace,
   onClose,
 }: {
   open: boolean;
   selectedId: string | null;
   onSelect: (id: string) => void;
+  onCreateWorkspace: () => void;
   onClose: () => void;
 }) {
   const [filter, setFilter] = useState<FilterMode>("all");
@@ -644,7 +647,8 @@ function PatientPickerModal({
   }
 
   const favorites = visiblePatients.filter((patient) => isFavorite(patient.id));
-  const others = visiblePatients.filter((patient) => !isFavorite(patient.id));
+  const uploadWorkspaces = visiblePatients.filter((patient) => patient.workspace_type === "upload" && !isFavorite(patient.id));
+  const syntheaPatients = visiblePatients.filter((patient) => patient.workspace_type !== "upload" && !isFavorite(patient.id));
   const selectedPatient = patients.find((patient) => patient.id === selectedId);
   const previewPatient = patients.find((patient) => patient.id === previewId) ?? selectedPatient ?? visiblePatients[0];
   const previewRisk = previewPatient ? riskMap.get(previewPatient.id) : undefined;
@@ -658,6 +662,7 @@ function PatientPickerModal({
     const previewing = patient.id === previewPatient?.id;
     const favorited = isFavorite(patient.id);
     const risk = riskMap.get(patient.id);
+    const isUploadWorkspace = patient.workspace_type === "upload";
 
     return (
       <div
@@ -676,7 +681,9 @@ function PatientPickerModal({
           <div className="min-w-0 flex-1">
             <span className="block truncate">{patient.name}</span>
             <span className="block truncate text-[10px] leading-tight text-[#a5a8b5]">
-              {patient.total_resources} resources · {patient.active_condition_count} conditions · {patient.active_med_count} meds
+              {isUploadWorkspace
+                ? `${patient.source_count ?? patient.total_resources} sources · ${patient.prepared_source_count ?? 0} prepared`
+                : `${patient.total_resources} resources · ${patient.active_condition_count} conditions · ${patient.active_med_count} meds`}
             </span>
           </div>
         </button>
@@ -724,7 +731,7 @@ function PatientPickerModal({
             </p>
             <h2 className="mt-1 text-xl font-semibold tracking-tight text-[#1c1c1e]">Advanced patient selection</h2>
             <p className="mt-1 text-sm text-[#667085]">
-              Switch the single-patient context used across the clinical workspace.
+              Switch the patient workspace used by Source Intake, Harmonized Record, charts, and clinical modules.
             </p>
           </div>
           <button
@@ -801,6 +808,18 @@ function PatientPickerModal({
               )}
             </div>
 
+            <button
+              type="button"
+              onClick={onCreateWorkspace}
+              className="mt-3 flex w-full items-center justify-between rounded-xl border border-[#dfe4ea] bg-white px-3 py-2.5 text-left text-sm font-semibold text-[#5b76fe] transition-colors hover:border-[#5b76fe] hover:bg-[#f8faff]"
+            >
+              <span className="inline-flex items-center gap-2">
+                <FileUp size={15} />
+                New patient workspace
+              </span>
+              <ChevronRight size={14} />
+            </button>
+
             <div className="mt-4 grid grid-cols-2 gap-2">
               <div className="rounded-xl bg-white p-3 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
                 <p className="text-[10px] uppercase tracking-wider text-[#a5a8b5]">Patients</p>
@@ -870,10 +889,20 @@ function PatientPickerModal({
                     </>
                   )}
 
+                  {uploadWorkspaces.length > 0 && (
+                    <>
+                      <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wider text-[#a5a8b5]">
+                        Uploaded workspaces
+                      </p>
+                      <div className="mb-3 space-y-0.5">{uploadWorkspaces.map(renderRow)}</div>
+                      <div className="mb-3 border-t border-[#e9eaef]" />
+                    </>
+                  )}
+
                   <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wider text-[#a5a8b5]">
-                    {filter === "all" ? "All Patients" : filter === "high_risk" ? "High Risk" : "Needs Review"}
+                    {filter === "all" ? "Synthea patients" : filter === "high_risk" ? "High Risk" : "Needs Review"}
                   </p>
-                  <div className="space-y-0.5">{others.map(renderRow)}</div>
+                  <div className="space-y-0.5">{syntheaPatients.map(renderRow)}</div>
 
                   {visiblePatients.length === 0 && (
                     <p className="px-3 py-8 text-center text-sm text-[#a5a8b5]">
@@ -894,10 +923,12 @@ function PatientPickerModal({
 function PatientSelector({
   patientId,
   onSelect,
+  onCreateWorkspace,
   onAdvancedOpen,
 }: {
   patientId: string | null;
   onSelect: (id: string) => void;
+  onCreateWorkspace: () => void;
   onAdvancedOpen: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -912,12 +943,21 @@ function PatientSelector({
   });
 
   const current = patients.find((p) => p.id === patientId);
+  const currentLabel = current
+    ? current.name
+    : patientId
+      ? patientId.startsWith("workspace-")
+        ? "New patient workspace"
+        : patientId
+      : "Select patient";
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return patients;
     return patients.filter((p) => p.name.toLowerCase().includes(q));
   }, [patients, search]);
+  const uploadWorkspaces = filtered.filter((patient) => patient.workspace_type === "upload");
+  const syntheaPatients = filtered.filter((patient) => patient.workspace_type !== "upload");
 
   // Close on outside click
   useEffect(() => {
@@ -946,17 +986,38 @@ function PatientSelector({
             ? "border-[#5b76fe] bg-[#eef1ff] text-[#5b76fe]"
             : "border-[#e9eaef] bg-white text-[#555a6a] hover:border-[#5b76fe] hover:text-[#5b76fe]"
         }`}
-        title="Switch patient"
+        title="Switch patient workspace"
       >
         <UserRound size={14} className="shrink-0" />
         <span className="max-w-[180px] truncate font-medium">
-          {isLoading ? "Loading…" : current ? current.name : "Select patient"}
+          {isLoading ? "Loading…" : currentLabel}
         </span>
         <ChevronDown size={13} className={`shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
 
       {open && (
         <div className="absolute left-0 top-full z-50 mt-1 w-72 rounded-xl border border-[#e9eaef] bg-white shadow-lg">
+          <div className="border-b border-[#e9eaef] px-3 py-2.5">
+            <p className="text-xs font-semibold uppercase tracking-wider text-[#5b76fe]">Patient workspace</p>
+            <p className="mt-1 text-xs leading-5 text-[#667085]">
+              Development selector for uploaded sessions, curated profiles, and Synthea patients.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              setSearch("");
+              onCreateWorkspace();
+            }}
+            className="flex w-full items-center justify-between border-b border-[#e9eaef] px-3 py-2 text-left text-sm font-semibold text-[#5b76fe] transition-colors hover:bg-[#eef1ff]"
+          >
+            <span className="inline-flex items-center gap-2">
+              <FileUp size={14} />
+              New patient workspace
+            </span>
+            <ChevronRight size={14} />
+          </button>
           {/* Search input */}
           <div className="flex items-center gap-2 border-b border-[#e9eaef] px-3 py-2">
             <Search size={13} className="shrink-0 text-[#a5a8b5]" />
@@ -973,7 +1034,42 @@ function PatientSelector({
             {filtered.length === 0 && (
               <p className="px-4 py-3 text-sm text-[#a5a8b5]">No patients match</p>
             )}
-            {filtered.slice(0, 100).map((p) => (
+            {uploadWorkspaces.length > 0 && (
+              <p className="px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wider text-[#a5a8b5]">
+                Uploaded workspaces
+              </p>
+            )}
+            {uploadWorkspaces.slice(0, 20).map((p) => (
+              <button
+                key={p.id}
+                onClick={() => {
+                  onSelect(p.id);
+                  setOpen(false);
+                  setSearch("");
+                }}
+                className={`flex w-full items-start gap-2 px-3 py-2 text-left transition-colors hover:bg-[#f5f6f8] ${
+                  p.id === patientId ? "bg-[#eef1ff]" : ""
+                }`}
+              >
+                <div className="min-w-0 flex-1">
+                  <p className={`truncate text-sm font-medium ${
+                    p.id === patientId ? "text-[#5b76fe]" : "text-[#1c1c1e]"
+                  }`}>
+                    {p.name}
+                  </p>
+                  <p className="truncate text-[11px] text-[#a5a8b5]">
+                    {(p.source_count ?? p.total_resources).toLocaleString()} sources · {(p.prepared_source_count ?? 0).toLocaleString()} prepared
+                  </p>
+                </div>
+                {p.id === patientId && (
+                  <span className="mt-0.5 shrink-0 text-[#5b76fe]">✓</span>
+                )}
+              </button>
+            ))}
+            <p className="px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wider text-[#a5a8b5]">
+              Synthea patients
+            </p>
+            {syntheaPatients.slice(0, 100).map((p) => (
               <button
                 key={p.id}
                 onClick={() => {
@@ -1000,9 +1096,9 @@ function PatientSelector({
                 )}
               </button>
             ))}
-            {filtered.length > 100 && (
+            {syntheaPatients.length > 100 && (
               <p className="px-4 py-2 text-center text-[11px] text-[#a5a8b5]">
-                {filtered.length - 100} more — type to narrow
+                {syntheaPatients.length - 100} more — type to narrow
               </p>
             )}
           </div>
@@ -1060,6 +1156,12 @@ export function Layout({ children }: LayoutProps) {
   const clinicalNavGroups = getClinicalNavGroups(environment);
   const workspace = getWorkspaceCopy(environment);
   const WorkspaceIcon = workspace.icon;
+  const sidebarOverviewPath =
+    environment === "marketplace"
+      ? "/marketplace/overview"
+      : environment === "clinical"
+        ? "/clinical-insights/overview"
+        : null;
   const topArea = getTopArea(environment);
   const activeModuleMap = getActiveModuleMap(location.pathname);
   const ActiveModuleMapIcon = activeModuleMap?.icon;
@@ -1155,9 +1257,9 @@ export function Layout({ children }: LayoutProps) {
   ];
 
   const aggregatorLinks: { key: string; label: string; to: string }[] = [
-    { key: "walkthrough", label: "Module Overview", to: withPatientQuery("/aggregate", patientId) },
-    { key: "sourceInventory", label: "Source Inventory", to: withPatientQuery("/aggregate/sources", patientId) },
-    { key: "cleaningQueue", label: "Cleaning Queue", to: withPatientQuery("/aggregate/cleaning", patientId) },
+    { key: "walkthrough", label: "Overview", to: withPatientQuery("/aggregate", patientId) },
+    { key: "sourceIntake", label: "Source Intake", to: withPatientQuery("/aggregate/sources", patientId) },
+    { key: "harmonizedRecord", label: "Harmonized Record", to: withPatientQuery("/aggregate/harmonize", patientId) },
     { key: "patientContext", label: "Patient Context", to: withPatientQuery("/aggregate/context", patientId) },
     { key: "publishReadiness", label: "Publish Readiness", to: withPatientQuery("/aggregate/publish", patientId) },
   ];
@@ -1248,8 +1350,10 @@ export function Layout({ children }: LayoutProps) {
     if (key === "journey") return location.pathname.startsWith("/explorer/care-journey");
     if (key === "sources") return location.pathname.startsWith("/explorer/patient-data");
     if (key === "walkthrough") return location.pathname === "/aggregate" || location.pathname.startsWith("/aggregate/methodology");
-    if (key === "sourceInventory") return location.pathname.startsWith("/aggregate/sources");
-    if (key === "cleaningQueue") return location.pathname.startsWith("/aggregate/cleaning");
+    if (key === "sourceIntake") return location.pathname.startsWith("/aggregate/sources");
+    if (key === "harmonizedRecord") {
+      return location.pathname.startsWith("/aggregate/harmonize") || location.pathname.startsWith("/aggregate/cleaning");
+    }
     if (key === "patientContext") return location.pathname.startsWith("/aggregate/context");
     if (key === "publishReadiness") return location.pathname.startsWith("/aggregate/publish");
     if (key === "preop") {
@@ -1284,6 +1388,15 @@ export function Layout({ children }: LayoutProps) {
     location.pathname.startsWith("/explorer/anesthesia");
 
   const navigate = useNavigate();
+
+  const handleCreatePatientWorkspace = () => {
+    const suffix =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `${Date.now()}`;
+    navigate(`/aggregate/sources?patient=workspace-${suffix}`);
+    setPatientPickerOpen(false);
+  };
 
   const handleSelectPatient = (id: string) => {
     // Use navigate (like landing page cards) to ensure reliable routing
@@ -1336,6 +1449,7 @@ export function Layout({ children }: LayoutProps) {
           handleSelectPatient(id);
           setPatientPickerOpen(false);
         }}
+        onCreateWorkspace={handleCreatePatientWorkspace}
         onClose={() => setPatientPickerOpen(false)}
       />
 
@@ -1363,6 +1477,7 @@ export function Layout({ children }: LayoutProps) {
                   <PatientSelector
                     patientId={patientId}
                     onSelect={handleSelectPatient}
+                    onCreateWorkspace={handleCreatePatientWorkspace}
                     onAdvancedOpen={() => setPatientPickerOpen(true)}
                   />
                 )}
@@ -1424,11 +1539,11 @@ export function Layout({ children }: LayoutProps) {
               <>
                 {/* Workspace header + collapse toggle */}
                 <div className="shrink-0 border-b border-[#e9eaef] px-2 pb-3 pt-4 lg:px-3">
-                  {environment === "marketplace" ? (
+                  {sidebarOverviewPath ? (
                     <div className="flex items-start justify-between gap-2">
                       <Link
-                        to={withPatientQuery("/marketplace/overview", patientId)}
-                        title={sidebarCollapsed ? "Marketplace overview" : undefined}
+                        to={withPatientQuery(sidebarOverviewPath, patientId)}
+                        title={sidebarCollapsed ? `${workspace.sidebarTitle} overview` : undefined}
                         className={`flex min-w-0 flex-1 items-start gap-2 rounded-lg no-underline transition-colors hover:bg-[#f5f6f8] ${
                           sidebarCollapsed ? "justify-center p-2" : "-ml-1 px-1 py-1.5"
                         }`}

@@ -476,14 +476,22 @@ def _load_resources_by_type(source: SourceDefinition) -> dict[str, list[dict]]:
     raw = json.loads(source.path.read_text())
     out: dict[str, list[dict]] = {}
     if source.kind == "fhir-pull":
-        # Health-Skillz envelope: list[{provider, fhir: {ResourceType: [...]}}]
+        # Health-Skillz envelope variants:
+        #   dict with top-level fhir: {ResourceType: [...]}
+        #   list[{provider, fhir: {ResourceType: [...]}}]
+        if isinstance(raw, dict) and isinstance(raw.get("fhir"), dict):
+            for rtype, resources in raw["fhir"].items():
+                if isinstance(resources, list):
+                    out[rtype] = list(resources)
+            return out
         if isinstance(raw, list) and raw and isinstance(raw[0].get("fhir"), dict):
             for rtype, resources in raw[0]["fhir"].items():
                 if isinstance(resources, list):
                     out[rtype] = list(resources)
             return out
         # Plain FHIR Bundle fallback
-        for entry in raw.get("entry", []):
+        entries = raw.get("entry", []) if isinstance(raw, dict) else []
+        for entry in entries:
             r = entry.get("resource", {})
             rt = r.get("resourceType")
             if rt:
@@ -534,15 +542,42 @@ def collection_source_manifest(collection_id: str) -> list[dict[str, Any]] | Non
     out = []
     for s in coll.sources:
         rs = resources.get(s.id, {})
+        total = sum(len(v) for v in rs.values())
+        available = s.path.exists()
+        if s.kind == "fhir-pull":
+            if not available:
+                status = "missing"
+                status_label = "Source file missing"
+            elif total > 0:
+                status = "structured"
+                status_label = "Structured source ready"
+            else:
+                status = "unparsed_structured"
+                status_label = "Structured file not parsed"
+        elif s.kind == "extracted-pdf":
+            if not available:
+                status = "pending_extraction"
+                status_label = "PDF pending extraction"
+            elif total > 0:
+                status = "extracted"
+                status_label = "Extracted candidate facts"
+            else:
+                status = "empty_extraction"
+                status_label = "Extracted with no structured facts"
+        else:
+            status = "missing" if not available else "structured"
+            status_label = "Source ready" if available else "Source file missing"
         out.append(
             {
                 "id": s.id,
                 "label": s.label,
                 "kind": s.kind,
-                "available": s.path.exists(),
+                "available": available,
                 "document_reference": s.document_reference,
                 "resource_counts": {rt: len(v) for rt, v in rs.items()},
-                "total_resources": sum(len(v) for v in rs.values()),
+                "total_resources": total,
+                "status": status,
+                "status_label": status_label,
             }
         )
     return out

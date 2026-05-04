@@ -10,7 +10,7 @@ contract stable independent of internal parsing model changes.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -30,6 +30,9 @@ class PatientListItem(BaseModel):
     encounter_count: int
     active_condition_count: int
     active_med_count: int
+    workspace_type: Literal["synthea", "upload", "demo"] = "synthea"
+    source_count: int = 0
+    prepared_source_count: int = 0
 
 
 # ---------------------------------------------------------------------------
@@ -831,6 +834,45 @@ class AggregationUploadedFile(BaseModel):
     context_notes: str = ""
     extraction_confidence: Literal["high", "medium", "low", "unknown"] = "unknown"
     storage_path: str = ""
+    parse_status: Literal[
+        "stored",
+        "ready_to_extract",
+        "extracted",
+        "structured",
+        "unsupported",
+    ] = "stored"
+    next_step: str = ""
+    derived_artifacts: list[str] = Field(default_factory=list)
+
+
+class AggregationPreparedPreviewItem(BaseModel):
+    resource_type: str
+    label: str
+    value: str = ""
+    date: str = ""
+    status: str = ""
+
+
+class AggregationPreparedPreviewResponse(BaseModel):
+    patient_id: str
+    file_id: str
+    file_name: str
+    parse_status: Literal[
+        "stored",
+        "ready_to_extract",
+        "extracted",
+        "structured",
+        "unsupported",
+    ]
+    output_type: str
+    total_resources: int = 0
+    resource_counts: dict[str, int] = Field(default_factory=dict)
+    artifact_paths: list[str] = Field(default_factory=list)
+    date_start: str = ""
+    date_end: str = ""
+    json_preview: dict[str, Any] | None = None
+    preview_items: list[AggregationPreparedPreviewItem] = Field(default_factory=list)
+    message: str = ""
 
 
 class AggregationSourceCard(BaseModel):
@@ -951,6 +993,15 @@ class HarmonizeSource(BaseModel):
     document_reference: str | None = None
     resource_counts: dict[str, int]
     total_resources: int
+    status: Literal[
+        "structured",
+        "unparsed_structured",
+        "pending_extraction",
+        "extracted",
+        "empty_extraction",
+        "missing",
+    ] = "missing"
+    status_label: str = ""
 
 
 class HarmonizeCollectionsResponse(BaseModel):

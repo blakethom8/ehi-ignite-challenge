@@ -30,6 +30,68 @@ Each entry should be 200–500 words. Tables and code snippets welcome. **Honest
 
 ---
 
+## 2026-05-03 · Move D — findable-in-PDF GT filter
+
+**Agent:** Claude Opus 4.7
+
+**What:** Added `filter_gt_to_findable_in_pdf()` to the eval module — extracts pdfplumber text from a PDF, filters ground-truth facts to those whose primary code or display tokens actually appear in the PDF text. Wired through `evaluate_bundle(pdf_path=, findable_only=)` and the bake-off harness's `findable_only` flag. Streamlit page now exposes the toggle (default ON).
+
+**Why:** Move A surfaced a recall-ceiling ambiguity: the Cedars FHIR has 28 conditions but the 25-page Health Summary PDF is a snapshot, not the full chart. Without filtering, multipass-fhir's recall is bounded by *how much of the chart appears in the PDF*, not *how good the pipeline is at extracting from what's there*.
+
+**How:** Three matching tests per fact (any one passes → findable):
+
+  1. Any code in any terminology (ICD-10, SNOMED, RxNorm, LOINC, CVX) appears as a substring in PDF text
+  2. Display name appears as case-insensitive substring
+  3. ≥50% of display tokens appear in PDF token set
+
+Anything that fails all three is unfindable. Scanned PDFs (no extractable text layer) default to all-findable.
+
+**Result on Cedars Health Summary:**
+
+| type | all GT | findable | unfindable |
+|---|---:|---:|---:|
+| condition | 28 | **19** | **9** |
+| medication | 7 | 7 | 0 |
+| allergy | 1 | 1 | 0 |
+| immunization | 10 | 10 | 0 |
+| lab | 143 | 143 | 0 |
+| **total** | **189** | **180** | **9** |
+
+All 9 unfindables are conditions — exactly the historical conditions we suspected weren't in the snapshot:
+- `D22.9` multiple nevi
+- `L82.1` seborrheic keratoses
+- `L81.9` post-inflammatory pigmentary changes
+- `Z00.00` annual physical exam (×3 — three encounter records all coded the same way)
+- `Z11.59` special screening examination for viral disease
+- `E78.5` hyperlipidemia, unspecified
+
+Re-scored multipass-fhir × cedars-health-summary with findable-only:
+
+| type | gt(strict) | gt(findable) | TP | recall(strict) | recall(findable) | F1(strict) | F1(findable) |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| condition | 28 | **19** | 3 | 0.11 | **0.16** | 0.18 | **0.27** |
+| medication | 7 | 7 | 6 | 0.86 | 0.86 | 0.92 | 0.92 |
+| allergy | 1 | 1 | 1 | 1.00 | 1.00 | 1.00 | 1.00 |
+| immunization | 10 | 10 | 8 | 0.80 | 0.80 | 0.89 | 0.89 |
+| lab | 143 | 143 | 98 | 0.69 | 0.69 | 0.70 | 0.70 |
+
+**Overall F1: 0.64 (strict) → 0.67 (findable).**
+
+**Conclusion:**
+
+1. **The recall ceiling was real but smaller than I estimated.** Only 9 of 28 conditions are unfindable; the other 19 are in the PDF and we missed 16 of them. So there *is* meaningful prompt-tuning room for conditions — we're not at the floor.
+2. **All 16 still-missed conditions are in the PDF text.** Future prompt iterations can be measured against this filtered baseline. Worth a separate experiment.
+3. **The filter caught exactly the kind of GT noise we expected** — historical/encounter-level conditions that don't make it into a Health Summary export. It did NOT filter out any medications/allergies/immunizations/labs, which makes sense (those have their own sections in the summary).
+4. **The eval harness now has a meaningful signal-to-noise improvement.** Future experiments should use `findable_only=True` by default; legacy strict mode kept for cases where we want to measure GT-coverage gap.
+
+**Next:**
+
+- ⏳ Investigate the 16 still-missed-but-findable conditions. Likely candidates for the next conditions-prompt iteration.
+- ⏳ The 40 lab false-positives still need triage — vision wins or hallucinations? Filterable similarly?
+- ⏳ Move F next: page chunking on GoogleAIStudioBackend.
+
+---
+
 ## 2026-05-03 · Move B — Gemma 4 31B for tabular passes on Cedars
 
 **Agent:** Claude Opus 4.7

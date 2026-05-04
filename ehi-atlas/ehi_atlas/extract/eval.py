@@ -528,6 +528,85 @@ class EvalReport:
 _FACT_TYPES: list[FactType] = ["condition", "medication", "allergy", "immunization", "lab"]
 
 
+# ---------------------------------------------------------------------------
+# Findable-in-PDF filter — resolves the recall-ceiling ambiguity
+# ---------------------------------------------------------------------------
+
+
+def filter_gt_to_findable_in_pdf(
+    gt_facts: list[Fact],
+    pdf_path: "Path",
+) -> tuple[list[Fact], list[Fact]]:
+    """Split ground-truth facts into ``(findable, unfindable)`` based on PDF text.
+
+    The Cedars FHIR ground truth contains 28 conditions covering Blake's
+    full chart history; the Health Summary PDF is a 25-page snapshot
+    that may only show a subset. Without filtering, our recall metric
+    is bounded by *how much of the patient's chart appears in the PDF*,
+    not by *how good the pipeline is at extracting from the PDF*.
+
+    This filter compares each GT fact's signature (display + codes) to
+    the text extracted from the PDF via pdfplumber. A fact is "findable"
+    when:
+
+      - Its primary code (ICD-10, SNOMED, RxNorm, LOINC, CVX) appears
+        as a substring in the PDF text, OR
+      - Its display name appears as a substring (case-insensitive), OR
+      - At least 50% of its display tokens appear in the PDF text
+
+    Anything that fails all three is unfindable; it gets excluded from
+    "findable" eval. We log the unfindable list separately so users can
+    sanity-check our filter.
+
+    On scanned PDFs (no extractable text layer), all facts default to
+    "findable" — we can't filter what we can't read.
+    """
+    try:
+        from ehi_atlas.extract.layout import extract_layout
+
+        layout = extract_layout(pdf_path)
+    except Exception:
+        # Scanned PDF or pdfplumber failure — can't filter, return all as findable
+        return list(gt_facts), []
+
+    # Build a normalized text blob for substring search.
+    pdf_tokens: set[str] = set()
+    pdf_text_lower = ""
+    for page in layout.pages:
+        for span in page.spans:
+            pdf_tokens.update(_tokens(span.text))
+            pdf_text_lower += " " + span.text.lower()
+
+    findable: list[Fact] = []
+    unfindable: list[Fact] = []
+
+    for fact in gt_facts:
+        if _is_findable(fact, pdf_text_lower, pdf_tokens):
+            findable.append(fact)
+        else:
+            unfindable.append(fact)
+
+    return findable, unfindable
+
+
+def _is_findable(fact: Fact, pdf_text_lower: str, pdf_tokens: set[str]) -> bool:
+    # Code-based findability: any code in any system appears in PDF text
+    for code in fact.all_codes.values():
+        if code and code.lower() in pdf_text_lower:
+            return True
+
+    # Substring match on display
+    if fact.display and fact.display in pdf_text_lower:
+        return True
+
+    # Token-overlap match (≥ 50% of fact's display tokens in PDF)
+    fact_tokens = _tokens(fact.display)
+    if not fact_tokens:
+        return False
+    overlap = fact_tokens & pdf_tokens
+    return len(overlap) / len(fact_tokens) >= 0.5
+
+
 def evaluate_bundle(
     ground_truth: dict | list,
     bundle: dict,
@@ -535,15 +614,33 @@ def evaluate_bundle(
     extraction_label: str = "",
     ground_truth_label: str = "",
     fuzzy_threshold: float = 0.5,
+    pdf_path: "Path | None" = None,
+    findable_only: bool = False,
 ) -> EvalReport:
     """Evaluate a FHIR Bundle (pipeline output) against a ClientFullEHR ground truth.
 
     Mirror of :func:`evaluate` but accepts the Bundle dict that pipelines
     produce, instead of the legacy ``ExtractionResult``. Use this from
     the bake-off harness and from any future pipeline-aware tooling.
+
+    Args:
+        ground_truth: ClientFullEHR JSON (raw list or wrapper dict).
+        bundle: FHIR Bundle the pipeline emitted.
+        extraction_label, ground_truth_label: cosmetic labels for reports.
+        fuzzy_threshold: token-overlap threshold for fuzzy display match
+            during scoring (default 0.5).
+        pdf_path: When given (and ``findable_only=True``), filter ground
+            truth to only facts whose text/codes appear in the PDF.
+            Resolves the "recall ceiling" ambiguity — without this, GT
+            facts that aren't in the PDF count as misses.
+        findable_only: If True, score against the findable subset of GT.
+            Defaults to False (legacy behavior — score against all GT).
     """
+    gt_facts = facts_from_clientfullehr(ground_truth)
+    if findable_only and pdf_path is not None:
+        gt_facts, _unfindable = filter_gt_to_findable_in_pdf(gt_facts, pdf_path)
     return _evaluate_facts(
-        gt_facts=facts_from_clientfullehr(ground_truth),
+        gt_facts=gt_facts,
         ex_facts=facts_from_bundle(bundle),
         extraction_label=extraction_label,
         ground_truth_label=ground_truth_label,

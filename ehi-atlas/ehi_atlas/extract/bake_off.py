@@ -105,6 +105,7 @@ def bake_off(
     pairs: list[tuple[str, Path, Path | None]],
     *,
     skip_cache: bool = False,
+    findable_only: bool = False,
     on_progress: ProgressCallback | None = None,
 ) -> list[BakeoffCell]:
     """Run every (pipeline × pair) cell. Returns one BakeoffCell per cell.
@@ -118,6 +119,11 @@ def bake_off(
         skip_cache: Forwarded to each pipeline if it accepts the kwarg.
             Pipelines that don't accept it raise TypeError, which we
             catch and treat as cell failure.
+        findable_only: When True, ground-truth facts are filtered to
+            those whose text/codes actually appear in the PDF before
+            scoring. Resolves the "GT covers full chart history but
+            PDF only shows a snapshot" ambiguity. See
+            :func:`filter_gt_to_findable_in_pdf`.
         on_progress: Optional callback invoked after each cell completes.
             Streamlit pages use this to stream live updates.
 
@@ -139,7 +145,14 @@ def bake_off(
     out: list[BakeoffCell] = []
 
     for idx, (pipeline, label, pdf_path, gt_path) in enumerate(cells_input, start=1):
-        cell = _run_one_cell(pipeline, label, pdf_path, gt_path, skip_cache=skip_cache)
+        cell = _run_one_cell(
+            pipeline,
+            label,
+            pdf_path,
+            gt_path,
+            skip_cache=skip_cache,
+            findable_only=findable_only,
+        )
         out.append(cell)
         if on_progress is not None:
             on_progress(idx, total, cell)
@@ -154,6 +167,7 @@ def _run_one_cell(
     ground_truth_path: Path | None,
     *,
     skip_cache: bool,
+    findable_only: bool = False,
 ) -> BakeoffCell:
     """Execute a single (pipeline × pair) cell with full error capture."""
     pipeline_name = pipeline.metadata.name
@@ -193,6 +207,8 @@ def _run_one_cell(
                 bundle=bundle,
                 extraction_label=pipeline_name,
                 ground_truth_label=ground_truth_path.name,
+                pdf_path=pdf_path,
+                findable_only=findable_only,
             )
         except Exception as e:
             # Eval failure is logged but doesn't fail the whole cell — we

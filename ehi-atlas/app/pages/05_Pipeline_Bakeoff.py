@@ -176,6 +176,17 @@ with opts_col:
             "prompt or schema change."
         ),
     )
+    findable_only = st.toggle(
+        "Score against findable-in-PDF GT only",
+        value=True,
+        help=(
+            "ON (recommended): filters ground-truth facts to those whose "
+            "text or codes actually appear in the PDF before scoring. "
+            "Resolves the 'GT covers full chart history but PDF is a "
+            "snapshot' ambiguity. OFF: legacy strict mode — recall is "
+            "bounded by PDF coverage, not pipeline quality."
+        ),
+    )
 total_cells = len(selected_pipeline_names) * len(selected_pairs)
 opts_col.caption(
     f"Will run **{total_cells} cells** "
@@ -235,6 +246,7 @@ if run_clicked:
         pipelines,
         selected_pairs,
         skip_cache=skip_cache,
+        findable_only=findable_only,
         on_progress=_on_progress,
     )
     progress.progress(1.0, text=f"Done · {len(cells)} cells.")

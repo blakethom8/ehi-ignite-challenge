@@ -440,6 +440,9 @@ class GoogleAIStudioBackend:
             )
 
         text = text_parts[0].get("text", "")
+        # Gemma occasionally wraps JSON in markdown code fences despite
+        # responseMimeType=application/json. Strip them before parsing.
+        text = _strip_markdown_code_fence(text)
         try:
             return json.loads(text)
         except json.JSONDecodeError as e:
@@ -482,6 +485,32 @@ class GoogleAIStudioBackend:
 # ---------------------------------------------------------------------------
 
 
+def _strip_markdown_code_fence(text: str) -> str:
+    """Strip leading/trailing markdown code fences like ```json ... ``` .
+
+    Gemma 4 via Google AI Studio occasionally wraps JSON in fences even
+    when responseMimeType=application/json is set. Caught this on a
+    chunked Cedars run where the immunizations pass returned:
+        ' {\\n  "immunizations": []\\n}\\n```'
+    Note the trailing fence with no opening — Gemma's mode-switching is
+    inconsistent. We strip both opening and trailing fences (with or
+    without language tag) and trim whitespace.
+    """
+    if not text:
+        return text
+    s = text.strip()
+    # Opening fence: ```json or ```
+    if s.startswith("```"):
+        # Skip the opening fence line (everything up to first newline)
+        nl = s.find("\n")
+        if nl != -1:
+            s = s[nl + 1 :]
+    # Trailing fence
+    if s.rstrip().endswith("```"):
+        s = s.rstrip()[: -len("```")]
+    return s.strip()
+
+
 def _merge_chunk_responses(
     responses: list[dict[str, Any]],
     schema_json: dict[str, Any],
@@ -513,10 +542,17 @@ def _merge_chunk_responses(
     # Schema-declared fields first
     for field_name, field_def in properties.items():
         if _is_array_field(field_def):
-            merged[field_name] = []
+            merged_list: list[Any] = []
+            seen_signatures: set[str] = set()
             for resp in responses:
                 if isinstance(resp, dict) and isinstance(resp.get(field_name), list):
-                    merged[field_name].extend(resp[field_name])
+                    for item in resp[field_name]:
+                        sig = _dedup_signature(item)
+                        if sig in seen_signatures:
+                            continue
+                        seen_signatures.add(sig)
+                        merged_list.append(item)
+            merged[field_name] = merged_list
         else:
             for resp in responses:
                 if isinstance(resp, dict) and resp.get(field_name) is not None:
@@ -532,6 +568,48 @@ def _merge_chunk_responses(
                 merged[k] = v
 
     return merged
+
+
+def _dedup_signature(item: Any) -> str:
+    """Build a normalized signature for chunk-level dedup of array items.
+
+    Items emitted across chunks often duplicate (same medication mentioned
+    on pages 4 and 12 → emitted by chunks 1 and 2). Dedup by:
+
+    1. Any code field (rxnorm_code, loinc_code, snomed_ct_code, cvx_code,
+       icd_10_cm_code) — codes are exact identifiers
+    2. Otherwise: normalized display/test_name/vaccine_display
+
+    Items with neither codes nor display fall back to JSON serialization
+    (probably unique by accident, won't dedupe — acceptable).
+    """
+    if not isinstance(item, dict):
+        return repr(item)
+
+    # Code-based signature wins if any of these is present
+    for code_field in (
+        "rxnorm_code",
+        "loinc_code",
+        "snomed_ct_code",
+        "icd_10_cm_code",
+        "cvx_code",
+        "ndc_code",
+    ):
+        v = item.get(code_field)
+        if v:
+            return f"code:{code_field}={v}"
+
+    # Display-based signature
+    for display_field in (
+        "display",
+        "test_name",
+        "vaccine_display",
+    ):
+        v = item.get(display_field)
+        if v and isinstance(v, str):
+            return f"display:{v.strip().lower()}"
+
+    return f"raw:{json.dumps(item, sort_keys=True)}"
 
 
 def _is_array_field(field_def: dict) -> bool:

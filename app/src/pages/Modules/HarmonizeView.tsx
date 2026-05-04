@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
@@ -516,6 +517,8 @@ function ConditionsTab({ collectionId }: { collectionId: string }) {
 export function HarmonizeView() {
   const [tab, setTab] = useState<ResourceTab>("labs");
   const queryClient = useQueryClient();
+  const [searchParams] = useSearchParams();
+  const requestedCollection = searchParams.get("collection");
 
   const collectionsQuery = useQuery({
     queryKey: ["harmonize-collections"],
@@ -523,6 +526,20 @@ export function HarmonizeView() {
   });
   const collections = collectionsQuery.data?.collections ?? [];
   const [collectionId, setCollectionId] = useState<string>("");
+
+  // Honor ?collection=<id> on first load — but only if the requested
+  // collection actually exists in the registry. Otherwise fall back to
+  // the first collection. We track sync via a flag so user picker
+  // changes aren't overwritten on every render.
+  const [hasSyncedFromUrl, setHasSyncedFromUrl] = useState(false);
+  useEffect(() => {
+    if (hasSyncedFromUrl || collections.length === 0) return;
+    if (requestedCollection && collections.some((c) => c.id === requestedCollection)) {
+      setCollectionId(requestedCollection);
+    }
+    setHasSyncedFromUrl(true);
+  }, [collections, requestedCollection, hasSyncedFromUrl]);
+
   const activeId =
     collectionId || collections[0]?.id || "";
   const activeCollection = collections.find((c) => c.id === activeId) ?? null;

@@ -428,14 +428,27 @@ function SourceInventoryPage({
       </section>
 
       <section className="rounded-2xl bg-white shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
-        <div className="flex items-center justify-between gap-3 border-b border-[#eef0f5] p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#eef0f5] p-5">
           <div className="flex items-center gap-2">
             <FileText size={18} className="text-[#5b76fe]" />
             <h2 className="text-lg font-semibold text-[#1c1c1e]">Submitted files</h2>
           </div>
-          <button type="button" onClick={() => inputRef.current?.click()} className="rounded-lg border border-[#dfe4ea] px-3 py-2 text-sm font-semibold text-[#555a6a]">
-            Add file
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            {sources.uploaded_files.length > 0 && (
+              <Link
+                to={`/aggregate/harmonize?collection=upload-${patientId}`}
+                className="inline-flex items-center gap-2 rounded-lg bg-[#5b76fe] px-3 py-2 text-sm font-semibold text-white hover:bg-[#4760e8]"
+                title="Open the harmonize view with these uploads pre-selected"
+              >
+                <Layers3 size={16} />
+                Harmonize {sources.uploaded_files.length} upload
+                {sources.uploaded_files.length === 1 ? "" : "s"} →
+              </Link>
+            )}
+            <button type="button" onClick={() => inputRef.current?.click()} className="rounded-lg border border-[#dfe4ea] px-3 py-2 text-sm font-semibold text-[#555a6a]">
+              Add file
+            </button>
+          </div>
         </div>
         {sources.uploaded_files.length ? (
           <div className="overflow-x-auto">

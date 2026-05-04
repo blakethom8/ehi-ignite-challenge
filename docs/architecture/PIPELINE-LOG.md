@@ -4,6 +4,23 @@
 >
 > The architecture decision record at [`PDF-PROCESSOR.md`](./PDF-PROCESSOR.md) captures *stable* decisions. This file captures the *empirical work* that produces them. Bake-off result tables, prompt-tuning A/Bs, model-swap experiments, dead-ends — all go here. The audience is future-Blake, future-Claude, and future contributors trying to understand "why is this pipeline configured this way?"
 
+## Quick index — all experiments to date
+
+Best multipass-fhir result on Cedars Health Summary: **F1 0.70** (post-Move H, with `findable_only=True` + GT dedup).
+
+| Date | Move | Subject | Headline result |
+|---|---|---|---|
+| 2026-05-03 | **H** | Conditions prompt v3 + GT dedup | F1 **0.67 → 0.70**; 4 condition "FPs" classified as **vision wins** (clinical findings in PDF that Cedars FHIR never coded) |
+| 2026-05-03 | **I** | Lab "FPs" diagnostic | 41/41 are correctly-extracted IgE allergen panel; matching issue (GT display="class"), not pipeline error |
+| 2026-05-03 | **F** | Page chunking for long PDFs | Gemma-tabular F1 0.55, 352s; 12 pts below all-Claude, 3.7× slower. Decision: keep all-Claude as default |
+| 2026-05-03 | **D** | Findable-in-PDF GT filter | F1 0.64 → 0.67. Resolves the recall ceiling (9 of 28 GT conditions aren't in PDF) |
+| 2026-05-03 | **C** | Multipass vs baseline across all PDFs | Lab-only PDFs: no improvement. Chart PDFs (Cedars, H&P, discharge): +15-153 facts. Routing opportunity. |
+| 2026-05-03 | **B** | Gemma-tabular variant | First HTTP 400 on long PDFs; works on small (3-page rhett759). Led to Move F chunking work |
+| 2026-05-03 | **A** | Conditions prompt v1 → v2 | F1 unchanged; surfaced recall-ceiling ambiguity → Move D |
+| 2026-05-03 | K.4 | First bake-off (multipass vs single-pass) | F1 **0.03 → 0.64** (21× improvement). Schema-direct multipass validated. |
+
+Pipeline framework + eval harness shipped 2026-05-03 (commits: pipeline Protocol + registry + bake-off + Streamlit Pipeline Bakeoff page).
+
 ## Entry template
 
 ```

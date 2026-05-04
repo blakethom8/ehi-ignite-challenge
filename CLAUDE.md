@@ -120,6 +120,8 @@ ehi-ignite-challenge/
 │
 ├── docs/architecture/                     ← architecture docs
 │   ├── ATLAS-DATA-MODEL.md                ← architectural decisions for Atlas's data layer ⭐
+│   ├── PDF-PROCESSOR.md                   ← PDF → FHIR pipeline decision record + bake-off results ⭐
+│   ├── PIPELINE-LOG.md                    ← running journal of pipeline experiments + measurements ⭐
 │   ├── CONTEXT-ENGINEERING.md             ← LLM context pipeline design ⭐
 │   ├── DATA-DEFINITIONS.md                ← data model reference ⭐
 │   ├── ECOSYSTEM-OVERVIEW.md              ← platform framing, full directory layout, build sequence
@@ -254,6 +256,8 @@ stats = compute_patient_stats(record)
 | Doc | What It Is |
 |---|---|
 | `docs/architecture/ATLAS-DATA-MODEL.md` | ⭐ **Read this first.** Architectural decisions for Atlas's data layer — FHIR R4 + USCDI as silver, bronze preserves native shape, LLM-authored mapping specs, hot path UI + cold path agent, Provenance graph as the wedge |
+| `docs/architecture/PDF-PROCESSOR.md` | ⭐ PDF → FHIR pipeline decision record. Seven decisions, bake-off results, vision-wins evidence. Read before touching any extraction code. |
+| `docs/architecture/PIPELINE-LOG.md` | Running journal of pipeline experiments — bake-off result tables, prompt-tuning A/Bs, model-swap experiments. Append-only, newest at top. |
 | `docs/architecture/CONTEXT-ENGINEERING.md` | 5-layer LLM context pipeline design — read before building batch_enrichment or NL search |
 | `docs/architecture/DATA-DEFINITIONS.md` | Full data model reference — encounter types, medication records, observation fields |
 | `ideas/PATIENT-JOURNEY-APP.md` | Full product spec for the clinical journey app |

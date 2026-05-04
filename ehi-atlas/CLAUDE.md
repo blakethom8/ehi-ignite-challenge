@@ -17,7 +17,9 @@
 | `notes/` | Research notes, primarily the multi-session `josh-stack-deep-dive/`. Code excerpts + commentary belong here; strategic narrative lives in the Chief vault (see below). |
 | `scripts/` | Utility scripts for corpus build, validation, ad-hoc data prep. |
 | `tests/` | Tests for `ehi_atlas/`. Library-code tests live at `lib/tests/`; FastAPI tests at `api/tests/`. |
-| `app/`, `docs/` | Atlas-specific UI prototype + per-package design docs. |
+| `app/` | Streamlit console for the Atlas data platform. Pages: Sources & Bronze, Standardize, **PDF Lab** (single-PDF live extraction), **PDF Compare** (vision-LLM backend A/B), **Pipeline Bakeoff** (extraction-architecture comparison with eval-harness scoring), Harmonize, Gold & Provenance. |
+| `ehi_atlas/extract/` | PDF-extraction pipeline framework — `pipelines/` Protocol + registry, `bake_off.py` comparison harness, `eval.py` ground-truth scoring with findable-only filter + GT dedup. See `pipelines/README.md` for the contributor guide. |
+| `docs/` | Atlas-specific design docs. |
 
 ## What does NOT live here
 
@@ -49,7 +51,13 @@ The legacy Streamlit shells in `archive/fhir-explorer-streamlit/` and `archive/p
 ### Repo-level
 - Repo CLAUDE.md (product strategy, build order, top-level layout) — `../CLAUDE.md`
 - Application zone library code — `../lib/README.md`
-- Architecture docs — `../docs/architecture/` (`ATLAS-DATA-MODEL.md`, `CONTEXT-ENGINEERING.md`, `DATA-DEFINITIONS.md`, `DEPLOYMENT.md`, `tracing.md`)
+- Architecture docs — `../docs/architecture/`:
+    - `ATLAS-DATA-MODEL.md` — top-level data-layer decisions (FHIR R4 + USCDI as canonical, Provenance as wedge)
+    - `PDF-PROCESSOR.md` — PDF → FHIR pipeline decisions, bake-off results, vision-wins evidence
+    - `PIPELINE-LOG.md` — running experiment journal (bake-off tables, prompt iterations, model swaps)
+    - `CONTEXT-ENGINEERING.md` — 5-layer LLM context pipeline
+    - `DATA-DEFINITIONS.md` — data model reference
+    - `DEPLOYMENT.md`, `tracing.md` — operational
 
 ### Chief vault (qualitative research lives here, not in this repo)
 - `~/Chief/20-projects/ehi-ignite-challenge/research/` — strategy, prior-art notes, screenshots, unzipped artifacts

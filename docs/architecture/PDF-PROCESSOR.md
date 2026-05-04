@@ -354,59 +354,62 @@ Total: ~17-20 hours. Output: multiple working pipelines + an empirical compariso
 
 ---
 
-## First bake-off result — 2026-05-03
+## Bake-off results — 2026-05-03
 
-`single-pass-vision` (baseline, current ExtractionResult-shaped path) vs
-`multipass-fhir` (Decisions 1–4 implementation) on Blake's Cedars Health
-Summary PDF (25 pages, 189 ground-truth facts in the ClientFullEHR JSON):
+For the running experiment journal (per-move detail, raw bake-off output, dead-ends), see [`PIPELINE-LOG.md`](./PIPELINE-LOG.md). Stable summary below.
+
+### Current state — multipass-fhir × Cedars Health Summary
+
+After Moves D (findable-in-PDF filter), H (conditions prompt v3 + GT dedup), I (lab FP diagnostic):
 
 | pipeline | weighted F1 | latency | bundle entries |
 |---|---:|---:|---:|
-| `single-pass-vision` | **0.03** | 1.3s (cache hit) | 3 |
-| `multipass-fhir`     | **0.64** | 93.7s            | 156 |
+| `single-pass-vision` (baseline) | **0.03** | 1s | 3 |
+| `multipass-fhir` (default) | **0.70** | 95s | 160 |
+| `multipass-fhir-gemma-tabular` (chunked) | 0.55 | 352s | 73 |
 
-Per-resource breakdown for `multipass-fhir`:
+Per-resource for `multipass-fhir` against deduped findable GT (post-D, post-H):
 
-| type | ground truth | extracted | precision | recall | F1 |
-|---|---:|---:|---:|---:|---:|
-| condition    |  28 |   3 | 1.00 | 0.11 | 0.19 |
-| medication   |   7 |   6 | 1.00 | 0.86 | **0.92** |
-| allergy      |   1 |   1 | 1.00 | 1.00 | **1.00** |
-| immunization |  10 |   8 | 1.00 | 0.80 | **0.89** |
-| lab          | 143 | 138 | 0.71 | 0.69 | 0.70 |
+| type | findable GT | extracted | TP | precision | recall | F1 |
+|---|---:|---:|---:|---:|---:|---:|
+| medication   |   7 |   6 |  6 | 1.00 | 0.86 | **0.92** |
+| allergy      |   1 |   1 |  1 | 1.00 | 1.00 | **1.00** |
+| immunization |   8 |   8 |  7 | 0.88 | 0.88 | **0.88** |
+| lab          | 140 | 138 | 97 | 0.70 | 0.69 | 0.70 |
+| condition    |  10 |   7 |  3 | 0.43 | 0.30 | 0.35 |
 
-**Findings.**
+### Vision wins are the architectural validation of Decision 5
 
-1. **The architecture hypothesis holds.** Schema-direct multi-pass
-   produced a **21× weighted-F1 improvement** over the bespoke
-   intermediate format on the same PDF — driven entirely by closing
-   the schema gaps in Decisions 1 + 3. Medications, allergies,
-   immunizations went from `SCHEMA GAP — 0/N` to F1 ≥ 0.89.
-2. **Conditions stayed at 0.11 recall on both pipelines** — same model,
-   same prompt baseline, same input. This is **not a schema-gap finding;
-   it's a prompt-quality finding for the conditions pass specifically**.
-   Health Summary PDFs decompose conditions across visit-section
-   subheadings ("Active Problems," "Past Medical History,"
-   "Reason for Visit"); the conditions prompt needs to nudge the model
-   toward all of those.
-3. **Lab precision is 0.71, not 1.00.** The 40 false-positives are the
-   "vision wins or hallucinations" bucket. Manual review pending; some
-   are likely real findings the FHIR Bundle doesn't code (textual lab
-   mentions in clinical notes that never become coded Observations
-   server-side).
-4. **Cost trade is real.** Multi-pass costs ~$0.30 per 25-page PDF
-   vs ~$0.05 baseline. F1 0.64 vs 0.03 is worth it; per-pass downgrade
-   to Gemma 4 (per Decision 4) is the natural next experiment to
-   reduce cost without surrendering quality.
+Inspecting the 4 condition "FPs" in the Move H result revealed they are **not hallucinations** — they are clinical findings present in the PDF that **Cedars FHIR never coded as Condition resources**:
 
-**Decisions made:**
-- `multipass-fhir` is the new default architecture for the PDF processor.
-- `single-pass-vision` retained as a baseline + regression detector.
-- Next investigation: prompt tuning for the conditions pass (target:
-  push condition recall above 0.6 on the same PDF).
-- Next experiment: per-pass model swap for the high-volume tabular
-  passes (medications, immunizations, lab observations) to Gemma 4 —
-  measure F1 + cost + latency delta.
+- `chronic appearing fracture at the base of the right 2nd toe proximal phalanx` — X-ray narrative
+- `bipartite tibial sesamoid on the left` — imaging anatomical variant
+- `marginal osteophyte at the lateral left 1st MTP joint` — bone spur
+- `bilateral inferior turbinate hypertrophy` — ENT exam finding
+
+Vision extraction recovered them from imaging-report and exam-note narrative text. The structured Cedars Bundle is missing these. **This is the Atlas wedge in concrete, measurable form** — vision extraction produces clinical facts the structured EHR is missing, exactly the harmonization-augmentation use case the architecture was designed for.
+
+The lab "FPs" are similar: 41 of 41 are an IgE allergen panel correctly extracted with proper allergen names, where the GT has them coded as LOINC but with `code.text="class"` — neither code nor display match. **No prompt change can fix this** (LOINC codes for individual allergens aren't printed in the PDF). This is a matcher-side or eval-side improvement opportunity, not a pipeline failure.
+
+### Eval upgrades shipped during the bake-off
+
+These improvements ship in [`eval.py`](../../ehi-atlas/ehi_atlas/extract/eval.py); each is documented in `PIPELINE-LOG.md`:
+
+1. **`filter_gt_to_findable_in_pdf()`** (Move D) — filter ground-truth facts to those whose codes/displays appear in the PDF text via pdfplumber. Resolves the "GT covers full chart history but PDF is a snapshot" bias.
+2. **`dedupe_gt_facts()`** (Move H) — collapse GT entries that share the same code. Cedars emits one Condition per encounter; without dedup recall was bounded by encounter-multiplicity.
+3. **`evaluate_bundle(findable_only=True, dedupe_gt=True)`** is the recommended default for any new bake-off run.
+
+### Vision-wins reviewer (planned)
+
+The 4 condition + 41 lab "FPs" deserve manual triage. A planned Streamlit page will let a human classify each FP as `valid_extra` / `hallucination` / `out_of_scope`, persist the verdict, and recompute "human-adjusted F1." Once shipped, the precision metric stops penalizing the pipeline for finding clinical content the structured EHR missed. Tracked in `PIPELINE-LOG.md` Move H "Next" list.
+
+### Decisions made
+
+- `multipass-fhir` (all-Claude) is the **default architecture**.
+- `single-pass-vision` retained as a regression detector + lab-only-PDF fast path (Move C showed it matches multipass quality on pure lab PDFs at ~70× lower latency).
+- `multipass-fhir-gemma-tabular` (chunked Gemma) **kept registered but not the default** — 12 F1 points lower, 3.7× slower on chart documents. Useful for cost-constrained workflows on small PDFs.
+- `dedupe_gt=True` and `findable_only=True` are the **eval defaults** for fairness.
+- Next investigations (in `PIPELINE-LOG.md`): vision-wins reviewer, conditions prompt v4 targeting Z/R/S codes, multipass on documents beyond Cedars.
 
 ---
 

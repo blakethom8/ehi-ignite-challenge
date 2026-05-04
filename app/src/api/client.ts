@@ -41,6 +41,8 @@ import type {
   HarmonizeProvenanceResponse,
   HarmonizeSourceManifestResponse,
   AggregationEnvironmentResponse,
+  AggregationCreateProfilePayload,
+  AggregationCreateProfileResponse,
   AggregationPreparedPreviewResponse,
   AggregationReadinessResponse,
   AggregationUploadPayload,
@@ -177,6 +179,9 @@ export const api = {
     http.post<PatientContextExportResponse>(`/patient-context/sessions/${sessionId}/export`).then((r) => r.data),
 
   /** Data Aggregator workflow */
+  createAggregationProfile: (payload: AggregationCreateProfilePayload = {}): Promise<AggregationCreateProfileResponse> =>
+    http.post<AggregationCreateProfileResponse>("/aggregation/profiles", payload).then((r) => r.data),
+
   getAggregationSources: (patientId: string): Promise<AggregationEnvironmentResponse> =>
     http.get<AggregationEnvironmentResponse>(`/aggregation/sources/${patientId}`).then((r) => r.data),
 

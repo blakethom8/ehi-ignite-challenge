@@ -30,9 +30,28 @@ class PatientListItem(BaseModel):
     encounter_count: int
     active_condition_count: int
     active_med_count: int
-    workspace_type: Literal["synthea", "upload", "demo"] = "synthea"
+    workspace_type: Literal["synthea", "upload", "profile", "demo"] = "synthea"
     source_count: int = 0
     prepared_source_count: int = 0
+
+
+class AggregationProfile(BaseModel):
+    id: str
+    display_name: str
+    created_at: datetime
+    updated_at: datetime
+    notes: str = ""
+    storage_mode: str = "server-local-workspace"
+
+
+class AggregationCreateProfileRequest(BaseModel):
+    display_name: str = "New patient workspace"
+    notes: str = ""
+
+
+class AggregationCreateProfileResponse(BaseModel):
+    profile: AggregationProfile
+    storage_posture: str
 
 
 class CanonicalSourceSummary(BaseModel):

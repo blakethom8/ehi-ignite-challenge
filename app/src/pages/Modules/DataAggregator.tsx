@@ -744,6 +744,10 @@ function UploadDetailModal({
             <p className="mt-1 text-sm leading-5 text-[#667085]">
               This source will be staged directly inside {patientLabel}'s Source Intake workspace.
             </p>
+            <p className="mt-2 rounded-lg border border-[#f0d7bf] bg-[#fff8f1] px-3 py-2 text-xs leading-5 text-[#8a5a24]">
+              Demo storage: uploaded files are stored on this application server for the prototype. Use synthetic or
+              test records unless you intentionally want to test this hosted demo environment.
+            </p>
           </div>
           <button
             type="button"
@@ -872,12 +876,16 @@ function SourceInventoryPage({
       setUploadModalOpen(false);
       setSelectedFile(null);
       setUploadForm(emptyUploadForm);
+      queryClient.invalidateQueries({ queryKey: ["patients"] });
       refreshAll();
     },
   });
   const deleteMutation = useMutation({
     mutationFn: (fileId: string) => api.deleteAggregationFile(patientId, fileId),
-    onSuccess: refreshAll,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["patients"] });
+      refreshAll();
+    },
   });
   const extractMutation = useMutation({
     mutationFn: () => api.extractHarmonizeCollection(collectionId),

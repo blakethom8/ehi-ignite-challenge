@@ -11,9 +11,28 @@ export interface PatientListItem {
   encounter_count: number;
   active_condition_count: number;
   active_med_count: number;
-  workspace_type?: "synthea" | "upload" | "demo";
+  workspace_type?: "synthea" | "upload" | "profile" | "demo";
   source_count?: number;
   prepared_source_count?: number;
+}
+
+export interface AggregationProfile {
+  id: string;
+  display_name: string;
+  created_at: string;
+  updated_at: string;
+  notes: string;
+  storage_mode: string;
+}
+
+export interface AggregationCreateProfilePayload {
+  display_name?: string;
+  notes?: string;
+}
+
+export interface AggregationCreateProfileResponse {
+  profile: AggregationProfile;
+  storage_posture: string;
 }
 
 export interface CanonicalSourceSummary {

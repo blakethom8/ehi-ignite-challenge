@@ -20,9 +20,12 @@ from api.core.loader import load_patient, patient_display_name, path_from_patien
 from api.core.patient_context import private_cedars_available
 from api.models import (
     AggregationCleaningIssue,
+    AggregationCreateProfileRequest,
+    AggregationCreateProfileResponse,
     AggregationDeleteResponse,
     AggregationCleaningQueueResponse,
     AggregationEnvironmentResponse,
+    AggregationProfile,
     AggregationPreparedPreviewItem,
     AggregationPreparedPreviewResponse,
     AggregationReadinessItem,
@@ -36,6 +39,8 @@ from api.models import (
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 STORE_ROOT = Path(os.getenv("AGGREGATION_UPLOAD_STORE_PATH", REPO_ROOT / "data" / "aggregation-uploads"))
+PROFILE_ROOT = Path(os.getenv("AGGREGATION_PROFILE_STORE_PATH", REPO_ROOT / "data" / "aggregation-profiles"))
+PROFILE_REGISTRY_PATH = PROFILE_ROOT / "profiles.json"
 MAX_UPLOAD_BYTES = int(os.getenv("AGGREGATION_MAX_UPLOAD_BYTES", str(25 * 1024 * 1024)))
 
 
@@ -49,6 +54,9 @@ def _safe_id(value: str) -> str:
 
 
 def _patient_label(patient_id: str) -> str:
+    profile = _profile_for(patient_id)
+    if profile:
+        return profile.display_name
     path = path_from_patient_id(patient_id)
     if path:
         return patient_display_name(path)
@@ -61,6 +69,73 @@ def _patient_root(patient_id: str) -> Path:
 
 def _upload_metadata_path(patient_id: str, file_id: str) -> Path:
     return _patient_root(patient_id) / f"{file_id}.metadata.json"
+
+
+def _load_profiles() -> dict[str, AggregationProfile]:
+    if not PROFILE_REGISTRY_PATH.exists():
+        return {}
+    try:
+        raw = json.loads(PROFILE_REGISTRY_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    items = raw.get("profiles") if isinstance(raw, dict) else raw
+    if not isinstance(items, list):
+        return {}
+    out: dict[str, AggregationProfile] = {}
+    for item in items:
+        try:
+            profile = AggregationProfile.model_validate(item)
+        except ValueError:
+            continue
+        out[profile.id] = profile
+    return out
+
+
+def _write_profiles(profiles: dict[str, AggregationProfile]) -> None:
+    PROFILE_ROOT.mkdir(parents=True, exist_ok=True)
+    ordered = sorted(profiles.values(), key=lambda item: item.created_at)
+    PROFILE_REGISTRY_PATH.write_text(
+        json.dumps({"profiles": [json.loads(profile.model_dump_json()) for profile in ordered]}, indent=2),
+        encoding="utf-8",
+    )
+
+
+def _profile_for(patient_id: str) -> AggregationProfile | None:
+    return _load_profiles().get(_safe_id(patient_id))
+
+
+def _ensure_profile(patient_id: str, display_name: str | None = None, notes: str = "") -> AggregationProfile:
+    profiles = _load_profiles()
+    profile_id = _safe_id(patient_id)
+    existing = profiles.get(profile_id)
+    now = _now()
+    if existing is not None:
+        return existing
+    profile = AggregationProfile(
+        id=profile_id,
+        display_name=(display_name or f"Uploaded workspace · {profile_id[:8]}").strip(),
+        created_at=now,
+        updated_at=now,
+        notes=notes.strip(),
+    )
+    profiles[profile.id] = profile
+    _write_profiles(profiles)
+    return profile
+
+
+def create_profile(payload: AggregationCreateProfileRequest) -> AggregationCreateProfileResponse:
+    display_name = payload.display_name.strip() or "New patient workspace"
+    profile_id = f"workspace-{uuid.uuid4()}"
+    profile = _ensure_profile(profile_id, display_name=display_name, notes=payload.notes)
+    _patient_root(profile.id).mkdir(parents=True, exist_ok=True)
+    return AggregationCreateProfileResponse(
+        profile=profile,
+        storage_posture=(
+            "Demo storage: this profile is stored on the application server under "
+            "data/aggregation-profiles and data/aggregation-uploads. It is durable "
+            "across restarts when those directories are mounted to persistent disk."
+        ),
+    )
 
 
 def _upload_file_path(patient_id: str, upload: AggregationUploadedFile) -> Path:
@@ -174,12 +249,37 @@ def list_upload_workspaces() -> list[PatientListItem]:
     them here lets the selector drive Source Intake and Harmonized Record from
     the same top-level context.
     """
-    if not STORE_ROOT.exists():
-        return []
-
     items: list[PatientListItem] = []
+    profile_ids: set[str] = set()
+    for profile in _load_profiles().values():
+        uploads = _load_uploaded_files(profile.id)
+        prepared = sum(1 for upload in uploads if upload.parse_status in {"structured", "extracted"})
+        profile_ids.add(profile.id)
+        items.append(
+            PatientListItem(
+                id=profile.id,
+                name=profile.display_name,
+                age_years=0,
+                gender="workspace",
+                complexity_tier="profile",
+                complexity_score=0,
+                total_resources=len(uploads),
+                encounter_count=0,
+                active_condition_count=0,
+                active_med_count=0,
+                workspace_type="profile",
+                source_count=len(uploads),
+                prepared_source_count=prepared,
+            )
+        )
+
+    if not STORE_ROOT.exists():
+        return items
+
     for session_dir in sorted(STORE_ROOT.iterdir()):
         if not session_dir.is_dir():
+            continue
+        if session_dir.name in profile_ids:
             continue
         uploads = _load_uploaded_files(session_dir.name)
         if not uploads:
@@ -800,6 +900,8 @@ def save_upload(
     description: str = "",
     context_notes: str = "",
 ) -> AggregationUploadResponse:
+    if path_from_patient_id(patient_id) is None:
+        _ensure_profile(patient_id)
     root = _patient_root(patient_id)
     root.mkdir(parents=True, exist_ok=True)
 

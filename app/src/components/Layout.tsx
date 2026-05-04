@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, NavLink, useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
   Archive,
@@ -647,11 +647,16 @@ function PatientPickerModal({
   }
 
   const favorites = visiblePatients.filter((patient) => isFavorite(patient.id));
-  const uploadWorkspaces = visiblePatients.filter((patient) => patient.workspace_type === "upload" && !isFavorite(patient.id));
-  const syntheaPatients = visiblePatients.filter((patient) => patient.workspace_type !== "upload" && !isFavorite(patient.id));
+  const uploadWorkspaces = visiblePatients.filter((patient) => (
+    (patient.workspace_type === "upload" || patient.workspace_type === "profile") && !isFavorite(patient.id)
+  ));
+  const syntheaPatients = visiblePatients.filter((patient) => (
+    patient.workspace_type !== "upload" && patient.workspace_type !== "profile" && !isFavorite(patient.id)
+  ));
   const selectedPatient = patients.find((patient) => patient.id === selectedId);
   const previewPatient = patients.find((patient) => patient.id === previewId) ?? selectedPatient ?? visiblePatients[0];
   const previewRisk = previewPatient ? riskMap.get(previewPatient.id) : undefined;
+  const previewIsWorkspace = previewPatient?.workspace_type === "upload" || previewPatient?.workspace_type === "profile";
   const complexCount = patients.filter((patient) => (
     patient.complexity_tier === "complex" || patient.complexity_tier === "highly_complex"
   )).length;
@@ -662,7 +667,7 @@ function PatientPickerModal({
     const previewing = patient.id === previewPatient?.id;
     const favorited = isFavorite(patient.id);
     const risk = riskMap.get(patient.id);
-    const isUploadWorkspace = patient.workspace_type === "upload";
+    const isUploadWorkspace = patient.workspace_type === "upload" || patient.workspace_type === "profile";
 
     return (
       <div
@@ -763,16 +768,22 @@ function PatientPickerModal({
               {previewPatient && (
                 <>
                 <p className="mt-1 text-sm text-[#667085]">
-                  {previewPatient.gender} · {Math.floor(previewPatient.age_years)} years · {previewPatient.complexity_score.toFixed(0)}/100 complexity
+                  {previewIsWorkspace
+                    ? `${previewPatient.source_count ?? previewPatient.total_resources} sources · ${previewPatient.prepared_source_count ?? 0} prepared · server-local profile`
+                    : `${previewPatient.gender} · ${Math.floor(previewPatient.age_years)} years · ${previewPatient.complexity_score.toFixed(0)}/100 complexity`}
                 </p>
                 <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
                   <div className="rounded-lg bg-[#f5f6f8] p-2">
-                    <p className="text-[10px] uppercase tracking-wider text-[#a5a8b5]">Resources</p>
-                    <p className="font-semibold text-[#1c1c1e]">{previewPatient.total_resources.toLocaleString()}</p>
+                    <p className="text-[10px] uppercase tracking-wider text-[#a5a8b5]">{previewIsWorkspace ? "Sources" : "Resources"}</p>
+                    <p className="font-semibold text-[#1c1c1e]">
+                      {(previewIsWorkspace ? previewPatient.source_count ?? 0 : previewPatient.total_resources).toLocaleString()}
+                    </p>
                   </div>
                   <div className="rounded-lg bg-[#f5f6f8] p-2">
                     <p className="text-[10px] uppercase tracking-wider text-[#a5a8b5]">Tier</p>
-                    <p className="capitalize font-semibold text-[#1c1c1e]">{previewPatient.complexity_tier.replace("_", " ")}</p>
+                    <p className="capitalize font-semibold text-[#1c1c1e]">
+                      {previewIsWorkspace ? "Demo profile" : previewPatient.complexity_tier.replace("_", " ")}
+                    </p>
                   </div>
                   <div className="rounded-lg bg-[#f5f6f8] p-2">
                     <p className="text-[10px] uppercase tracking-wider text-[#a5a8b5]">Conditions</p>
@@ -819,6 +830,9 @@ function PatientPickerModal({
               </span>
               <ChevronRight size={14} />
             </button>
+            <p className="mt-2 rounded-lg border border-[#f0d7bf] bg-[#fff8f1] px-3 py-2 text-xs leading-5 text-[#8a5a24]">
+              Demo storage: profiles and uploads are stored on this application server for the prototype.
+            </p>
 
             <div className="mt-4 grid grid-cols-2 gap-2">
               <div className="rounded-xl bg-white p-3 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
@@ -892,7 +906,7 @@ function PatientPickerModal({
                   {uploadWorkspaces.length > 0 && (
                     <>
                       <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wider text-[#a5a8b5]">
-                        Uploaded workspaces
+                        Uploaded workspaces and profiles
                       </p>
                       <div className="mb-3 space-y-0.5">{uploadWorkspaces.map(renderRow)}</div>
                       <div className="mb-3 border-t border-[#e9eaef]" />
@@ -956,8 +970,8 @@ function PatientSelector({
     if (!q) return patients;
     return patients.filter((p) => p.name.toLowerCase().includes(q));
   }, [patients, search]);
-  const uploadWorkspaces = filtered.filter((patient) => patient.workspace_type === "upload");
-  const syntheaPatients = filtered.filter((patient) => patient.workspace_type !== "upload");
+  const uploadWorkspaces = filtered.filter((patient) => patient.workspace_type === "upload" || patient.workspace_type === "profile");
+  const syntheaPatients = filtered.filter((patient) => patient.workspace_type !== "upload" && patient.workspace_type !== "profile");
 
   // Close on outside click
   useEffect(() => {
@@ -1018,6 +1032,9 @@ function PatientSelector({
             </span>
             <ChevronRight size={14} />
           </button>
+          <p className="border-b border-[#e9eaef] px-3 py-2 text-[11px] leading-5 text-[#8d92a3]">
+            Demo storage: profiles and uploads are stored on this application server for the prototype.
+          </p>
           {/* Search input */}
           <div className="flex items-center gap-2 border-b border-[#e9eaef] px-3 py-2">
             <Search size={13} className="shrink-0 text-[#a5a8b5]" />
@@ -1036,7 +1053,7 @@ function PatientSelector({
             )}
             {uploadWorkspaces.length > 0 && (
               <p className="px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wider text-[#a5a8b5]">
-                Uploaded workspaces
+                Uploaded workspaces and profiles
               </p>
             )}
             {uploadWorkspaces.slice(0, 20).map((p) => (
@@ -1129,6 +1146,7 @@ export function Layout({ children }: LayoutProps) {
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const patientId = searchParams.get("patient");
+  const queryClient = useQueryClient();
 
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [patientPickerOpen, setPatientPickerOpen] = useState(false);
@@ -1389,13 +1407,21 @@ export function Layout({ children }: LayoutProps) {
 
   const navigate = useNavigate();
 
+  const createProfileMutation = useMutation({
+    mutationFn: () => api.createAggregationProfile({
+      display_name: "New patient workspace",
+      notes: "Created from the demo patient selector.",
+    }),
+    onSuccess: async (response) => {
+      await queryClient.invalidateQueries({ queryKey: ["patients"] });
+      navigate(`/aggregate/sources?patient=${response.profile.id}`);
+      setPatientPickerOpen(false);
+    },
+  });
+
   const handleCreatePatientWorkspace = () => {
-    const suffix =
-      typeof crypto !== "undefined" && "randomUUID" in crypto
-        ? crypto.randomUUID()
-        : `${Date.now()}`;
-    navigate(`/aggregate/sources?patient=workspace-${suffix}`);
-    setPatientPickerOpen(false);
+    if (createProfileMutation.isPending) return;
+    createProfileMutation.mutate();
   };
 
   const handleSelectPatient = (id: string) => {

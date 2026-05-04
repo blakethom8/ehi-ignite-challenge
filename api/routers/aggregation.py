@@ -8,6 +8,7 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 from api.core.aggregation import (
     cleaning_queue,
+    create_profile,
     delete_upload,
     readiness,
     save_upload,
@@ -17,6 +18,8 @@ from api.core.aggregation import (
 )
 from api.models import (
     AggregationCleaningQueueResponse,
+    AggregationCreateProfileRequest,
+    AggregationCreateProfileResponse,
     AggregationDeleteResponse,
     AggregationEnvironmentResponse,
     AggregationPreparedPreviewResponse,
@@ -41,6 +44,11 @@ def get_cleaning_queue(patient_id: str) -> AggregationCleaningQueueResponse:
 @router.get("/readiness/{patient_id}", response_model=AggregationReadinessResponse)
 def get_readiness(patient_id: str) -> AggregationReadinessResponse:
     return readiness(patient_id)
+
+
+@router.post("/profiles", response_model=AggregationCreateProfileResponse)
+def create_patient_profile(payload: AggregationCreateProfileRequest) -> AggregationCreateProfileResponse:
+    return create_profile(payload)
 
 
 @router.get("/uploads/{patient_id}/{file_id}/preview", response_model=AggregationPreparedPreviewResponse)

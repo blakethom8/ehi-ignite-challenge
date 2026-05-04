@@ -82,6 +82,28 @@ class AggregationApiTests(unittest.TestCase):
             self.assertEqual(body["source_card"]["category"], "file_upload")
             self.assertTrue(any(Path(tmpdir).glob("*/*.metadata.json")))
 
+    def test_create_profile_persists_empty_workspace(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            with (
+                patch("api.core.aggregation.STORE_ROOT", root / "uploads"),
+                patch("api.core.aggregation.PROFILE_ROOT", root / "profiles"),
+                patch("api.core.aggregation.PROFILE_REGISTRY_PATH", root / "profiles" / "profiles.json"),
+            ):
+                response = self.client.post(
+                    "/api/aggregation/profiles",
+                    json={"display_name": "Demo upload patient", "notes": "Synthetic PDF test."},
+                )
+                patients = self.client.get("/api/patients").json()
+
+            self.assertEqual(response.status_code, 200)
+            body = response.json()
+            profile = body["profile"]
+            self.assertTrue(profile["id"].startswith("workspace-"))
+            self.assertEqual(profile["display_name"], "Demo upload patient")
+            self.assertTrue((root / "profiles" / "profiles.json").exists())
+            self.assertIn(profile["id"], {item["id"] for item in patients})
+
     def test_delete_upload_removes_metadata_and_file(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch("api.core.aggregation.STORE_ROOT", Path(tmpdir)):

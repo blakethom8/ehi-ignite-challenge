@@ -24,6 +24,7 @@ __pycache__/
 data/traces.db
 data/traces.db-*
 data/aggregation-uploads/
+data/aggregation-profiles/
 data/patient-context/
 data/harmonize-demo/
 data/sof.db

@@ -10,6 +10,7 @@ Best multipass-fhir result on Cedars Health Summary: **F1 0.70** (post-Move H, w
 
 | Date | Move | Subject | Headline result |
 |---|---|---|---|
+| 2026-05-03 | **Q** | Bidirectional Provenance walk | New endpoint + clickable Sources rows. From any DocumentReference, see every merged fact it contributed. **Cedars FHIR contributes 207 facts; Cedars PDF contributes 160** on blake-real, broken down per resource type. The Atlas Provenance wedge is now directly demoable from both directions. |
 | 2026-05-03 | **P** | Allergies + Immunizations matchers — USCDI clinical core complete | 4th and 5th resource types ported. **1/1 allergies + 8/10 immunization events cross-source merged** on Cedars FHIR + PDF. Five tabs in the React app now: Labs / Conditions / Medications / Allergies / Immunizations. |
 | 2026-05-03 | **O** | Medications matcher + Medications tab | Third resource type ported. RxNorm overlap → drug-name canonicalize → drug-name bridge → passthrough. **6 of 7 medications cross-source merged** on Cedars FHIR + PDF (only flu vaccine misses — it's in FHIR but not the PDF). |
 | 2026-05-03 | **N** | Closed upload→harmonize loop in the app | DataAggregator gets a "Harmonize N uploads" CTA; HarmonizeView reads `?collection=<id>` to pre-select. End-to-end clinician flow: upload → click → extract → merged record. Each step one click. |
@@ -51,6 +52,40 @@ Pipeline framework + eval harness shipped 2026-05-03 (commits: pipeline Protocol
 ```
 
 Each entry should be 200–500 words. Tables and code snippets welcome. **Honesty about negative results matters as much as wins** — knowing what *didn't* work prevents future re-litigation.
+
+---
+
+## 2026-05-03 · Move Q — bidirectional Provenance walk
+
+**Agent:** Claude Opus 4.7
+
+**What:** The Provenance graph supports walking in both directions now. The fact → sources direction was already shipped (per-merged-record lineage panel, Move L). This adds the source → facts direction: from any DocumentReference in a collection, list every merged record across every resource type that has a source pointing back at that document.
+
+**Why:** The two directions answer different clinician questions. Per-fact lineage answers "where did this lab value come from?" — useful when auditing one number. Per-source contribution answers "what did this source PDF actually give us?" — useful for evaluating source quality before deciding whether to keep or remove a source, or to compare information density across sources. It's also the most viscerally demonstrable Atlas-wedge feature for a Phase 1 reviewer: click a source row, see the Provenance graph fan out into 200 facts.
+
+**How:** `facts_for_document_reference()` walks all five merged-record lists (Observations / Conditions / Medications / Allergies / Immunizations), filters to records whose `sources[].document_reference` matches, and returns serialized payloads grouped by resource type with per-type and total counts. The serializers were already in place from earlier moves; the walk is just a fan-out filter. No data structure changes — `MergedX.sources[].document_reference` was always there, just not queried in this direction.
+
+API: new `GET /api/harmonize/{id}/contributions/{document_reference:path}` (path-typed param so the slash in `DocumentReference/cedars-...` doesn't break routing).
+
+React: Sources panel rows are now clickable. Click → inline ContributionsPanel expands underneath the table with five stat tiles + four list cards (Conditions / Medications / Immunizations / Allergies showing canonical names) + a footer line for the Lab count (too dense to list inline).
+
+**Result:** Live numbers on `blake-real`:
+
+| Source | Obs | Cond | Med | All | Imm | Total |
+|---|---:|---:|---:|---:|---:|---:|
+| Cedars-Sinai (FHIR) | 174 | 15 | 7 | 1 | 10 | **207** |
+| Cedars-Sinai (PDF)  | 138 | 7  | 6 | 1 | 8  | **160** |
+
+The asymmetry is informative: the FHIR pull contributes 47 more facts than the PDF, mostly in Observations (174 vs 138 — Cedars FHIR carries vitals + anthropometrics that the PDF summary doesn't include). For Conditions the PDF hits 7 vs FHIR 15 — Conditions are encounter-coded in FHIR (multiple instances per code) but appear once-each in the PDF summary, so pre-dedup that gap is bigger than it looks.
+
+2 new API tests; 146 tests green total. TypeScript clean.
+
+**Conclusion:** The Atlas Provenance graph is now bidirectional in production, which closes the design loop on the wedge described in `ATLAS-DATA-MODEL.md`. Every fact knows where it came from; every source knows what it contributed.
+
+**Next:**
+- Async extract: still synchronous `POST /extract`. Background task with polling endpoint is the obvious upgrade.
+- Multi-source contribution diff: "what does the PDF add that FHIR doesn't?" — symmetric difference between two source contribution sets. The vision-wins from Move H are this concept; productizing it would let a clinician sort sources by *unique* contribution rather than total contribution.
+- Synthetic Synthea demo collection so a fresh-clone reviewer has something pre-staged.
 
 ---
 

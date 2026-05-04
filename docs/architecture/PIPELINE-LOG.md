@@ -10,6 +10,7 @@ Best multipass-fhir result on Cedars Health Summary: **F1 0.70** (post-Move H, w
 
 | Date | Move | Subject | Headline result |
 |---|---|---|---|
+| 2026-05-03 | **O** | Medications matcher + Medications tab | Third resource type ported. RxNorm overlap → drug-name canonicalize → drug-name bridge → passthrough. **6 of 7 medications cross-source merged** on Cedars FHIR + PDF (only flu vaccine misses — it's in FHIR but not the PDF). |
 | 2026-05-03 | **N** | Closed upload→harmonize loop in the app | DataAggregator gets a "Harmonize N uploads" CTA; HarmonizeView reads `?collection=<id>` to pre-select. End-to-end clinician flow: upload → click → extract → merged record. Each step one click. |
 | 2026-05-03 | **M** | Document-agnostic collections + manual extract endpoint | Upload sessions auto-register as harmonize collections; `POST /api/harmonize/{id}/extract` runs multipass-fhir on uploaded PDFs. App is no longer hardcoded to blake-real. End-to-end fake-upload smoke test passes with zero code changes. |
 | 2026-05-03 | **L** | Harmonization layer wired into FastAPI + React app | `/aggregate/harmonize` ships in the production app. 350 merged Observations / 65 cross-source · 19 Conditions / 3 cross-source against `blake-real` collection (Cedars FHIR + Cedars PDF + 3 Function Health PDFs) |
@@ -49,6 +50,41 @@ Pipeline framework + eval harness shipped 2026-05-03 (commits: pipeline Protocol
 ```
 
 Each entry should be 200–500 words. Tables and code snippets welcome. **Honesty about negative results matters as much as wins** — knowing what *didn't* work prevents future re-litigation.
+
+---
+
+## 2026-05-03 · Move O — Medications matcher + Medications tab
+
+**Agent:** Claude Opus 4.7
+
+**What:** Third resource type ported into the harmonization layer. New `lib/harmonize/medications.py` matches MedicationRequests across sources via RxNorm code overlap → drug-name canonicalization → drug-name bridge → passthrough. New `MergedMedication` model. New `/api/harmonize/{id}/medications` endpoint. New "Medications" tab in the React HarmonizeView.
+
+**Why:** Labs + Conditions cover the structural / observational story; medications cover the *interventions* — and they're the resource type a clinician most often needs to reconcile across sources (refills, dose changes, prescribed-vs-taking divergence). The same matcher shape generalizes cleanly: only the identity-priority list changes per resource type.
+
+**How:** Three implementation details worth noting:
+
+1. **Reference resolution.** Cedars MedicationRequests don't carry codings inline; they reference a contained `Medication` resource via `medicationReference`. The matcher pulls the Medication out of the same SourceBundle and reads its `code.coding` array. The `harmonize_service.merged_medications()` is responsible for handing both `MedicationRequest` and `Medication` resources into each bundle.
+2. **RxNorm code unions.** Cedars stamps 5–20 RxNorm codes on the contained Medication (one per generic / strength / formulation variant). The matcher unions them and uses an `rxnorm_to_key` index so a later source whose RxNorm set overlaps via *any* code finds the existing merged record. Without the index, two sources whose primary keys differ but whose code sets overlap would create duplicate records.
+3. **Drug-name canonicalization.** `canonical_drug_name()` strips brand-name parentheticals and the dose/formulation tail. "fluticasone propionate (FLONASE) 50 mcg/actuation nasal spray" → "fluticasone propionate". This catches the case where Cedars FHIR has the generic display and the PDF has the brand-parenthetical display — they both canonicalize to the same key.
+
+**Result:**
+
+Live numbers on `blake-real` (Cedars FHIR + Cedars HealthSummary PDF):
+
+| | FHIR | PDF | merged | cross-source |
+|---|---:|---:|---:|---:|
+| MedicationRequests | 7 | 6 | **7** | **6** |
+
+The 6 cross-source merges are azelastine, cetirizine, epinephrine, fluticasone propionate, loratadine, methylprednisolone — every prescription drug present in both sources. The single non-merge is the influenza vaccine (FHIR-only). RxNorm code unions per merged record run 8–22 codes (e.g. azelastine: 9 codes, fluticasone propionate: 22 codes).
+
+12 unit tests + 1 API test, all green. Total project tests: 132. TypeScript compiles clean.
+
+**Conclusion:** Pattern proven across three resource types now. Allergies + Immunizations are mechanical follow-ups — same matcher shape with their own identity-priority lists (e.g. SNOMED for allergies, CVX + date proximity for immunizations).
+
+**Next:**
+- Allergies + Immunizations matchers (~30 min each, additive).
+- Async extract: `POST /extract` is still synchronous; 60–90s blocks. Background task with polling endpoint.
+- Bidirectional Provenance walk: from a DocumentReference, list every fact derived from it.
 
 ---
 

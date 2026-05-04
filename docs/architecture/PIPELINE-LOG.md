@@ -10,6 +10,7 @@ Best multipass-fhir result on Cedars Health Summary: **F1 0.70** (post-Move H, w
 
 | Date | Move | Subject | Headline result |
 |---|---|---|---|
+| 2026-05-03 | **T** | Empty-state + loading UI on the harmonize page | Three render branches now handle the previously-unreachable zero-collections state gracefully. Centered empty-state card explains what's missing and offers two CTAs (upload documents in-app, Synthea quick-start external). Closes the fresh-clone polish loop. |
 | 2026-05-03 | **S** | Synthea demo collection — fresh-clone reviewers get a working harmonize flow | Self-bootstrapping cross-source dataset from public Synthea data. One patient bundle split into 2 temporal EHR snapshots, persistent identity + chronic conditions carry forward. **9 conditions / 8 cross-source merged** without any private data. blake-real now registers conditionally so fresh clones don't see an empty collection. |
 | 2026-05-03 | **R** | Multi-source contribution diff — vision wins surface automatically | Per-source unique vs shared partitioning. **The 4 Cedars PDF unique conditions auto-emerge as exactly the vision wins from Move H** — manual triage replaced by a graph query. Function Health 2025-11-29 has 0 unique / 58 shared, automatically exposing it as a cross-source confirmation source rather than a unique-data source. |
 | 2026-05-03 | **Q** | Bidirectional Provenance walk | New endpoint + clickable Sources rows. From any DocumentReference, see every merged fact it contributed. **Cedars FHIR contributes 207 facts; Cedars PDF contributes 160** on blake-real, broken down per resource type. The Atlas Provenance wedge is now directly demoable from both directions. |
@@ -54,6 +55,38 @@ Pipeline framework + eval harness shipped 2026-05-03 (commits: pipeline Protocol
 ```
 
 Each entry should be 200–500 words. Tables and code snippets welcome. **Honesty about negative results matters as much as wins** — knowing what *didn't* work prevents future re-litigation.
+
+---
+
+## 2026-05-03 · Move T — empty-state + loading UI on the harmonize page
+
+**Agent:** Claude Opus 4.7
+
+**What:** Three render branches at the top of the harmonize page handle every collection-registry state cleanly: (1) loading — spinner + "Loading collections…" while the query is in flight; (2) empty — centered card explaining what's missing and offering Upload-Documents + Synthea-quick-start CTAs; (3) populated — existing behavior with picker / sources / tabs / footer.
+
+**Why:** Until Move S, the empty-collections state was unreachable — `blake-real` was hardcoded into the registry so the page always had at least one collection. After Move S, blake-real registers conditionally; on a fresh checkout where someone has neither private Cedars data nor the public Synthea bundle, zero collections register and the page would render an empty `<select>` plus broken downstream queries. Empty state needed a graceful render path.
+
+**How:** A conditional + Fragment wraps the populated-state JSX so the picker / sources panel / tabs / footer don't render when there's nothing to show. The empty-state card uses an Inbox icon in a soft-blue circle, two paragraphs of copy explaining the situation, and two CTAs (in-app upload route + external Synthea repo). Loading state is just a single line with the existing Loader2 spinner — no commitment to a content shape until the query resolves.
+
+Caught a JSX parse error during the build: the conditional opened with `(` but the multi-block content inside needed a Fragment wrapper. TypeScript silently accepted it but Vite's parser rejected. Fixed by changing `(` to `(<>` and the existing closing `</>)}` matched up correctly.
+
+**Result:**
+
+The fresh-clone demo loop now has graceful degradation at every step. A reviewer who:
+
+- Has the Synthea bundle: sees `synthea-demo` collection auto-loaded.
+- Has Blake's data: sees `blake-real` collection alongside.
+- Has neither: sees the empty-state card with clear next steps.
+- Is mid-load: sees the spinner card.
+
+TypeScript compiles. Vite serves the page at HTTP 200 with the new structure. 151 tests still green; no API surface changed.
+
+**Conclusion:** The harmonize wedge demo is now polished end-to-end across every entry-point state. The `data-agnostic` framing the user pushed back on early in the project is now genuinely true: any reviewer, regardless of what data they have local, gets a coherent first-load experience.
+
+**Next:**
+- Async extract: still synchronous; bigger PDFs block 60–90s. Background task + polling endpoint.
+- Pairwise source diff: "what does A have that B doesn't" rather than "what does A have that nobody else has."
+- Mobile / tablet responsive pass — current layouts are desktop-tuned.
 
 ---
 

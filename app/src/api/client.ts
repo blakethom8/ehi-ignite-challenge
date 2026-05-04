@@ -33,6 +33,7 @@ import type {
   HarmonizeConditionsResponse,
   HarmonizeContributionsResponse,
   HarmonizeExtractResponse,
+  HarmonizeSourceDiffResponse,
   HarmonizeImmunizationsResponse,
   HarmonizeMedicationsResponse,
   HarmonizeObservationsResponse,
@@ -287,6 +288,13 @@ export const api = {
       .get<HarmonizeContributionsResponse>(
         `/harmonize/${collectionId}/contributions/${encodeURIComponent(documentReference)}`,
       )
+      .then((r) => r.data),
+
+  getHarmonizeSourceDiff: (
+    collectionId: string,
+  ): Promise<HarmonizeSourceDiffResponse> =>
+    http
+      .get<HarmonizeSourceDiffResponse>(`/harmonize/${collectionId}/source-diff`)
       .then((r) => r.data),
 
   extractHarmonizeCollection: (collectionId: string): Promise<HarmonizeExtractResponse> =>

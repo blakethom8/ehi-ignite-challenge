@@ -1161,3 +1161,30 @@ class HarmonizeContributionsResponse(BaseModel):
     allergies: list[HarmonizeMergedAllergy]
     immunizations: list[HarmonizeMergedImmunization]
     totals: HarmonizeContributionTotals
+
+
+class HarmonizeSourceDiffSourceTotals(BaseModel):
+    unique: HarmonizeContributionTotals
+    shared: HarmonizeContributionTotals
+
+
+class HarmonizeSourceDiffUniqueFacts(BaseModel):
+    observations: list[HarmonizeMergedObservation]
+    conditions: list[HarmonizeMergedCondition]
+    medications: list[HarmonizeMergedMedication]
+    allergies: list[HarmonizeMergedAllergy]
+    immunizations: list[HarmonizeMergedImmunization]
+
+
+class HarmonizeSourceDiffSource(BaseModel):
+    id: str
+    label: str
+    kind: str
+    document_reference: str | None
+    totals: HarmonizeSourceDiffSourceTotals
+    unique_facts: HarmonizeSourceDiffUniqueFacts
+
+
+class HarmonizeSourceDiffResponse(BaseModel):
+    collection_id: str
+    sources: list[HarmonizeSourceDiffSource]

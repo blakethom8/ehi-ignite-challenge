@@ -146,6 +146,34 @@ class HarmonizeAPITests(unittest.TestCase):
         totals = r.json()["totals"]
         self.assertEqual(totals["all"], 0)
 
+    def test_source_diff_returns_per_source_unique_vs_shared(self) -> None:
+        r = self.client.get("/api/harmonize/blake-real/source-diff")
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        # Five registered sources in blake-real.
+        self.assertEqual(len(body["sources"]), 5)
+        # Cedars (FHIR) should have substantial unique contributions
+        # (older immunizations, vitals not in summary PDF, etc.).
+        cedars_fhir = next(
+            s for s in body["sources"] if s["label"] == "Cedars-Sinai (FHIR)"
+        )
+        self.assertGreater(cedars_fhir["totals"]["unique"]["all"], 20)
+        self.assertGreater(cedars_fhir["totals"]["shared"]["all"], 0)
+
+    def test_source_diff_unique_facts_listed(self) -> None:
+        body = self.client.get("/api/harmonize/blake-real/source-diff").json()
+        cedars_pdf = next(
+            s for s in body["sources"] if s["label"] == "Cedars-Sinai (PDF)"
+        )
+        # Unique-fact lists should match the totals.
+        u = cedars_pdf["totals"]["unique"]
+        self.assertEqual(len(cedars_pdf["unique_facts"]["observations"]), u["observations"])
+        self.assertEqual(len(cedars_pdf["unique_facts"]["conditions"]), u["conditions"])
+
+    def test_source_diff_unknown_collection_404s(self) -> None:
+        r = self.client.get("/api/harmonize/does-not-exist/source-diff")
+        self.assertEqual(r.status_code, 404)
+
     def test_provenance_for_known_merged_obs_ref(self) -> None:
         # First find any cross-source merged observation
         obs = self.client.get(

@@ -740,6 +740,116 @@ def facts_for_document_reference(
     }
 
 
+# ---------------------------------------------------------------------------
+# Multi-source contribution diff — "what did each source uniquely add?"
+# ---------------------------------------------------------------------------
+
+
+def source_contribution_diff(collection_id: str) -> dict[str, Any] | None:
+    """Per-source unique vs shared fact counts and unique-fact listings.
+
+    For each source bundle in the collection, compute:
+
+      * **unique**: merged records where this source is the only contributor
+        (i.e. ``len({s.source_label for s in record.sources}) == 1`` and
+        the record's source label matches this source).
+      * **shared**: merged records where this source contributed alongside
+        at least one other source.
+
+    Unique facts are the high-signal "if I removed this source, here's
+    what I'd lose" set — and on the demo data they correspond to:
+
+      * **vision wins** (PDF-only): clinical findings present in the
+        narrative-PDF that the structured FHIR pull never coded
+        (e.g. "Bilateral inferior turbinate hypertrophy" — see
+        Move H in PIPELINE-LOG.md).
+      * **FHIR-only**: structured facts only the API surfaces, like
+        the COVID-19 Pfizer 2021 doses in the immunization history.
+
+    Returns ``None`` for unknown collections.
+    """
+    coll = get_collection(collection_id)
+    if coll is None:
+        return None
+
+    obs = merged_observations(collection_id)
+    cond = merged_conditions(collection_id)
+    med = merged_medications(collection_id)
+    allergy = merged_allergies(collection_id)
+    im = merged_immunizations(collection_id)
+
+    def _is_unique_to(record: Any, source_label: str) -> bool:
+        labels = {s.source_label for s in record.sources}
+        return len(labels) == 1 and source_label in labels
+
+    def _is_shared_with(record: Any, source_label: str) -> bool:
+        labels = {s.source_label for s in record.sources}
+        return len(labels) > 1 and source_label in labels
+
+    sources_out: list[dict[str, Any]] = []
+    for s in coll.sources:
+        unique_obs = [m for m in obs if _is_unique_to(m, s.label)]
+        unique_cond = [m for m in cond if _is_unique_to(m, s.label)]
+        unique_med = [m for m in med if _is_unique_to(m, s.label)]
+        unique_allergy = [m for m in allergy if _is_unique_to(m, s.label)]
+        unique_im = [m for m in im if _is_unique_to(m, s.label)]
+        shared_obs = sum(1 for m in obs if _is_shared_with(m, s.label))
+        shared_cond = sum(1 for m in cond if _is_shared_with(m, s.label))
+        shared_med = sum(1 for m in med if _is_shared_with(m, s.label))
+        shared_allergy = sum(1 for m in allergy if _is_shared_with(m, s.label))
+        shared_im = sum(1 for m in im if _is_shared_with(m, s.label))
+
+        unique_total = (
+            len(unique_obs)
+            + len(unique_cond)
+            + len(unique_med)
+            + len(unique_allergy)
+            + len(unique_im)
+        )
+        shared_total = (
+            shared_obs + shared_cond + shared_med + shared_allergy + shared_im
+        )
+
+        sources_out.append(
+            {
+                "id": s.id,
+                "label": s.label,
+                "kind": s.kind,
+                "document_reference": s.document_reference,
+                "totals": {
+                    "unique": {
+                        "observations": len(unique_obs),
+                        "conditions": len(unique_cond),
+                        "medications": len(unique_med),
+                        "allergies": len(unique_allergy),
+                        "immunizations": len(unique_im),
+                        "all": unique_total,
+                    },
+                    "shared": {
+                        "observations": shared_obs,
+                        "conditions": shared_cond,
+                        "medications": shared_med,
+                        "allergies": shared_allergy,
+                        "immunizations": shared_im,
+                        "all": shared_total,
+                    },
+                },
+                "unique_facts": {
+                    "observations": [serialize_observation(m) for m in unique_obs],
+                    "conditions": [serialize_condition(m) for m in unique_cond],
+                    "medications": [serialize_medication(m) for m in unique_med],
+                    "allergies": [serialize_allergy(m) for m in unique_allergy],
+                    "immunizations": [serialize_immunization(m) for m in unique_im],
+                },
+            }
+        )
+
+    return {
+        "collection_id": collection_id,
+        "sources": sources_out,
+    }
+
+
 def find_merged_record(collection_id: str, merged_ref: str):
     """Look up a merged record by its synthetic ref ID across all resource types."""
     if merged_ref.startswith("Observation/"):

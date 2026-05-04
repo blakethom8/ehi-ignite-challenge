@@ -62,15 +62,25 @@ function MetricCard({
 
 function SourcesPanel({ collectionId }: { collectionId: string }) {
   const [selectedDocRef, setSelectedDocRef] = useState<string | null>(null);
+  const [selectedSourceLabel, setSelectedSourceLabel] = useState<string | null>(null);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["harmonize-sources", collectionId],
     queryFn: () => api.getHarmonizeSources(collectionId),
     enabled: !!collectionId,
   });
+  const diffQuery = useQuery({
+    queryKey: ["harmonize-source-diff", collectionId],
+    queryFn: () => api.getHarmonizeSourceDiff(collectionId),
+    enabled: !!collectionId,
+  });
 
   if (isLoading) return <p className="text-sm text-[#667085]">Loading sources…</p>;
   if (error || !data) return <p className="text-sm text-red-700">Couldn't load sources.</p>;
+
+  const diffByLabel = new Map(
+    (diffQuery.data?.sources ?? []).map((s) => [s.label, s]),
+  );
 
   return (
     <div className="rounded-2xl bg-white p-5 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
@@ -89,9 +99,19 @@ function SourcesPanel({ collectionId }: { collectionId: string }) {
             <tr>
               <th className="px-4 py-2">Source</th>
               <th className="px-4 py-2">Kind</th>
-              <th className="px-4 py-2 text-right">Observations</th>
-              <th className="px-4 py-2 text-right">Conditions</th>
-              <th className="px-4 py-2 text-right">Total</th>
+              <th
+                className="px-4 py-2 text-right"
+                title="Facts only this source contributed — the high-signal set"
+              >
+                Unique
+              </th>
+              <th
+                className="px-4 py-2 text-right"
+                title="Facts shared with at least one other source"
+              >
+                Shared
+              </th>
+              <th className="px-4 py-2 text-right">Total raw</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[#eef0f4] bg-white">
@@ -100,16 +120,22 @@ function SourcesPanel({ collectionId }: { collectionId: string }) {
               const clickable = !!s.document_reference;
               const isSelected =
                 clickable && selectedDocRef === s.document_reference;
+              const diff = diffByLabel.get(s.label);
+              const unique = diff?.totals.unique.all ?? 0;
+              const shared = diff?.totals.shared.all ?? 0;
               return (
                 <tr
                   key={s.id}
-                  onClick={() =>
-                    clickable
-                      ? setSelectedDocRef(
-                          isSelected ? null : s.document_reference,
-                        )
-                      : undefined
-                  }
+                  onClick={() => {
+                    if (!clickable) return;
+                    if (isSelected) {
+                      setSelectedDocRef(null);
+                      setSelectedSourceLabel(null);
+                    } else {
+                      setSelectedDocRef(s.document_reference);
+                      setSelectedSourceLabel(s.label);
+                    }
+                  }}
                   className={cls(
                     !s.available && "opacity-50",
                     clickable && "cursor-pointer hover:bg-[#f7f9fc]",
@@ -127,13 +153,18 @@ function SourcesPanel({ collectionId }: { collectionId: string }) {
                       {badge.label}
                     </span>
                   </td>
-                  <td className="px-4 py-2 text-right tabular-nums text-[#1c1c1e]">
-                    {s.resource_counts.Observation ?? 0}
-                  </td>
-                  <td className="px-4 py-2 text-right tabular-nums text-[#1c1c1e]">
-                    {s.resource_counts.Condition ?? 0}
+                  <td
+                    className={cls(
+                      "px-4 py-2 text-right tabular-nums",
+                      unique > 0 ? "font-semibold text-[#5b76fe]" : "text-[#a5a8b5]",
+                    )}
+                  >
+                    {diffQuery.isLoading ? "…" : unique}
                   </td>
                   <td className="px-4 py-2 text-right tabular-nums text-[#667085]">
+                    {diffQuery.isLoading ? "…" : shared}
+                  </td>
+                  <td className="px-4 py-2 text-right tabular-nums text-[#a5a8b5]">
                     {s.total_resources}
                   </td>
                 </tr>
@@ -146,7 +177,15 @@ function SourcesPanel({ collectionId }: { collectionId: string }) {
         <ContributionsPanel
           collectionId={collectionId}
           documentReference={selectedDocRef}
-          onClose={() => setSelectedDocRef(null)}
+          uniqueDiff={
+            selectedSourceLabel
+              ? diffByLabel.get(selectedSourceLabel) ?? null
+              : null
+          }
+          onClose={() => {
+            setSelectedDocRef(null);
+            setSelectedSourceLabel(null);
+          }}
         />
       )}
     </div>
@@ -157,17 +196,50 @@ function SourcesPanel({ collectionId }: { collectionId: string }) {
 function ContributionsPanel({
   collectionId,
   documentReference,
+  uniqueDiff,
   onClose,
 }: {
   collectionId: string;
   documentReference: string;
+  uniqueDiff: import("../../types").HarmonizeSourceDiffSource | null;
   onClose: () => void;
 }) {
+  const [showUniqueOnly, setShowUniqueOnly] = useState(false);
+
   const { data, isLoading } = useQuery({
     queryKey: ["harmonize-contributions", collectionId, documentReference],
     queryFn: () =>
       api.getHarmonizeContributions(collectionId, documentReference),
   });
+
+  // Pick which dataset to display: either the full contribution payload
+  // or the unique-to-this-source subset from the source-diff endpoint.
+  const view = showUniqueOnly && uniqueDiff
+    ? {
+        observations: uniqueDiff.unique_facts.observations,
+        conditions: uniqueDiff.unique_facts.conditions,
+        medications: uniqueDiff.unique_facts.medications,
+        allergies: uniqueDiff.unique_facts.allergies,
+        immunizations: uniqueDiff.unique_facts.immunizations,
+        totals: {
+          observations: uniqueDiff.totals.unique.observations,
+          conditions: uniqueDiff.totals.unique.conditions,
+          medications: uniqueDiff.totals.unique.medications,
+          allergies: uniqueDiff.totals.unique.allergies,
+          immunizations: uniqueDiff.totals.unique.immunizations,
+          all: uniqueDiff.totals.unique.all,
+        },
+      }
+    : data
+      ? {
+          observations: data.observations,
+          conditions: data.conditions,
+          medications: data.medications,
+          allergies: data.allergies,
+          immunizations: data.immunizations,
+          totals: data.totals,
+        }
+      : null;
 
   return (
     <div className="mt-4 rounded-xl border border-[#dfe4ea] bg-[#fafbfd] p-4">
@@ -177,33 +249,61 @@ function ContributionsPanel({
             Reverse Provenance walk
           </p>
           <p className="mt-1 text-sm font-semibold text-[#1c1c1e]">
-            What did <span className="font-mono">{data?.label ?? "this source"}</span> contribute?
+            {showUniqueOnly ? (
+              <>
+                What did <span className="font-mono">{data?.label ?? "this source"}</span> uniquely contribute?
+              </>
+            ) : (
+              <>
+                What did <span className="font-mono">{data?.label ?? "this source"}</span> contribute?
+              </>
+            )}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="rounded-lg border border-[#dfe4ea] bg-white px-2 py-1 text-xs text-[#667085]"
-        >
-          Close
-        </button>
+        <div className="flex items-center gap-2">
+          {uniqueDiff && (
+            <label className="flex items-center gap-1.5 text-xs text-[#667085]">
+              <input
+                type="checkbox"
+                checked={showUniqueOnly}
+                onChange={(e) => setShowUniqueOnly(e.target.checked)}
+                className="h-3.5 w-3.5 rounded border-[#dfe4ea]"
+              />
+              Unique only
+            </label>
+          )}
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-[#dfe4ea] bg-white px-2 py-1 text-xs text-[#667085]"
+          >
+            Close
+          </button>
+        </div>
       </div>
 
-      {isLoading || !data ? (
+      {isLoading || !view ? (
         <p className="mt-3 text-sm text-[#667085]">Walking the Provenance graph…</p>
       ) : (
         <>
           <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
-            <ContributionStat label="Labs" value={data.totals.observations} />
-            <ContributionStat label="Conditions" value={data.totals.conditions} />
-            <ContributionStat label="Medications" value={data.totals.medications} />
-            <ContributionStat label="Allergies" value={data.totals.allergies} />
-            <ContributionStat label="Immunizations" value={data.totals.immunizations} />
+            <ContributionStat label="Labs" value={view.totals.observations} />
+            <ContributionStat label="Conditions" value={view.totals.conditions} />
+            <ContributionStat label="Medications" value={view.totals.medications} />
+            <ContributionStat label="Allergies" value={view.totals.allergies} />
+            <ContributionStat label="Immunizations" value={view.totals.immunizations} />
           </div>
+          {showUniqueOnly && view.totals.all === 0 && (
+            <p className="mt-3 rounded-lg bg-amber-50 p-3 text-xs text-amber-800">
+              Every fact this source contributes is also in another source.
+              Removing this source from the harmonization wouldn't lose any
+              data — but would lose the cross-source confirmation.
+            </p>
+          )}
           <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
             <ContributionList
               title="Conditions"
-              items={data.conditions.map((c) => ({
+              items={view.conditions.map((c) => ({
                 primary: c.canonical_name,
                 secondary: c.snomed
                   ? `SCT ${c.snomed}`
@@ -214,7 +314,7 @@ function ContributionsPanel({
             />
             <ContributionList
               title="Medications"
-              items={data.medications.map((m) => ({
+              items={view.medications.map((m) => ({
                 primary: m.canonical_name,
                 secondary:
                   m.rxnorm_codes.length > 0
@@ -224,14 +324,14 @@ function ContributionsPanel({
             />
             <ContributionList
               title="Immunizations"
-              items={data.immunizations.map((i) => ({
+              items={view.immunizations.map((i) => ({
                 primary: i.canonical_name,
                 secondary: `${i.occurrence_date?.slice(0, 10) ?? "—"}${i.cvx ? ` · CVX ${i.cvx}` : ""}`,
               }))}
             />
             <ContributionList
               title="Allergies"
-              items={data.allergies.map((a) => ({
+              items={view.allergies.map((a) => ({
                 primary: a.canonical_name,
                 secondary: a.snomed
                   ? `SCT ${a.snomed}`
@@ -241,10 +341,10 @@ function ContributionsPanel({
               }))}
             />
           </div>
-          {data.totals.observations > 0 && (
+          {view.totals.observations > 0 && (
             <p className="mt-3 text-xs text-[#a5a8b5]">
-              + {data.totals.observations} lab observation
-              {data.totals.observations === 1 ? "" : "s"} contributed (open the
+              + {view.totals.observations} lab observation
+              {view.totals.observations === 1 ? "" : "s"} {showUniqueOnly ? "uniquely contributed" : "contributed"} (open the
               Labs tab to drill in).
             </p>
           )}

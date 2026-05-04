@@ -949,6 +949,33 @@ export interface HarmonizeContributionTotals {
   all: number;
 }
 
+export interface HarmonizeSourceDiffSourceTotals {
+  unique: HarmonizeContributionTotals;
+  shared: HarmonizeContributionTotals;
+}
+
+export interface HarmonizeSourceDiffUniqueFacts {
+  observations: HarmonizeMergedObservation[];
+  conditions: HarmonizeMergedCondition[];
+  medications: HarmonizeMergedMedication[];
+  allergies: HarmonizeMergedAllergy[];
+  immunizations: HarmonizeMergedImmunization[];
+}
+
+export interface HarmonizeSourceDiffSource {
+  id: string;
+  label: string;
+  kind: string;
+  document_reference: string | null;
+  totals: HarmonizeSourceDiffSourceTotals;
+  unique_facts: HarmonizeSourceDiffUniqueFacts;
+}
+
+export interface HarmonizeSourceDiffResponse {
+  collection_id: string;
+  sources: HarmonizeSourceDiffSource[];
+}
+
 export interface HarmonizeContributionsResponse {
   collection_id: string;
   document_reference: string;

@@ -45,6 +45,10 @@ from api.models import (
     HarmonizeObservationsResponse,
     HarmonizeProvenanceResponse,
     HarmonizeSource,
+    HarmonizeSourceDiffResponse,
+    HarmonizeSourceDiffSource,
+    HarmonizeSourceDiffSourceTotals,
+    HarmonizeSourceDiffUniqueFacts,
     HarmonizeSourceManifestResponse,
 )
 
@@ -223,6 +227,68 @@ def extract_collection(collection_id: str) -> HarmonizeExtractResponse:
     return HarmonizeExtractResponse(
         collection_id=collection_id,
         extracted=[HarmonizeExtractItem(**vars(r)) for r in results],
+    )
+
+
+@router.get(
+    "/{collection_id}/source-diff",
+    response_model=HarmonizeSourceDiffResponse,
+)
+def get_source_diff(collection_id: str) -> HarmonizeSourceDiffResponse:
+    """Per-source unique vs shared contribution counts + the unique-fact lists.
+
+    For each source bundle in the collection: the merged records that are
+    *only* contributed-to by this source ("unique") vs those shared with
+    at least one other source ("shared").
+
+    Unique facts are the high-signal "if I removed this source, here's
+    what I'd lose" set. On Cedars FHIR + extracted-PDF pairs, the PDF's
+    unique set tends to be the *vision wins* (clinical findings the
+    structured FHIR pull never coded — see PIPELINE-LOG Move H), and
+    the FHIR's unique set tends to be older / non-summary records.
+    """
+    if harmonize_service.get_collection(collection_id) is None:
+        raise HTTPException(status_code=404, detail=f"Collection not found: {collection_id}")
+    payload = harmonize_service.source_contribution_diff(collection_id)
+    if payload is None:
+        raise HTTPException(status_code=404, detail=f"Collection not found: {collection_id}")
+    return HarmonizeSourceDiffResponse(
+        collection_id=payload["collection_id"],
+        sources=[
+            HarmonizeSourceDiffSource(
+                id=s["id"],
+                label=s["label"],
+                kind=s["kind"],
+                document_reference=s["document_reference"],
+                totals=HarmonizeSourceDiffSourceTotals(
+                    unique=HarmonizeContributionTotals(**s["totals"]["unique"]),
+                    shared=HarmonizeContributionTotals(**s["totals"]["shared"]),
+                ),
+                unique_facts=HarmonizeSourceDiffUniqueFacts(
+                    observations=[
+                        HarmonizeMergedObservation(**m)
+                        for m in s["unique_facts"]["observations"]
+                    ],
+                    conditions=[
+                        HarmonizeMergedCondition(**m)
+                        for m in s["unique_facts"]["conditions"]
+                    ],
+                    medications=[
+                        HarmonizeMergedMedication(**m)
+                        for m in s["unique_facts"]["medications"]
+                    ],
+                    allergies=[
+                        HarmonizeMergedAllergy(**m)
+                        for m in s["unique_facts"]["allergies"]
+                    ],
+                    immunizations=[
+                        HarmonizeMergedImmunization(**m)
+                        for m in s["unique_facts"]["immunizations"]
+                    ],
+                ),
+            )
+            for s in payload["sources"]
+        ],
     )
 
 

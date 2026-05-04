@@ -205,7 +205,7 @@ const sourceTypeExamples = [
 ];
 
 function resourceCountEntries(preview: AggregationPreparedPreviewResponse): [string, number][] {
-  return Object.entries(preview.resource_counts)
+  return Object.entries(preview.resource_counts ?? {})
     .sort((a, b) => b[1] - a[1])
     .slice(0, 8);
 }
@@ -232,7 +232,7 @@ function exportJsonFile(fileName: string, data: Record<string, unknown>) {
 
 function baselineResourceEntries(
   overview: PatientOverview | undefined,
-  counts: Record<string, number>,
+  counts: Record<string, number> | null | undefined,
 ): [string, number][] {
   if (overview?.resource_type_counts.length) {
     return overview.resource_type_counts
@@ -240,7 +240,7 @@ function baselineResourceEntries(
       .sort((a, b) => b[1] - a[1])
       .slice(0, 8);
   }
-  return Object.entries(counts)
+  return Object.entries(counts ?? {})
     .filter(([, count]) => count > 0)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 8);
@@ -351,7 +351,7 @@ function PreparedPreviewPane({
 }: {
   patientId: string;
   baselineSource: AggregationSourceCard | null;
-  baselineCounts: Record<string, number>;
+  baselineCounts: Record<string, number> | null | undefined;
   selectedSource: SourceSelection | null;
   file: AggregationUploadedFile | null;
   extractInProgress: boolean;
@@ -410,7 +410,8 @@ function PreparedPreviewPane({
   }, [file?.file_id, selectedSource?.type]);
 
   const baselineRows = baselineSampleRows(overview);
-  const baselineTotal = baselineSource?.record_count ?? Object.values(baselineCounts).reduce((sum, count) => sum + count, 0);
+  const safeBaselineCounts = baselineCounts ?? {};
+  const baselineTotal = baselineSource?.record_count ?? Object.values(safeBaselineCounts).reduce((sum, count) => sum + count, 0);
 
   return (
     <>

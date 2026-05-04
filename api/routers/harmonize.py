@@ -32,7 +32,9 @@ from api.models import (
     HarmonizeConditionsResponse,
     HarmonizeExtractItem,
     HarmonizeExtractResponse,
+    HarmonizeMedicationsResponse,
     HarmonizeMergedCondition,
+    HarmonizeMergedMedication,
     HarmonizeMergedObservation,
     HarmonizeObservationsResponse,
     HarmonizeProvenanceResponse,
@@ -113,6 +115,30 @@ def get_conditions(
         cross_source=len(cross),
         merged=[
             HarmonizeMergedCondition(**harmonize_service.serialize_condition(m))
+            for m in visible
+        ],
+    )
+
+
+@router.get(
+    "/{collection_id}/medications",
+    response_model=HarmonizeMedicationsResponse,
+)
+def get_medications(
+    collection_id: str,
+    cross_source_only: bool = False,
+) -> HarmonizeMedicationsResponse:
+    if harmonize_service.get_collection(collection_id) is None:
+        raise HTTPException(status_code=404, detail=f"Collection not found: {collection_id}")
+    merged = harmonize_service.merged_medications(collection_id)
+    cross = [m for m in merged if len({s.source_label for s in m.sources}) > 1]
+    visible = cross if cross_source_only else merged
+    return HarmonizeMedicationsResponse(
+        collection_id=collection_id,
+        total=len(merged),
+        cross_source=len(cross),
+        merged=[
+            HarmonizeMergedMedication(**harmonize_service.serialize_medication(m))
             for m in visible
         ],
     )

@@ -31,6 +31,7 @@ import type {
   HarmonizeCollectionsResponse,
   HarmonizeConditionsResponse,
   HarmonizeExtractResponse,
+  HarmonizeMedicationsResponse,
   HarmonizeObservationsResponse,
   HarmonizeProvenanceResponse,
   HarmonizeSourceManifestResponse,
@@ -231,6 +232,16 @@ export const api = {
   ): Promise<HarmonizeConditionsResponse> =>
     http
       .get<HarmonizeConditionsResponse>(`/harmonize/${collectionId}/conditions`, {
+        params: { cross_source_only: crossSourceOnly },
+      })
+      .then((r) => r.data),
+
+  getHarmonizeMedications: (
+    collectionId: string,
+    crossSourceOnly = false,
+  ): Promise<HarmonizeMedicationsResponse> =>
+    http
+      .get<HarmonizeMedicationsResponse>(`/harmonize/${collectionId}/medications`, {
         params: { cross_source_only: crossSourceOnly },
       })
       .then((r) => r.data),

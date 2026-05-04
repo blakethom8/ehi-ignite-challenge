@@ -8,17 +8,19 @@ import {
   Layers3,
   Link2,
   Loader2,
+  Pill,
   Sparkles,
   Stethoscope,
 } from "lucide-react";
 import { api } from "../../api/client";
 import type {
   HarmonizeMergedCondition,
+  HarmonizeMergedMedication,
   HarmonizeMergedObservation,
   HarmonizeProvenanceResponse,
 } from "../../types";
 
-type ResourceTab = "labs" | "conditions";
+type ResourceTab = "labs" | "conditions" | "medications";
 
 function cls(...parts: (string | false | null | undefined)[]): string {
   return parts.filter(Boolean).join(" ");
@@ -514,6 +516,170 @@ function ConditionsTab({ collectionId }: { collectionId: string }) {
   );
 }
 
+function MedicationsTab({ collectionId }: { collectionId: string }) {
+  const [crossOnly, setCrossOnly] = useState(true);
+  const [selectedRef, setSelectedRef] = useState<string | null>(null);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["harmonize-medications", collectionId, crossOnly],
+    queryFn: () => api.getHarmonizeMedications(collectionId, crossOnly),
+    enabled: !!collectionId,
+  });
+
+  const merged: HarmonizeMergedMedication[] = data?.merged ?? [];
+  const selected = useMemo(
+    () => merged.find((m) => m.merged_ref === selectedRef) ?? merged[0] ?? null,
+    [merged, selectedRef],
+  );
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        <MetricCard
+          label="Canonical medications"
+          value={data?.total ?? 0}
+          detail="Distinct meds after identity resolution"
+        />
+        <MetricCard
+          label="Cross-source merges"
+          value={data?.cross_source ?? 0}
+          detail="Meds found in ≥2 sources"
+        />
+        <MetricCard
+          label="Active"
+          value={merged.filter((m) => m.is_active).length}
+          detail="Status active / on-hold / unknown"
+        />
+      </div>
+
+      <div className="flex items-center justify-between">
+        <label className="flex items-center gap-2 text-sm text-[#667085]">
+          <input
+            type="checkbox"
+            checked={crossOnly}
+            onChange={(e) => {
+              setCrossOnly(e.target.checked);
+              setSelectedRef(null);
+            }}
+            className="h-4 w-4 rounded border-[#dfe4ea]"
+          />
+          Show only cross-source merges
+        </label>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="lg:col-span-2 overflow-hidden rounded-2xl bg-white shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+          {isLoading ? (
+            <p className="p-6 text-sm text-[#667085]">Loading medications…</p>
+          ) : merged.length === 0 ? (
+            <p className="p-6 text-sm text-[#667085]">No medications to display.</p>
+          ) : (
+            <div className="max-h-[640px] overflow-y-auto">
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 bg-[#f7f9fc] text-left text-xs font-semibold uppercase tracking-wider text-[#667085]">
+                  <tr>
+                    <th className="px-4 py-2">Medication</th>
+                    <th className="px-4 py-2">RxNorm</th>
+                    <th className="px-4 py-2 text-right">Sources</th>
+                    <th className="px-4 py-2 text-center">Active</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#eef0f4] bg-white">
+                  {merged.map((m) => {
+                    const isSelected = selected?.merged_ref === m.merged_ref;
+                    return (
+                      <tr
+                        key={m.merged_ref ?? m.canonical_name}
+                        onClick={() => setSelectedRef(m.merged_ref)}
+                        className={cls(
+                          "cursor-pointer hover:bg-[#f7f9fc]",
+                          isSelected && "bg-[#eef2ff]",
+                        )}
+                      >
+                        <td className="px-4 py-2 font-medium text-[#1c1c1e]">
+                          {m.canonical_name.length > 50
+                            ? m.canonical_name.slice(0, 50) + "…"
+                            : m.canonical_name}
+                        </td>
+                        <td className="px-4 py-2 text-[#667085]">
+                          <code className="text-xs">
+                            {m.rxnorm_codes[0] ?? "—"}
+                            {m.rxnorm_codes.length > 1 && ` +${m.rxnorm_codes.length - 1}`}
+                          </code>
+                        </td>
+                        <td className="px-4 py-2 text-right tabular-nums text-[#1c1c1e]">
+                          {m.source_count}
+                        </td>
+                        <td className="px-4 py-2 text-center">
+                          {m.is_active ? (
+                            <span className="text-emerald-600">●</span>
+                          ) : (
+                            <span className="text-[#dfe4ea]">○</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-4">
+          <div className="rounded-2xl bg-white p-4 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+            <h4 className="text-sm font-semibold text-[#1c1c1e]">
+              {selected?.canonical_name ?? "—"}
+            </h4>
+            {selected && selected.rxnorm_codes.length > 0 && (
+              <p className="mt-1 text-xs text-[#667085]">
+                RxNorm codes:{" "}
+                {selected.rxnorm_codes.slice(0, 5).map((c, i) => (
+                  <code key={c} className="text-xs">
+                    {c}
+                    {i < Math.min(selected.rxnorm_codes.length, 5) - 1 ? ", " : ""}
+                  </code>
+                ))}
+                {selected.rxnorm_codes.length > 5 &&
+                  ` (+${selected.rxnorm_codes.length - 5} more)`}
+              </p>
+            )}
+            {selected && (
+              <ul className="mt-3 space-y-1 text-sm">
+                {selected.sources.map((s, i) => (
+                  <li key={i} className="border-b border-[#eef0f4] py-1 last:border-b-0">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium text-[#1c1c1e]">{s.source_label}</span>
+                      <span className="text-xs text-[#667085]">
+                        {s.status ?? "—"}
+                      </span>
+                    </div>
+                    <p className="text-xs text-[#667085]">{s.display}</p>
+                    {s.authored_on && (
+                      <p className="text-[10px] text-[#a5a8b5]">
+                        authored {s.authored_on.slice(0, 10)}
+                      </p>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <div className="rounded-2xl bg-white p-4 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+            <h4 className="mb-2 text-sm font-semibold text-[#1c1c1e]">
+              Provenance lineage
+            </h4>
+            <ProvenancePanel
+              collectionId={collectionId}
+              mergedRef={selected?.merged_ref ?? null}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function HarmonizeView() {
   const [tab, setTab] = useState<ResourceTab>("labs");
   const queryClient = useQueryClient();
@@ -683,13 +849,28 @@ export function HarmonizeView() {
             <Stethoscope size={14} />
             Conditions
           </button>
+          <button
+            type="button"
+            onClick={() => setTab("medications")}
+            className={cls(
+              "flex items-center gap-2 border-b-2 px-3 py-3 text-sm font-medium",
+              tab === "medications"
+                ? "border-[#5b76fe] text-[#5b76fe]"
+                : "border-transparent text-[#667085] hover:text-[#1c1c1e]",
+            )}
+          >
+            <Pill size={14} />
+            Medications
+          </button>
         </div>
         <div className="p-5">
           {activeId &&
             (tab === "labs" ? (
               <LabsTab collectionId={activeId} />
-            ) : (
+            ) : tab === "conditions" ? (
               <ConditionsTab collectionId={activeId} />
+            ) : (
+              <MedicationsTab collectionId={activeId} />
             ))}
         </div>
       </div>

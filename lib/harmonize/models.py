@@ -156,6 +156,64 @@ class MergedCondition:
         return not seen_any_status
 
 
+@dataclass(frozen=True)
+class MedicationSource:
+    """One source MedicationRequest backing a merged medication.
+
+    Multiple source requests for the same canonical medication collapse
+    onto one ``MergedMedication`` (e.g. one prescription record from the
+    EHR FHIR pull plus one extracted from a discharge summary PDF).
+    Refills and dose changes appear as additional sources on the same
+    merged record.
+    """
+
+    source_label: str
+    source_request_ref: str
+    display: str
+    rxnorm_codes: tuple[str, ...]
+    status: str | None
+    """``active`` / ``completed`` / ``stopped`` / ``on-hold`` / etc.
+    Per FHIR MedicationRequest.status."""
+
+    authored_on: datetime | None
+    document_reference: str | None = None
+
+
+@dataclass
+class MergedMedication:
+    """A canonical medication, optionally backed by multiple sources.
+
+    Identity priority: any RxNorm code overlap → drug-name canonical
+    form (generic name with brand parenthetical and dose stripped) →
+    normalized full-text passthrough. Sources contribute RxNorm codes
+    incrementally — the merged record's ``rxnorm_codes`` is the union
+    across all contributing sources.
+    """
+
+    canonical_name: str
+    rxnorm_codes: tuple[str, ...]
+
+    sources: list[MedicationSource] = field(default_factory=list)
+    provenance: list[ProvenanceEdge] = field(default_factory=list)
+
+    @property
+    def is_active(self) -> bool:
+        """True if any source still considers the medication active.
+
+        Mirrors ``MergedCondition.is_active`` semantics: PDF-extracted
+        MedicationRequests often lack a status, so missing-status defaults
+        to active rather than inactive.
+        """
+        seen_any_status = False
+        for s in self.sources:
+            if not s.status:
+                continue
+            seen_any_status = True
+            if s.status in ("active", "on-hold"):
+                return True
+        return not seen_any_status
+
+
 @dataclass
 class MergedObservation:
     """A canonical fact, optionally backed by multiple sources.

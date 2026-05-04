@@ -1050,3 +1050,30 @@ class HarmonizeExtractItem(BaseModel):
 class HarmonizeExtractResponse(BaseModel):
     collection_id: str
     extracted: list[HarmonizeExtractItem]
+
+
+class HarmonizeMedicationSource(BaseModel):
+    source_label: str
+    source_request_ref: str
+    display: str
+    rxnorm_codes: list[str]
+    status: str | None
+    authored_on: str | None
+    document_reference: str | None
+
+
+class HarmonizeMergedMedication(BaseModel):
+    merged_ref: str | None
+    canonical_name: str
+    rxnorm_codes: list[str]
+    is_active: bool
+    source_count: int
+    occurrence_count: int
+    sources: list[HarmonizeMedicationSource]
+
+
+class HarmonizeMedicationsResponse(BaseModel):
+    collection_id: str
+    total: int
+    cross_source: int
+    merged: list[HarmonizeMergedMedication]

@@ -21,9 +21,12 @@ Immunizations follow the same shape but are not yet implemented.
 from __future__ import annotations
 
 from .conditions import merge_conditions
+from .medications import canonical_drug_name, merge_medications
 from .models import (
     ConditionSource,
+    MedicationSource,
     MergedCondition,
+    MergedMedication,
     MergedObservation,
     ObservationSource,
     ProvenanceEdge,
@@ -34,12 +37,16 @@ from .provenance import mint_provenance, mint_provenance_bundle
 __all__ = [
     "merge_observations",
     "merge_conditions",
+    "merge_medications",
+    "canonical_drug_name",
     "mint_provenance",
     "mint_provenance_bundle",
     "MergedObservation",
     "MergedCondition",
+    "MergedMedication",
     "ObservationSource",
     "ConditionSource",
+    "MedicationSource",
     "ProvenanceEdge",
     "SourceBundle",
 ]

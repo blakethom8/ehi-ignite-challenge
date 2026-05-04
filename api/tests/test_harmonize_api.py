@@ -86,6 +86,20 @@ class HarmonizeAPITests(unittest.TestCase):
         else:
             self.fail("Expected at least one merged Condition with a SNOMED code")
 
+    def test_medications_returns_cross_source_merges(self) -> None:
+        r = self.client.get("/api/harmonize/blake-real/medications")
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        # Cedars FHIR has 7 MedicationRequests; the PDF extraction adds 6 — most
+        # should cross-source-merge via RxNorm + drug-name bridge.
+        self.assertGreater(body["total"], 5)
+        self.assertGreaterEqual(body["cross_source"], 5)
+        # Spot-check shape
+        first = body["merged"][0]
+        self.assertIn("canonical_name", first)
+        self.assertIn("rxnorm_codes", first)
+        self.assertIn("is_active", first)
+
     def test_provenance_for_known_merged_obs_ref(self) -> None:
         # First find any cross-source merged observation
         obs = self.client.get(

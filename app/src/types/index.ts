@@ -913,6 +913,33 @@ export interface HarmonizeConditionsResponse {
   merged: HarmonizeMergedCondition[];
 }
 
+export interface HarmonizeMedicationSource {
+  source_label: string;
+  source_request_ref: string;
+  display: string;
+  rxnorm_codes: string[];
+  status: string | null;
+  authored_on: string | null;
+  document_reference: string | null;
+}
+
+export interface HarmonizeMergedMedication {
+  merged_ref: string | null;
+  canonical_name: string;
+  rxnorm_codes: string[];
+  is_active: boolean;
+  source_count: number;
+  occurrence_count: number;
+  sources: HarmonizeMedicationSource[];
+}
+
+export interface HarmonizeMedicationsResponse {
+  collection_id: string;
+  total: number;
+  cross_source: number;
+  merged: HarmonizeMergedMedication[];
+}
+
 export interface HarmonizeExtractItem {
   source_id: string;
   label: string;

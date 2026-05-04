@@ -37,10 +37,11 @@ from typing import Any
 from lib.harmonize import (
     SourceBundle,
     merge_conditions,
+    merge_medications,
     merge_observations,
     mint_provenance,
 )
-from lib.harmonize.models import MergedCondition, MergedObservation
+from lib.harmonize.models import MergedCondition, MergedMedication, MergedObservation
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -385,6 +386,32 @@ def merged_conditions(collection_id: str) -> list[MergedCondition]:
     return merge_conditions(_bundles_for(collection_id, "Condition"))
 
 
+def merged_medications(collection_id: str) -> list[MergedMedication]:
+    """Merge MedicationRequests across sources.
+
+    The matcher needs both ``MedicationRequest`` (the orders) and
+    ``Medication`` (the contained resources holding RxNorm codes), so
+    we hand both resource types into each ``SourceBundle``.
+    """
+    coll = get_collection(collection_id)
+    if not coll:
+        return []
+    resources = load_collection_resources(collection_id)
+    bundles: list[SourceBundle] = []
+    for s in coll.sources:
+        rs = resources.get(s.id, {})
+        pool: list[dict] = list(rs.get("MedicationRequest", [])) + list(rs.get("Medication", []))
+        if pool:
+            bundles.append(
+                SourceBundle(
+                    label=s.label,
+                    observations=pool,
+                    document_reference=s.document_reference,
+                )
+            )
+    return merge_medications(bundles)
+
+
 # ---------------------------------------------------------------------------
 # Serialization helpers (lib.harmonize.models → JSON-friendly dicts)
 # ---------------------------------------------------------------------------
@@ -422,6 +449,29 @@ def serialize_observation(m: MergedObservation) -> dict[str, Any]:
                 "raw_value": s.raw_value,
                 "raw_unit": s.raw_unit,
                 "effective_date": _iso(s.effective_date),
+                "document_reference": s.document_reference,
+            }
+            for s in m.sources
+        ],
+    }
+
+
+def serialize_medication(m: MergedMedication) -> dict[str, Any]:
+    return {
+        "merged_ref": getattr(m, "_merged_ref", None),
+        "canonical_name": m.canonical_name,
+        "rxnorm_codes": list(m.rxnorm_codes),
+        "is_active": m.is_active,
+        "source_count": len({s.source_label for s in m.sources}),
+        "occurrence_count": len(m.sources),
+        "sources": [
+            {
+                "source_label": s.source_label,
+                "source_request_ref": s.source_request_ref,
+                "display": s.display,
+                "rxnorm_codes": list(s.rxnorm_codes),
+                "status": s.status,
+                "authored_on": _iso(s.authored_on),
                 "document_reference": s.document_reference,
             }
             for s in m.sources
@@ -546,13 +596,17 @@ def extract_pending_pdfs(collection_id: str) -> list[ExtractResult] | None:
 
 
 def find_merged_record(collection_id: str, merged_ref: str):
-    """Look up a merged record by its synthetic ref ID across both resource types."""
-    if "merged-loinc" in merged_ref or merged_ref.startswith("Observation/merged-"):
+    """Look up a merged record by its synthetic ref ID across all resource types."""
+    if merged_ref.startswith("Observation/"):
         for m in merged_observations(collection_id):
             if getattr(m, "_merged_ref", "") == merged_ref:
                 return m
-    if "merged-snomed" in merged_ref or "merged-icd" in merged_ref or merged_ref.startswith("Condition/merged-"):
+    if merged_ref.startswith("Condition/"):
         for m in merged_conditions(collection_id):
+            if getattr(m, "_merged_ref", "") == merged_ref:
+                return m
+    if merged_ref.startswith("MedicationRequest/"):
+        for m in merged_medications(collection_id):
             if getattr(m, "_merged_ref", "") == merged_ref:
                 return m
     return None

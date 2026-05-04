@@ -47,6 +47,7 @@ with st.sidebar:
     st.page_link("pages/03_PDF_Lab.py", label="PDF Lab (single PDF)", icon="🧪")
     st.page_link("pages/04_PDF_Compare.py", label="PDF Compare (backends)", icon="🆚")
     st.page_link("pages/05_Pipeline_Bakeoff.py", label="Pipeline Bakeoff", icon="🥧")
+    st.page_link("pages/06_Harmonize_Labs.py", label="Harmonize Labs", icon="🔗")
 
 st.markdown(
     """
@@ -77,7 +78,7 @@ st.caption(f"Bronze root: `{BRONZE_ROOT}`")
 st.divider()
 st.subheader("Where to start")
 
-cols = st.columns(3)
+cols = st.columns(4)
 _CARDS = [
     (
         "🧪",
@@ -94,8 +95,14 @@ _CARDS = [
     (
         "🥧",
         "Pipeline Bakeoff",
-        "Compare entire extraction architectures (single-pass vs multi-pass) with F1 scoring against ground truth.",
+        "Compare extraction architectures (single-pass vs multi-pass) with F1 scoring against ground truth.",
         "pages/05_Pipeline_Bakeoff.py",
+    ),
+    (
+        "🔗",
+        "Harmonize Labs",
+        "Cross-source merge: Cedars FHIR + Function Health PDFs identity-resolved, longitudinal view, Provenance lineage.",
+        "pages/06_Harmonize_Labs.py",
     ),
 ]
 for col, (icon, title, desc, page) in zip(cols, _CARDS):

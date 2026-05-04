@@ -35,6 +35,38 @@ class PatientListItem(BaseModel):
     prepared_source_count: int = 0
 
 
+class CanonicalSourceSummary(BaseModel):
+    id: str
+    label: str
+    kind: str
+    status: str
+    status_label: str
+    total_resources: int
+
+
+class CanonicalPatientSummary(BaseModel):
+    patient_id: str
+    patient_name: str
+    workspace_id: str
+    source_count: int
+    prepared_source_count: int
+    needs_preparation_count: int
+    total_resources: int
+    canonical_observation_count: int
+    canonical_condition_count: int
+    canonical_medication_count: int
+    canonical_allergy_count: int
+    canonical_immunization_count: int
+    encounter_count: int
+    review_item_count: int
+    date_start: str | None = None
+    date_end: str | None = None
+    storage_mode: str
+    storage_description: str
+    sources: list[CanonicalSourceSummary] = Field(default_factory=list)
+    fallback_modes: list[str] = Field(default_factory=list)
+
+
 # ---------------------------------------------------------------------------
 # Overview detail
 # ---------------------------------------------------------------------------

@@ -136,10 +136,31 @@ export function PatientRecordOverview() {
   const overviewQ = useQuery({
     queryKey: ["overview", patientId],
     queryFn: () => api.getOverview(patientId!),
+    enabled: !!patientId && !patientId.startsWith("workspace-"),
+  });
+
+  const canonicalQ = useQuery({
+    queryKey: ["canonical-summary", patientId],
+    queryFn: () => api.getCanonicalSummary(patientId!),
     enabled: !!patientId,
   });
 
   const overview = overviewQ.data;
+  const canonical = canonicalQ.data;
+  const chartName = canonical?.patient_name || overview?.name;
+  const readinessPct = canonical
+    ? Math.max(
+        0,
+        Math.min(
+          100,
+          Math.round(
+            canonical.source_count > 0
+              ? (canonical.prepared_source_count / canonical.source_count) * 100 - Math.min(canonical.review_item_count * 4, 20)
+              : 0,
+          ),
+        ),
+      )
+    : 78;
 
   return (
     <main className="mx-auto max-w-7xl space-y-5 p-4 lg:p-6">
@@ -151,24 +172,24 @@ export function PatientRecordOverview() {
           Module Overview
             </p>
             <h1 className="mt-5 text-3xl font-semibold tracking-tight text-[#1c1c1e] lg:text-4xl">
-              {overview ? `${overview.name}'s FHIR Chart` : "The patient-owned FHIR Chart"}
+              {chartName ? `${chartName}'s FHIR Chart` : "The patient-owned FHIR Chart"}
             </h1>
             <p className="mt-3 max-w-3xl text-base leading-7 text-[#667085]">
-              This is the platform layer: connected records become a source-aware, patient-owned clinical chart.
-              The useful product is not raw FHIR browsing. It is the record intelligence that modules can act on.
+              This page reads from the canonical patient workspace: source files are collected, prepared, and exposed as
+              one source-aware chart for downstream modules.
             </p>
           </div>
 
           <div className="min-w-[260px] rounded-2xl bg-[#fafbff] p-4 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-[#a5a8b5]">Activation readiness</p>
             <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#e9eaef]">
-              <div className="h-full w-[78%] rounded-full bg-[#00b473]" />
+              <div className="h-full rounded-full bg-[#00b473]" style={{ width: `${readinessPct}%` }} />
             </div>
-            <p className="mt-3 text-sm font-semibold text-[#1c1c1e]">78% module-ready</p>
+            <p className="mt-3 text-sm font-semibold text-[#1c1c1e]">{readinessPct}% module-ready</p>
             <div className="mt-3 space-y-2 text-sm text-[#667085]">
-              <div className="flex items-center gap-2"><CheckCircle2 size={14} className="text-[#00b473]" /> Identity linked</div>
-              <div className="flex items-center gap-2"><CheckCircle2 size={14} className="text-[#00b473]" /> FHIR normalized</div>
-              <div className="flex items-center gap-2"><AlertTriangle size={14} className="text-[#f59e0b]" /> Review flags open</div>
+              <div className="flex items-center gap-2"><CheckCircle2 size={14} className="text-[#00b473]" /> Workspace selected</div>
+              <div className="flex items-center gap-2"><CheckCircle2 size={14} className="text-[#00b473]" /> {canonical?.prepared_source_count ?? 0} prepared sources</div>
+              <div className="flex items-center gap-2"><AlertTriangle size={14} className="text-[#f59e0b]" /> {canonical?.review_item_count ?? 0} review items</div>
             </div>
           </div>
         </div>
@@ -181,14 +202,24 @@ export function PatientRecordOverview() {
         tone="blue"
       >
         <div className="grid gap-4 md:grid-cols-3">
-          <StatCard label="Data gathered" value="5 sources" note="2 hospitals, 2 clinics, 1 payer feed" tone="blue" />
+          <StatCard
+            label="Data gathered"
+            value={`${canonical?.source_count ?? 0} sources`}
+            note={`${canonical?.prepared_source_count ?? 0} prepared for canonical use`}
+            tone="blue"
+          />
           <StatCard
             label="Usable chart facts"
-            value={overview ? (overview.active_condition_count + overview.active_med_count + overview.encounter_count).toLocaleString() : "1,284"}
-            note="Normalized conditions, medications, labs, and encounters"
+            value={(canonical?.total_resources ?? overview?.total_resources ?? 0).toLocaleString()}
+            note="Prepared resources available to downstream modules"
             tone="teal"
           />
-          <StatCard label="Needs review" value="17 items" note="Conflicts, sparse fields, stale status, or inferred facts" tone="amber" />
+          <StatCard
+            label="Needs review"
+            value={`${canonical?.review_item_count ?? 0} items`}
+            note="Unprepared sources or source conflicts before module activation"
+            tone="amber"
+          />
         </div>
       </SectionBand>
 
@@ -248,7 +279,29 @@ export function PatientRecordOverview() {
                 <div className="rounded-xl bg-[#fafbff] p-4">
                   <p className="text-[10px] font-semibold uppercase tracking-wider text-[#a5a8b5]">Module-ready facts</p>
                   <p className="mt-1 text-sm font-semibold text-[#1c1c1e]">
-                    {overview.active_condition_count} active conditions · {overview.active_med_count} active meds · {overview.encounter_count} encounters
+                    {canonical?.canonical_condition_count ?? overview.active_condition_count} conditions ·{" "}
+                    {canonical?.canonical_medication_count ?? overview.active_med_count} meds ·{" "}
+                    {canonical?.encounter_count ?? overview.encounter_count} encounters
+                  </p>
+                </div>
+              </>
+            )}
+            {patientId && !overview && !overviewQ.isLoading && canonical && (
+              <>
+                <div className="rounded-xl bg-[#fafbff] p-4">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-[#a5a8b5]">Workspace</p>
+                  <p className="mt-1 text-sm font-semibold text-[#1c1c1e]">{canonical.workspace_id}</p>
+                </div>
+                <div className="rounded-xl bg-[#fafbff] p-4">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-[#a5a8b5]">Record span</p>
+                  <p className="mt-1 text-sm font-semibold text-[#1c1c1e]">
+                    {formatDate(canonical.date_start)} to {formatDate(canonical.date_end)}
+                  </p>
+                </div>
+                <div className="rounded-xl bg-[#fafbff] p-4">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-[#a5a8b5]">Canonical source posture</p>
+                  <p className="mt-1 text-sm font-semibold text-[#1c1c1e]">
+                    {canonical.source_count} sources · {canonical.total_resources.toLocaleString()} prepared resources
                   </p>
                 </div>
               </>

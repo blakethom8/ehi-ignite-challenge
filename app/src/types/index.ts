@@ -16,6 +16,38 @@ export interface PatientListItem {
   prepared_source_count?: number;
 }
 
+export interface CanonicalSourceSummary {
+  id: string;
+  label: string;
+  kind: string;
+  status: string;
+  status_label: string;
+  total_resources: number;
+}
+
+export interface CanonicalPatientSummary {
+  patient_id: string;
+  patient_name: string;
+  workspace_id: string;
+  source_count: number;
+  prepared_source_count: number;
+  needs_preparation_count: number;
+  total_resources: number;
+  canonical_observation_count: number;
+  canonical_condition_count: number;
+  canonical_medication_count: number;
+  canonical_allergy_count: number;
+  canonical_immunization_count: number;
+  encounter_count: number;
+  review_item_count: number;
+  date_start: string | null;
+  date_end: string | null;
+  storage_mode: string;
+  storage_description: string;
+  sources: CanonicalSourceSummary[];
+  fallback_modes: string[];
+}
+
 export interface ConditionRow {
   condition_id: string;
   display: string;

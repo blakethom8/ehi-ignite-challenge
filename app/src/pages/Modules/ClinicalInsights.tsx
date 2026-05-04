@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import {
   Activity,
   ArrowRight,
@@ -26,6 +27,7 @@ import {
   X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { api } from "../../api/client";
 
 function withPatient(path: string, patientId: string | null): string {
   return patientId ? `${path}?patient=${patientId}` : path;
@@ -303,6 +305,50 @@ function ViewModeToggle({
         </button>
       ))}
     </div>
+  );
+}
+
+function CanonicalWorkspaceStrip({ patientId }: { patientId: string | null }) {
+  const canonicalQ = useQuery({
+    queryKey: ["canonical-summary", patientId],
+    queryFn: () => api.getCanonicalSummary(patientId!),
+    enabled: !!patientId,
+  });
+  const canonical = canonicalQ.data;
+
+  return (
+    <section className="rounded-2xl border border-[#dfe4ff] bg-[#fbfcff] p-4">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-[#5b76fe]">Canonical patient workspace</p>
+          <h2 className="mt-1 text-lg font-semibold text-[#1c1c1e]">
+            {canonical?.patient_name || "Select a patient"} feeds Clinical Insights
+          </h2>
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-[#667085]">
+            Modules should consume this harmonized read layer first. Synthea is just one baseline source inside the
+            workspace, alongside uploaded PDFs and FHIR exports.
+          </p>
+        </div>
+        <div className="grid w-full gap-2 sm:grid-cols-4 lg:w-auto lg:min-w-[520px]">
+          <div className="rounded-xl bg-white p-3 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-[#8d92a3]">Sources</p>
+            <p className="mt-1 text-lg font-semibold text-[#1c1c1e]">{canonical?.source_count ?? 0}</p>
+          </div>
+          <div className="rounded-xl bg-white p-3 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-[#8d92a3]">Facts</p>
+            <p className="mt-1 text-lg font-semibold text-[#1c1c1e]">{(canonical?.total_resources ?? 0).toLocaleString()}</p>
+          </div>
+          <div className="rounded-xl bg-white p-3 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-[#8d92a3]">Review</p>
+            <p className="mt-1 text-lg font-semibold text-[#1c1c1e]">{canonical?.review_item_count ?? 0}</p>
+          </div>
+          <div className="rounded-xl bg-white p-3 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-[#8d92a3]">Storage</p>
+            <p className="mt-1 truncate text-sm font-semibold text-[#1c1c1e]">{canonical?.storage_mode ?? "Not selected"}</p>
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -614,6 +660,8 @@ function ClinicalInsightsOverviewPage({ patientId }: { patientId: string | null 
           </div>
         </div>
       </section>
+
+      <CanonicalWorkspaceStrip patientId={patientId} />
 
       <section className="grid gap-4 lg:grid-cols-3">
         {pillars.map((pillar) => {
@@ -1133,6 +1181,8 @@ export function ClinicalInsights() {
           </div>
         </div>
       </section>
+
+      <CanonicalWorkspaceStrip patientId={patientId} />
 
       <section className="rounded-[24px] border border-[#f6dfc9] bg-[#fff8f1] p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">

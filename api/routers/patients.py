@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import json
+import os
 from collections import defaultdict
 from datetime import date, datetime
 from functools import lru_cache
@@ -89,6 +90,31 @@ router = APIRouter(prefix="/patients", tags=["patients"])
 
 BILLING_TYPES = {"Claim", "ExplanationOfBenefit"}
 ADMIN_TYPES = {"Organization", "Practitioner", "PractitionerRole", "Location"}
+DEMO_PATIENT_LIMIT = max(1, int(os.getenv("EHI_DEMO_PATIENT_LIMIT", "20")))
+DEMO_PATIENT_IDS = (
+    # Current working demo patient and early aggregation fixture.
+    "763b6101-133a-44bb-ac60-3c097d6c0ba1",
+    "5cbc121b-cd71-4428-b8b7-31e53eba8184",
+    # Curated high-signal Synthea records for development and demos.
+    "eec393be-2569-46db-a974-33d7c853d690",
+    "8143897c-e650-4e55-b08d-8306e2f424bb",
+    "0718123b-5034-4965-a145-3d8d71b11389",
+    "8055d1ca-46b7-44a3-a033-b918e4c3ecfb",
+    "86017b61-3171-45b6-9bd7-b6ca6a946604",
+    "4b5e42a8-b3e6-411b-b32d-585f71bca118",
+    "8e674838-e3da-4bc9-b9e3-7d726b07291d",
+    "fc863fc4-dbe2-430b-b213-ce400f6e47a8",
+    "81e1b4cb-6817-4bdc-97cd-c1f3ac960345",
+    "86337f98-0d8d-40ee-ad5d-68811024c886",
+    "2d75e3a4-f0f6-45dd-8b57-75fb2f303c9e",
+    "f636829a-4277-4392-a9a2-1050ef6eceed",
+    "afafca2f-b97d-4fc9-b3b6-984e46d4c0b8",
+    "b0f49c80-b59b-4df6-8292-40ce8b8f8612",
+    "8937b6dc-4484-49c1-9bef-5700688d5f90",
+    "df121e33-f3dc-4d02-a523-3bbd89c8fa5b",
+    "6e965c83-1c3f-42bb-9604-f809c18bad6b",
+    "fa7e100a-ff60-4edb-9fc6-9574a42784aa",
+)
 
 
 def _encounter_date_sort(value: datetime | None) -> int:
@@ -261,13 +287,33 @@ def _limit_evidence(items: list[str], limit: int = 5) -> list[str]:
 
 @router.get("", response_model=list[PatientListItem])
 def list_patients() -> list[PatientListItem]:
-    synthea_items = _cached_patient_list()
-    synthea_ids = {patient.id for patient in synthea_items}
+    all_synthea_items = _cached_patient_list()
+    synthea_items = _curated_demo_patients(all_synthea_items)
+    all_synthea_ids = {patient.id for patient in all_synthea_items}
     upload_items = [
         item for item in list_upload_workspaces()
-        if item.id not in synthea_ids
+        if item.id not in all_synthea_ids
     ]
     return upload_items + synthea_items
+
+
+def _curated_demo_patients(items: list[PatientListItem]) -> list[PatientListItem]:
+    """Return the intentionally small patient registry shown in the selector.
+
+    The Synthea corpus remains available for benchmarks and backend tests, but
+    the application demo should feel like a managed patient workspace list, not
+    a 1,180-patient file browser.
+    """
+    by_id = {item.id: item for item in items}
+    curated = [by_id[patient_id] for patient_id in DEMO_PATIENT_IDS if patient_id in by_id]
+    seen = {item.id for item in curated}
+    if len(curated) < DEMO_PATIENT_LIMIT:
+        fillers = sorted(
+            (item for item in items if item.id not in seen),
+            key=lambda item: (-item.complexity_score, item.name),
+        )
+        curated.extend(fillers[: DEMO_PATIENT_LIMIT - len(curated)])
+    return curated[:DEMO_PATIENT_LIMIT]
 
 
 @lru_cache(maxsize=1)

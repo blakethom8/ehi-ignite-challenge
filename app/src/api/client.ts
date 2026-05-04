@@ -45,6 +45,7 @@ import type {
   AggregationReadinessResponse,
   AggregationUploadPayload,
   AggregationUploadResponse,
+  CanonicalPatientSummary,
 } from "../types";
 import { mockPatients } from "./mockData";
 
@@ -76,6 +77,10 @@ export const api = {
   /** Full patient overview — loads and parses the FHIR bundle */
   getOverview: (patientId: string): Promise<PatientOverview> =>
     http.get<PatientOverview>(`/patients/${patientId}/overview`).then((r) => r.data),
+
+  /** Canonical patient workspace summary — source-agnostic read facade */
+  getCanonicalSummary: (patientId: string): Promise<CanonicalPatientSummary> =>
+    http.get<CanonicalPatientSummary>(`/canonical/${patientId}/summary`).then((r) => r.data),
 
   /** Encounter timeline */
   getTimeline: (patientId: string): Promise<TimelineResponse> =>

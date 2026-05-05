@@ -557,3 +557,138 @@ async def test_runner_escalates_on_no_anchors(trial_skill) -> None:
     assert result.status == "escalated"
     pending = ws.pending_escalations()
     assert pending and pending[0].condition == "no_anchor_condition"
+
+
+# ── Bug-fix coverage ───────────────────────────────────────────────────────
+#
+# Each test below pins a specific regression introduced (and then fixed) in
+# the runtime build: resume re-init wiping workspace.md, unsubstituted
+# template variables, and the `_belongs_to_anchor` collapse that mixed
+# trial sections with the run summary.
+
+
+def test_start_is_idempotent_on_resume(trial_skill) -> None:
+    """Calling start() a second time must not wipe content the agent already wrote.
+
+    Repro: in the original build, escalation → resolve → pool.resume rebuilt
+    the workspace and called runner.run() → workspace.start() → template
+    overwrite. Any per-trial sections written before the escalation got
+    erased on resume.
+    """
+    ws = _fresh_workspace(trial_skill)
+    ws.start()
+    cid = ws.cite(
+        claim="Active diagnosis",
+        source_kind="fhir_resource",
+        source_ref="Condition/abc",
+        evidence_tier="T1",
+    )
+    ws.write(
+        section="NCT01234567",
+        content=f"Pre-escalation content [cite:{cid}].",
+        anchor="TRIAL_SECTIONS",
+    )
+    pre_resume = ws.workspace_md_path.read_text("utf-8")
+    assert "Pre-escalation content" in pre_resume
+
+    # Second start() — simulates the resume path.
+    ws.start()
+    post_resume = ws.workspace_md_path.read_text("utf-8")
+    assert "Pre-escalation content" in post_resume, (
+        "Resume must preserve content the agent already wrote pre-escalation"
+    )
+
+
+def test_template_variables_substituted_on_start(trial_skill) -> None:
+    ws = _fresh_workspace(trial_skill, patient_id="tmpl-001")
+    ws._brief.update({"patient_display_name": "Test Patient"})
+    ws.start()
+    md = ws.workspace_md_path.read_text("utf-8")
+
+    # The trial-matching template references these — they must be substituted,
+    # not rendered as literal `{{patient.display_name}}`.
+    assert "{{" not in md, f"unsubstituted template variable in workspace: {md[:200]}"
+    assert "Test Patient" in md
+    assert ws.run_id in md
+    assert trial_skill.manifest.version in md
+
+
+def test_template_substitution_falls_back_to_patient_id(trial_skill) -> None:
+    ws = _fresh_workspace(trial_skill, patient_id="fallback-pid")
+    ws.start()
+    md = ws.workspace_md_path.read_text("utf-8")
+
+    # No display name in brief → substitution should fall back to patient id.
+    assert "fallback-pid" in md
+    assert "{{" not in md
+
+
+def test_template_substitution_includes_anchors_summary(trial_skill) -> None:
+    ws = _fresh_workspace(trial_skill, patient_id="anchor-summary-001")
+    ws._brief["anchors"] = [
+        {"display": "Type 2 Diabetes", "resource_id": "Condition/dm"},
+        {"display": "Hypertension", "resource_id": "Condition/htn"},
+    ]
+    ws.start()
+    md = ws.workspace_md_path.read_text("utf-8")
+    assert "Type 2 Diabetes" in md
+    assert "Hypertension" in md
+
+
+def test_unknown_template_variable_left_intact(trial_skill) -> None:
+    """Unknown placeholders survive substitution so the bug is visible, not silent."""
+    ws = _fresh_workspace(trial_skill, patient_id="unknown-tmpl-001")
+    # Overlay a synthetic template that references a nonexistent var.
+    ws.skill.workspace_template  # touch
+    rendered = ws._substitute_template_vars(
+        "Hello {{patient.display_name}} and {{nope.missing}}!"
+    )
+    assert "{{nope.missing}}" in rendered
+    assert "{{patient.display_name}}" not in rendered
+
+
+def test_sections_with_different_anchors_do_not_collapse(trial_skill) -> None:
+    """Two writes under different anchors must end up in different anchor blocks.
+
+    Repro: the original `_belongs_to_anchor` returned True for every section,
+    so both anchors got the union of all sections — duplicating content.
+    """
+    ws = _fresh_workspace(trial_skill)
+    ws.start()
+    cid = ws.cite(
+        claim="x",
+        source_kind="fhir_resource",
+        source_ref="Condition/y",
+        evidence_tier="T1",
+    )
+    ws.write(
+        section="NCT01234567",
+        content=f"Trial body [cite:{cid}].",
+        anchor="TRIAL_SECTIONS",
+    )
+    ws.write(
+        section="run-summary",
+        content="Summary text.",
+        anchor="WORKSPACE_BODY",
+    )
+
+    md = ws.workspace_md_path.read_text("utf-8")
+    trial_anchor = _between(md, "TRIAL_SECTIONS_START", "TRIAL_SECTIONS_END")
+    body_anchor = _between(md, "WORKSPACE_BODY_START", "WORKSPACE_BODY_END")
+
+    assert "NCT01234567" in trial_anchor
+    assert "Summary text" not in trial_anchor, (
+        "Run summary should not appear inside TRIAL_SECTIONS anchor"
+    )
+    assert "Summary text" in body_anchor
+    assert "NCT01234567" not in body_anchor, (
+        "Trial section should not appear inside WORKSPACE_BODY anchor"
+    )
+
+
+def _between(text: str, start_marker: str, end_marker: str) -> str:
+    s = text.find(start_marker)
+    e = text.find(end_marker)
+    if s == -1 or e == -1 or e <= s:
+        return ""
+    return text[s + len(start_marker) : e]

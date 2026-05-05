@@ -174,6 +174,11 @@ class Workspace:
         self._next_citation_seq = 1
         self._next_approval_seq = 1
         self._sections: dict[str, str] = {}
+        # Per-section anchor membership. None means "append at the end of the
+        # body" (or to the WORKSPACE_BODY anchor if present). The same section
+        # name in different anchors are kept distinct via the
+        # `(anchor, section)` composite key the renderer uses.
+        self._section_anchors: dict[str, str | None] = {}
         self._status: RunStatus = "created"
         self._failure_reason: str | None = None
 
@@ -192,13 +197,20 @@ class Workspace:
         return self.run_dir / "workspace.md"
 
     def start(self) -> None:
-        """Initialize the run dir from the skill's workspace template."""
-        if self.skill.workspace_template is None:
-            template = "# Workspace\n\n_(no template)_\n"
-        else:
-            template = self.skill.workspace_template
+        """Initialize (or re-attach to) the run dir.
 
-        self.workspace_md_path.write_text(template, encoding="utf-8")
+        Idempotent: on a fresh run it renders the skill's workspace template
+        with brief/run/skill substitutions; on a resume (workspace.md
+        already exists) it preserves whatever the agent has written so far.
+        Either way, brief.json and status.json are kept in sync, and the
+        status moves to `running` if no escalations are pending.
+        """
+        is_fresh = not self.workspace_md_path.is_file()
+        if is_fresh:
+            template = self.skill.workspace_template or "# Workspace\n\n_(no template)_\n"
+            rendered = self._substitute_template_vars(template)
+            self.workspace_md_path.write_text(rendered, encoding="utf-8")
+
         self._brief.setdefault("started_at", _now_iso())
         # Underscore-prefixed keys are internal (test injectables, transports);
         # they never get persisted alongside the run.
@@ -207,10 +219,72 @@ class Workspace:
             json.dumps(public_brief, indent=2, sort_keys=True, default=str),
             encoding="utf-8",
         )
-        self._set_status("running")
-        self.append_transcript(
-            TranscriptEvent(kind="run_started", payload={"run_id": self.run_id})
+        if not self.pending_escalations():
+            self._set_status("running")
+        if is_fresh:
+            self.append_transcript(
+                TranscriptEvent(kind="run_started", payload={"run_id": self.run_id})
+            )
+        else:
+            self.append_transcript(
+                TranscriptEvent(kind="run_resumed", payload={"run_id": self.run_id})
+            )
+
+    def _substitute_template_vars(self, template: str) -> str:
+        """Resolve `{{var.path}}` placeholders in the workspace template.
+
+        Supported keys:
+        - run.id, run.started_at
+        - skill.name, skill.version
+        - patient.id, patient.display_name
+        - brief.<key> (top-level brief keys, joined to a string)
+        Unknown keys are left as-is so the renderer can flag them visibly.
+        """
+        started_at = self._brief.get("started_at") or _now_iso()
+        display_name = (
+            self._brief.get("patient_display_name")
+            or self._brief.get("patient_name")
+            or self.patient_id
         )
+        ctx: dict[str, str] = {
+            "run.id": self.run_id,
+            "run.started_at": started_at,
+            "skill.name": self.skill.name,
+            "skill.version": self.skill.manifest.version,
+            "patient.id": self.patient_id,
+            "patient.display_name": str(display_name),
+        }
+        for key, value in self._brief.items():
+            if key.startswith("_") or not isinstance(key, str):
+                continue
+            if isinstance(value, (str, int, float, bool)):
+                ctx[f"brief.{key}"] = str(value)
+            elif isinstance(value, list) and all(
+                isinstance(item, (str, int, float, bool)) for item in value
+            ):
+                ctx[f"brief.{key}"] = ", ".join(str(v) for v in value)
+
+        # Friendly fallbacks for fields the trial-matching template references
+        # but which aren't directly populated.
+        anchors = self._brief.get("anchors")
+        if isinstance(anchors, list) and anchors:
+            displays = [
+                str(a.get("display") or a.get("text") or a.get("resource_id") or "")
+                for a in anchors
+                if isinstance(a, dict)
+            ]
+            displays = [d for d in displays if d]
+            if displays:
+                ctx.setdefault("brief.anchors_summary", "; ".join(displays))
+        ctx.setdefault("brief.anchors_summary", "_(none yet)_")
+        ctx.setdefault("brief.search_constraints_summary", "")
+        ctx.setdefault("brief.patient_context_summary", "")
+
+        def _resolve(match: "re.Match[str]") -> str:
+            key = match.group(1).strip()
+            return ctx.get(key, match.group(0))
+
+        return re.sub(r"\{\{\s*([\w.]+)\s*\}\}", _resolve, template)
 
     def _set_status(self, status: RunStatus, **extra: Any) -> None:
         self._status = status
@@ -267,6 +341,11 @@ class Workspace:
 
         rendered_section = f"### {section}\n\n{content.strip()}\n"
         self._sections[section] = rendered_section
+        # Track the anchor this section belongs to so the renderer can keep
+        # WORKSPACE_BODY content out of the TRIAL_SECTIONS block (and vice
+        # versa). A section re-written under a different anchor migrates to
+        # the new one rather than being duplicated.
+        self._section_anchors[section] = anchor
         self._render_workspace_md(anchor=anchor, current_section=section)
 
         self.append_transcript(
@@ -285,47 +364,71 @@ class Workspace:
         return re.findall(r"\[cite:(c_\d{4})\]", content)
 
     def _render_workspace_md(self, *, anchor: str | None, current_section: str) -> None:
-        existing = self.workspace_md_path.read_text(encoding="utf-8")
-        if anchor:
-            marker_start = f"<!-- {anchor}_START -->"
-            marker_end = f"<!-- {anchor}_END -->"
-            if marker_start not in existing or marker_end not in existing:
-                # Anchor not in the template — append at end.
-                existing += "\n" + self._sections[current_section]
-                self.workspace_md_path.write_text(existing, encoding="utf-8")
-                return
-            block = "\n".join(
-                self._sections[name]
-                for name in self._sections
-                if self._belongs_to_anchor(name, anchor)
-            )
-            new_text = re.sub(
-                rf"{re.escape(marker_start)}.*?{re.escape(marker_end)}",
-                f"{marker_start}\n{block}\n{marker_end}",
-                existing,
-                flags=re.DOTALL,
-            )
-            self.workspace_md_path.write_text(new_text, encoding="utf-8")
-            return
+        """Update the anchors that have in-memory sections.
 
-        # No anchor — append the new section at the bottom (idempotent).
-        sections_block = "\n".join(self._sections.values())
-        if "<!-- WORKSPACE_BODY_START -->" in existing:
-            new_text = re.sub(
-                r"<!-- WORKSPACE_BODY_START -->.*?<!-- WORKSPACE_BODY_END -->",
-                f"<!-- WORKSPACE_BODY_START -->\n{sections_block}\n<!-- WORKSPACE_BODY_END -->",
-                existing,
-                flags=re.DOTALL,
-            )
-        else:
-            new_text = existing.rstrip() + "\n\n" + sections_block + "\n"
-        self.workspace_md_path.write_text(new_text, encoding="utf-8")
+        Only touches anchors with sections currently in `_sections` so that
+        post-resume writes (where in-memory state is partial) don't wipe
+        anchors written before the escalation. Each section is rendered into
+        the anchor it was last written under — that's the "fix to
+        `_belongs_to_anchor` always returning true" behavior change.
+        """
+        rendered_text = self.workspace_md_path.read_text(encoding="utf-8")
+        by_anchor: dict[str | None, list[str]] = {}
+        for name, rendered in self._sections.items():
+            target = self._section_anchors.get(name)
+            by_anchor.setdefault(target, []).append(rendered)
 
-    def _belongs_to_anchor(self, section_name: str, anchor: str) -> bool:
-        # Sections are tagged into anchors by name prefix convention; the
-        # default tag is the anchor name itself. Skills that need fine-grained
-        # tagging can pass `anchor` explicitly per write call.
-        return True  # all sections written under one anchor live in that anchor
+        for declared, blocks in by_anchor.items():
+            if declared is None:
+                continue
+            marker_start = f"<!-- {declared}_START -->"
+            marker_end = f"<!-- {declared}_END -->"
+            block = "\n".join(blocks)
+            if marker_start in rendered_text and marker_end in rendered_text:
+                rendered_text = re.sub(
+                    rf"{re.escape(marker_start)}.*?{re.escape(marker_end)}",
+                    f"{marker_start}\n{block}\n{marker_end}",
+                    rendered_text,
+                    flags=re.DOTALL,
+                )
+            else:
+                # Declared anchor not in the template — append a fresh
+                # marker block so subsequent writes can find it.
+                rendered_text = (
+                    rendered_text.rstrip()
+                    + f"\n\n{marker_start}\n{block}\n{marker_end}\n"
+                )
+
+        untagged = by_anchor.get(None, [])
+        if untagged and anchor is None:
+            untagged_block = "\n".join(untagged)
+            if "<!-- WORKSPACE_BODY_START -->" in rendered_text:
+                rendered_text = re.sub(
+                    r"<!-- WORKSPACE_BODY_START -->.*?<!-- WORKSPACE_BODY_END -->",
+                    f"<!-- WORKSPACE_BODY_START -->\n{untagged_block}\n<!-- WORKSPACE_BODY_END -->",
+                    rendered_text,
+                    flags=re.DOTALL,
+                )
+            else:
+                rendered_text = self._strip_appended_untagged_block(rendered_text)
+                rendered_text = (
+                    rendered_text.rstrip()
+                    + "\n\n<!-- WORKSPACE_BODY_START -->\n"
+                    + untagged_block
+                    + "\n<!-- WORKSPACE_BODY_END -->\n"
+                )
+
+        self.workspace_md_path.write_text(rendered_text, encoding="utf-8")
+
+    @staticmethod
+    def _strip_appended_untagged_block(text: str) -> str:
+        """Remove a previously-appended WORKSPACE_BODY block to keep the doc tidy."""
+        return re.sub(
+            r"\n*<!-- WORKSPACE_BODY_START -->.*?<!-- WORKSPACE_BODY_END -->\n*",
+            "",
+            text,
+            flags=re.DOTALL,
+        )
 
     # ── Citation primitive ──────────────────────────────────────────────
 

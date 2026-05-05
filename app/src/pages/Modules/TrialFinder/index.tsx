@@ -25,6 +25,7 @@ import type {
 
 import { BriefPanel, type AnchorChoice } from "./components/BriefPanel";
 import { EscalationBanner } from "./components/EscalationBanner";
+import { PatientMemoryPanel } from "./components/PatientMemoryPanel";
 import { RunHistorySidebar } from "./components/RunHistorySidebar";
 import { SaveDestinationDrawer } from "./components/SaveDestinationDrawer";
 import { TranscriptPane } from "./components/TranscriptPane";
@@ -135,11 +136,19 @@ function Landing({ patientId }: { patientId: string }) {
         )}
       </div>
 
-      <RunHistorySidebar
-        patientId={patientId}
-        runs={runsQuery.data ?? []}
-        activeRunId={null}
-      />
+      <div className="space-y-4">
+        <PatientMemoryPanel
+          patientId={patientId}
+          detailHref={`/skills/patients/memory?patient=${encodeURIComponent(
+            patientId
+          )}`}
+        />
+        <RunHistorySidebar
+          patientId={patientId}
+          runs={runsQuery.data ?? []}
+          activeRunId={null}
+        />
+      </div>
     </div>
   );
 }
@@ -219,6 +228,11 @@ function RunView({
       });
       queryClient.invalidateQueries({
         queryKey: ["skill-runs", patientId, SKILL_NAME],
+      });
+      // Pinned facts and context packages mutate the patient memory layer —
+      // refresh the panel so the new content appears without a hard reload.
+      queryClient.invalidateQueries({
+        queryKey: ["skill-patient-memory", patientId],
       });
     },
   });
@@ -308,6 +322,13 @@ function RunView({
           </div>
           <TranscriptPane events={transcript?.events ?? []} />
         </section>
+
+        <PatientMemoryPanel
+          patientId={patientId}
+          detailHref={`/skills/patients/memory?patient=${encodeURIComponent(
+            patientId
+          )}`}
+        />
 
         <RunHistorySidebar
           patientId={patientId}

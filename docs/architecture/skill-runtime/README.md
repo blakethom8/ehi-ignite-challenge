@@ -75,10 +75,13 @@ What's shipping in code today:
 
 What's documented as deferred:
 
-- ⏳ Token-by-token streaming in agent mode (`MODE-SWITCHING.md` §7)
+- ⏳ **Eleven pi-mono borrows** ranked in `PI-MONO-EVALUATION.md` §6 —
+  Tier 1 (token streaming, steering queue, hook framework, provider
+  protocol) is the high-leverage subset; Tier 2 covers prompt caching,
+  per-turn cost on the timeline, `transformContext`, progressive
+  tool-arg streaming, parallel tool execution, `terminate: true`,
+  the barrier pattern.
 - ⏳ Schema-error feedback to the agent on bad finalize (`MODE-SWITCHING.md` §6)
-- ⏳ Mid-run clinician messages / steering queue (`SELF-MODIFYING-WORKSPACE.md` §2.5)
-- ⏳ Web search + web fetch tools (`TOOL-SURFACE.md` §3-4)
+- ⏳ Web search + web fetch tools (`TOOL-SURFACE.md` §3–4)
 - ⏳ Browser automation + W2 sandbox (`TOOL-SURFACE.md` §5)
-- ⏳ Multi-provider abstraction (`PI-MONO-EVALUATION.md` §6 borrow #4)
 - ⏳ Resume after escalation in agent mode (`MODE-SWITCHING.md` §6)

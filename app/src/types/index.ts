@@ -30,6 +30,11 @@ export interface AggregationCreateProfilePayload {
   notes?: string;
 }
 
+export interface AggregationUpdateProfilePayload {
+  display_name: string;
+  notes?: string;
+}
+
 export interface AggregationCreateProfileResponse {
   profile: AggregationProfile;
   storage_posture: string;
@@ -1163,6 +1168,106 @@ export interface HarmonizeExtractJobResponse {
   processed_pages: number;
   current_source_label: string | null;
   estimated_seconds: number | null;
+}
+
+export interface HarmonizeRunFactCounts {
+  observations: number;
+  conditions: number;
+  medications: number;
+  allergies: number;
+  immunizations: number;
+}
+
+export interface HarmonizeRunSummary {
+  source_count: number;
+  prepared_source_count: number;
+  needs_preparation_count: number;
+  candidate_counts: HarmonizeRunFactCounts;
+  cross_source_counts: HarmonizeRunFactCounts;
+  total_candidate_facts: number;
+  cross_source_facts: number;
+  conflict_count: number;
+  review_item_count: number;
+  publishable: boolean;
+}
+
+export interface HarmonizeRunSource {
+  id: string;
+  label: string;
+  kind: string;
+  document_reference: string | null;
+  path: string;
+  exists: boolean;
+  size_bytes: number | null;
+  modified_at: string | null;
+  sha256: string | null;
+  status: string;
+  status_label: string;
+  total_resources: number;
+  resource_counts: Record<string, number>;
+}
+
+export interface HarmonizeRunReviewItem {
+  id: string;
+  category: string;
+  severity: "low" | "medium" | "high";
+  title: string;
+  body: string;
+  source_id: string | null;
+  resource_type: string | null;
+  merged_ref: string | null;
+  resolved: boolean;
+  decision: string | null;
+  decision_notes: string;
+  resolved_at: string | null;
+}
+
+export interface HarmonizeReviewDecisionPayload {
+  item_id: string;
+  decision: "accepted" | "dismissed" | "source_fixed" | "overridden";
+  notes?: string;
+}
+
+export interface HarmonizeRunResponse {
+  run_id: string;
+  collection_id: string;
+  collection_name: string;
+  status: "complete" | "failed";
+  rule_version: string;
+  started_at: string;
+  completed_at: string;
+  duration_seconds: number;
+  sources: HarmonizeRunSource[];
+  summary: HarmonizeRunSummary;
+  review_items: HarmonizeRunReviewItem[];
+  artifact_path: string;
+}
+
+export interface HarmonizeRunStateResponse {
+  collection_id: string;
+  latest_run: HarmonizeRunResponse | null;
+}
+
+export interface PublishedChartSnapshot {
+  snapshot_id: string;
+  collection_id: string;
+  run_id: string;
+  collection_name: string;
+  published_at: string;
+  run_completed_at: string;
+  rule_version: string;
+  artifact_path: string;
+  summary: HarmonizeRunSummary;
+  source_count: number;
+  candidate_fact_count: number;
+  review_item_count: number;
+  is_active: boolean;
+}
+
+export interface PublishedChartStateResponse {
+  collection_id: string;
+  active_snapshot: PublishedChartSnapshot | null;
+  snapshots: PublishedChartSnapshot[];
 }
 
 export interface HarmonizeProvenanceResponse {

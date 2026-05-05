@@ -60,6 +60,10 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 UPLOADS_ROOT = Path(
     os.getenv("AGGREGATION_UPLOAD_STORE_PATH", REPO_ROOT / "data" / "aggregation-uploads")
 )
+PROFILE_ROOT = Path(
+    os.getenv("AGGREGATION_PROFILE_STORE_PATH", REPO_ROOT / "data" / "aggregation-profiles")
+)
+PROFILE_REGISTRY_PATH = PROFILE_ROOT / "profiles.json"
 
 # Make the extraction pipeline registry (lib in the dev zone) importable
 # from this API process. Without this, background extract jobs fail with
@@ -459,6 +463,34 @@ def _patient_id_from_workspace_collection(collection_id: str) -> str | None:
     return collection_id.removeprefix("workspace-")
 
 
+def _profile_display_name(patient_id: str) -> str | None:
+    """Return the server-local workspace label without importing aggregation.
+
+    Harmonization must be able to represent an empty workspace before any
+    sources are uploaded. The profile registry is the durable signal that the
+    workspace exists.
+    """
+    if not PROFILE_REGISTRY_PATH.exists():
+        return None
+    try:
+        raw = json.loads(PROFILE_REGISTRY_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    items = raw.get("profiles") if isinstance(raw, dict) else raw
+    if not isinstance(items, list):
+        return None
+    safe_id = _safe_upload_segment(patient_id)
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        if item.get("id") != safe_id:
+            continue
+        display_name = item.get("display_name")
+        if isinstance(display_name, str) and display_name.strip():
+            return display_name.strip()
+    return None
+
+
 def patient_workspace_collection(patient_id: str) -> CollectionDefinition | None:
     """Build the harmonize collection for one selected patient workspace.
 
@@ -468,6 +500,8 @@ def patient_workspace_collection(patient_id: str) -> CollectionDefinition | None
     """
     safe_id = _safe_upload_segment(patient_id)
     sources: list[SourceDefinition] = []
+    profile_label = _profile_display_name(patient_id)
+    upload_root = UPLOADS_ROOT / safe_id
 
     patient_path = path_from_patient_id(patient_id)
     if patient_path is not None:
@@ -481,7 +515,7 @@ def patient_workspace_collection(patient_id: str) -> CollectionDefinition | None
             )
         )
 
-    upload_collection = _upload_session_to_collection(UPLOADS_ROOT / safe_id)
+    upload_collection = _upload_session_to_collection(upload_root)
     if upload_collection is not None:
         sources.extend(
             SourceDefinition(
@@ -494,10 +528,15 @@ def patient_workspace_collection(patient_id: str) -> CollectionDefinition | None
             for source in upload_collection.sources
         )
 
-    if not sources:
+    workspace_exists = profile_label is not None or upload_root.exists()
+    if not sources and not workspace_exists:
         return None
 
-    patient_label = patient_display_name(patient_path) if patient_path is not None else patient_id
+    patient_label = (
+        patient_display_name(patient_path)
+        if patient_path is not None
+        else profile_label or patient_id
+    )
     upload_count = max(0, len(sources) - (1 if patient_path is not None else 0))
     return CollectionDefinition(
         id=workspace_collection_id(patient_id),

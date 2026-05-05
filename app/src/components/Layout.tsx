@@ -36,7 +36,7 @@ import type { LucideIcon } from "lucide-react";
 import { api } from "../api/client";
 import { useFavorites } from "../hooks/useFavorites";
 import { CommandPalette } from "./CommandPalette";
-import type { PatientListItem, PatientRiskSummary } from "../types";
+import type { AggregationCreateProfilePayload, PatientListItem, PatientRiskSummary } from "../types";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -314,10 +314,11 @@ const DATA_AGGREGATOR_NAV_GROUPS: NavGroup[] = [
     label: "Data Aggregator",
     items: [
       { to: "/aggregate", label: "Overview", icon: DatabaseZap, description: "Aggregation guide" },
+      { to: "/aggregate/workspaces", label: "Workspace Library", icon: Archive, description: "Create and manage workspaces" },
       { to: "/aggregate/sources", label: "Source Intake", icon: FileJson2, description: "Upload and source checklist" },
       { to: "/aggregate/harmonize", label: "Harmonized Record", icon: Layers3, description: "Merge, review, provenance" },
       { to: "/aggregate/context", label: "Patient Context", icon: MessageSquareText, description: "Guided patient intake" },
-      { to: "/aggregate/publish", label: "Publish Readiness", icon: ClipboardCheck, description: "Chart activation gates" },
+      { to: "/aggregate/publish", label: "Publish Chart", icon: ClipboardCheck, description: "Activate chart snapshots" },
     ],
   },
 ];
@@ -1140,6 +1141,87 @@ function PatientSelector({
     </div>
   );
 }
+
+function CreateWorkspaceModal({
+  form,
+  isPending,
+  error,
+  onChange,
+  onClose,
+  onSubmit,
+}: {
+  form: Required<AggregationCreateProfilePayload>;
+  isPending: boolean;
+  error: Error | null;
+  onChange: (form: Required<AggregationCreateProfilePayload>) => void;
+  onClose: () => void;
+  onSubmit: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-[70] flex items-start justify-center overflow-y-auto bg-[#101828]/35 px-4 py-10 backdrop-blur-[2px]">
+      <section className="w-full max-w-xl overflow-hidden rounded-xl border border-[#dfe4ea] bg-white shadow-2xl">
+        <header className="flex items-start justify-between gap-4 border-b border-[#eef0f5] px-5 py-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-[#5b76fe]">New patient workspace</p>
+            <h2 className="mt-1 text-lg font-semibold text-[#1c1c1e]">Name the workspace before adding files</h2>
+            <p className="mt-1 text-sm leading-6 text-[#667085]">
+              This creates a saved demo profile. Uploaded records will stay attached to this name in the patient selector, Source Intake, FHIR Charts, and Clinical Insights.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#dfe4ea] text-[#667085] hover:border-[#5b76fe] hover:text-[#5b76fe]"
+            aria-label="Close new patient workspace"
+          >
+            <X size={16} />
+          </button>
+        </header>
+        <div className="space-y-4 px-5 py-4">
+          <label className="block text-sm font-semibold text-[#1c1c1e]">
+            Patient or workspace name
+            <input
+              value={form.display_name}
+              onChange={(event) => onChange({ ...form, display_name: event.target.value })}
+              placeholder="Example: Blake test upload, Aaron demo packet"
+              className="mt-2 w-full rounded-lg border border-[#dfe4ea] px-3 py-2 text-sm outline-none focus:border-[#5b76fe]"
+            />
+          </label>
+          <label className="block text-sm font-semibold text-[#1c1c1e]">
+            Notes
+            <textarea
+              value={form.notes}
+              onChange={(event) => onChange({ ...form, notes: event.target.value })}
+              placeholder="Optional context for this demo workspace."
+              className="mt-2 min-h-[88px] w-full resize-y rounded-lg border border-[#dfe4ea] px-3 py-2 text-sm outline-none focus:border-[#5b76fe]"
+            />
+          </label>
+          <div className="rounded-lg border border-[#f0d7bf] bg-[#fff8f1] px-3 py-2 text-xs leading-5 text-[#8a5a24]">
+            Demo storage: the profile and uploaded files are saved on this application server. Use synthetic or test records unless you intentionally want to test the hosted demo environment.
+          </div>
+          {error && (
+            <p className="rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {error.message}
+            </p>
+          )}
+        </div>
+        <footer className="flex justify-end gap-2 border-t border-[#eef0f5] bg-[#f8faff] px-5 py-4">
+          <button type="button" onClick={onClose} className="rounded-lg border border-[#dfe4ea] bg-white px-3 py-2 text-sm font-semibold text-[#555a6a]">
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onSubmit}
+            disabled={isPending || !form.display_name.trim()}
+            className="rounded-lg bg-[#5b76fe] px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isPending ? "Creating..." : "Create workspace"}
+          </button>
+        </footer>
+      </section>
+    </div>
+  );
+}
 // ───────────────────────────────────────────────────────────────────────────────
 
 export function Layout({ children }: LayoutProps) {
@@ -1153,6 +1235,11 @@ export function Layout({ children }: LayoutProps) {
   const [marketplacePinnedIds, setMarketplacePinnedIds] = useState<string[]>(loadMarketplacePinnedIds);
   const [moduleMapOpen, setModuleMapOpen] = useState(true);
   const [openModuleMapSections, setOpenModuleMapSections] = useState<Set<string>>(() => new Set(["trial-review"]));
+  const [createWorkspaceOpen, setCreateWorkspaceOpen] = useState(false);
+  const [createWorkspaceForm, setCreateWorkspaceForm] = useState<Required<AggregationCreateProfilePayload>>({
+    display_name: "",
+    notes: "",
+  });
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
     try { return localStorage.getItem("ehi-sidebar-collapsed") === "true"; } catch { return false; }
@@ -1276,10 +1363,11 @@ export function Layout({ children }: LayoutProps) {
 
   const aggregatorLinks: { key: string; label: string; to: string }[] = [
     { key: "walkthrough", label: "Overview", to: withPatientQuery("/aggregate", patientId) },
+    { key: "workspaceLibrary", label: "Workspace Library", to: withPatientQuery("/aggregate/workspaces", patientId) },
     { key: "sourceIntake", label: "Source Intake", to: withPatientQuery("/aggregate/sources", patientId) },
     { key: "harmonizedRecord", label: "Harmonized Record", to: withPatientQuery("/aggregate/harmonize", patientId) },
     { key: "patientContext", label: "Patient Context", to: withPatientQuery("/aggregate/context", patientId) },
-    { key: "publishReadiness", label: "Publish Readiness", to: withPatientQuery("/aggregate/publish", patientId) },
+    { key: "publishReadiness", label: "Publish Chart", to: withPatientQuery("/aggregate/publish", patientId) },
   ];
 
   const clinicalInsightLinks: { key: string; label: string; to: string }[] = [
@@ -1368,6 +1456,7 @@ export function Layout({ children }: LayoutProps) {
     if (key === "journey") return location.pathname.startsWith("/explorer/care-journey");
     if (key === "sources") return location.pathname.startsWith("/explorer/patient-data");
     if (key === "walkthrough") return location.pathname === "/aggregate" || location.pathname.startsWith("/aggregate/methodology");
+    if (key === "workspaceLibrary") return location.pathname.startsWith("/aggregate/workspaces");
     if (key === "sourceIntake") return location.pathname.startsWith("/aggregate/sources");
     if (key === "harmonizedRecord") {
       return location.pathname.startsWith("/aggregate/harmonize") || location.pathname.startsWith("/aggregate/cleaning");
@@ -1408,20 +1497,28 @@ export function Layout({ children }: LayoutProps) {
   const navigate = useNavigate();
 
   const createProfileMutation = useMutation({
-    mutationFn: () => api.createAggregationProfile({
-      display_name: "New patient workspace",
-      notes: "Created from the demo patient selector.",
-    }),
+    mutationFn: (payload: AggregationCreateProfilePayload) => api.createAggregationProfile(payload),
     onSuccess: async (response) => {
       await queryClient.invalidateQueries({ queryKey: ["patients"] });
       navigate(`/aggregate/sources?patient=${response.profile.id}`);
       setPatientPickerOpen(false);
+      setCreateWorkspaceOpen(false);
+      setCreateWorkspaceForm({ display_name: "", notes: "" });
     },
   });
 
   const handleCreatePatientWorkspace = () => {
-    if (createProfileMutation.isPending) return;
-    createProfileMutation.mutate();
+    createProfileMutation.reset();
+    setCreateWorkspaceForm({ display_name: "", notes: "" });
+    setCreateWorkspaceOpen(true);
+  };
+
+  const submitCreatePatientWorkspace = () => {
+    if (createProfileMutation.isPending || !createWorkspaceForm.display_name.trim()) return;
+    createProfileMutation.mutate({
+      display_name: createWorkspaceForm.display_name.trim(),
+      notes: createWorkspaceForm.notes.trim(),
+    });
   };
 
   const handleSelectPatient = (id: string) => {
@@ -1478,6 +1575,16 @@ export function Layout({ children }: LayoutProps) {
         onCreateWorkspace={handleCreatePatientWorkspace}
         onClose={() => setPatientPickerOpen(false)}
       />
+      {createWorkspaceOpen && (
+        <CreateWorkspaceModal
+          form={createWorkspaceForm}
+          isPending={createProfileMutation.isPending}
+          error={createProfileMutation.error as Error | null}
+          onChange={setCreateWorkspaceForm}
+          onClose={() => setCreateWorkspaceOpen(false)}
+          onSubmit={submitCreatePatientWorkspace}
+        />
+      )}
 
       <div className={`h-screen overflow-hidden ${isInternal ? "bg-[#edf7f5]" : "bg-[#f5f6f8]"}`}>
         <header

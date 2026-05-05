@@ -49,6 +49,11 @@ class AggregationCreateProfileRequest(BaseModel):
     notes: str = ""
 
 
+class AggregationUpdateProfileRequest(BaseModel):
+    display_name: str
+    notes: str = ""
+
+
 class AggregationCreateProfileResponse(BaseModel):
     profile: AggregationProfile
     storage_posture: str
@@ -1309,3 +1314,103 @@ class HarmonizeExtractJobResponse(BaseModel):
     processed_pages: int = 0
     current_source_label: str | None = None
     estimated_seconds: int | None = None
+
+
+class HarmonizeRunFactCounts(BaseModel):
+    observations: int = 0
+    conditions: int = 0
+    medications: int = 0
+    allergies: int = 0
+    immunizations: int = 0
+
+
+class HarmonizeRunSummary(BaseModel):
+    source_count: int
+    prepared_source_count: int
+    needs_preparation_count: int
+    candidate_counts: HarmonizeRunFactCounts
+    cross_source_counts: HarmonizeRunFactCounts
+    total_candidate_facts: int
+    cross_source_facts: int
+    conflict_count: int
+    review_item_count: int
+    publishable: bool
+
+
+class HarmonizeRunSource(BaseModel):
+    id: str
+    label: str
+    kind: str
+    document_reference: str | None = None
+    path: str
+    exists: bool
+    size_bytes: int | None = None
+    modified_at: str | None = None
+    sha256: str | None = None
+    status: str
+    status_label: str
+    total_resources: int
+    resource_counts: dict[str, int] = Field(default_factory=dict)
+
+
+class HarmonizeRunReviewItem(BaseModel):
+    id: str
+    category: str
+    severity: Literal["low", "medium", "high"]
+    title: str
+    body: str
+    source_id: str | None = None
+    resource_type: str | None = None
+    merged_ref: str | None = None
+    resolved: bool = False
+    decision: str | None = None
+    decision_notes: str = ""
+    resolved_at: datetime | None = None
+
+
+class HarmonizeReviewDecisionRequest(BaseModel):
+    item_id: str
+    decision: Literal["accepted", "dismissed", "source_fixed", "overridden"]
+    notes: str = ""
+
+
+class HarmonizeRunResponse(BaseModel):
+    run_id: str
+    collection_id: str
+    collection_name: str
+    status: Literal["complete", "failed"]
+    rule_version: str
+    started_at: datetime
+    completed_at: datetime
+    duration_seconds: float
+    sources: list[HarmonizeRunSource]
+    summary: HarmonizeRunSummary
+    review_items: list[HarmonizeRunReviewItem]
+    artifact_path: str
+
+
+class HarmonizeRunStateResponse(BaseModel):
+    collection_id: str
+    latest_run: HarmonizeRunResponse | None = None
+
+
+class PublishedChartSnapshot(BaseModel):
+    snapshot_id: str
+    collection_id: str
+    run_id: str
+    collection_name: str
+    published_at: datetime
+    run_completed_at: datetime
+    rule_version: str
+    artifact_path: str
+    summary: HarmonizeRunSummary
+    source_count: int
+    candidate_fact_count: int
+    review_item_count: int
+    is_active: bool = False
+
+
+class PublishedChartStateResponse(BaseModel):
+    collection_id: str
+    active_snapshot: PublishedChartSnapshot | None = None
+    snapshots: list[PublishedChartSnapshot] = Field(default_factory=list)

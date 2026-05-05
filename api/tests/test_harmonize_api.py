@@ -225,17 +225,33 @@ class UploadCollectionDiscoveryTests(unittest.TestCase):
         self._tmp = Path(tempfile.mkdtemp(prefix="harmonize-test-"))
         # Patch the UPLOADS_ROOT module global so discovery scans our tempdir.
         from api.core import harmonize_service
+        from api.core import harmonization_runs
+        from api.core import published_charts
 
         self._old_root = harmonize_service.UPLOADS_ROOT
+        self._old_profile_root = harmonize_service.PROFILE_ROOT
+        self._old_profile_registry_path = harmonize_service.PROFILE_REGISTRY_PATH
+        self._old_runs_root = harmonization_runs.RUNS_ROOT
+        self._old_published_root = published_charts.PUBLISHED_ROOT
         harmonize_service.UPLOADS_ROOT = self._tmp
+        harmonize_service.PROFILE_ROOT = self._tmp / "profiles"
+        harmonize_service.PROFILE_REGISTRY_PATH = harmonize_service.PROFILE_ROOT / "profiles.json"
+        harmonization_runs.RUNS_ROOT = self._tmp / "runs"
+        published_charts.PUBLISHED_ROOT = self._tmp / "published"
         # Bust caches so discovery reads from the new root.
         harmonize_service._cached_load.cache_clear()
         self.client = TestClient(app)
 
     def tearDown(self) -> None:
         from api.core import harmonize_service
+        from api.core import harmonization_runs
+        from api.core import published_charts
 
         harmonize_service.UPLOADS_ROOT = self._old_root
+        harmonize_service.PROFILE_ROOT = self._old_profile_root
+        harmonize_service.PROFILE_REGISTRY_PATH = self._old_profile_registry_path
+        harmonization_runs.RUNS_ROOT = self._old_runs_root
+        published_charts.PUBLISHED_ROOT = self._old_published_root
         harmonize_service._cached_load.cache_clear()
         shutil.rmtree(self._tmp, ignore_errors=True)
 
@@ -333,6 +349,140 @@ class UploadCollectionDiscoveryTests(unittest.TestCase):
         self.assertIn("Synthea FHIR patient bundle", labels)
         self.assertIn("labs.json", labels)
         self.assertIn("report.pdf", labels)
+
+    def test_empty_upload_profile_is_empty_harmonize_workspace(self) -> None:
+        from api.core import harmonize_service
+
+        profile_id = "workspace-empty-harmonize-test"
+        harmonize_service.PROFILE_ROOT.mkdir(parents=True, exist_ok=True)
+        harmonize_service.PROFILE_REGISTRY_PATH.write_text(
+            json.dumps(
+                {
+                    "profiles": [
+                        {
+                            "id": profile_id,
+                            "display_name": "Empty Harmonize Test",
+                            "created_at": "2026-05-05T00:00:00Z",
+                            "updated_at": "2026-05-05T00:00:00Z",
+                            "notes": "",
+                            "storage_mode": "server-local-workspace",
+                        }
+                    ]
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        workspace = self.client.get(f"/api/harmonize/workspaces/{profile_id}")
+        self.assertEqual(workspace.status_code, 200)
+        body = workspace.json()
+        self.assertEqual(body["id"], f"workspace-{profile_id}")
+        self.assertEqual(body["name"], "Empty Harmonize Test — patient workspace")
+        self.assertEqual(body["source_count"], 0)
+
+        sources = self.client.get(f"/api/harmonize/{body['id']}/sources")
+        self.assertEqual(sources.status_code, 200)
+        self.assertEqual(sources.json()["sources"], [])
+
+        observations = self.client.get(f"/api/harmonize/{body['id']}/observations")
+        self.assertEqual(observations.status_code, 200)
+        self.assertEqual(observations.json()["total"], 0)
+
+    def test_harmonization_run_persists_candidate_summary(self) -> None:
+        self._stage_session("run-test")
+
+        latest_before = self.client.get("/api/harmonize/upload-run-test/runs/latest")
+        self.assertEqual(latest_before.status_code, 200)
+        self.assertIsNone(latest_before.json()["latest_run"])
+
+        created = self.client.post("/api/harmonize/upload-run-test/runs")
+        self.assertEqual(created.status_code, 201)
+        run = created.json()
+        self.assertEqual(run["collection_id"], "upload-run-test")
+        self.assertEqual(run["status"], "complete")
+        self.assertEqual(run["rule_version"], "scripted-harmonize-v1")
+        self.assertEqual(run["summary"]["source_count"], 2)
+        self.assertEqual(run["summary"]["prepared_source_count"], 1)
+        self.assertEqual(run["summary"]["needs_preparation_count"], 1)
+        self.assertEqual(run["summary"]["candidate_counts"]["observations"], 1)
+        self.assertGreaterEqual(run["summary"]["review_item_count"], 1)
+        self.assertTrue(any(item["category"] == "source" for item in run["review_items"]))
+
+        latest_after = self.client.get("/api/harmonize/upload-run-test/runs/latest")
+        self.assertEqual(latest_after.status_code, 200)
+        self.assertEqual(latest_after.json()["latest_run"]["run_id"], run["run_id"])
+
+        fetched = self.client.get(f"/api/harmonize/upload-run-test/runs/{run['run_id']}")
+        self.assertEqual(fetched.status_code, 200)
+        self.assertEqual(fetched.json()["run_id"], run["run_id"])
+
+    def test_publish_rejects_run_with_review_items(self) -> None:
+        self._stage_session("blocked-publish")
+        run = self.client.post("/api/harmonize/upload-blocked-publish/runs").json()
+
+        published = self.client.post(
+            f"/api/harmonize/upload-blocked-publish/runs/{run['run_id']}/publish"
+        )
+        self.assertEqual(published.status_code, 400)
+        self.assertIn("Resolve review items", published.json()["detail"])
+
+    def test_resolving_review_item_unblocks_publish(self) -> None:
+        self._stage_session("resolve-review")
+        run = self.client.post("/api/harmonize/upload-resolve-review/runs").json()
+        self.assertGreaterEqual(run["summary"]["review_item_count"], 1)
+        item_id = run["review_items"][0]["id"]
+
+        resolved = self.client.post(
+            f"/api/harmonize/upload-resolve-review/runs/{run['run_id']}/review-items/resolve",
+            json={
+                "item_id": item_id,
+                "decision": "dismissed",
+                "notes": "Reviewed source blocker for test publish.",
+            },
+        )
+        self.assertEqual(resolved.status_code, 200)
+        resolved_run = resolved.json()
+        self.assertEqual(resolved_run["summary"]["review_item_count"], 0)
+        self.assertTrue(resolved_run["summary"]["publishable"])
+        self.assertTrue(resolved_run["review_items"][0]["resolved"])
+        self.assertEqual(resolved_run["review_items"][0]["decision"], "dismissed")
+
+        latest = self.client.get("/api/harmonize/upload-resolve-review/runs/latest")
+        self.assertEqual(latest.status_code, 200)
+        self.assertEqual(latest.json()["latest_run"]["summary"]["review_item_count"], 0)
+
+        published = self.client.post(
+            f"/api/harmonize/upload-resolve-review/runs/{run['run_id']}/publish"
+        )
+        self.assertEqual(published.status_code, 201)
+
+    def test_publish_clean_run_and_unpublish(self) -> None:
+        sess = self._stage_session("clean-publish")
+        (sess / "report.pdf").unlink()
+
+        run = self.client.post("/api/harmonize/upload-clean-publish/runs").json()
+        self.assertEqual(run["summary"]["review_item_count"], 0)
+
+        state = self.client.post(
+            f"/api/harmonize/upload-clean-publish/runs/{run['run_id']}/publish"
+        )
+        self.assertEqual(state.status_code, 201)
+        body = state.json()
+        self.assertIsNotNone(body["active_snapshot"])
+        self.assertEqual(body["active_snapshot"]["run_id"], run["run_id"])
+        self.assertEqual(len(body["snapshots"]), 1)
+
+        snapshot_id = body["active_snapshot"]["snapshot_id"]
+        activated = self.client.post(
+            f"/api/harmonize/upload-clean-publish/published/{snapshot_id}/activate"
+        )
+        self.assertEqual(activated.status_code, 200)
+        self.assertEqual(activated.json()["active_snapshot"]["snapshot_id"], snapshot_id)
+
+        unpublished = self.client.delete("/api/harmonize/upload-clean-publish/published/active")
+        self.assertEqual(unpublished.status_code, 200)
+        self.assertIsNone(unpublished.json()["active_snapshot"])
+        self.assertEqual(len(unpublished.json()["snapshots"]), 1)
 
     def test_extract_endpoint_rejects_static_collection(self) -> None:
         # blake-real is static; extraction must 400

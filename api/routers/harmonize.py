@@ -27,7 +27,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, HTTPException
 
-from api.core import harmonize_service
+from api.core import harmonization_runs, harmonize_service, published_charts
 from api.models import (
     HarmonizeAllergiesResponse,
     HarmonizeCollection,
@@ -47,12 +47,16 @@ from api.models import (
     HarmonizeMergedObservation,
     HarmonizeObservationsResponse,
     HarmonizeProvenanceResponse,
+    HarmonizeReviewDecisionRequest,
+    HarmonizeRunResponse,
+    HarmonizeRunStateResponse,
     HarmonizeSource,
     HarmonizeSourceDiffResponse,
     HarmonizeSourceDiffSource,
     HarmonizeSourceDiffSourceTotals,
     HarmonizeSourceDiffUniqueFacts,
     HarmonizeSourceManifestResponse,
+    PublishedChartStateResponse,
 )
 
 
@@ -270,6 +274,131 @@ def get_latest_extract_job(collection_id: str) -> HarmonizeExtractJobResponse:
     if job is None:
         raise HTTPException(status_code=404, detail=f"No extract job found for: {collection_id}")
     return _job_to_response(job)
+
+
+@router.post(
+    "/{collection_id}/runs",
+    response_model=HarmonizeRunResponse,
+    status_code=201,
+)
+def run_harmonization(collection_id: str) -> HarmonizeRunResponse:
+    """Create a durable scripted harmonization run for this collection."""
+    if harmonize_service.get_collection(collection_id) is None:
+        raise HTTPException(status_code=404, detail=f"Collection not found: {collection_id}")
+    try:
+        payload = harmonization_runs.run_harmonization(collection_id)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Collection not found: {collection_id}") from None
+    return HarmonizeRunResponse(**payload)
+
+
+@router.get(
+    "/{collection_id}/runs/latest",
+    response_model=HarmonizeRunStateResponse,
+)
+def get_latest_harmonization_run(collection_id: str) -> HarmonizeRunStateResponse:
+    """Return the latest persisted harmonization run, if one exists."""
+    if harmonize_service.get_collection(collection_id) is None:
+        raise HTTPException(status_code=404, detail=f"Collection not found: {collection_id}")
+    latest = harmonization_runs.latest_run(collection_id)
+    return HarmonizeRunStateResponse(
+        collection_id=collection_id,
+        latest_run=HarmonizeRunResponse(**latest) if latest else None,
+    )
+
+
+@router.get(
+    "/{collection_id}/runs/{run_id}",
+    response_model=HarmonizeRunResponse,
+)
+def get_harmonization_run(collection_id: str, run_id: str) -> HarmonizeRunResponse:
+    """Fetch one persisted harmonization run artifact by id."""
+    if harmonize_service.get_collection(collection_id) is None:
+        raise HTTPException(status_code=404, detail=f"Collection not found: {collection_id}")
+    payload = harmonization_runs.get_run(collection_id, run_id)
+    if payload is None:
+        raise HTTPException(status_code=404, detail=f"Harmonization run not found: {run_id}")
+    return HarmonizeRunResponse(**payload)
+
+
+@router.post(
+    "/{collection_id}/runs/{run_id}/review-items/resolve",
+    response_model=HarmonizeRunResponse,
+)
+def resolve_harmonization_review_item(
+    collection_id: str,
+    run_id: str,
+    decision: HarmonizeReviewDecisionRequest,
+) -> HarmonizeRunResponse:
+    """Record a reviewer decision for one persisted harmonization run item."""
+    if harmonize_service.get_collection(collection_id) is None:
+        raise HTTPException(status_code=404, detail=f"Collection not found: {collection_id}")
+    try:
+        payload = harmonization_runs.resolve_review_item(
+            collection_id=collection_id,
+            run_id=run_id,
+            item_id=decision.item_id,
+            decision=decision.decision,
+            notes=decision.notes,
+        )
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Harmonization run not found: {run_id}") from None
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"Review item not found: {decision.item_id}") from None
+    return HarmonizeRunResponse(**payload)
+
+
+@router.get(
+    "/{collection_id}/published",
+    response_model=PublishedChartStateResponse,
+)
+def get_published_chart(collection_id: str) -> PublishedChartStateResponse:
+    """Return published chart snapshots for this harmonize collection."""
+    if harmonize_service.get_collection(collection_id) is None:
+        raise HTTPException(status_code=404, detail=f"Collection not found: {collection_id}")
+    return PublishedChartStateResponse(**published_charts.state(collection_id))
+
+
+@router.post(
+    "/{collection_id}/runs/{run_id}/publish",
+    response_model=PublishedChartStateResponse,
+    status_code=201,
+)
+def publish_harmonization_run(collection_id: str, run_id: str) -> PublishedChartStateResponse:
+    """Pin a completed harmonization run as the active downstream chart."""
+    if harmonize_service.get_collection(collection_id) is None:
+        raise HTTPException(status_code=404, detail=f"Collection not found: {collection_id}")
+    try:
+        return PublishedChartStateResponse(**published_charts.publish_run(collection_id, run_id))
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Harmonization run not found: {run_id}") from None
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post(
+    "/{collection_id}/published/{snapshot_id}/activate",
+    response_model=PublishedChartStateResponse,
+)
+def activate_published_snapshot(collection_id: str, snapshot_id: str) -> PublishedChartStateResponse:
+    """Switch downstream modules back to a prior published snapshot."""
+    if harmonize_service.get_collection(collection_id) is None:
+        raise HTTPException(status_code=404, detail=f"Collection not found: {collection_id}")
+    try:
+        return PublishedChartStateResponse(**published_charts.activate_snapshot(collection_id, snapshot_id))
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Published snapshot not found: {snapshot_id}") from None
+
+
+@router.delete(
+    "/{collection_id}/published/active",
+    response_model=PublishedChartStateResponse,
+)
+def unpublish_active_snapshot(collection_id: str) -> PublishedChartStateResponse:
+    """Remove active downstream access while keeping snapshot history."""
+    if harmonize_service.get_collection(collection_id) is None:
+        raise HTTPException(status_code=404, detail=f"Collection not found: {collection_id}")
+    return PublishedChartStateResponse(**published_charts.unpublish(collection_id))
 
 
 def _job_progress(job: harmonize_service.ExtractJob) -> int:

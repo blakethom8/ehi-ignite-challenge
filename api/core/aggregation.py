@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import uuid
 from collections import Counter
 from datetime import datetime, timezone
@@ -31,6 +32,7 @@ from api.models import (
     AggregationReadinessItem,
     AggregationReadinessResponse,
     AggregationSourceCard,
+    AggregationUpdateProfileRequest,
     AggregationUploadedFile,
     AggregationUploadResponse,
     PatientListItem,
@@ -128,6 +130,38 @@ def create_profile(payload: AggregationCreateProfileRequest) -> AggregationCreat
     profile_id = f"workspace-{uuid.uuid4()}"
     profile = _ensure_profile(profile_id, display_name=display_name, notes=payload.notes)
     _patient_root(profile.id).mkdir(parents=True, exist_ok=True)
+    return AggregationCreateProfileResponse(
+        profile=profile,
+        storage_posture=(
+            "Demo storage: this profile is stored on the application server under "
+            "data/aggregation-profiles and data/aggregation-uploads. It is durable "
+            "across restarts when those directories are mounted to persistent disk."
+        ),
+    )
+
+
+def update_profile(patient_id: str, payload: AggregationUpdateProfileRequest) -> AggregationCreateProfileResponse:
+    profile_id = _safe_id(patient_id)
+    if path_from_patient_id(profile_id) is not None:
+        raise ValueError("Seed Synthea patients cannot be renamed from the workspace library.")
+
+    profiles = _load_profiles()
+    existing = profiles.get(profile_id)
+    if existing is None and not _patient_root(profile_id).exists():
+        raise FileNotFoundError(profile_id)
+
+    now = _now()
+    profile = AggregationProfile(
+        id=profile_id,
+        display_name=payload.display_name.strip() or "Untitled workspace",
+        created_at=existing.created_at if existing else now,
+        updated_at=now,
+        notes=payload.notes.strip(),
+        storage_mode=existing.storage_mode if existing else "server-local-workspace",
+    )
+    profiles[profile_id] = profile
+    _write_profiles(profiles)
+    _patient_root(profile_id).mkdir(parents=True, exist_ok=True)
     return AggregationCreateProfileResponse(
         profile=profile,
         storage_posture=(
@@ -238,7 +272,7 @@ def _load_uploaded_files(patient_id: str) -> list[AggregationUploadedFile]:
             files.append(_with_processing_state(patient_id, upload))
         except (OSError, json.JSONDecodeError, ValueError):
             continue
-    return files
+    return sorted(files, key=lambda upload: upload.uploaded_at, reverse=True)
 
 
 def list_upload_workspaces() -> list[PatientListItem]:
@@ -961,3 +995,24 @@ def delete_upload(patient_id: str, file_id: str) -> AggregationDeleteResponse:
     file_path.unlink(missing_ok=True)
     metadata.unlink(missing_ok=True)
     return AggregationDeleteResponse(deleted=True, file_id=file_id)
+
+
+def delete_profile(patient_id: str) -> AggregationDeleteResponse:
+    """Delete a prototype upload/profile workspace and its staged files."""
+    profile_id = _safe_id(patient_id)
+    if path_from_patient_id(profile_id) is not None:
+        raise ValueError("Synthea demo patients cannot be deleted from Source Intake.")
+
+    profiles = _load_profiles()
+    profile_existed = profiles.pop(profile_id, None) is not None
+    workspace_root = _patient_root(profile_id)
+    workspace_existed = workspace_root.exists()
+
+    if profile_existed:
+        _write_profiles(profiles)
+    if workspace_existed:
+        shutil.rmtree(workspace_root)
+    if not profile_existed and not workspace_existed:
+        raise FileNotFoundError(f"Patient workspace not found: {patient_id}")
+
+    return AggregationDeleteResponse(deleted=True, file_id=profile_id)

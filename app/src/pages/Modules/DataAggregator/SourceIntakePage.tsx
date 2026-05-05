@@ -1,0 +1,1 @@
+export { SourceIntakePage } from "./shared";

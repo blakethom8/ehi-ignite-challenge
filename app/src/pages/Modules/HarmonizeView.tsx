@@ -13,6 +13,7 @@ import {
   Link2,
   Loader2,
   Pill,
+  PlayCircle,
   ShieldAlert,
   Sparkles,
   Stethoscope,
@@ -27,6 +28,7 @@ import type {
   HarmonizeMergedMedication,
   HarmonizeMergedObservation,
   HarmonizeProvenanceResponse,
+  HarmonizeRunReviewItem,
 } from "../../types";
 
 type ResourceTab =
@@ -328,7 +330,14 @@ function SourcesPanel({
   );
 }
 
-function ReviewQueuePanel({ collectionId }: { collectionId: string }) {
+function ReviewQueuePanel({
+  collectionId,
+  patientId,
+}: {
+  collectionId: string;
+  patientId?: string | null;
+}) {
+  const queryClient = useQueryClient();
   const sourcesQuery = useQuery({
     queryKey: ["harmonize-sources", collectionId],
     queryFn: () => api.getHarmonizeSources(collectionId),
@@ -339,18 +348,67 @@ function ReviewQueuePanel({ collectionId }: { collectionId: string }) {
     queryFn: () => api.getHarmonizeObservations(collectionId, false),
     enabled: !!collectionId,
   });
+  const latestRunQuery = useQuery({
+    queryKey: ["harmonize-run-latest", collectionId],
+    queryFn: () => api.getLatestHarmonizationRun(collectionId),
+    enabled: !!collectionId,
+  });
+  const resolveMutation = useMutation({
+    mutationFn: ({
+      runId,
+      item,
+      decision,
+      notes,
+    }: {
+      runId: string;
+      item: HarmonizeRunReviewItem;
+      decision: "accepted" | "dismissed" | "source_fixed" | "overridden";
+      notes: string;
+    }) =>
+      api.resolveHarmonizationReviewItem(collectionId, runId, {
+        item_id: item.id,
+        decision,
+        notes,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["harmonize-run-latest", collectionId] });
+    },
+  });
 
+  const latestRun = latestRunQuery.data?.latest_run ?? null;
   const sources = sourcesQuery.data?.sources ?? [];
   const sourceIssues = sources.filter(
     (source) =>
       source.status !== "structured" &&
       source.status !== "extracted",
   );
-  const labConflicts =
-    observationsQuery.data?.merged.filter((item) => item.has_conflict).length ?? 0;
+  const openRunItems = latestRun?.review_items.filter((item) => !item.resolved) ?? [];
+  const resolvedRunItems = latestRun?.review_items.filter((item) => item.resolved) ?? [];
+  const labConflicts = openRunItems.filter(
+    (item) => item.category === "fact" && item.resource_type === "Observation",
+  ).length;
   const crossSourceLabs = observationsQuery.data?.cross_source ?? 0;
-  const reviewItems = sourceIssues.length + labConflicts;
-  const isLoading = sourcesQuery.isLoading || observationsQuery.isLoading;
+  const reviewItems = latestRun ? openRunItems.length : sourceIssues.length + (
+    observationsQuery.data?.merged.filter((item) => item.has_conflict).length ?? 0
+  );
+  const isLoading = sourcesQuery.isLoading || observationsQuery.isLoading || latestRunQuery.isLoading;
+
+  const matchingObservation = (item: HarmonizeRunReviewItem) =>
+    item.merged_ref
+      ? observationsQuery.data?.merged.find((obs) => obs.merged_ref === item.merged_ref) ?? null
+      : null;
+
+  const sourceLabel = (item: HarmonizeRunReviewItem) =>
+    item.source_id ? sources.find((source) => source.id === item.source_id)?.label ?? item.source_id : null;
+
+  const resolveItem = (
+    item: HarmonizeRunReviewItem,
+    decision: "accepted" | "dismissed" | "source_fixed" | "overridden",
+    notes: string,
+  ) => {
+    if (!latestRun) return;
+    resolveMutation.mutate({ runId: latestRun.run_id, item, decision, notes });
+  };
 
   return (
     <section className="rounded-lg border border-[#dfe4ea] bg-white p-4">
@@ -388,11 +446,127 @@ function ReviewQueuePanel({ collectionId }: { collectionId: string }) {
           />
         </div>
       </div>
-      {!isLoading && sourceIssues.length > 0 && (
-        <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          {sourceIssues.length} source{sourceIssues.length === 1 ? "" : "s"} need
-          attention before this collection is publish-ready.
+      {!isLoading && !latestRun && (
+        <div className="mt-4 rounded-lg border border-[#dfe4ea] bg-[#f7f9fc] px-3 py-3 text-sm text-[#667085]">
+          Run harmonization first. The review queue is populated from the
+          persisted run artifact so each decision can be carried into Publish Chart.
         </div>
+      )}
+      {!isLoading && latestRun && openRunItems.length === 0 && (
+        <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm text-emerald-900">
+          <span className="font-semibold">No open review items.</span>{" "}
+          This run can move to Publish Chart when you are ready to activate it downstream.
+          {resolvedRunItems.length > 0 && (
+            <span className="ml-1">
+              {resolvedRunItems.length} prior decision
+              {resolvedRunItems.length === 1 ? "" : "s"} saved on this run.
+            </span>
+          )}
+        </div>
+      )}
+      {!isLoading && latestRun && openRunItems.length > 0 && (
+        <div className="mt-4 space-y-3">
+          {openRunItems.map((item) => {
+            const observation = matchingObservation(item);
+            const label = sourceLabel(item);
+            return (
+              <article
+                key={item.id}
+                className="rounded-lg border border-amber-200 bg-amber-50/70 p-3"
+              >
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-amber-800">
+                        {item.category === "fact" ? "Fact conflict" : "Source issue"}
+                      </span>
+                      <span className="text-xs font-semibold uppercase tracking-wide text-amber-800">
+                        {item.severity} severity
+                      </span>
+                    </div>
+                    <h3 className="mt-2 text-sm font-semibold text-[#1c1c1e]">
+                      {item.title}
+                    </h3>
+                    <p className="mt-1 text-sm leading-6 text-[#667085]">
+                      {item.body}
+                    </p>
+                    {label && (
+                      <p className="mt-1 text-xs text-[#667085]">
+                        Source: <span className="font-semibold text-[#1c1c1e]">{label}</span>
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex shrink-0 flex-wrap gap-2">
+                    {item.category === "source" && (
+                      <Link
+                        to={`/aggregate/sources${patientId ? `?patient=${encodeURIComponent(patientId)}` : ""}`}
+                        className="inline-flex items-center justify-center rounded-lg border border-[#dfe4ea] bg-white px-3 py-2 text-sm font-semibold text-[#555a6a] hover:border-[#5b76fe] hover:text-[#5b76fe]"
+                      >
+                        Fix source
+                      </Link>
+                    )}
+                    <button
+                      type="button"
+                      disabled={resolveMutation.isPending}
+                      onClick={() =>
+                        resolveItem(
+                          item,
+                          item.category === "fact" ? "accepted" : "dismissed",
+                          item.category === "fact"
+                            ? "Accepted current candidate canonical fact after review."
+                            : "Dismissed source blocker after review.",
+                        )
+                      }
+                      className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#5b76fe] px-3 py-2 text-sm font-semibold text-white hover:bg-[#4760e8] disabled:bg-[#dfe4ea] disabled:text-[#667085]"
+                    >
+                      {resolveMutation.isPending ? (
+                        <Loader2 size={14} className="animate-spin" />
+                      ) : (
+                        <CheckCircle2 size={14} />
+                      )}
+                      {item.category === "fact" ? "Accept candidate" : "Mark reviewed"}
+                    </button>
+                  </div>
+                </div>
+                {observation && (
+                  <div className="mt-3 overflow-hidden rounded-lg border border-amber-200 bg-white">
+                    <div className="border-b border-amber-100 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-[#667085]">
+                      Values under review
+                    </div>
+                    <div className="divide-y divide-[#eef1f5]">
+                      {observation.sources.map((source) => (
+                        <div
+                          key={`${item.id}-${source.source_observation_ref}`}
+                          className="grid gap-2 px-3 py-2 text-sm md:grid-cols-[1fr_140px_140px]"
+                        >
+                          <div>
+                            <p className="font-semibold text-[#1c1c1e]">
+                              {source.source_label}
+                            </p>
+                            <p className="text-xs text-[#667085]">
+                              {source.source_observation_ref}
+                            </p>
+                          </div>
+                          <p className="font-semibold text-[#1c1c1e]">
+                            {source.value ?? source.raw_value ?? "—"} {source.unit ?? source.raw_unit ?? ""}
+                          </p>
+                          <p className="text-[#667085]">
+                            {source.effective_date ?? "No date"}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </article>
+            );
+          })}
+        </div>
+      )}
+      {resolveMutation.error && (
+        <p className="mt-3 text-sm text-red-700">
+          Couldn't save review decision: {(resolveMutation.error as Error).message}
+        </p>
       )}
     </section>
   );
@@ -1714,6 +1888,8 @@ export function HarmonizeView() {
   const isPatientWorkspace = activeId === patientWorkspace?.id && !!patientWorkspace;
   const isUploadCollection = activeId === uploadCollectionId && !!patientUploadCollection;
   const isDeveloperFixture = !!activeId && !isPatientWorkspace && !isUploadCollection;
+  const activeCollectionHasNoSources =
+    !!activeCollection && activeCollection.source_count === 0 && !isDeveloperFixture;
 
   // Async extract: kick off a background job, then poll until complete.
   // The mutation just starts the job; the polling query owns the lifecycle.
@@ -1757,10 +1933,32 @@ export function HarmonizeView() {
       (extractJobQuery.data?.status === "pending" ||
         extractJobQuery.data?.status === "running"));
   const extractJob = extractJobQuery.data ?? null;
+  const latestRunQuery = useQuery({
+    queryKey: ["harmonize-run-latest", activeId],
+    queryFn: () => api.getLatestHarmonizationRun(activeId),
+    enabled: !!activeId,
+  });
+  const runMutation = useMutation({
+    mutationFn: () => api.runHarmonization(activeId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["harmonize-run-latest", activeId] });
+    },
+  });
+  const latestRun = latestRunQuery.data?.latest_run ?? null;
+  const openRunReviewItems = latestRun?.review_items.filter((item) => !item.resolved) ?? [];
 
   const isLoadingCollections = collectionsQuery.isLoading || (Boolean(patientId) && workspaceQuery.isLoading);
   const hasNoCollections =
     !isLoadingCollections && collections.length === 0 && !patientWorkspace;
+  const formatRunDate = (value: string | null | undefined) => {
+    if (!value) return "Not run yet";
+    return new Date(value).toLocaleString(undefined, {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  };
 
   return (
     <div className="space-y-4">
@@ -1943,9 +2141,134 @@ export function HarmonizeView() {
         )}
       </div>
 
-      <WorkspaceTabs active={workspaceTab} onChange={setWorkspaceTab} />
+      {activeCollectionHasNoSources && (
+        <section className="rounded-lg border border-[#dfe4ea] bg-white p-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="max-w-3xl">
+              <div className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-[#eef2ff] text-[#5b76fe]">
+                <Inbox size={18} />
+              </div>
+              <h2 className="mt-3 text-lg font-semibold text-[#1c1c1e]">
+                No sources ready for harmonization
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-[#667085]">
+                This workspace exists, but Source Intake does not have any
+                prepared source files yet. Upload a portal export or PDF first;
+                the harmonized record will stay empty until there is source
+                data to merge.
+              </p>
+            </div>
+            <div className="flex shrink-0 flex-wrap gap-2">
+              <Link
+                to={`/aggregate/sources${patientId ? `?patient=${encodeURIComponent(patientId)}` : ""}`}
+                className="inline-flex items-center gap-2 rounded-lg bg-[#5b76fe] px-4 py-2 text-sm font-semibold text-white hover:bg-[#4760e8]"
+              >
+                <FileUp size={14} />
+                Add sources
+              </Link>
+              <Link
+                to="/aggregate/workspaces"
+                className="inline-flex items-center gap-2 rounded-lg border border-[#dfe4ea] bg-white px-4 py-2 text-sm font-semibold text-[#555a6a] hover:border-[#5b76fe] hover:text-[#5b76fe]"
+              >
+                Workspace library
+              </Link>
+            </div>
+          </div>
+        </section>
+      )}
 
-      {activeId && workspaceTab === "record" && (
+      {activeId && !activeCollectionHasNoSources && (
+        <section className="rounded-lg border border-[#dfe4ea] bg-white p-4">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-wider text-[#5b76fe]">
+                Harmonization run
+              </p>
+              <h2 className="mt-1 text-base font-semibold text-[#1c1c1e]">
+                {latestRun
+                  ? latestRun.summary.publishable
+                    ? "Candidate record is ready for publish review"
+                    : "Candidate record needs review"
+                  : "Run harmonization to create the candidate record"}
+              </h2>
+              <p className="mt-1 max-w-4xl text-sm leading-6 text-[#667085]">
+                This creates a persisted run artifact with source fingerprints,
+                matcher version, candidate canonical facts, review items, and
+                provenance links. The tables below remain a live preview, but a
+                run is the durable handoff into review and publish.
+              </p>
+            </div>
+            <button
+              type="button"
+              disabled={runMutation.isPending || !activeId}
+              onClick={() => runMutation.mutate()}
+              className={cls(
+                "inline-flex shrink-0 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors",
+                runMutation.isPending
+                  ? "bg-[#dfe4ea] text-[#667085]"
+                  : "bg-[#5b76fe] text-white hover:bg-[#4760e8]",
+              )}
+            >
+              {runMutation.isPending ? (
+                <>
+                  <Loader2 size={15} className="animate-spin" />
+                  Running…
+                </>
+              ) : (
+                <>
+                  <PlayCircle size={15} />
+                  {latestRun ? "Re-run harmonization" : "Run harmonization"}
+                </>
+              )}
+            </button>
+          </div>
+          <div className="mt-4 grid gap-3 md:grid-cols-4">
+            <MetricCard
+              label="Last run"
+              value={latestRunQuery.isLoading ? "…" : formatRunDate(latestRun?.completed_at)}
+              detail={latestRun?.rule_version ?? "No persisted run yet"}
+            />
+            <MetricCard
+              label="Candidate facts"
+              value={latestRun?.summary.total_candidate_facts ?? "—"}
+              detail="Persisted in latest run"
+            />
+            <MetricCard
+              label="Review items"
+              value={latestRun?.summary.review_item_count ?? "—"}
+              detail="Source gaps or fact conflicts"
+            />
+            <MetricCard
+              label="Publish state"
+              value={latestRun ? (latestRun.summary.publishable ? "Ready" : "Blocked") : "Not run"}
+              detail={latestRun ? `${latestRun.summary.prepared_source_count}/${latestRun.summary.source_count} sources ready` : "Run first"}
+            />
+          </div>
+          {latestRun && openRunReviewItems.length > 0 && (
+            <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              <span className="font-semibold">{openRunReviewItems[0].title}</span>
+              <span className="ml-1">{openRunReviewItems[0].body}</span>
+              {openRunReviewItems.length > 1 && (
+                <span className="ml-1">
+                  +{openRunReviewItems.length - 1} more item
+                  {openRunReviewItems.length === 2 ? "" : "s"} in the run.
+                </span>
+              )}
+            </div>
+          )}
+          {runMutation.error && (
+            <p className="mt-3 text-sm text-red-700">
+              Couldn't run harmonization: {(runMutation.error as Error).message}
+            </p>
+          )}
+        </section>
+      )}
+
+      {!activeCollectionHasNoSources && (
+        <WorkspaceTabs active={workspaceTab} onChange={setWorkspaceTab} />
+      )}
+
+      {activeId && !activeCollectionHasNoSources && workspaceTab === "record" && (
         <RecordWorkspace
           collectionId={activeId}
           tab={tab}
@@ -1953,11 +2276,11 @@ export function HarmonizeView() {
         />
       )}
 
-      {activeId && workspaceTab === "review" && (
-        <ReviewQueuePanel collectionId={activeId} />
+      {activeId && !activeCollectionHasNoSources && workspaceTab === "review" && (
+        <ReviewQueuePanel collectionId={activeId} patientId={patientId} />
       )}
 
-      {activeId && workspaceTab === "sources" && (
+      {activeId && !activeCollectionHasNoSources && workspaceTab === "sources" && (
         <SourcesPanel
           collectionId={activeId}
           canExtract={isUploadCollection || isPatientWorkspace}
@@ -1966,7 +2289,7 @@ export function HarmonizeView() {
         />
       )}
 
-      {activeId && workspaceTab === "provenance" && (
+      {activeId && !activeCollectionHasNoSources && workspaceTab === "provenance" && (
         <ProvenanceWorkspace collectionId={activeId} />
       )}
 

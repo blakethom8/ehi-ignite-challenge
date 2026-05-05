@@ -9,10 +9,12 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from api.core.aggregation import (
     cleaning_queue,
     create_profile,
+    delete_profile,
     delete_upload,
     readiness,
     save_upload,
     source_inventory,
+    update_profile,
     upload_prepared_json,
     upload_preview,
 )
@@ -24,6 +26,7 @@ from api.models import (
     AggregationEnvironmentResponse,
     AggregationPreparedPreviewResponse,
     AggregationReadinessResponse,
+    AggregationUpdateProfileRequest,
     AggregationUploadResponse,
 )
 
@@ -49,6 +52,26 @@ def get_readiness(patient_id: str) -> AggregationReadinessResponse:
 @router.post("/profiles", response_model=AggregationCreateProfileResponse)
 def create_patient_profile(payload: AggregationCreateProfileRequest) -> AggregationCreateProfileResponse:
     return create_profile(payload)
+
+
+@router.patch("/profiles/{patient_id}", response_model=AggregationCreateProfileResponse)
+def update_patient_profile(patient_id: str, payload: AggregationUpdateProfileRequest) -> AggregationCreateProfileResponse:
+    try:
+        return update_profile(patient_id, payload)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.delete("/profiles/{patient_id}", response_model=AggregationDeleteResponse)
+def delete_patient_profile(patient_id: str) -> AggregationDeleteResponse:
+    try:
+        return delete_profile(patient_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.get("/uploads/{patient_id}/{file_id}/preview", response_model=AggregationPreparedPreviewResponse)

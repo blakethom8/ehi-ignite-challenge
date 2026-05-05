@@ -33,9 +33,12 @@ import { Marketplace } from "./pages/Modules/Marketplace";
 import { MarketplaceConcept } from "./pages/Modules/MarketplaceConcept";
 import { DataSharing } from "./pages/Modules/DataSharing";
 import { DataCatalog } from "./pages/Modules/DataCatalog";
-import { DataAggregator } from "./pages/Modules/DataAggregator";
+import { PublishReadinessPage } from "./pages/Modules/DataAggregator/PublishReadinessPage";
+import { SourceIntakePage } from "./pages/Modules/DataAggregator/SourceIntakePage";
+import { WorkspaceLibraryPage } from "./pages/Modules/DataAggregator/WorkspaceLibraryPage";
 import { HarmonizeView } from "./pages/Modules/HarmonizeView";
 import { ClinicalInsights } from "./pages/Modules/ClinicalInsights";
+import { LabExplainer } from "./pages/Modules/LabExplainer";
 import { PatientContext } from "./pages/Modules/PatientContext";
 import { AggregationMethodology } from "./pages/Modules/AggregationMethodology";
 import { AnalysisOverview } from "./pages/Analysis/Overview";
@@ -61,17 +64,19 @@ export default function App() {
     { path: "/record", element: <PatientRecordOverview /> },
     { path: "/aggregate", element: <AggregationMethodology /> },
     { path: "/aggregate/methodology", element: <AggregationMethodology /> },
-    { path: "/aggregate/sources", element: <DataAggregator /> },
+    { path: "/aggregate/workspaces", element: <WorkspaceLibraryPage /> },
+    { path: "/aggregate/sources", element: <SourceIntakePage /> },
     { path: "/aggregate/cleaning", element: <HarmonizeView /> },
     { path: "/aggregate/context", element: <PatientContext /> },
     { path: "/aggregate/harmonize", element: <HarmonizeView /> },
-    { path: "/aggregate/publish", element: <DataAggregator /> },
+    { path: "/aggregate/publish", element: <PublishReadinessPage /> },
     { path: "/clinical-insights/overview", element: <ClinicalInsights /> },
     { path: "/clinical-insights", element: <ClinicalInsights /> },
     { path: "/clinical-insights/packages", element: <ClinicalInsights /> },
     { path: "/clinical-insights/context-library", element: <ClinicalInsights /> },
     { path: "/clinical-insights/favorites", element: <ClinicalInsights /> },
     { path: "/clinical-insights/create", element: <ClinicalInsights /> },
+    { path: "/clinical-insights/labs", element: <LabExplainer /> },
     { path: "/marketplace", element: <Marketplace /> },
     { path: "/marketplace/overview", element: <Marketplace /> },
     { path: "/marketplace/workspace", element: <Marketplace /> },

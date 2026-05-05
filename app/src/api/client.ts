@@ -39,12 +39,17 @@ import type {
   HarmonizeMedicationsResponse,
   HarmonizeObservationsResponse,
   HarmonizeProvenanceResponse,
+  HarmonizeReviewDecisionPayload,
+  HarmonizeRunResponse,
+  HarmonizeRunStateResponse,
   HarmonizeSourceManifestResponse,
+  PublishedChartStateResponse,
   AggregationEnvironmentResponse,
   AggregationCreateProfilePayload,
   AggregationCreateProfileResponse,
   AggregationPreparedPreviewResponse,
   AggregationReadinessResponse,
+  AggregationUpdateProfilePayload,
   AggregationUploadPayload,
   AggregationUploadResponse,
   CanonicalPatientSummary,
@@ -181,6 +186,12 @@ export const api = {
   /** Data Aggregator workflow */
   createAggregationProfile: (payload: AggregationCreateProfilePayload = {}): Promise<AggregationCreateProfileResponse> =>
     http.post<AggregationCreateProfileResponse>("/aggregation/profiles", payload).then((r) => r.data),
+
+  updateAggregationProfile: (patientId: string, payload: AggregationUpdateProfilePayload): Promise<AggregationCreateProfileResponse> =>
+    http.patch<AggregationCreateProfileResponse>(`/aggregation/profiles/${patientId}`, payload).then((r) => r.data),
+
+  deleteAggregationProfile: (patientId: string): Promise<AggregationDeleteResponse> =>
+    http.delete<AggregationDeleteResponse>(`/aggregation/profiles/${patientId}`).then((r) => r.data),
 
   getAggregationSources: (patientId: string): Promise<AggregationEnvironmentResponse> =>
     http.get<AggregationEnvironmentResponse>(`/aggregation/sources/${patientId}`).then((r) => r.data),
@@ -341,5 +352,44 @@ export const api = {
   getLatestHarmonizeExtractJob: (collectionId: string): Promise<HarmonizeExtractJobResponse> =>
     http
       .get<HarmonizeExtractJobResponse>(`/harmonize/${collectionId}/extract-job`)
+      .then((r) => r.data),
+
+  runHarmonization: (collectionId: string): Promise<HarmonizeRunResponse> =>
+    http
+      .post<HarmonizeRunResponse>(`/harmonize/${collectionId}/runs`)
+      .then((r) => r.data),
+
+  getLatestHarmonizationRun: (collectionId: string): Promise<HarmonizeRunStateResponse> =>
+    http
+      .get<HarmonizeRunStateResponse>(`/harmonize/${collectionId}/runs/latest`)
+      .then((r) => r.data),
+
+  resolveHarmonizationReviewItem: (
+    collectionId: string,
+    runId: string,
+    payload: HarmonizeReviewDecisionPayload,
+  ): Promise<HarmonizeRunResponse> =>
+    http
+      .post<HarmonizeRunResponse>(`/harmonize/${collectionId}/runs/${runId}/review-items/resolve`, payload)
+      .then((r) => r.data),
+
+  getPublishedChart: (collectionId: string): Promise<PublishedChartStateResponse> =>
+    http
+      .get<PublishedChartStateResponse>(`/harmonize/${collectionId}/published`)
+      .then((r) => r.data),
+
+  publishHarmonizationRun: (collectionId: string, runId: string): Promise<PublishedChartStateResponse> =>
+    http
+      .post<PublishedChartStateResponse>(`/harmonize/${collectionId}/runs/${runId}/publish`)
+      .then((r) => r.data),
+
+  activatePublishedSnapshot: (collectionId: string, snapshotId: string): Promise<PublishedChartStateResponse> =>
+    http
+      .post<PublishedChartStateResponse>(`/harmonize/${collectionId}/published/${snapshotId}/activate`)
+      .then((r) => r.data),
+
+  unpublishActiveChart: (collectionId: string): Promise<PublishedChartStateResponse> =>
+    http
+      .delete<PublishedChartStateResponse>(`/harmonize/${collectionId}/published/active`)
       .then((r) => r.data),
 };

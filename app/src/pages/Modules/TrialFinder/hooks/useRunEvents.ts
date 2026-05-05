@@ -39,10 +39,21 @@ export function useRunEvents({
   patientId,
   onEvent,
 }: UseRunEventsArgs): UseRunEventsResult {
-  const [events, setEvents] = useState<TranscriptEvent[]>([]);
-  const [connection, setConnection] =
-    useState<UseRunEventsResult["connection"]>("connecting");
-  const [streamClosed, setStreamClosed] = useState(false);
+  const streamKey = `${skillName}:${runId}:${patientId}`;
+  const [eventState, setEventState] = useState<{
+    key: string;
+    events: TranscriptEvent[];
+  }>({ key: streamKey, events: [] });
+  const [connectionState, setConnectionState] = useState<{
+    key: string;
+    connection: UseRunEventsResult["connection"];
+    streamClosed: boolean;
+  }>({ key: streamKey, connection: "connecting", streamClosed: false });
+  const events = eventState.key === streamKey ? eventState.events : [];
+  const connection =
+    connectionState.key === streamKey ? connectionState.connection : "connecting";
+  const streamClosed =
+    connectionState.key === streamKey ? connectionState.streamClosed : false;
   // Track the latest onEvent in a ref so the EventSource lifecycle
   // doesn't depend on a re-renderable callback identity.
   const onEventRef = useRef(onEvent);
@@ -51,10 +62,6 @@ export function useRunEvents({
   }, [onEvent]);
 
   useEffect(() => {
-    setEvents([]);
-    setStreamClosed(false);
-    setConnection("connecting");
-
     const url =
       `/api/skills/${encodeURIComponent(skillName)}` +
       `/runs/${encodeURIComponent(runId)}/events` +
@@ -62,7 +69,8 @@ export function useRunEvents({
 
     const source = new EventSource(url);
 
-    source.onopen = () => setConnection("open");
+    source.onopen = () =>
+      setConnectionState({ key: streamKey, connection: "open", streamClosed: false });
 
     source.onmessage = (raw) => {
       let parsed: TranscriptEvent;
@@ -73,12 +81,14 @@ export function useRunEvents({
         return;
       }
       if (parsed.kind === "stream_closed") {
-        setStreamClosed(true);
-        setConnection("closed");
+        setConnectionState({ key: streamKey, connection: "closed", streamClosed: true });
         source.close();
         return;
       }
-      setEvents((prev) => [...prev, parsed]);
+      setEventState((prev) => ({
+        key: streamKey,
+        events: prev.key === streamKey ? [...prev.events, parsed] : [parsed],
+      }));
       onEventRef.current?.(parsed);
     };
 
@@ -86,13 +96,13 @@ export function useRunEvents({
       // EventSource will retry automatically on transient drops; we
       // surface the state so the UI can show a reconnect indicator
       // without forcing a hard refresh.
-      setConnection("error");
+      setConnectionState({ key: streamKey, connection: "error", streamClosed: false });
     };
 
     return () => {
       source.close();
     };
-  }, [skillName, runId, patientId]);
+  }, [skillName, runId, patientId, streamKey]);
 
   return { events, connection, streamClosed };
 }

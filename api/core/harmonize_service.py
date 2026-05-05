@@ -29,8 +29,11 @@ documents and the harmonizer surfaces a per-upload-session merged record
 
 from __future__ import annotations
 
+import base64
+import binascii
 import json
 import os
+import re
 from dataclasses import dataclass
 from datetime import datetime
 from functools import lru_cache
@@ -702,6 +705,311 @@ def collection_source_manifest(collection_id: str) -> list[dict[str, Any]] | Non
             }
         )
     return out
+
+
+# ---------------------------------------------------------------------------
+# Supporting clinical artifacts
+# ---------------------------------------------------------------------------
+
+
+def _raw_source_payload(source: SourceDefinition) -> dict[str, Any] | list[Any] | None:
+    if not source.path.exists():
+        return None
+    try:
+        raw = json.loads(source.path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if isinstance(raw, (dict, list)):
+        return raw
+    return None
+
+
+def _codeable_text(value: Any) -> str:
+    if not isinstance(value, dict):
+        return ""
+    if isinstance(value.get("text"), str) and value["text"].strip():
+        return value["text"].strip()
+    for coding in value.get("coding") or []:
+        if isinstance(coding, dict):
+            display = coding.get("display")
+            if isinstance(display, str) and display.strip():
+                return display.strip()
+            code = coding.get("code")
+            if isinstance(code, str) and code.strip():
+                return code.strip()
+    return ""
+
+
+def _codeable_code(value: Any) -> str:
+    if not isinstance(value, dict):
+        return ""
+    for coding in value.get("coding") or []:
+        if isinstance(coding, dict) and isinstance(coding.get("code"), str):
+            return coding["code"].strip()
+    return ""
+
+
+def _codeable_system(value: Any) -> str:
+    if not isinstance(value, dict):
+        return ""
+    for coding in value.get("coding") or []:
+        if isinstance(coding, dict) and isinstance(coding.get("system"), str):
+            return coding["system"].strip()
+    return ""
+
+
+def _reference_id(value: Any) -> str | None:
+    if not isinstance(value, dict):
+        return None
+    ref = value.get("reference")
+    if not isinstance(ref, str) or not ref.strip():
+        return None
+    return ref.rsplit("/", 1)[-1].removeprefix("urn:uuid:")
+
+
+def _resource_date(resource: dict[str, Any]) -> str | None:
+    for key in (
+        "effectiveDateTime",
+        "performedDateTime",
+        "occurrenceDateTime",
+        "onsetDateTime",
+        "authoredOn",
+        "recordedDate",
+        "issued",
+        "date",
+    ):
+        value = resource.get(key)
+        if isinstance(value, str) and value:
+            return value
+    for key in ("period", "performedPeriod", "effectivePeriod"):
+        period = resource.get(key)
+        if isinstance(period, dict) and isinstance(period.get("start"), str):
+            return period["start"]
+    return None
+
+
+def _period(resource: dict[str, Any], key: str) -> dict[str, str | None]:
+    value = resource.get(key)
+    if isinstance(value, dict):
+        return {
+            "start": value.get("start") if isinstance(value.get("start"), str) else None,
+            "end": value.get("end") if isinstance(value.get("end"), str) else None,
+        }
+    dt = _resource_date(resource)
+    return {"start": dt, "end": dt}
+
+
+def _date_span(resources_by_type: dict[str, list[dict]]) -> dict[str, str | None]:
+    dates = []
+    for resources in resources_by_type.values():
+        for resource in resources:
+            dt = _resource_date(resource)
+            if dt:
+                dates.append(dt)
+    dates.sort()
+    return {"start": dates[0] if dates else None, "end": dates[-1] if dates else None}
+
+
+def _document_context(source: SourceDefinition) -> dict[str, Any] | None:
+    raw = _raw_source_payload(source)
+    if not isinstance(raw, dict):
+        return None
+    meta = raw.get("meta")
+    if not isinstance(meta, dict):
+        return None
+    for ext in meta.get("extension") or []:
+        if not isinstance(ext, dict):
+            continue
+        url = ext.get("url")
+        if not isinstance(url, str) or not url.endswith("/document-context"):
+            continue
+        value = ext.get("valueString")
+        if not isinstance(value, str) or not value.strip():
+            return None
+        try:
+            parsed = json.loads(value)
+        except json.JSONDecodeError:
+            return {"raw": value}
+        return parsed if isinstance(parsed, dict) else None
+    return None
+
+
+def _strip_html(value: str) -> str:
+    text = re.sub(r"<[^>]+>", " ", value)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _attachment_text(attachment: Any) -> str:
+    if not isinstance(attachment, dict):
+        return ""
+    if isinstance(attachment.get("data"), str):
+        try:
+            return base64.b64decode(attachment["data"], validate=True).decode("utf-8", errors="replace").strip()
+        except (binascii.Error, ValueError):
+            return ""
+    if isinstance(attachment.get("url"), str):
+        return attachment["url"].strip()
+    return ""
+
+
+def _resource_notes(resource: dict[str, Any]) -> list[str]:
+    out: list[str] = []
+    for note in resource.get("note") or []:
+        if isinstance(note, dict) and isinstance(note.get("text"), str) and note["text"].strip():
+            out.append(note["text"].strip())
+    if resource.get("resourceType") == "DiagnosticReport":
+        for attachment in resource.get("presentedForm") or []:
+            text = _attachment_text(attachment)
+            if text:
+                out.append(text)
+    if resource.get("resourceType") == "Composition":
+        for section in resource.get("section") or []:
+            if not isinstance(section, dict):
+                continue
+            text = section.get("text")
+            if isinstance(text, dict) and isinstance(text.get("div"), str):
+                stripped = _strip_html(text["div"])
+                if stripped:
+                    out.append(stripped)
+    if resource.get("resourceType") == "DocumentReference":
+        description = resource.get("description")
+        if isinstance(description, str) and description.strip():
+            out.append(description.strip())
+    return out
+
+
+def clinical_artifacts(collection_id: str) -> dict[str, list[dict[str, Any]]]:
+    """Return document-heavy supporting artifacts from every collection source.
+
+    The harmonizer's first-class matchers focus on canonical clinical facts.
+    This companion payload keeps the document context, clinical notes, procedures,
+    encounters, and diagnostic reports visible so downstream chart surfaces do not
+    silently lose narrative or CDR resources.
+    """
+    coll = get_collection(collection_id)
+    if not coll:
+        return {
+            "documents": [],
+            "encounters": [],
+            "procedures": [],
+            "diagnostic_reports": [],
+            "clinical_notes": [],
+        }
+
+    resources_by_source = load_collection_resources(collection_id)
+    documents: list[dict[str, Any]] = []
+    encounters: list[dict[str, Any]] = []
+    procedures: list[dict[str, Any]] = []
+    diagnostic_reports: list[dict[str, Any]] = []
+    clinical_notes: list[dict[str, Any]] = []
+
+    for source in coll.sources:
+        source_resources = resources_by_source.get(source.id, {})
+        counts = {rtype: len(items) for rtype, items in source_resources.items()}
+        span = _date_span(source_resources)
+        context = _document_context(source)
+        documents.append(
+            {
+                "source_id": source.id,
+                "source_label": source.label,
+                "source_kind": source.kind,
+                "document_reference": source.document_reference,
+                "path": str(source.path),
+                "available": source.path.exists(),
+                "document_context": context,
+                "date_start": span["start"] or (context or {}).get("encounter_date"),
+                "date_end": span["end"] or (context or {}).get("encounter_date"),
+                "resource_counts": counts,
+                "total_resources": sum(counts.values()),
+            }
+        )
+
+        for resource in source_resources.get("Encounter", []):
+            period = _period(resource, "period")
+            encounters.append(
+                {
+                    "source_id": source.id,
+                    "source_label": source.label,
+                    "id": str(resource.get("id") or ""),
+                    "status": str(resource.get("status") or ""),
+                    "class_code": (resource.get("class") or {}).get("code") if isinstance(resource.get("class"), dict) else "",
+                    "type": _codeable_text((resource.get("type") or [{}])[0]),
+                    "reason": _codeable_text((resource.get("reasonCode") or [{}])[0]),
+                    "period_start": period["start"],
+                    "period_end": period["end"],
+                    "provider": (resource.get("serviceProvider") or {}).get("display")
+                    if isinstance(resource.get("serviceProvider"), dict)
+                    else "",
+                }
+            )
+
+        for resource in source_resources.get("Procedure", []):
+            period = _period(resource, "performedPeriod")
+            if not period["start"] and isinstance(resource.get("performedDateTime"), str):
+                period = {"start": resource["performedDateTime"], "end": resource["performedDateTime"]}
+            procedures.append(
+                {
+                    "source_id": source.id,
+                    "source_label": source.label,
+                    "id": str(resource.get("id") or ""),
+                    "status": str(resource.get("status") or ""),
+                    "code": _codeable_code(resource.get("code")),
+                    "system": _codeable_system(resource.get("code")),
+                    "display": _codeable_text(resource.get("code")) or "Procedure",
+                    "performed_start": period["start"],
+                    "performed_end": period["end"],
+                    "reason": _codeable_text((resource.get("reasonCode") or [{}])[0]),
+                    "encounter_id": _reference_id(resource.get("encounter")),
+                }
+            )
+
+        for resource in source_resources.get("DiagnosticReport", []):
+            presented_text = "\n\n".join(_attachment_text(a) for a in resource.get("presentedForm") or [])
+            presented_text = presented_text.strip()
+            diagnostic_reports.append(
+                {
+                    "source_id": source.id,
+                    "source_label": source.label,
+                    "id": str(resource.get("id") or ""),
+                    "status": str(resource.get("status") or ""),
+                    "category": _codeable_text((resource.get("category") or [{}])[0]),
+                    "code": _codeable_code(resource.get("code")),
+                    "system": _codeable_system(resource.get("code")),
+                    "display": _codeable_text(resource.get("code")) or "Diagnostic report",
+                    "effective_date": _resource_date(resource),
+                    "result_refs": [
+                        ref
+                        for ref in (_reference_id(item) for item in resource.get("result") or [])
+                        if ref
+                    ],
+                    "encounter_id": _reference_id(resource.get("encounter")),
+                    "has_presented_form": bool(resource.get("presentedForm")),
+                    "presented_form_text": presented_text,
+                }
+            )
+
+        for resource_type, resources in source_resources.items():
+            for resource in resources:
+                for idx, text in enumerate(_resource_notes(resource)):
+                    clinical_notes.append(
+                        {
+                            "source_id": source.id,
+                            "source_label": source.label,
+                            "resource_type": resource_type,
+                            "resource_id": str(resource.get("id") or ""),
+                            "note_index": idx,
+                            "date": _resource_date(resource),
+                            "text": text,
+                        }
+                    )
+
+    return {
+        "documents": documents,
+        "encounters": encounters,
+        "procedures": procedures,
+        "diagnostic_reports": diagnostic_reports,
+        "clinical_notes": clinical_notes,
+    }
 
 
 # ---------------------------------------------------------------------------

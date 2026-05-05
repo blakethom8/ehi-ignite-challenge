@@ -1176,6 +1176,10 @@ export interface HarmonizeRunFactCounts {
   medications: number;
   allergies: number;
   immunizations: number;
+  procedures: number;
+  diagnostic_reports: number;
+  clinical_documents: number;
+  clinical_notes: number;
 }
 
 export interface HarmonizeRunSummary {

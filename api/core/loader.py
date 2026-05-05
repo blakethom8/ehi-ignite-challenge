@@ -34,6 +34,8 @@ from lib.fhir_parser.models import (
     PatientRecord,
     PatientSummary,
     Period,
+    ProcedureRecord,
+    DiagnosticReportRecord,
 )
 
 _DATA_DIR = _REPO_ROOT / "data" / "synthea-samples" / "synthea-r4-individual" / "fhir"
@@ -248,6 +250,10 @@ def _add_encounter(
         encounter.linked_medications.append(resource_id)
     elif resource_type == "Immunization":
         encounter.linked_immunizations.append(resource_id)
+    elif resource_type == "Procedure":
+        encounter.linked_procedures.append(resource_id)
+    elif resource_type == "DiagnosticReport":
+        encounter.linked_diagnostic_reports.append(resource_id)
     return encounter.encounter_id
 
 
@@ -300,6 +306,30 @@ def _record_from_published_run(patient_id: str, run: dict[str, Any]) -> tuple[Pa
     )
     encounter_by_key: dict[tuple[str, str], EncounterRecord] = {}
     candidate = run.get("candidate_record") if isinstance(run.get("candidate_record"), dict) else {}
+    artifacts = candidate.get("clinical_artifacts") if isinstance(candidate.get("clinical_artifacts"), dict) else {}
+    artifact_encounter_by_key: dict[tuple[str, str], EncounterRecord] = {}
+
+    for idx, enc in enumerate(artifacts.get("encounters") or []):
+        if not isinstance(enc, dict):
+            continue
+        source_id = str(enc.get("source_id") or "")
+        raw_id = str(enc.get("id") or "")
+        encounter_id = _safe_id("enc", f"{source_id}-{raw_id}", idx)
+        start = _parse_dt(enc.get("period_start"))
+        end = _parse_dt(enc.get("period_end")) or start
+        encounter_record = EncounterRecord(
+            encounter_id=encounter_id,
+            patient_id=patient_id,
+            status=str(enc.get("status") or "finished"),
+            class_code=str(enc.get("class_code") or "DOC"),
+            encounter_type=str(enc.get("type") or "Source encounter"),
+            reason_display=str(enc.get("reason") or ""),
+            period=Period(start=start, end=end),
+            provider_org=str(enc.get("provider") or enc.get("source_label") or "Published chart"),
+        )
+        record.encounters.append(encounter_record)
+        if raw_id:
+            artifact_encounter_by_key[(source_id, raw_id)] = encounter_record
 
     for obs_idx, obs in enumerate(candidate.get("observations") or []):
         if not isinstance(obs, dict):
@@ -444,6 +474,77 @@ def _record_from_published_run(patient_id: str, run: dict[str, Any]) -> tuple[Pa
         )
         record.immunizations.append(imm_record)
 
+    for idx, procedure in enumerate(artifacts.get("procedures") or []):
+        if not isinstance(procedure, dict):
+            continue
+        start = _parse_dt(procedure.get("performed_start"))
+        end = _parse_dt(procedure.get("performed_end")) or start
+        procedure_id = _safe_id("procedure", f"{procedure.get('source_id')}-{procedure.get('id')}", idx)
+        procedure_record = ProcedureRecord(
+            procedure_id=procedure_id,
+            patient_id=patient_id,
+            status=str(procedure.get("status") or "completed"),
+            code=CodeableConcept(
+                system=str(procedure.get("system") or ""),
+                code=str(procedure.get("code") or ""),
+                display=str(procedure.get("display") or "Procedure"),
+            ),
+            performed_period=Period(start=start, end=end),
+            reason_display=str(procedure.get("reason") or ""),
+        )
+        source_id = str(procedure.get("source_id") or "")
+        encounter = artifact_encounter_by_key.get((source_id, str(procedure.get("encounter_id") or "")))
+        if encounter is not None:
+            procedure_record.encounter_id = encounter.encounter_id
+            encounter.linked_procedures.append(procedure_id)
+        else:
+            procedure_record.encounter_id = _add_encounter(
+                record,
+                encounter_by_key,
+                str(procedure.get("source_label") or "Published chart"),
+                start,
+                "Procedure",
+                procedure_id,
+            )
+        record.procedures.append(procedure_record)
+
+    for idx, report in enumerate(artifacts.get("diagnostic_reports") or []):
+        if not isinstance(report, dict):
+            continue
+        effective_dt = _parse_dt(report.get("effective_date"))
+        report_id = _safe_id("diagnostic-report", f"{report.get('source_id')}-{report.get('id')}", idx)
+        result_refs = [str(ref) for ref in report.get("result_refs") or [] if ref]
+        diagnostic_report = DiagnosticReportRecord(
+            report_id=report_id,
+            patient_id=patient_id,
+            category=str(report.get("category") or ""),
+            status=str(report.get("status") or "final"),
+            code=CodeableConcept(
+                system=str(report.get("system") or ""),
+                code=str(report.get("code") or ""),
+                display=str(report.get("display") or "Diagnostic report"),
+            ),
+            effective_dt=effective_dt,
+            result_refs=result_refs,
+            has_presented_form=bool(report.get("has_presented_form")),
+            presented_form_text=str(report.get("presented_form_text") or ""),
+        )
+        source_id = str(report.get("source_id") or "")
+        encounter = artifact_encounter_by_key.get((source_id, str(report.get("encounter_id") or "")))
+        if encounter is not None:
+            diagnostic_report.encounter_id = encounter.encounter_id
+            encounter.linked_diagnostic_reports.append(report_id)
+        else:
+            diagnostic_report.encounter_id = _add_encounter(
+                record,
+                encounter_by_key,
+                str(report.get("source_label") or "Published chart"),
+                effective_dt,
+                "DiagnosticReport",
+                report_id,
+            )
+        record.diagnostic_reports.append(diagnostic_report)
+
     record.encounter_index = {enc.encounter_id: enc for enc in record.encounters}
     record.obs_index = {obs.obs_id: obs for obs in record.observations}
     record.obs_by_encounter = defaultdict(list)
@@ -461,6 +562,8 @@ def _record_from_published_run(patient_id: str, run: dict[str, Any]) -> tuple[Pa
         "Observation": len(record.observations),
         "Condition": len(record.conditions),
         "MedicationRequest": len(record.medications),
+        "Procedure": len(record.procedures),
+        "DiagnosticReport": len(record.diagnostic_reports),
         "AllergyIntolerance": len(record.allergies),
         "Immunization": len(record.immunizations),
     }

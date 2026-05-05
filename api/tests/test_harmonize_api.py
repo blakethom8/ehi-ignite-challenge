@@ -10,6 +10,7 @@ on any checkout without external state.
 
 from __future__ import annotations
 
+import base64
 import json
 import os
 import shutil
@@ -286,6 +287,91 @@ class UploadCollectionDiscoveryTests(unittest.TestCase):
         (sess / "report.pdf").write_bytes(b"%PDF-1.4 stub")
         return sess
 
+    def _stage_clinical_session(self, session_id: str) -> Path:
+        """Create a source with clinical-document resources beyond core facts."""
+        sess = self._tmp / session_id
+        sess.mkdir(parents=True, exist_ok=True)
+        note_text = "Assessment: chronic kidney disease risk discussed. Follow up with PCP."
+        (sess / "clinical.json").write_text(
+            json.dumps(
+                {
+                    "resourceType": "Bundle",
+                    "entry": [
+                        {
+                            "resource": {
+                                "resourceType": "Encounter",
+                                "id": "enc-1",
+                                "status": "finished",
+                                "class": {"code": "AMB"},
+                                "type": [{"text": "Office visit"}],
+                                "period": {"start": "2026-02-03", "end": "2026-02-03"},
+                            }
+                        },
+                        {
+                            "resource": {
+                                "resourceType": "Observation",
+                                "id": "creatinine-1",
+                                "status": "final",
+                                "code": {
+                                    "coding": [
+                                        {
+                                            "system": "http://loinc.org",
+                                            "code": "2160-0",
+                                            "display": "Creatinine [Mass/volume] in Serum or Plasma",
+                                        }
+                                    ],
+                                    "text": "Creatinine",
+                                },
+                                "valueQuantity": {"value": 1.8, "unit": "mg/dL"},
+                                "effectiveDateTime": "2026-02-03",
+                                "encounter": {"reference": "Encounter/enc-1"},
+                            }
+                        },
+                        {
+                            "resource": {
+                                "resourceType": "Procedure",
+                                "id": "proc-1",
+                                "status": "completed",
+                                "code": {"text": "Renal ultrasound"},
+                                "performedDateTime": "2026-02-03",
+                                "encounter": {"reference": "Encounter/enc-1"},
+                            }
+                        },
+                        {
+                            "resource": {
+                                "resourceType": "DiagnosticReport",
+                                "id": "report-1",
+                                "status": "final",
+                                "category": [{"text": "Laboratory"}],
+                                "code": {"text": "Renal function panel"},
+                                "effectiveDateTime": "2026-02-03",
+                                "encounter": {"reference": "Encounter/enc-1"},
+                                "result": [{"reference": "Observation/creatinine-1"}],
+                                "presentedForm": [
+                                    {
+                                        "contentType": "text/plain",
+                                        "data": base64.b64encode(note_text.encode("utf-8")).decode("ascii"),
+                                    }
+                                ],
+                            }
+                        },
+                        {
+                            "resource": {
+                                "resourceType": "Condition",
+                                "id": "condition-note-1",
+                                "clinicalStatus": {"text": "active"},
+                                "code": {"text": "Kidney function concern"},
+                                "onsetDateTime": "2026-02-03",
+                                "note": [{"text": note_text}],
+                            }
+                        },
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+        return sess
+
     def _sample_patient_id(self) -> str:
         from api.core.loader import list_patient_files, patient_id_from_path
 
@@ -516,6 +602,36 @@ class UploadCollectionDiscoveryTests(unittest.TestCase):
         resource_types = {entry["resource"]["resourceType"] for entry in bundle["entry"]}
         self.assertIn("Patient", resource_types)
         self.assertIn("Observation", resource_types)
+
+    def test_published_workspace_preserves_clinical_artifacts(self) -> None:
+        self._stage_clinical_session("workspace-clinical-artifacts")
+
+        run = self.client.post("/api/harmonize/workspace-workspace-clinical-artifacts/runs").json()
+        self.assertEqual(run["summary"]["candidate_counts"]["observations"], 1)
+        self.assertEqual(run["summary"]["candidate_counts"]["procedures"], 1)
+        self.assertEqual(run["summary"]["candidate_counts"]["diagnostic_reports"], 1)
+        self.assertEqual(run["summary"]["candidate_counts"]["clinical_documents"], 1)
+        self.assertGreaterEqual(run["summary"]["candidate_counts"]["clinical_notes"], 2)
+
+        state = self.client.post(
+            f"/api/harmonize/workspace-workspace-clinical-artifacts/runs/{run['run_id']}/publish"
+        )
+        self.assertEqual(state.status_code, 201)
+
+        procedures = self.client.get("/api/patients/workspace-clinical-artifacts/procedures")
+        self.assertEqual(procedures.status_code, 200)
+        self.assertEqual(procedures.json()["total_count"], 1)
+        self.assertEqual(procedures.json()["procedures"][0]["display"], "Renal ultrasound")
+
+        care_journey = self.client.get("/api/patients/workspace-clinical-artifacts/care-journey")
+        self.assertEqual(care_journey.status_code, 200)
+        self.assertEqual(len(care_journey.json()["diagnostic_reports"]), 1)
+
+        raw_fhir = self.client.get("/api/patients/workspace-clinical-artifacts/fhir")
+        self.assertEqual(raw_fhir.status_code, 200)
+        resource_types = {entry["resource"]["resourceType"] for entry in raw_fhir.json()["entry"]}
+        self.assertIn("Procedure", resource_types)
+        self.assertIn("DiagnosticReport", resource_types)
 
     def test_provider_assistant_uses_published_workspace_snapshot(self) -> None:
         sess = self._stage_session("workspace-assistant")

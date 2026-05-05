@@ -1322,6 +1322,10 @@ class HarmonizeRunFactCounts(BaseModel):
     medications: int = 0
     allergies: int = 0
     immunizations: int = 0
+    procedures: int = 0
+    diagnostic_reports: int = 0
+    clinical_documents: int = 0
+    clinical_notes: int = 0
 
 
 class HarmonizeRunSummary(BaseModel):

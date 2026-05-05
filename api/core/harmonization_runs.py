@@ -25,6 +25,20 @@ RUNS_ROOT = Path(
 RUN_VERSION = "scripted-harmonize-v1"
 
 
+def _empty_fact_counts() -> dict[str, int]:
+    return {
+        "observations": 0,
+        "conditions": 0,
+        "medications": 0,
+        "allergies": 0,
+        "immunizations": 0,
+        "procedures": 0,
+        "diagnostic_reports": 0,
+        "clinical_documents": 0,
+        "clinical_notes": 0,
+    }
+
+
 def _now() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -160,23 +174,42 @@ def _summary(
     medications: list[dict[str, Any]],
     allergies: list[dict[str, Any]],
     immunizations: list[dict[str, Any]],
+    artifacts: dict[str, list[dict[str, Any]]] | None,
     review_items: list[dict[str, Any]],
 ) -> dict[str, Any]:
-    cross_source = {
+    artifacts = artifacts or {}
+    cross_source = _empty_fact_counts()
+    cross_source.update({
         "observations": sum(1 for item in observations if item.get("source_count", 0) > 1),
         "conditions": sum(1 for item in conditions if item.get("source_count", 0) > 1),
         "medications": sum(1 for item in medications if item.get("source_count", 0) > 1),
         "allergies": sum(1 for item in allergies if item.get("source_count", 0) > 1),
         "immunizations": sum(1 for item in immunizations if item.get("source_count", 0) > 1),
-    }
-    candidate_counts = {
+    })
+    candidate_counts = _empty_fact_counts()
+    candidate_counts.update({
         "observations": len(observations),
         "conditions": len(conditions),
         "medications": len(medications),
         "allergies": len(allergies),
         "immunizations": len(immunizations),
-    }
-    total_candidate_facts = sum(candidate_counts.values())
+        "procedures": len(artifacts.get("procedures") or []),
+        "diagnostic_reports": len(artifacts.get("diagnostic_reports") or []),
+        "clinical_documents": sum(1 for item in artifacts.get("documents") or [] if item.get("available")),
+        "clinical_notes": len(artifacts.get("clinical_notes") or []),
+    })
+    total_candidate_facts = sum(
+        candidate_counts[key]
+        for key in (
+            "observations",
+            "conditions",
+            "medications",
+            "allergies",
+            "immunizations",
+            "procedures",
+            "diagnostic_reports",
+        )
+    )
     open_review_item_count = sum(1 for item in review_items if _is_open_review_item(item))
     return {
         "source_count": len(sources),
@@ -201,6 +234,7 @@ def _recompute_summary(payload: dict[str, Any]) -> None:
         candidate_record.get("medications") or [],
         candidate_record.get("allergies") or [],
         candidate_record.get("immunizations") or [],
+        candidate_record.get("clinical_artifacts") or {},
         payload.get("review_items") or [],
     )
 
@@ -243,6 +277,7 @@ def _build_run(collection_id: str, run_id: str, started_at: datetime) -> dict[st
         harmonize_service.serialize_immunization(item)
         for item in harmonize_service.merged_immunizations(collection_id)
     ]
+    artifacts = harmonize_service.clinical_artifacts(collection_id)
     review_items = _review_items(sources, observations)
     summary = _summary(
         sources,
@@ -251,6 +286,7 @@ def _build_run(collection_id: str, run_id: str, started_at: datetime) -> dict[st
         medications,
         allergies,
         immunizations,
+        artifacts,
         review_items,
     )
     completed_at = _now()
@@ -272,6 +308,7 @@ def _build_run(collection_id: str, run_id: str, started_at: datetime) -> dict[st
             "medications": medications,
             "allergies": allergies,
             "immunizations": immunizations,
+            "clinical_artifacts": artifacts,
         },
     }
 
@@ -301,20 +338,8 @@ def run_harmonization(collection_id: str) -> dict[str, Any]:
                 "source_count": 0,
                 "prepared_source_count": 0,
                 "needs_preparation_count": 0,
-                "candidate_counts": {
-                    "observations": 0,
-                    "conditions": 0,
-                    "medications": 0,
-                    "allergies": 0,
-                    "immunizations": 0,
-                },
-                "cross_source_counts": {
-                    "observations": 0,
-                    "conditions": 0,
-                    "medications": 0,
-                    "allergies": 0,
-                    "immunizations": 0,
-                },
+                "candidate_counts": _empty_fact_counts(),
+                "cross_source_counts": _empty_fact_counts(),
                 "total_candidate_facts": 0,
                 "cross_source_facts": 0,
                 "conflict_count": 0,
@@ -343,6 +368,13 @@ def run_harmonization(collection_id: str) -> dict[str, Any]:
                 "medications": [],
                 "allergies": [],
                 "immunizations": [],
+                "clinical_artifacts": {
+                    "documents": [],
+                    "encounters": [],
+                    "procedures": [],
+                    "diagnostic_reports": [],
+                    "clinical_notes": [],
+                },
             },
         }
 

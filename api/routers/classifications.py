@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import base64
 import json
 from pathlib import Path
 
@@ -200,6 +201,53 @@ def _record_to_bundle(record: PatientRecord) -> dict:
                 }
             }
         )
+
+    for procedure in record.procedures:
+        period = procedure.performed_period
+        entries.append(
+            {
+                "resource": {
+                    "resourceType": "Procedure",
+                    "id": procedure.procedure_id,
+                    "status": procedure.status or "completed",
+                    "code": {
+                        "coding": _coding(procedure.code.system, procedure.code.code, procedure.code.display),
+                        "text": procedure.code.label(),
+                    },
+                    "subject": {"reference": f"Patient/{patient_id}"},
+                    "encounter": {"reference": f"Encounter/{procedure.encounter_id}"} if procedure.encounter_id else None,
+                    "performedPeriod": {
+                        "start": _iso(period.start) if period else None,
+                        "end": _iso(period.end) if period else None,
+                    },
+                    "reasonCode": [{"text": procedure.reason_display}] if procedure.reason_display else [],
+                }
+            }
+        )
+
+    for report in record.diagnostic_reports:
+        resource = {
+            "resourceType": "DiagnosticReport",
+            "id": report.report_id,
+            "status": report.status or "final",
+            "category": [{"text": report.category}] if report.category else [],
+            "code": {
+                "coding": _coding(report.code.system, report.code.code, report.code.display),
+                "text": report.code.label(),
+            },
+            "subject": {"reference": f"Patient/{patient_id}"},
+            "encounter": {"reference": f"Encounter/{report.encounter_id}"} if report.encounter_id else None,
+            "effectiveDateTime": _iso(report.effective_dt),
+            "result": [{"reference": f"Observation/{ref}"} for ref in report.result_refs],
+        }
+        if report.has_presented_form and report.presented_form_text:
+            resource["presentedForm"] = [
+                {
+                    "contentType": "text/plain",
+                    "data": base64.b64encode(report.presented_form_text.encode("utf-8")).decode("ascii"),
+                }
+            ]
+        entries.append({"resource": resource})
 
     for entry in entries:
         resource = entry.get("resource", {})

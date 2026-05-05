@@ -30,6 +30,7 @@ import { RunHistorySidebar } from "./components/RunHistorySidebar";
 import { SaveDestinationDrawer } from "./components/SaveDestinationDrawer";
 import { TranscriptPane } from "./components/TranscriptPane";
 import { WorkspacePane } from "./components/WorkspacePane";
+import { useRunEvents } from "./hooks/useRunEvents";
 
 const SKILL_NAME = "trial-matching";
 
@@ -179,15 +180,38 @@ function RunView({
   const workspaceQuery = useQuery({
     queryKey: ["skill-workspace", SKILL_NAME, runId, patientId],
     queryFn: () => skillsApi.getWorkspace(SKILL_NAME, runId, patientId),
-    refetchInterval: 2000,
+    // Polled at a relaxed cadence; SSE events of kind `workspace_write`
+    // and `cite` invalidate this query for sub-second updates.
+    refetchInterval: 5000,
     enabled: !!stateQuery.data,
   });
 
-  const transcriptQuery = useQuery({
-    queryKey: ["skill-transcript", SKILL_NAME, runId, patientId],
-    queryFn: () => skillsApi.getTranscript(SKILL_NAME, runId, patientId),
-    refetchInterval: 2000,
-    enabled: !!stateQuery.data,
+  // Live event feed via SSE — replaces the previous transcript polling.
+  // Workspace markdown updates ride on top: when a relevant event lands,
+  // the workspace query is invalidated so the rendered artifact tracks
+  // the agent's writes in near-real-time.
+  const liveEvents = useRunEvents({
+    skillName: SKILL_NAME,
+    runId,
+    patientId,
+    onEvent: (event) => {
+      if (event.kind === "workspace_write" || event.kind === "cite") {
+        queryClient.invalidateQueries({
+          queryKey: ["skill-workspace", SKILL_NAME, runId, patientId],
+        });
+      }
+      if (
+        event.kind === "escalation" ||
+        event.kind === "escalation_resolved" ||
+        event.kind === "run_finished" ||
+        event.kind === "run_failed" ||
+        event.kind === "finalize_failed"
+      ) {
+        queryClient.invalidateQueries({
+          queryKey: ["skill-run", SKILL_NAME, runId, patientId],
+        });
+      }
+    },
   });
 
   const runsQuery = useQuery({
@@ -223,14 +247,12 @@ function RunView({
       skillsApi.saveRun(SKILL_NAME, runId, patientId, payload),
     onSuccess: () => {
       setDrawerOpen(false);
-      queryClient.invalidateQueries({
-        queryKey: ["skill-transcript", SKILL_NAME, runId],
-      });
+      // The save event itself rides the SSE stream — no need to invalidate
+      // a transcript query (we no longer have one). The run-list and
+      // patient-memory caches still need a manual nudge.
       queryClient.invalidateQueries({
         queryKey: ["skill-runs", patientId, SKILL_NAME],
       });
-      // Pinned facts and context packages mutate the patient memory layer —
-      // refresh the panel so the new content appears without a hard reload.
       queryClient.invalidateQueries({
         queryKey: ["skill-patient-memory", patientId],
       });
@@ -239,7 +261,7 @@ function RunView({
 
   const state = stateQuery.data;
   const workspace = workspaceQuery.data;
-  const transcript = transcriptQuery.data;
+  const transcriptEvents = liveEvents.events;
 
   const pendingEscalation: PendingEscalation | null =
     state?.pending_escalations[0] ?? null;
@@ -317,10 +339,27 @@ function RunView({
               <h3 className="text-sm font-semibold text-[#1c1c1e]">Transcript</h3>
             </div>
             <span className="text-[11px] text-[#a5a8b5]">
-              {transcript?.events.length ?? 0} events
+              {transcriptEvents.length} events
+              <span
+                className={`ml-2 rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider ${
+                  liveEvents.connection === "open"
+                    ? "bg-[#f0fdf4] text-[#166534]"
+                    : liveEvents.connection === "error"
+                    ? "bg-[#fef2f2] text-[#991b1b]"
+                    : liveEvents.streamClosed
+                    ? "bg-[#f5f6f8] text-[#555a6a]"
+                    : "bg-[#fffbeb] text-[#92400e]"
+                }`}
+              >
+                {liveEvents.streamClosed
+                  ? "closed"
+                  : liveEvents.connection === "open"
+                  ? "live"
+                  : liveEvents.connection}
+              </span>
             </span>
           </div>
-          <TranscriptPane events={transcript?.events ?? []} />
+          <TranscriptPane events={transcriptEvents} />
         </section>
 
         <PatientMemoryPanel

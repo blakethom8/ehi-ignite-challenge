@@ -22,9 +22,10 @@ import asyncio
 import json
 import os
 from dataclasses import dataclass
-from typing import Any, AsyncIterator
+from typing import Any
 
 from api.core.skills import clinicaltrials_gov as ctgov
+from api.core.skills.event_hub import EventHub
 from api.core.skills.loader import Skill
 from api.core.skills.patient_memory import PatientMemory
 from api.core.skills.workspace import (
@@ -51,7 +52,11 @@ class SkillRunner:
     Public surface:
     - `await runner.run()` — run to completion, escalation, or failure.
     - `await runner.resume()` — continue after an escalation is resolved.
-    - `runner.events()` — async iterator yielding event dicts (for SSE).
+
+    Live progress is broadcast via an injected `EventHub` (the worker
+    pool owns the hub lifecycle); SSE endpoints subscribe to that hub.
+    The runner itself does not expose an event stream — that
+    responsibility lives in Layer 1 substrate, not in the runner.
     """
 
     def __init__(
@@ -60,29 +65,39 @@ class SkillRunner:
         workspace: Workspace,
         patient_memory: PatientMemory,
         brief: dict[str, Any],
+        event_hub: EventHub | None = None,
     ) -> None:
         self.skill = skill
         self.workspace = workspace
         self.patient_memory = patient_memory
         self.brief = dict(brief)
-        self._event_queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
+        # Hub plumbing lives on the workspace — every transcript event
+        # (whether emitted from the runner or from a workspace internal
+        # like `escalate`) reaches the hub uniformly. We attach here for
+        # callers that pass the hub through the runner constructor.
+        if event_hub is not None and workspace.event_hub is None:
+            workspace.event_hub = event_hub
         self._completed = asyncio.Event()
 
-    # ── Event stream ────────────────────────────────────────────────────
+    @property
+    def event_hub(self) -> EventHub | None:
+        return self.workspace.event_hub
 
-    async def events(self) -> AsyncIterator[dict[str, Any]]:
-        while True:
-            if self._completed.is_set() and self._event_queue.empty():
-                return
-            try:
-                event = await asyncio.wait_for(self._event_queue.get(), timeout=0.5)
-                yield event
-            except asyncio.TimeoutError:
-                continue
+    @event_hub.setter
+    def event_hub(self, hub: EventHub | None) -> None:
+        self.workspace.event_hub = hub
+
+    # ── Event emission ──────────────────────────────────────────────────
 
     def _emit(self, kind: str, **payload: Any) -> None:
-        event = {"kind": kind, **payload}
-        self._event_queue.put_nowait(event)
+        """Emit a structured event via the workspace transcript.
+
+        The workspace handles both disk persistence and (if a hub is
+        attached) live broadcast. Keeping all emission funnelled through
+        `Workspace.append_transcript` is what guarantees that escalations
+        and citations — emitted from inside workspace primitives —
+        reach the hub on the same path as runner-level events.
+        """
         self.workspace.append_transcript(TranscriptEvent(kind=kind, payload=payload))
 
     # ── System prompt assembly ──────────────────────────────────────────

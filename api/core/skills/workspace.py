@@ -21,6 +21,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator, Literal
 
+from api.core.skills.event_hub import EventHub
 from api.core.skills.loader import Skill
 from api.core.skills.patient_memory import PatientMemory
 
@@ -162,6 +163,7 @@ class Workspace:
         patient_memory: PatientMemory,
         run_dir: Path | None = None,
         brief: dict[str, Any] | None = None,
+        event_hub: EventHub | None = None,
     ) -> None:
         self.skill = skill
         self.patient_id = patient_id
@@ -181,6 +183,10 @@ class Workspace:
         self._section_anchors: dict[str, str | None] = {}
         self._status: RunStatus = "created"
         self._failure_reason: str | None = None
+        # Optional live broadcast — when attached, every transcript event
+        # also reaches connected SSE subscribers. Disk remains the source
+        # of truth; the hub is the fast path.
+        self.event_hub = event_hub
 
     # ── Lifecycle ───────────────────────────────────────────────────────
 
@@ -298,8 +304,17 @@ class Workspace:
         )
 
     def append_transcript(self, event: TranscriptEvent) -> None:
+        """Persist an event to disk and broadcast to live subscribers.
+
+        Disk write happens *first* — durability before broadcast. If a
+        subscriber's queue is full, the live event is dropped for them;
+        they recover via transcript replay on reconnect.
+        """
+        record = {"at": event.at, "kind": event.kind, **event.payload}
         with (self.run_dir / "transcript.jsonl").open("a", encoding="utf-8") as fp:
-            fp.write(json.dumps({"at": event.at, "kind": event.kind, **event.payload}, default=str) + "\n")
+            fp.write(json.dumps(record, default=str) + "\n")
+        if self.event_hub is not None:
+            self.event_hub.publish_nowait(record)
 
     # ── Mediated write primitive ────────────────────────────────────────
 

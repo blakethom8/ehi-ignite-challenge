@@ -21,12 +21,14 @@ from __future__ import annotations
 import asyncio
 import json
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, AsyncIterator, Literal
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from api.core.skills import workspace as workspace_module
+from api.core.skills.event_hub import EventHub
 from api.core.skills.loader import (
     Skill,
     SkillManifestError,
@@ -39,6 +41,12 @@ from api.core.skills.workspace import (
     load_workspace,
 )
 from api.core.skills.worker import get_pool, get_skill
+
+
+# Tuned for FastAPI behind nginx — keepalive bytes every ~15s prevent any
+# upstream proxy from killing an idle SSE connection. See
+# docs/architecture/STREAMING-AND-GATEWAY.md §5.2 for the contract.
+SSE_KEEPALIVE_INTERVAL_S = 15.0
 
 
 router = APIRouter(prefix="/skills", tags=["skills"])
@@ -282,6 +290,103 @@ async def get_transcript(
     return TranscriptResponse(
         run_id=run_id, events=list(workspace.transcript_events())
     )
+
+
+@router.get("/{skill_name}/runs/{run_id}/events")
+async def stream_run_events(
+    skill_name: str, run_id: str, patient_id: str
+) -> StreamingResponse:
+    """SSE feed for a run.
+
+    Replays every event in `transcript.jsonl` first (so a late subscriber
+    sees the full history), then attaches to the in-memory `EventHub` for
+    live updates. Closes when the run terminates and the hub publishes
+    its close sentinel.
+
+    Sent as `text/event-stream`. See
+    `docs/architecture/STREAMING-AND-GATEWAY.md` for the design rationale.
+    """
+    skill = _resolve_skill(skill_name)
+    workspace = _resolve_workspace(skill, patient_id, run_id)
+    pool = get_pool()
+    hub = await pool.hub_for(patient_id, skill.name, run_id)
+
+    async def event_stream() -> AsyncIterator[bytes]:
+        # 1. Replay history. Disk is the source of truth — every connected
+        #    client gets the complete record before joining the live tail.
+        for event in workspace.transcript_events():
+            yield _format_sse(event)
+
+        # 2. Subscribe to live events if the run is still active. If the
+        #    run already finished (hub closed or absent), emit a close
+        #    sentinel and end.
+        if hub is not None and not hub.closed:
+            keepalive_task: asyncio.Task[None] | None = None
+            keepalive_queue: asyncio.Queue[bytes] = asyncio.Queue()
+
+            async def emit_keepalives() -> None:
+                while True:
+                    await asyncio.sleep(SSE_KEEPALIVE_INTERVAL_S)
+                    await keepalive_queue.put(b": keepalive\n\n")
+
+            keepalive_task = asyncio.create_task(emit_keepalives())
+            try:
+                async def merge() -> AsyncIterator[bytes]:
+                    sub_iter = hub.subscribe().__aiter__()
+                    sub_task: asyncio.Task[Any] = asyncio.create_task(
+                        sub_iter.__anext__()
+                    )
+                    keep_task: asyncio.Task[bytes] = asyncio.create_task(
+                        keepalive_queue.get()
+                    )
+                    try:
+                        while True:
+                            done, _ = await asyncio.wait(
+                                {sub_task, keep_task},
+                                return_when=asyncio.FIRST_COMPLETED,
+                            )
+                            if sub_task in done:
+                                try:
+                                    event = sub_task.result()
+                                except StopAsyncIteration:
+                                    return
+                                yield _format_sse(event)
+                                sub_task = asyncio.create_task(
+                                    sub_iter.__anext__()
+                                )
+                            if keep_task in done:
+                                yield keep_task.result()
+                                keep_task = asyncio.create_task(
+                                    keepalive_queue.get()
+                                )
+                    finally:
+                        for t in (sub_task, keep_task):
+                            if not t.done():
+                                t.cancel()
+                async for chunk in merge():
+                    yield chunk
+            finally:
+                if keepalive_task is not None:
+                    keepalive_task.cancel()
+
+        # 3. Terminal sentinel — clients use this to stop reading cleanly.
+        yield _format_sse({"kind": "stream_closed"})
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            # nginx — disable response buffering so events flush in real time
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+def _format_sse(event: dict[str, Any]) -> bytes:
+    """Render a JSON event as one SSE record."""
+    return f"data: {json.dumps(event, default=str)}\n\n".encode("utf-8")
 
 
 @router.get("/{skill_name}/runs/{run_id}/output")

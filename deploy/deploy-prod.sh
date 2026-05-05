@@ -22,4 +22,8 @@ git pull origin master
 "${COMPOSE[@]}" -f "$COMPOSE_FILE" rm -fsv api app cursor-sidecar
 "${COMPOSE[@]}" -f "$COMPOSE_FILE" up -d --no-build
 
+if docker ps --format '{{.Names}}' | grep -qx 'personal-website_nginx_1'; then
+  docker exec personal-website_nginx_1 nginx -s reload
+fi
+
 "${COMPOSE[@]}" -f "$COMPOSE_FILE" ps

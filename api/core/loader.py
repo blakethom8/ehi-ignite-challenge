@@ -7,9 +7,13 @@ to the same patient don't re-parse from disk.
 
 from __future__ import annotations
 
+import json
 import re
 import sys
+from collections import defaultdict
 from functools import lru_cache
+from datetime import datetime, timezone
+from typing import Any
 from pathlib import Path
 
 # Ensure repo root is on path so fhir_explorer imports work
@@ -19,7 +23,18 @@ if str(_REPO_ROOT) not in sys.path:
 
 from lib.fhir_parser.bundle_parser import parse_bundle
 from lib.patient_catalog.single_patient import compute_patient_stats, PatientStats
-from lib.fhir_parser.models import PatientRecord
+from lib.fhir_parser.models import (
+    AllergyRecord,
+    CodeableConcept,
+    ConditionRecord,
+    EncounterRecord,
+    ImmunizationRecord,
+    MedicationRecord,
+    ObservationRecord,
+    PatientRecord,
+    PatientSummary,
+    Period,
+)
 
 _DATA_DIR = _REPO_ROOT / "data" / "synthea-samples" / "synthea-r4-individual" / "fhir"
 
@@ -167,6 +182,293 @@ def warm_patient_indexes() -> None:
         _uuid_to_stem = _build_uuid_index()
 
 
+def _parse_dt(value: Any) -> datetime | None:
+    """Parse FHIR-ish date strings into naive UTC datetimes.
+
+    The legacy parsed Synthea models generally compare naive datetimes. Published
+    harmonization artifacts may contain offset-aware timestamps from uploaded
+    FHIR exports, so normalize here before feeding the shared patient endpoints.
+    """
+    if not value or not isinstance(value, str):
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        try:
+            parsed = datetime.fromisoformat(f"{value}T00:00:00")
+        except ValueError:
+            return None
+    if parsed.tzinfo is not None:
+        parsed = parsed.astimezone(timezone.utc).replace(tzinfo=None)
+    return parsed
+
+
+def _safe_id(prefix: str, value: Any, index: int) -> str:
+    raw = str(value or "").strip() or f"{prefix}-{index}"
+    return re.sub(r"[^A-Za-z0-9_.-]+", "-", raw).strip(".-")[:160] or f"{prefix}-{index}"
+
+
+def _best_source_date(sources: list[dict[str, Any]], field: str) -> datetime | None:
+    dates = [_parse_dt(source.get(field)) for source in sources]
+    present = [dt for dt in dates if dt is not None]
+    return max(present) if present else None
+
+
+def _add_encounter(
+    record: PatientRecord,
+    encounter_by_key: dict[tuple[str, str], EncounterRecord],
+    source_label: str,
+    event_dt: datetime | None,
+    resource_type: str,
+    resource_id: str,
+) -> str | None:
+    if event_dt is None:
+        return None
+    key = (source_label or "Published chart", event_dt.date().isoformat())
+    encounter = encounter_by_key.get(key)
+    if encounter is None:
+        encounter_id = _safe_id("enc", f"published-{key[0]}-{key[1]}", len(encounter_by_key))
+        encounter = EncounterRecord(
+            encounter_id=encounter_id,
+            patient_id=record.summary.patient_id,
+            status="finished",
+            class_code="DOC",
+            encounter_type="Published chart source event",
+            reason_display="Harmonized source fact",
+            period=Period(start=event_dt, end=event_dt),
+            provider_org=source_label or "Published chart",
+        )
+        encounter_by_key[key] = encounter
+        record.encounters.append(encounter)
+    if resource_type == "Observation":
+        encounter.linked_observations.append(resource_id)
+    elif resource_type == "Condition":
+        encounter.linked_conditions.append(resource_id)
+    elif resource_type == "MedicationRequest":
+        encounter.linked_medications.append(resource_id)
+    elif resource_type == "Immunization":
+        encounter.linked_immunizations.append(resource_id)
+    return encounter.encounter_id
+
+
+def _load_active_published_run(patient_id: str) -> dict[str, Any] | None:
+    """Return the active published harmonization run for a selected patient id."""
+    from api.core import harmonization_runs, harmonize_service, published_charts
+
+    collection_ids = [harmonize_service.workspace_collection_id(patient_id)]
+    if patient_id.startswith("workspace-"):
+        # Backward-compatible upload collection id used before the patient
+        # workspace wrapper became the canonical downstream read target.
+        collection_ids.append(f"upload-{patient_id}")
+
+    for collection_id in dict.fromkeys(collection_ids):
+        active = published_charts.state(collection_id).get("active_snapshot")
+        if not active:
+            continue
+        artifact_path = active.get("artifact_path")
+        if isinstance(artifact_path, str):
+            path = Path(artifact_path)
+            if path.exists():
+                try:
+                    return json.loads(path.read_text(encoding="utf-8"))
+                except (OSError, json.JSONDecodeError):
+                    pass
+        run_id = active.get("run_id")
+        if isinstance(run_id, str):
+            run = harmonization_runs.get_run(collection_id, run_id)
+            if run is not None:
+                return run
+    return None
+
+
+def _record_from_published_run(patient_id: str, run: dict[str, Any]) -> tuple[PatientRecord, PatientStats]:
+    """Convert a published harmonization artifact into the shared PatientRecord shape.
+
+    This is intentionally a read facade, not a new parser. It lets existing
+    downstream modules consume the published canonical chart without knowing
+    whether the source was Synthea, an uploaded FHIR export, or PDF extraction.
+    """
+    collection_name = str(run.get("collection_name") or patient_id)
+    display_name = collection_name.removesuffix(" — patient workspace")
+    record = PatientRecord(
+        summary=PatientSummary(
+            patient_id=patient_id,
+            file_path=str(run.get("artifact_path") or ""),
+            name=display_name,
+            gender="workspace",
+        )
+    )
+    encounter_by_key: dict[tuple[str, str], EncounterRecord] = {}
+    candidate = run.get("candidate_record") if isinstance(run.get("candidate_record"), dict) else {}
+
+    for obs_idx, obs in enumerate(candidate.get("observations") or []):
+        if not isinstance(obs, dict):
+            continue
+        sources = [s for s in obs.get("sources") or [] if isinstance(s, dict)]
+        if not sources and isinstance(obs.get("latest"), dict):
+            sources = [obs["latest"]]
+        if not sources:
+            sources = [{}]
+        for source_idx, source in enumerate(sources):
+            effective_dt = _parse_dt(source.get("effective_date") or (obs.get("latest") or {}).get("effective_date"))
+            raw_value = source.get("value", (obs.get("latest") or {}).get("value"))
+            unit = source.get("unit") or obs.get("canonical_unit") or (obs.get("latest") or {}).get("unit") or ""
+            obs_id = _safe_id(
+                "obs",
+                source.get("source_observation_ref") or f"{obs.get('merged_ref')}-{source_idx}",
+                obs_idx,
+            )
+            value_quantity = float(raw_value) if isinstance(raw_value, (int, float)) else None
+            record_obs = ObservationRecord(
+                obs_id=obs_id,
+                patient_id=patient_id,
+                status="final",
+                category="laboratory" if obs.get("loinc_code") else "unknown",
+                loinc_code=str(obs.get("loinc_code") or ""),
+                display=str(obs.get("canonical_name") or "Observation"),
+                effective_dt=effective_dt,
+                value_type="quantity" if value_quantity is not None else ("codeable_concept" if raw_value else "none"),
+                value_quantity=value_quantity,
+                value_unit=str(unit),
+                value_concept_display=None if value_quantity is not None else (str(raw_value) if raw_value is not None else None),
+            )
+            record_obs.encounter_id = _add_encounter(
+                record,
+                encounter_by_key,
+                str(source.get("source_label") or "Published chart"),
+                effective_dt,
+                "Observation",
+                obs_id,
+            )
+            record.observations.append(record_obs)
+
+    for idx, condition in enumerate(candidate.get("conditions") or []):
+        if not isinstance(condition, dict):
+            continue
+        sources = [s for s in condition.get("sources") or [] if isinstance(s, dict)]
+        onset_dt = _best_source_date(sources, "onset_date")
+        source = sources[0] if sources else {}
+        condition_id = _safe_id("condition", condition.get("merged_ref"), idx)
+        condition_record = ConditionRecord(
+            condition_id=condition_id,
+            patient_id=patient_id,
+            clinical_status=str(source.get("clinical_status") or ("active" if condition.get("is_active") else "resolved")),
+            verification_status="confirmed",
+            code=CodeableConcept(
+                system="http://snomed.info/sct" if condition.get("snomed") else "",
+                code=str(condition.get("snomed") or condition.get("icd10") or condition.get("icd9") or ""),
+                display=str(condition.get("canonical_name") or source.get("display") or "Condition"),
+            ),
+            onset_dt=onset_dt,
+            is_active=bool(condition.get("is_active")),
+        )
+        condition_record.encounter_id = _add_encounter(
+            record,
+            encounter_by_key,
+            str(source.get("source_label") or "Published chart"),
+            onset_dt,
+            "Condition",
+            condition_id,
+        )
+        record.conditions.append(condition_record)
+
+    for idx, medication in enumerate(candidate.get("medications") or []):
+        if not isinstance(medication, dict):
+            continue
+        sources = [s for s in medication.get("sources") or [] if isinstance(s, dict)]
+        authored_on = _best_source_date(sources, "authored_on")
+        source = sources[0] if sources else {}
+        rxnorm_codes = medication.get("rxnorm_codes") if isinstance(medication.get("rxnorm_codes"), list) else []
+        med_id = _safe_id("med", medication.get("merged_ref"), idx)
+        medication_record = MedicationRecord(
+            med_id=med_id,
+            patient_id=patient_id,
+            status=str(source.get("status") or ("active" if medication.get("is_active") else "completed")),
+            rxnorm_code=str(rxnorm_codes[0]) if rxnorm_codes else "",
+            display=str(medication.get("canonical_name") or source.get("display") or "Medication"),
+            authored_on=authored_on,
+        )
+        medication_record.encounter_id = _add_encounter(
+            record,
+            encounter_by_key,
+            str(source.get("source_label") or "Published chart"),
+            authored_on,
+            "MedicationRequest",
+            med_id,
+        )
+        record.medications.append(medication_record)
+
+    for idx, allergy in enumerate(candidate.get("allergies") or []):
+        if not isinstance(allergy, dict):
+            continue
+        sources = [s for s in allergy.get("sources") or [] if isinstance(s, dict)]
+        recorded_dt = _best_source_date(sources, "recorded_date")
+        source = sources[0] if sources else {}
+        record.allergies.append(
+            AllergyRecord(
+                allergy_id=_safe_id("allergy", allergy.get("merged_ref"), idx),
+                patient_id=patient_id,
+                clinical_status=str(source.get("clinical_status") or ("active" if allergy.get("is_active") else "inactive")),
+                criticality=str(allergy.get("highest_criticality") or source.get("criticality") or ""),
+                code=CodeableConcept(
+                    system="http://snomed.info/sct" if allergy.get("snomed") else "",
+                    code=str(allergy.get("snomed") or allergy.get("rxnorm") or ""),
+                    display=str(allergy.get("canonical_name") or source.get("display") or "Allergy"),
+                ),
+                recorded_date=recorded_dt,
+            )
+        )
+
+    for idx, immunization in enumerate(candidate.get("immunizations") or []):
+        if not isinstance(immunization, dict):
+            continue
+        sources = [s for s in immunization.get("sources") or [] if isinstance(s, dict)]
+        occurrence_dt = _parse_dt(immunization.get("occurrence_date")) or _best_source_date(sources, "occurrence_date")
+        source = sources[0] if sources else {}
+        imm_id = _safe_id("imm", immunization.get("merged_ref"), idx)
+        imm_record = ImmunizationRecord(
+            imm_id=imm_id,
+            patient_id=patient_id,
+            status=str(source.get("status") or "completed"),
+            cvx_code=str(immunization.get("cvx") or source.get("cvx") or ""),
+            display=str(immunization.get("canonical_name") or source.get("display") or "Immunization"),
+            occurrence_dt=occurrence_dt,
+        )
+        imm_record.encounter_id = _add_encounter(
+            record,
+            encounter_by_key,
+            str(source.get("source_label") or "Published chart"),
+            occurrence_dt,
+            "Immunization",
+            imm_id,
+        )
+        record.immunizations.append(imm_record)
+
+    record.encounter_index = {enc.encounter_id: enc for enc in record.encounters}
+    record.obs_index = {obs.obs_id: obs for obs in record.observations}
+    record.obs_by_encounter = defaultdict(list)
+    record.obs_by_loinc = defaultdict(list)
+    for obs in record.observations:
+        if obs.encounter_id:
+            record.obs_by_encounter[obs.encounter_id].append(obs.obs_id)
+        if obs.loinc_code:
+            record.obs_by_loinc[obs.loinc_code].append(obs.obs_id)
+    record.obs_by_encounter = dict(record.obs_by_encounter)
+    record.obs_by_loinc = dict(record.obs_by_loinc)
+    record.resource_type_counts = {
+        "Patient": 1,
+        "Encounter": len(record.encounters),
+        "Observation": len(record.observations),
+        "Condition": len(record.conditions),
+        "MedicationRequest": len(record.medications),
+        "AllergyIntolerance": len(record.allergies),
+        "Immunization": len(record.immunizations),
+    }
+    record.resource_type_counts = {key: value for key, value in record.resource_type_counts.items() if value > 0}
+    record.parse_warnings.append("Loaded from active published harmonization snapshot.")
+    return record, compute_patient_stats(record)
+
+
 @lru_cache(maxsize=30)
 def _cached_load(canonical_stem: str) -> tuple[PatientRecord, PatientStats]:
     """Parse bundle and compute stats. Cached by canonical filename stem."""
@@ -183,6 +485,10 @@ def load_patient(patient_id: str) -> tuple[PatientRecord, PatientStats] | None:
     resolve to the same ``_cached_load`` entry via the canonical stem so the
     LRU cache is never double-populated for the same physical patient.
     """
+    published_run = _load_active_published_run(patient_id)
+    if published_run is not None:
+        return _record_from_published_run(patient_id, published_run)
+
     path = path_from_patient_id(patient_id)
     if path is None:
         return None

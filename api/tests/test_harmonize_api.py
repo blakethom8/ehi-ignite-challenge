@@ -484,6 +484,53 @@ class UploadCollectionDiscoveryTests(unittest.TestCase):
         self.assertIsNone(unpublished.json()["active_snapshot"])
         self.assertEqual(len(unpublished.json()["snapshots"]), 1)
 
+    def test_published_workspace_feeds_patient_read_endpoints(self) -> None:
+        sess = self._stage_session("workspace-downstream")
+        (sess / "report.pdf").unlink()
+
+        run = self.client.post("/api/harmonize/workspace-workspace-downstream/runs").json()
+        state = self.client.post(
+            f"/api/harmonize/workspace-workspace-downstream/runs/{run['run_id']}/publish"
+        )
+        self.assertEqual(state.status_code, 201)
+
+        overview = self.client.get("/api/patients/workspace-downstream/overview")
+        self.assertEqual(overview.status_code, 200)
+        body = overview.json()
+        self.assertEqual(body["id"], "workspace-downstream")
+        self.assertEqual(body["unique_loinc_count"], 1)
+        self.assertGreaterEqual(body["total_resources"], 2)
+
+        timeline = self.client.get("/api/patients/workspace-downstream/timeline")
+        self.assertEqual(timeline.status_code, 200)
+        self.assertGreaterEqual(len(timeline.json()["encounters"]), 1)
+
+    def test_provider_assistant_uses_published_workspace_snapshot(self) -> None:
+        sess = self._stage_session("workspace-assistant")
+        (sess / "report.pdf").unlink()
+
+        run = self.client.post("/api/harmonize/workspace-workspace-assistant/runs").json()
+        state = self.client.post(
+            f"/api/harmonize/workspace-workspace-assistant/runs/{run['run_id']}/publish"
+        )
+        self.assertEqual(state.status_code, 201)
+
+        response = self.client.post(
+            "/api/assistant/chat",
+            json={
+                "patient_id": "workspace-assistant",
+                "question": "What A1C result is in this chart?",
+                "history": [],
+                "context_packages": [],
+                "stance": "opinionated",
+                "mode": "deterministic",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["patient_id"], "workspace-assistant")
+        self.assertNotIn("Patient not found", body["answer"])
+
     def test_extract_endpoint_rejects_static_collection(self) -> None:
         # blake-real is static; extraction must 400
         r = self.client.post("/api/harmonize/blake-real/extract")

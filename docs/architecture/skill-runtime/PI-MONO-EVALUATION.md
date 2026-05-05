@@ -53,19 +53,36 @@ build/scripts.
 
 ## 3. What pi-mono does that our current harness does not
 
-This is the honest list of capability gaps. Ordered by how much they
-matter for our roadmap.
+Honest list of capability gaps. **Two passes here:** the first table
+captures the architecturally-significant gaps, the second catches the
+smaller-but-real items that I underweighted in the original draft of
+this report. Both matter when sizing the borrow list in §6.
+
+### 3.1 Architecturally-significant gaps
 
 | Capability | pi-mono | our harness today | impact for us |
 |---|---|---|---|
 | Multi-provider abstraction | ✅ 20+ providers behind one API | ❌ bare `anthropic` SDK only | Medium-high. We'll want OpenAI / Google / open-weight eventually for cost mix and per-skill model fit. |
-| Token-level streaming with structured deltas | ✅ `text_delta`, `toolcall_delta`, `thinking_delta` events | ⚠️ per-turn events only | Medium. We listed this as deferred in `MODE-SWITCHING.md` §7. |
-| Mid-run "steering" queue | ✅ inject messages between turns | ❌ only escalation gates | High for UX. We listed mid-run inline comments as deferred in `SELF-MODIFYING-WORKSPACE.md` §2.5. |
-| Hooks framework | ✅ `beforeToolCall` / `afterToolCall` / `transformContext` | ⚠️ ad-hoc; mediation lives inside Workspace methods | Medium. Our mediation is *correct* but less composable than pi-mono's lifecycle hooks. |
-| Cost / token tracking per turn | ✅ per `AssistantMessage` with `usage` + `cost.total` USD | ⚠️ tracing.py captures spans separately | Low-medium. Our `tracing.py` already covers this; just less integrated. |
-| TypeBox tool schemas with progressive JSON parsing | ✅ partial tool args streamed during generation | ❌ wait for full block | Low. Nice-to-have for UI feel, not load-bearing. |
-| OAuth flow for provider creds | ✅ for Anthropic, Codex, GitHub Copilot | ❌ env vars only | Low for clinical app. (Could matter if we ever offer a "bring your own key" model.) |
-| Prompt caching across turns | ✅ via `sessionId` | ⚠️ implicit only | Medium. Real cost savings on long runs. |
+| Token-level streaming with structured deltas | ✅ `text_delta`, `toolcall_delta`, `thinking_delta` events | ⚠️ per-turn events only | **High.** Single biggest UX gap — agent prose arriving in 4-second bursts vs streaming in real time. We listed this as deferred in `MODE-SWITCHING.md` §7. |
+| Mid-run "steering" queue | ✅ inject messages between turns | ❌ only escalation gates | High for UX. Closes the deferred mid-run inline-comments item from `SELF-MODIFYING-WORKSPACE.md` §2.5. |
+| Hooks framework | ✅ `beforeToolCall` / `afterToolCall` / `transformContext` | ⚠️ ad-hoc; mediation lives inside Workspace methods | Medium. Our mediation is *correct* but less composable — each new policy (rate limits, redaction, per-tenant rules) costs a method edit instead of a hook registration. |
+| `transformContext` hook (prune / summarize / inject) | ✅ first-class | ❌ no escape valve | Medium. **Important once runs get long** — without it, we'll hit context limits with no path to recover. I underweighted this in the first draft. |
+
+### 3.2 Smaller gaps I underweighted in the first draft
+
+| Capability | pi-mono | our harness today | impact for us |
+|---|---|---|---|
+| Prompt caching across turns | ✅ via `sessionId` | ⚠️ implicit only | **Medium.** Real cost savings on long runs — Anthropic supports it natively, we just need to thread `run_id` through as the session id. Roughly 30 minutes of work I dismissed too quickly. |
+| Cost / token tracking per turn | ✅ per `AssistantMessage` with `usage` + `cost.total` USD | ⚠️ `tracing.py` captures spans separately | Medium. Surfaces cost in the run timeline, not just in the trace store. ~half day to wire through. |
+| Progressive JSON parsing for tool args | ✅ partial tool args streamed during generation | ❌ wait for full block | Medium. Lets the workspace pane show "agent is composing a workspace_write call to section X with citations [c_0001, c_0002]…" before the full args arrive. UX win. |
+| Parallel tool execution mode | ✅ configurable per-tool / global | ❌ always sequential | Medium. When an agent makes N independent CT.gov fetches, those should run concurrently. Real latency win. |
+| `terminate: true` tool hint | ✅ tools can signal "stop after this batch" | ❌ rely on prompt compliance + max_turns | Low. Cleaner end-of-run signal than what we have, but `submit_final_artifact` already works in practice. |
+| "Barrier" pattern (assistant `message_end` as sync point before tool preflight) | ✅ explicit | ⚠️ implicit | Low. Subtle but matters for token-streaming cleanliness; folds into the streaming work above. |
+| OAuth flow for provider creds | ✅ for Anthropic, Codex, GitHub Copilot | ❌ env vars only | Low for clinical app. Could matter for a "bring your own key" / multi-tenant SaaS surface — not Phase 1. |
+
+**Calibrated read:** on agent-loop polish, pi-mono is probably 6–12
+months ahead of where we are today. The first draft of this report
+under-counted that gap.
 
 ## 4. What we have that pi-mono does not
 
@@ -155,39 +172,18 @@ but that's not the same as adopting their agent loop.
 Treat pi-mono as a **design reference**, not a runtime. Lift the
 specific patterns that solve our gaps; keep the Python implementation.
 
-Concrete borrows, in priority order:
-
-1. **Event shape.** Adopt pi-ai's structured streaming events
-   (`text_delta`, `toolcall_delta`, `thinking_delta`) as the
-   transport between the Claude SDK and our EventHub. Already a
-   natural fit — the EventHub is provider-agnostic.
-2. **Steering queue.** Add `pending_clinician_messages` to the
-   runner; the loop drains it between turns and prepends to the next
-   `messages.create`. This is the deferred mid-run-comments item from
-   `SELF-MODIFYING-WORKSPACE.md`. Roughly 40 lines + a POST endpoint.
-3. **Hooks framework.** Lift `beforeToolCall` / `afterToolCall` from
-   pi-agent-core. Today our tool dispatch is hardcoded; a hook
-   framework gives us per-skill tool gating + observability without
-   touching the loop.
-4. **Provider abstraction (lighter version).** A `ModelProvider`
-   protocol with `claude` as the only implementation today, but the
-   shape ready for `openai` / `bedrock` / `local-vllm` later. We do
-   *not* need 20+ providers on day one; we need the abstraction.
-5. **Cost / token tracking on the run object.** Pi-mono surfaces this
-   per `AssistantMessage`; we should attach `usage` + `cost_usd` to
-   each `agent_turn` event. `tracing.py` already captures it; the
-   wiring is "publish through the hub too."
-6. **Prompt caching via session id.** Anthropic supports it; pi-ai
-   exposes it via `sessionId`. We can pass our `run_id` as the
-   session id directly.
+The borrow list lives in §6 below. Headline: it's eleven items, not
+the four the original draft listed. After all eleven we'd be at parity
+with pi-mono on agent-loop polish while preserving every domain
+primitive that's actually our differentiator.
 
 **Pros**
 - Solves the real gaps without rewriting anything.
 - Stays in one language.
 - Preserves the workspace contract, the citation graph, MCP, and
   every domain primitive.
-- Each borrow is a small, reviewable commit (probably 4 commits over
-  ~3 days).
+- Each borrow is a small, reviewable commit. Total ~5–6 days of work
+  for the full set; the highest-impact subset is ~2–3 days.
 
 **Cons**
 - We maintain the harness. Pi-mono is more code we don't have to
@@ -206,34 +202,80 @@ gaps until they hurt.
 This is fine and would also work. Option C is just Option D with a
 small set of explicit borrows that close the most felt gaps faster.
 
-## 6. The recommendation
+## 6. The recommendation: borrow eleven items
 
-**Take Option C.** Specifically, the next four commits should be
-(in order):
+**Take Option C.** The full borrow list, ranked by impact-per-effort,
+captured here so we can come back to it without re-deriving:
 
-1. **Event shape upgrade.** Switch agent_loop.py from `messages.create`
-   to `messages.stream`. Emit `agent_text_delta` / `agent_tool_call_delta`
-   / `agent_thinking_delta` events through the EventHub. Frontend
-   shows the agent's prose materialize in real time. This is the
-   single most felt UX improvement.
-2. **Steering queue + mid-run messages endpoint.** Closes the chat-
-   alongside-workspace loop you flagged earlier. Small.
-3. **Hook framework.** `beforeToolCall` / `afterToolCall` /
-   `transformContext` lifted into the Workspace + Runner. Lets us
-   add tool-call rate limits, redaction, and per-tenant policy
-   without touching the loop body.
-4. **Provider protocol shim.** `ModelProvider` protocol; default
-   `AnthropicModelProvider`. Sets up the seam for OpenAI / Bedrock /
-   local-vllm later. Doesn't block on actually adding any of those.
+### 6.1 Tier 1 — architecturally significant (the original four)
 
-After those four, we're in the same architectural position pi-mono
-puts you in *for the runtime*, while keeping our domain layer intact.
+These are the items that *change the shape* of the loop and the
+biggest UX upgrades. If we only do four borrows, do these.
+
+| # | Borrow | Why | Effort |
+|---|---|---|---|
+| 1 | **Token-level streaming** — switch `agent_loop.py` from `messages.create` to `messages.stream`; emit `agent_text_delta` / `agent_tool_call_delta` / `agent_thinking_delta` events through the EventHub | Single biggest UX upgrade — agent prose materializes in real time vs arriving in 4-second bursts | ~1 day |
+| 2 | **Steering queue + mid-run messages endpoint** — `pending_clinician_messages` drained between turns; new POST endpoint to enqueue | Closes the chat-alongside-workspace loop deferred in `SELF-MODIFYING-WORKSPACE.md` §2.5 | ~1 day |
+| 3 | **Hook framework** — lift `beforeToolCall` / `afterToolCall` / `transformContext` from pi-agent-core into Workspace + Runner | Per-skill tool gating, redaction, rate limits, per-tenant policy without touching the loop body | ~1 day |
+| 4 | **Provider protocol shim** — `ModelProvider` protocol with default `AnthropicModelProvider` | Seam for OpenAI / Bedrock / local-vllm later; doesn't block on adding any of those today | ~half day |
+
+### 6.2 Tier 2 — smaller but real (the seven I missed in the first draft)
+
+These are 30-minute to 1-day improvements that I underweighted in the
+original report. Several are real cost / latency / observability wins.
+
+| # | Borrow | Why | Effort |
+|---|---|---|---|
+| 5 | **Prompt caching via session_id** — pass `run_id` to Anthropic as the cache key | Real per-token cost savings on long runs; Anthropic supports it natively, we just don't thread it | ~30 min |
+| 6 | **Per-turn cost / usage on the agent_turn event** — surface `usage.input_tokens / output_tokens / cost_usd` from `tracing.py` onto the run timeline | Cost observability in the UI, not just in the trace store | ~half day |
+| 7 | **`transformContext` hook** — prune / summarize / inject before each `messages.create` | **Important once runs get long.** Without it, we'll hit context limits with no escape valve. Closes a real risk. | ~half day |
+| 8 | **Progressive tool-arg streaming** — show partial tool args in the UI while the agent is composing them | UX win: workspace pane can show "agent is composing a workspace_write to section X with citations [c_0001, c_0002]…" before the full call lands | ~half day |
+| 9 | **Parallel tool execution mode** — configurable per-tool / global; default sequential, opt-in parallel for independent tools | Latency win when the agent makes N independent CT.gov fetches | ~1 day |
+| 10 | **`terminate: true` tool hint** — let tools signal "stop after this batch" instead of relying on prompt compliance + max_turns | Cleaner end-of-run signal; small behavioral robustness improvement | ~1 hour |
+| 11 | **"Barrier" pattern** — assistant `message_end` as explicit sync point before tool preflight begins | Cleaner streaming UX (text fully renders before tool calls fire); subtle but matters once #1 is in. Folds into commit #1 | included with #1 |
+
+### 6.3 Suggested commit order
+
+If we ship the full set, this is the order with the best
+incremental-value curve:
+
+1. **#1 (token streaming) + #11 (barrier pattern)** — shipped together;
+   biggest UX win.
+2. **#5 (prompt caching)** — 30 minutes; saves money on every
+   subsequent run.
+3. **#2 (steering queue)** — closes a deferred item the user has
+   asked about explicitly.
+4. **#7 (transformContext hook)** — risk mitigation for long runs;
+   pairs naturally with #3.
+5. **#3 (hook framework)** — generalizes the mediation pattern.
+6. **#6 (cost on the timeline)** — observability follow-on once
+   streaming events are richer.
+7. **#4 (provider protocol)** — sets up the seam for #8+.
+8. **#8 (progressive tool-arg streaming)** — UX polish on top of #1.
+9. **#9 (parallel tool execution)** — performance once the loop is
+   otherwise stable.
+10. **#10 (`terminate: true`)** — small final tightening.
+
+Tier 1 alone (four commits, ~3 days) gets us to "pi-mono-equivalent
+on the high-leverage axes." Tier 1 + Tier 2 (eleven items, ~5–6
+days) gets us to full parity on agent-loop polish while keeping every
+domain primitive that's actually our differentiator.
+
+### 6.4 Why this is the right call
 
 The deeper bet — that the differentiator is the **workspace contract
 + citation graph + Provenance lineage** rather than the agent loop —
 is exactly what `ATLAS-DATA-MODEL.md` Decision 5 already says. Our
 moat is data lineage. Adopting pi-mono wouldn't accelerate that; it
 would distract from it.
+
+But the corollary, which the first draft of this report buried: **on
+agent-loop polish specifically, pi-mono is meaningfully ahead, and
+"good enough" is not the right framing.** We have structural
+advantages (workspace contract, citation graph, skill manifests, MCP,
+domain layer) that pi-mono doesn't, *and* we have ~6–12 months of
+agent-loop polish to pick up. Those are independent assessments.
+Both are true.
 
 ## 7. What changes if the answer is actually Option A
 

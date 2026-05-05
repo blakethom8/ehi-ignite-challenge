@@ -21,6 +21,8 @@ dependencies = [
     "pdf2image>=1.17.0",
     "pypdfium2>=4.30.0",
     "pillow>=10.4.0",
+    "pyyaml>=6.0.0",
+    "jsonschema>=4.21.0",
 ]
 
 [dependency-groups]

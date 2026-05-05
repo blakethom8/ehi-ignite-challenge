@@ -1379,6 +1379,7 @@ export function Layout({ children }: LayoutProps) {
 
   const clinicalInsightLinks: { key: string; label: string; to: string }[] = [
     { key: "preop", label: "Pre-Op Support", to: withPatientQuery("/preop", patientId) },
+    { key: "trialFinder", label: "Trial Finder (agentic)", to: withPatientQuery("/skills/trial-finder", patientId) },
   ];
 
   const internalToolLinks: { key: string; label: string; to: string }[] = [

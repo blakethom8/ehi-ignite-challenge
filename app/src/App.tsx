@@ -39,6 +39,8 @@ import { WorkspaceLibraryPage } from "./pages/Modules/DataAggregator/WorkspaceLi
 import { HarmonizeView } from "./pages/Modules/HarmonizeView";
 import { ClinicalInsights } from "./pages/Modules/ClinicalInsights";
 import { LabExplainer } from "./pages/Modules/LabExplainer";
+import { TrialFinder } from "./pages/Modules/TrialFinder";
+import { PatientMemoryView } from "./pages/Modules/PatientMemoryView";
 import { PatientContext } from "./pages/Modules/PatientContext";
 import { AggregationMethodology } from "./pages/Modules/AggregationMethodology";
 import { AnalysisOverview } from "./pages/Analysis/Overview";
@@ -103,6 +105,8 @@ export default function App() {
     { path: "/preop/anesthesia-handoff", element: <ExplorerAnesthesia /> },
     { path: "/journey", element: <PatientJourney /> },
     { path: "/trials", element: <ClinicalTrials /> },
+    { path: "/skills/trial-finder", element: <TrialFinder /> },
+    { path: "/skills/patients/memory", element: <PatientMemoryView /> },
     { path: "/medication-access", element: <MedicationAccess /> },
     { path: "/grants", element: <MarketplaceConcept /> },
     { path: "/research-opportunities", element: <MarketplaceConcept /> },

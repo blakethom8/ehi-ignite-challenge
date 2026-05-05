@@ -1,0 +1,134 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ehi-ignite/skills/trial-matching/output.schema.json",
+  "title": "Trial Matching Output",
+  "description": "Validated artifact produced by the trial-matching skill. The runtime enforces this schema on workspace finalize.",
+  "type": "object",
+  "required": ["run_id", "skill_version", "patient_id", "summary", "trials", "escalations"],
+  "additionalProperties": false,
+  "properties": {
+    "run_id": { "type": "string", "minLength": 1 },
+    "skill_version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "patient_id": { "type": "string", "minLength": 1 },
+    "summary": {
+      "type": "object",
+      "required": ["trials_reviewed", "trials_surviving", "trials_excluded", "confidence_note"],
+      "additionalProperties": false,
+      "properties": {
+        "trials_reviewed": { "type": "integer", "minimum": 0 },
+        "trials_surviving": { "type": "integer", "minimum": 0 },
+        "trials_excluded": { "type": "integer", "minimum": 0 },
+        "confidence_note": { "type": "string" }
+      }
+    },
+    "trials": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/trial" }
+    },
+    "escalations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/escalation" }
+    }
+  },
+  "$defs": {
+    "trial": {
+      "type": "object",
+      "required": [
+        "nct_id",
+        "title",
+        "fit_score",
+        "evidence_tier",
+        "supporting_facts",
+        "gaps",
+        "excluded",
+        "escalation_triggered"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "nct_id": { "type": "string", "pattern": "^NCT\\d{8}$" },
+        "title": { "type": "string", "minLength": 1 },
+        "sponsor": { "type": "string" },
+        "phase": { "type": "string" },
+        "status": { "type": "string" },
+        "fit_score": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "evidence_tier": { "type": "string", "enum": ["T1", "T2", "T3", "T4"] },
+        "anchor_condition_id": { "type": "string" },
+        "supporting_facts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/citation" }
+        },
+        "gaps": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "locations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/location" }
+        },
+        "excluded": { "type": "boolean" },
+        "excluded_reason": { "type": "string" },
+        "escalation_triggered": { "type": "boolean" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "excluded": { "const": true } }, "required": ["excluded"] },
+          "then": { "required": ["excluded_reason"] }
+        }
+      ]
+    },
+    "citation": {
+      "type": "object",
+      "required": ["claim", "source_kind", "evidence_tier"],
+      "additionalProperties": false,
+      "properties": {
+        "claim": { "type": "string", "minLength": 1 },
+        "source_kind": {
+          "type": "string",
+          "enum": ["fhir_resource", "external_url", "clinician_input", "agent_inference"]
+        },
+        "source_ref": { "type": "string" },
+        "access_timestamp": { "type": "string", "format": "date-time" },
+        "evidence_tier": { "type": "string", "enum": ["T1", "T2", "T3", "T4"] }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "source_kind": { "enum": ["fhir_resource", "external_url"] }
+            },
+            "required": ["source_kind"]
+          },
+          "then": { "required": ["source_ref"] }
+        }
+      ]
+    },
+    "location": {
+      "type": "object",
+      "required": ["facility"],
+      "additionalProperties": false,
+      "properties": {
+        "facility": { "type": "string" },
+        "city": { "type": "string" },
+        "state": { "type": "string" },
+        "country": { "type": "string" },
+        "contact_name": { "type": "string" },
+        "contact_phone": { "type": "string" },
+        "contact_email": { "type": "string", "format": "email" }
+      }
+    },
+    "escalation": {
+      "type": "object",
+      "required": ["condition", "prompt", "resolved", "resolved_at"],
+      "additionalProperties": false,
+      "properties": {
+        "condition": { "type": "string" },
+        "prompt": { "type": "string" },
+        "context": { "type": "object" },
+        "resolved": { "type": "boolean" },
+        "resolution_choice": { "type": "string" },
+        "resolution_notes": { "type": "string" },
+        "resolved_at": { "type": "string", "format": "date-time" }
+      }
+    }
+  }
+}

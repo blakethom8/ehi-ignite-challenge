@@ -1300,3 +1300,12 @@ class HarmonizeExtractJobResponse(BaseModel):
     error: str | None
     started_at: datetime
     completed_at: datetime | None
+    progress_percent: int = 0
+    stage: str = "Queued"
+    detail: str | None = None
+    total_files: int = 0
+    processed_files: int = 0
+    total_pages: int | None = None
+    processed_pages: int = 0
+    current_source_label: str | None = None
+    estimated_seconds: int | None = None

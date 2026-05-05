@@ -923,20 +923,67 @@ class ExtractJob:
     error: str | None
     started_at: datetime
     completed_at: datetime | None
+    total_files: int = 0
+    processed_files: int = 0
+    total_pages: int | None = None
+    processed_pages: int = 0
+    current_source_label: str | None = None
+    stage: str = "queued"
+    estimated_seconds: int | None = None
 
 
 _EXTRACT_JOBS: dict[str, ExtractJob] = {}
+_EXTRACT_COLLECTION_JOBS: dict[str, str] = {}
 _EXTRACT_JOBS_LOCK = threading.Lock()
 
 
 def _set_job_state(job: ExtractJob) -> None:
     with _EXTRACT_JOBS_LOCK:
         _EXTRACT_JOBS[job.job_id] = job
+        _EXTRACT_COLLECTION_JOBS[job.collection_id] = job.job_id
 
 
 def get_extract_job(job_id: str) -> ExtractJob | None:
     with _EXTRACT_JOBS_LOCK:
         return _EXTRACT_JOBS.get(job_id)
+
+
+def get_latest_extract_job(collection_id: str) -> ExtractJob | None:
+    with _EXTRACT_JOBS_LOCK:
+        job_id = _EXTRACT_COLLECTION_JOBS.get(collection_id)
+        return _EXTRACT_JOBS.get(job_id) if job_id else None
+
+
+def _pdf_page_count(pdf_path: Path) -> int | None:
+    """Best-effort page count for progress estimates.
+
+    This intentionally never raises. Extraction itself owns hard PDF failures;
+    progress metadata should not prevent a job from being enqueued.
+    """
+    try:
+        import pypdfium2 as pdfium
+
+        pdf = pdfium.PdfDocument(str(pdf_path))
+        try:
+            return len(pdf)
+        finally:
+            pdf.close()
+    except Exception:
+        return None
+
+
+def _pending_pdf_work(collection: CollectionDefinition) -> list[tuple[SourceDefinition, Path, Path, int | None]]:
+    work: list[tuple[SourceDefinition, Path, Path, int | None]] = []
+    for src in collection.sources:
+        if src.kind != "extracted-pdf":
+            continue
+        extracted_json = src.path
+        pdf_name = extracted_json.name.removesuffix(".extracted.json")
+        pdf_path = extracted_json.with_name(pdf_name)
+        if not pdf_path.exists() or extracted_json.exists():
+            continue
+        work.append((src, pdf_path, extracted_json, _pdf_page_count(pdf_path)))
+    return work
 
 
 def _run_extract_job(job_id: str, collection_id: str) -> None:
@@ -945,14 +992,21 @@ def _run_extract_job(job_id: str, collection_id: str) -> None:
     if job is None:
         return
     job.status = "running"
+    job.stage = "Preparing PDF pipeline"
     _set_job_state(job)
     try:
-        results = extract_pending_pdfs(collection_id) or []
+        results = extract_pending_pdfs(collection_id, job_id=job_id) or []
         job.results = list(results)
         job.status = "complete"
+        job.stage = "Extraction complete"
+        job.current_source_label = None
+        job.processed_files = max(job.processed_files, job.total_files)
+        if job.total_pages is not None:
+            job.processed_pages = max(job.processed_pages, job.total_pages)
     except Exception as exc:
         job.status = "failed"
         job.error = f"{type(exc).__name__}: {exc}"
+        job.stage = "Extraction failed"
     finally:
         job.completed_at = datetime.now()
         _set_job_state(job)
@@ -969,6 +1023,11 @@ def start_extract_job(collection_id: str) -> ExtractJob | None:
         return None
     if not (collection_id.startswith("upload-") or collection_id.startswith("workspace-")):
         return None
+    latest = get_latest_extract_job(collection_id)
+    if latest and latest.status in {"pending", "running"}:
+        return latest
+    pending_work = _pending_pdf_work(coll)
+    total_pages = sum(item[3] for item in pending_work if item[3] is not None)
     job = ExtractJob(
         job_id=uuid.uuid4().hex,
         collection_id=collection_id,
@@ -977,6 +1036,12 @@ def start_extract_job(collection_id: str) -> ExtractJob | None:
         error=None,
         started_at=datetime.now(),
         completed_at=None,
+        total_files=len(pending_work),
+        processed_files=0,
+        total_pages=total_pages or None,
+        processed_pages=0,
+        stage="Queued",
+        estimated_seconds=(max(30, total_pages * 45) if total_pages else (len(pending_work) * 60 or 30)),
     )
     _set_job_state(job)
     thread = threading.Thread(
@@ -989,7 +1054,7 @@ def start_extract_job(collection_id: str) -> ExtractJob | None:
     return job
 
 
-def extract_pending_pdfs(collection_id: str) -> list[ExtractResult] | None:
+def extract_pending_pdfs(collection_id: str, job_id: str | None = None) -> list[ExtractResult] | None:
     """Run the multipass-fhir pipeline on every uploaded PDF in this collection
     that doesn't yet have a cached extraction next to it.
 
@@ -1038,10 +1103,22 @@ def extract_pending_pdfs(collection_id: str) -> list[ExtractResult] | None:
                 )
             )
             continue
+        job = get_extract_job(job_id) if job_id else None
+        if job is not None:
+            job.current_source_label = src.label
+            job.stage = "Reading pages and running FHIR passes"
+            _set_job_state(job)
         t0 = time.time()
         bundle = pipeline.extract(pdf_path)
         elapsed = time.time() - t0
         extracted_json.write_text(json.dumps(bundle, indent=2))
+        page_count = _pdf_page_count(pdf_path)
+        if job is not None:
+            job.processed_files += 1
+            if page_count is not None:
+                job.processed_pages += page_count
+            job.stage = "Writing extracted FHIR bundle"
+            _set_job_state(job)
         results.append(
             ExtractResult(
                 source_id=src.id,

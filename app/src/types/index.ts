@@ -1154,6 +1154,15 @@ export interface HarmonizeExtractJobResponse {
   error: string | null;
   started_at: string;
   completed_at: string | null;
+  progress_percent: number;
+  stage: string;
+  detail: string | null;
+  total_files: number;
+  processed_files: number;
+  total_pages: number | null;
+  processed_pages: number;
+  current_source_label: string | null;
+  estimated_seconds: number | null;
 }
 
 export interface HarmonizeProvenanceResponse {

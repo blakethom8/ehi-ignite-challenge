@@ -337,4 +337,9 @@ export const api = {
     http
       .get<HarmonizeExtractJobResponse>(`/harmonize/extract-jobs/${jobId}`)
       .then((r) => r.data),
+
+  getLatestHarmonizeExtractJob: (collectionId: string): Promise<HarmonizeExtractJobResponse> =>
+    http
+      .get<HarmonizeExtractJobResponse>(`/harmonize/${collectionId}/extract-job`)
+      .then((r) => r.data),
 };

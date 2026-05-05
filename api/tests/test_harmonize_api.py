@@ -351,6 +351,11 @@ class UploadCollectionDiscoveryTests(unittest.TestCase):
         body = r.json()
         self.assertIn(body["status"], ("pending", "running", "complete"))
         job_id = body["job_id"]
+        self.assertGreaterEqual(body["progress_percent"], 5)
+        self.assertLessEqual(body["progress_percent"], 100)
+        latest = self.client.get("/api/harmonize/upload-zen-extract/extract-job")
+        self.assertEqual(latest.status_code, 200)
+        self.assertEqual(latest.json()["job_id"], job_id)
 
         # Poll until complete (the no-PDFs case finishes in milliseconds).
         import time
@@ -361,6 +366,7 @@ class UploadCollectionDiscoveryTests(unittest.TestCase):
                 break
             time.sleep(0.05)
         self.assertEqual(poll["status"], "complete")
+        self.assertEqual(poll["progress_percent"], 100)
         self.assertEqual(poll["results"], [])
 
     def test_extract_job_unknown_id_404s(self) -> None:

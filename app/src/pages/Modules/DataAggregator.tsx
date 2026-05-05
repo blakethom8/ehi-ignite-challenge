@@ -32,6 +32,7 @@ import type {
   AggregationSourceCard,
   AggregationUploadedFile,
   AggregationUploadPayload,
+  HarmonizeExtractJobResponse,
   PatientOverview,
 } from "../../types";
 
@@ -109,6 +110,49 @@ function CompactMetric({ label, value, detail }: { label: string; value: string 
         <span className="text-lg font-semibold text-[#1c1c1e]">{value}</span>
         <span className="text-xs text-[#667085]">{detail}</span>
       </div>
+    </div>
+  );
+}
+
+function PdfPageProgressMap({ job }: { job: HarmonizeExtractJobResponse | null }) {
+  const totalPages = job?.total_pages ?? null;
+  const visiblePages = totalPages ? Math.min(totalPages, 8) : 4;
+  const processedPages = job?.processed_pages ?? 0;
+  const isRunning = job?.status === "pending" || job?.status === "running";
+
+  return (
+    <div className="rounded-lg border border-[#ead3b9] bg-white px-3 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs font-semibold uppercase tracking-wider text-[#9a5a16]">Page processing map</p>
+        <p className="text-xs text-[#667085]">
+          {totalPages ? `${processedPages}/${totalPages} pages complete` : "Counting pages when extraction starts"}
+        </p>
+      </div>
+      <div className="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-8">
+        {Array.from({ length: visiblePages }).map((_, index) => {
+          const pageNumber = index + 1;
+          const isComplete = totalPages ? pageNumber <= processedPages : false;
+          const isActive = isRunning && !isComplete && (totalPages ? pageNumber === processedPages + 1 : index === 0);
+          return (
+            <div
+              key={pageNumber}
+              className={`flex h-16 flex-col justify-between rounded-md border px-2 py-2 text-[11px] ${
+                isComplete
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                  : isActive
+                    ? "border-[#5b76fe] bg-[#f4f6ff] text-[#4157d8]"
+                    : "border-[#eef0f4] bg-[#f7f9fc] text-[#667085]"
+              }`}
+            >
+              <span className="font-semibold">{totalPages ? `Page ${pageNumber}` : ["Read", "Extract", "Map", "Validate"][index]}</span>
+              <span className={isActive ? "h-1.5 rounded-full bg-[#5b76fe]" : "h-1.5 rounded-full bg-[#dfe4ea]"} />
+            </div>
+          );
+        })}
+      </div>
+      {totalPages && totalPages > visiblePages && (
+        <p className="mt-2 text-xs text-[#667085]">Showing the first {visiblePages} pages; remaining pages continue in the same server job.</p>
+      )}
     </div>
   );
 }
@@ -343,6 +387,7 @@ function PreparedPreviewPane({
   selectedSource,
   file,
   extractInProgress,
+  extractJob,
   extractStatus,
   extractStartedAt,
   extractCompletedAt,
@@ -355,6 +400,7 @@ function PreparedPreviewPane({
   selectedSource: SourceSelection | null;
   file: AggregationUploadedFile | null;
   extractInProgress: boolean;
+  extractJob: HarmonizeExtractJobResponse | null;
   extractStatus: string | null;
   extractStartedAt: string | null;
   extractCompletedAt: string | null;
@@ -399,6 +445,11 @@ function PreparedPreviewPane({
       : extractStatus === "failed"
         ? "Failed"
         : "Not started";
+  const extractionProgress = extractJob?.progress_percent ?? (extractInProgress ? 10 : 0);
+  const extractionEstimateDetail = extractJob?.total_pages
+    ? `${extractJob.total_pages} page${extractJob.total_pages === 1 ? "" : "s"} detected`
+    : "often 30-90s/page";
+  const extractionStage = extractJob?.stage ?? (extractInProgress ? "Starting processor" : "Waiting to start");
   const preparedJsonQuery = useQuery({
     queryKey: ["aggregation-upload-json", patientId, file?.file_id],
     queryFn: () => api.getAggregationUploadJson(patientId, file!.file_id),
@@ -559,10 +610,32 @@ function PreparedPreviewPane({
               </div>
               <div className="mt-3 grid gap-2 sm:grid-cols-4">
                 <CompactMetric label="Status" value={extractionStatusLabel} detail={extractInProgress ? "active job" : "processor"} />
-                <CompactMetric label="Estimate" value="Page-based" detail="often 30-90s" />
+                <CompactMetric label="Estimate" value="Page-based" detail={extractionEstimateDetail} />
                 <CompactMetric label="Started" value={extractStartedAt ? dateLabel(extractStartedAt) : "Not yet"} detail="job time" />
                 <CompactMetric label="Finished" value={extractCompletedAt ? dateLabel(extractCompletedAt) : "Pending"} detail="job time" />
               </div>
+              {(extractInProgress || extractJob) && (
+                <div className="mt-3 space-y-3">
+                  <div className="rounded-lg border border-[#ead3b9] bg-white px-3 py-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-semibold text-[#1c1c1e]">{extractionStage}</p>
+                        <p className="mt-1 text-xs leading-5 text-[#667085]">
+                          {extractJob?.detail ?? "Runs on the server, so you can leave this page and come back later."}
+                        </p>
+                      </div>
+                      <p className="text-sm font-semibold text-[#5b76fe]">{extractionProgress}%</p>
+                    </div>
+                    <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#eef0f5]">
+                      <div
+                        className="h-full rounded-full bg-[#5b76fe] transition-all duration-500"
+                        style={{ width: `${Math.max(5, Math.min(100, extractionProgress))}%` }}
+                      />
+                    </div>
+                  </div>
+                  <PdfPageProgressMap job={extractJob} />
+                </div>
+              )}
               {extractError && (
                 <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
                   Extraction failed: {extractError}
@@ -866,6 +939,7 @@ function SourceInventoryPage({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [selectedSource, setSelectedSource] = useState<SourceSelection | null>(null);
   const [activeExtractJobId, setActiveExtractJobId] = useState<string | null>(null);
+  const lastFinalizedExtractJobRef = useRef<string | null>(null);
   const [uploadForm, setUploadForm] = useState<Omit<AggregationUploadPayload, "file">>(emptyUploadForm);
   const collectionId = `upload-${safeUploadSessionId(patientId)}`;
   const baselineSource =
@@ -891,6 +965,7 @@ function SourceInventoryPage({
     mutationFn: () => api.extractHarmonizeCollection(collectionId),
     onSuccess: (job) => {
       setActiveExtractJobId(job.job_id);
+      queryClient.invalidateQueries({ queryKey: ["source-intake-extract-job", collectionId, "latest"] });
       refreshAll();
     },
   });
@@ -910,6 +985,16 @@ function SourceInventoryPage({
   const needsContext = sources.uploaded_files.filter((file) => !file.description || !file.contains.length).length;
   const sourceCount = sources.uploaded_files.length + (baselineSource ? 1 : 0);
   const preparedFiles = structuredFiles + extractedFiles + (baselineSource ? 1 : 0);
+  const latestExtractJobQuery = useQuery({
+    queryKey: ["source-intake-extract-job", collectionId, "latest"],
+    queryFn: () => api.getLatestHarmonizeExtractJob(collectionId),
+    enabled: pendingExtraction > 0 || Boolean(activeExtractJobId),
+    retry: false,
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      return status === "pending" || status === "running" ? 1500 : false;
+    },
+  });
   const activeSelection =
     selectedSource ??
     (baselineSource
@@ -927,7 +1012,7 @@ function SourceInventoryPage({
     activeSelection?.type === "upload"
       ? activeUpload
       : null;
-  const extractJob = extractJobQuery.data ?? null;
+  const extractJob = extractJobQuery.data ?? latestExtractJobQuery.data ?? null;
   const extractInProgress =
     extractMutation.isPending ||
     extractJob?.status === "pending" ||
@@ -948,10 +1033,13 @@ function SourceInventoryPage({
   }, [baselineSource, selectedSource, sources.uploaded_files]);
 
   useEffect(() => {
-    if (extractJob?.status !== "complete") return;
+    if (!extractJob || (extractJob.status !== "complete" && extractJob.status !== "failed")) return;
+    if (lastFinalizedExtractJobRef.current === extractJob.job_id) return;
+    lastFinalizedExtractJobRef.current = extractJob.job_id;
     refreshAll();
     queryClient.invalidateQueries({ queryKey: ["aggregation-upload-preview", patientId] });
-  }, [extractJob?.status, patientId, queryClient]);
+    queryClient.invalidateQueries({ queryKey: ["source-intake-extract-job", collectionId, "latest"] });
+  }, [collectionId, extractJob, patientId, queryClient, refreshAll]);
 
   function openUpload(file?: File | null) {
     setSelectedFile(file ?? null);
@@ -1180,6 +1268,7 @@ function SourceInventoryPage({
           selectedSource={activeSelection}
           file={selectedPreviewFile}
           extractInProgress={extractInProgress}
+          extractJob={extractJob}
           extractStatus={extractJob?.status ?? null}
           extractStartedAt={extractJob?.started_at ?? null}
           extractCompletedAt={extractJob?.completed_at ?? null}

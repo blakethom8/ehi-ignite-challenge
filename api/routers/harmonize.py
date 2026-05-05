@@ -23,6 +23,8 @@ Endpoint surface:
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from fastapi import APIRouter, HTTPException
 
 from api.core import harmonize_service
@@ -253,6 +255,53 @@ def get_extract_job(job_id: str) -> HarmonizeExtractJobResponse:
     return _job_to_response(job)
 
 
+@router.get(
+    "/{collection_id}/extract-job",
+    response_model=HarmonizeExtractJobResponse,
+)
+def get_latest_extract_job(collection_id: str) -> HarmonizeExtractJobResponse:
+    """Return the most recent extraction job for a collection.
+
+    This lets the UI recover in-flight progress after navigation or reloads.
+    """
+    if harmonize_service.get_collection(collection_id) is None:
+        raise HTTPException(status_code=404, detail=f"Collection not found: {collection_id}")
+    job = harmonize_service.get_latest_extract_job(collection_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail=f"No extract job found for: {collection_id}")
+    return _job_to_response(job)
+
+
+def _job_progress(job: harmonize_service.ExtractJob) -> int:
+    if job.status == "complete":
+        return 100
+    if job.status == "failed":
+        return min(95, max(5, _job_progress_from_work(job)))
+    if job.status == "pending":
+        return 5
+    return min(95, max(10, _job_progress_from_work(job)))
+
+
+def _job_progress_from_work(job: harmonize_service.ExtractJob) -> int:
+    progress_candidates: list[float] = []
+    if job.total_files:
+        progress_candidates.append((job.processed_files / job.total_files) * 100)
+    if job.total_pages:
+        progress_candidates.append((job.processed_pages / job.total_pages) * 100)
+    if job.estimated_seconds:
+        ended_at = job.completed_at or datetime.now()
+        elapsed_seconds = max(0.0, (ended_at - job.started_at).total_seconds())
+        progress_candidates.append(min(90.0, (elapsed_seconds / job.estimated_seconds) * 90.0))
+    if not progress_candidates:
+        return 15 if job.status == "running" else 0
+    return round(max(progress_candidates))
+
+
+def _job_detail(job: harmonize_service.ExtractJob) -> str:
+    source = f" Current file: {job.current_source_label}." if job.current_source_label else ""
+    return f"Runs on the server, so you can leave this page and come back later.{source}"
+
+
 def _job_to_response(job: harmonize_service.ExtractJob) -> HarmonizeExtractJobResponse:
     return HarmonizeExtractJobResponse(
         job_id=job.job_id,
@@ -262,6 +311,15 @@ def _job_to_response(job: harmonize_service.ExtractJob) -> HarmonizeExtractJobRe
         error=job.error,
         started_at=job.started_at,
         completed_at=job.completed_at,
+        progress_percent=_job_progress(job),
+        stage=job.stage,
+        detail=_job_detail(job),
+        total_files=job.total_files,
+        processed_files=job.processed_files,
+        total_pages=job.total_pages,
+        processed_pages=job.processed_pages,
+        current_source_label=job.current_source_label,
+        estimated_seconds=job.estimated_seconds,
     )
 
 

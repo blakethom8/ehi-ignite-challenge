@@ -5,9 +5,11 @@ Blake's two real sources (Cedars-Sinai FHIR pull + Function Health PDF
 extractions). Read alongside [`ATLAS-DATA-MODEL.md`](ATLAS-DATA-MODEL.md)
 for the strategic framing and `lib/harmonize/` for the implementation.
 
-> **Status:** v1, May 2026. Vertical slice on Observations only.
-> Conditions, Medications, Allergies, Immunizations follow the same
-> shape and are not yet implemented.
+> **Status:** Updated 2026-05-05. This example still uses HDL Cholesterol
+> as the simplest walkthrough, but the harmonization layer now also supports
+> Conditions, Medications, Allergies, and Immunizations. Harmonization runs
+> can be persisted, reviewed, published, and read by downstream FHIR Charts
+> and Clinical Insights for uploaded workspaces.
 
 ## The fact
 
@@ -187,19 +189,29 @@ edge fired through the name bridge).
   (HDL trajectory) is the thing the harmonized view emits — not buried in a
   pile of per-source bundles.
 
-## Beyond v1
+## Current coverage and next gaps
 
-- **More resource types.** Conditions, Medications, Allergies, Immunizations
-  follow the same shape. Each gets its own match strategy (Conditions: SNOMED
-  + ICD-10 cross-walk; Medications: RxNorm + drug-class fallback;
-  Immunizations: CVX + date proximity).
-- **Conflict detection.** `MergedObservation.has_conflict` flags same-day
-  cross-source disagreement >10%. The richer version surfaces *which* sources
-  disagree, by *how much*, and *why* (units? reference range? methodology?).
-- **Bridge expansion.** The hand-curated name→LOINC dict covers the ~50
-  most-common labs across Blake's sources today. Scaling to the long tail
-  is an LLM-bootstrapped crosswalk job mirroring `lib/sql_on_fhir/`
-  enrichments — not v1.
-- **Bidirectional Provenance walk.** From a fact, walk back to source
-  documents (already shipped). From a source document, walk forward to every
-  fact it produced (one query, not yet wired into the UI).
+- **Current core resource coverage.** Observations, Conditions, Medications,
+  Allergies, and Immunizations now use the same SourceBundle → merged fact →
+  Provenance shape. Observations remain the easiest worked example because
+  LOINC and units make the merge mechanics concrete.
+- **Published workspace read path.** Harmonization runs can now be persisted
+  and published. The active published snapshot feeds `/api/patients/{patient_id}/...`
+  so FHIR Charts and Clinical Insights read the same canonical layer that the
+  Data Aggregator produces.
+- **Remaining resource breadth.** Procedures, DiagnosticReports,
+  DocumentReference-rich notes, imaging, claims, and device streams still need
+  first-class matchers and review affordances.
+- **Conflict review depth.** `MergedObservation.has_conflict` flags same-day
+  cross-source disagreement >10%. The richer version should surface *which*
+  sources disagree, by *how much*, and *why* (units? reference range?
+  methodology?), then persist the reviewer decision.
+- **Bridge expansion.** The hand-curated name→LOINC dict covers the common labs
+  across Blake's sources today. Scaling to the long tail is an LLM-bootstrapped
+  crosswalk job mirroring `lib/sql_on_fhir/` enrichments, with deterministic
+  specs checked into the codebase after review.
+- **Bidirectional Provenance walk.** From a fact, walk back to source documents.
+  From a source document, walk forward to every fact it produced. Both
+  directions are now part of the UI model through source contributions and
+  provenance drill-downs; the next step is making this equally strong for
+  richer document-note resources.

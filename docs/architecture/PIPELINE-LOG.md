@@ -10,6 +10,7 @@ Best multipass-fhir result on Cedars Health Summary: **F1 0.70** (post-Move H, w
 
 | Date | Move | Subject | Headline result |
 |---|---|---|---|
+| 2026-05-05 | **W** | Published workspace downstream read facade | Active published workspace snapshots now feed `/api/patients/{id}/...` so FHIR Charts, raw FHIR, Care Journey, and Clinical Insights work for uploaded workspaces. |
 | 2026-05-03 | **V** | Responsive breakpoints on the 6 merged-record tables | Targeted column-hiding at sm/md/lg per table. No more horizontal scrollbar on narrow viewports. Closes the harmonize feature's polish loop. |
 | 2026-05-03 | **U** | Async PDF extraction with job-polling pattern | POST /extract no longer blocks 30-90s. Returns 202 + job_id immediately; React page polls every 1.5s until complete. Cache-bust fans out to all 6 resource-type queries on completion. Live test: 134ms round-trip for the no-PDF case. |
 | 2026-05-03 | **T** | Empty-state + loading UI on the harmonize page | Three render branches now handle the previously-unreachable zero-collections state gracefully. Centered empty-state card explains what's missing and offers two CTAs (upload documents in-app, Synthea quick-start external). Closes the fresh-clone polish loop. |
@@ -57,6 +58,52 @@ Pipeline framework + eval harness shipped 2026-05-03 (commits: pipeline Protocol
 ```
 
 Each entry should be 200–500 words. Tables and code snippets welcome. **Honesty about negative results matters as much as wins** — knowing what *didn't* work prevents future re-litigation.
+
+---
+
+## 2026-05-05 · Move W — published workspace downstream read facade
+
+**Agent:** Codex
+
+**What:** Closed the downstream read gap for uploaded patient workspaces after
+publish. The `/api/patients/{patient_id}/...` facade now resolves an uploaded
+workspace's active published snapshot instead of treating the workspace id as a
+missing Synthea patient. This makes FHIR Charts, raw FHIR, Care Journey, key
+labs, overview, timeline, safety panels, and Clinical Insights read the same
+published canonical layer produced by Data Aggregator.
+
+**Why:** The Data Aggregator flow was working through intake, PDF extraction,
+harmonization run, review, and publish, but downstream modules still assumed
+patient ids mapped directly to parser-backed Synthea bundles. Production smoke
+testing surfaced the failure clearly: FHIR Charts showed "Failed to load
+patient data" and the Clinical Insights assistant returned "Patient not found"
+for a published workspace id. That contradicted the product model: publish
+should activate the chart snapshot that the rest of the app consumes.
+
+**How:** Added a workspace-aware published-snapshot bridge in the patient data
+service path. The bridge keeps the existing deterministic endpoints stable while
+making workspace ids first-class read targets when a published snapshot exists.
+The runtime remains scripts-first: publish chooses the active canonical bundle;
+downstream services do not re-run harmonization or parse source files directly.
+
+**Result:** Local validation: 93 API tests passed, frontend lint passed, and the
+Vite production build completed with the existing large-chunk warning only.
+Production validation on `ehi.healthcaredataai.com`: `/api/health` returned OK,
+the workspace endpoint matrix returned 200 for overview, timeline, key-labs,
+safety, surgical-risk, immunizations, condition-acuity, interactions,
+care-journey, procedures, raw FHIR, and canonical summary. Browser smoke
+confirmed FHIR Charts rendered patient metrics and the Clinical Insights
+assistant answered without the previous patient-not-found error.
+
+**Conclusion:** Published chart snapshots are now the handoff between Data
+Aggregator and the rest of the app. That is the right architectural boundary:
+Source Intake stores and prepares evidence, Harmonized Record creates/reviews a
+candidate canonical record, Publish Chart activates a snapshot, and downstream
+modules read the active published layer.
+
+**Next:** Persist richer review decisions, add snapshot rollback/history to
+Publish Chart, and keep expanding endpoint coverage as new resource types move
+from candidate facts into first-class chart surfaces.
 
 ---
 

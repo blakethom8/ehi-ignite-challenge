@@ -8,7 +8,7 @@ Purpose: clarify the relationship between Source Intake and Harmonized Record be
 
 The current confusion is not just labels. The UI is mixing three concepts:
 
-- Durable workspaces: Source Intake, Harmonized Record, Patient Context, Publish Readiness.
+- Durable workspaces: Source Intake, Harmonized Record, Patient Context, Publish Chart.
 - Pipeline state: source added, prepared, merged, reviewed.
 - User actions: upload, prepare pending sources, inspect provenance, resolve review items.
 
@@ -29,11 +29,15 @@ Data Aggregator
   Patient Context
     Patient-reported context
 
-  Publish Readiness
-    Activation gates
+  Publish Chart
+    Activate chart snapshots
 ```
 
 No standalone Cleaning Queue. Review is a sub-area of Harmonized Record.
+
+Implementation note, 2026-05-05: the app now uses `Publish Chart`, not
+`Publish Readiness`, for the final activation surface. It should manage active
+snapshots and downstream availability, not read like a generic checklist page.
 
 ## Wireframe A: Source Intake
 

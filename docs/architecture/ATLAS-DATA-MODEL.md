@@ -1,6 +1,6 @@
 # Atlas Data Model — Architectural Decisions
 
-*Status: load-bearing. Read this first. Last updated: 2026-05-01.*
+*Status: load-bearing. Read this first. Last updated: 2026-05-05.*
 
 > **Purpose.** This is the single entry-point architecture doc for Atlas's data layer. It captures *what we decided and why*, not the exhaustive spec. For depth, follow the cross-references at the end.
 
@@ -31,14 +31,14 @@
             ╠═══════════════════════════════════════════════╣
             ║  Layer 3 — HARMONIZE   (silver)               ║
             ║  Cross-source merge, entity resolution,       ║  ◀── ★ Atlas's wedge
-            ║  conflict detection, FHIR Provenance edges    ║       (mostly TODO)
+            ║  conflict detection, FHIR Provenance edges    ║       prototype exists
             ╠═══════════════════════════════════════════════╣
             ║  Layer 2 — STANDARDIZE   (bronze→silver)      ║
-            ║  TSV/PDF/HL7v2/CCDA → FHIR R4 + USCDI         ║  ◀── Phase 2; LLM-authored specs
+            ║  TSV/PDF/HL7v2/CCDA → FHIR R4 + USCDI         ║  ◀── active for FHIR JSON + PDFs
             ║  with extensions for the non-mapping 15%      ║
             ╠═══════════════════════════════════════════════╣
             ║  Layer 1 — INGEST   (bronze)                  ║
-            ║  Per-source adapters, raw immutable bronze    ║  ◀── Phase 2 for non-FHIR
+            ║  Per-source adapters, raw immutable bronze    ║  ◀── file workspaces active
             ║  Synthea / SMART / EHI Export TSV / PDF /     ║       (Synthea exists today)
             ║  CMS Blue Button / wearables                  ║
             ╚═══════════════════════════════════════════════╝
@@ -48,8 +48,9 @@
                           │           — but Josh stops at bronze, never merges.
                           │           Atlas owns Layers 3–5.
                           │
-              Sources Atlas accepts (Phase 1: Synthea only;
-              Phase 2: SMART pull, EHI TSV, PDF, claims, wearables)
+              Sources Atlas accepts in the prototype: Synthea, uploaded
+              FHIR JSON, and uploaded PDFs. Phase 2 widens to SMART pull,
+              EHI TSV, claims, wearables, and richer document types.
 ```
 
 The full 5-layer spec is in `~/Chief/20-projects/ehi-ignite-challenge/architecture/DATA-AGGREGATION-LAYER.md`. **The wedge is Layer 3 (HARMONIZE) with Provenance — that's the thin spot in the prior-art landscape.**
@@ -189,19 +190,26 @@ Three concrete implications:
 
 ## Phase 1 vs Phase 2 priority
 
-**Phase 1 (12-day Submission deadline 2026-05-13):** prove the architecture end-to-end on **one source** (Synthea, since it's already FHIR).
+**Phase 1 (Submission deadline 2026-05-13):** prove the architecture end-to-end
+on a tight vertical slice: curated Synthea workspaces for reproducible demos,
+plus uploaded workspace records that can ingest FHIR JSON/PDF sources, run
+harmonization, review blockers, publish a snapshot, and feed downstream FHIR
+Charts / Clinical Insights.
 
 1. Provenance edges in the data layer — every fact carries `bronze_source` + `bronze_path`.
 2. Provenance breadcrumbs in the UI — click any fact → see lineage.
-3. Agent panel using existing `run_sql` + Agent SDK — same data graph.
-4. (Stretch) A second source stub (curated 1-patient EHI sample, or simulated CCDA) to demonstrate cross-source merge mechanics.
+3. Run artifacts — scripted harmonization creates a durable candidate record
+   with source fingerprints, matcher version, review items, and provenance.
+4. Publish snapshots — an activated workspace snapshot becomes the read target
+   for FHIR Charts and Clinical Insights.
+5. Agent panel using existing chart context + Agent SDK — same data graph.
 
 **Phase 2 (2026 summer onward):** widen the source set.
 
 - LLM-authored Epic TSV → FHIR mapping spec (USCDI-aligned subset).
 - CMS Blue Button claims ingest.
 - C-CDA → FHIR converter (use Microsoft FHIR-Converter as starting point).
-- PDF multimodal extraction pipeline.
+- Expand PDF multimodal extraction beyond the current lab/report slice.
 - Wearables (Whoop, Oura, Apple HealthKit) via FHIR Observation extensions.
 - Real cross-source merge with conflict resolution.
 - Per-fact confidence/quality scoring.
@@ -214,7 +222,7 @@ Three concrete implications:
 |---|---|
 | 5-layer pipeline spec | `~/Chief/20-projects/ehi-ignite-challenge/architecture/DATA-AGGREGATION-LAYER.md` |
 | Competitive landscape | `~/Chief/20-projects/ehi-ignite-challenge/research/harmonization-prior-art.md` |
-| Multi-format ingestion product spec | `ideas/FORMAT-AGNOSTIC-INGESTION.md` |
+| Multi-format ingestion product spec | `docs/ideas/FORMAT-AGNOSTIC-INGESTION.md` |
 | Layer 5 — context engineering for the LLM | `docs/architecture/CONTEXT-PIPELINE.md` |
 | SOF warehouse (current Layer 4 implementation) | `patient-journey/core/sql_on_fhir/views/README.md` |
 | Platform-level architecture | `docs/architecture/ECOSYSTEM-OVERVIEW.md` |

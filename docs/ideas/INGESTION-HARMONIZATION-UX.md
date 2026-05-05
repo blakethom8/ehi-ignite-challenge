@@ -15,6 +15,10 @@ This document focuses on the near-term product path, not the future agentic buil
 - upload-derived harmonize collections
 - async PDF extraction jobs
 - cross-source harmonization
+- persisted harmonization runs
+- review queue items
+- published chart snapshots
+- downstream read path for FHIR Charts and Clinical Insights
 - source contribution diff
 - provenance drill-down
 
@@ -26,18 +30,21 @@ Today the flow is roughly:
 
 ```text
 Data Aggregator
-  -> user uploads files and adds context
+  -> user creates or selects a workspace
+  -> user uploads files and adds source context
   -> files are stored locally under data/aggregation-uploads/<patient_id>/
-  -> user clicks Harmonize uploads
+  -> PDFs show a per-file Extract PDF / Run PDF processor action
+  -> structured files are marked FHIR ready
 
 Harmonize View
-  -> upload-<patient_id> collection auto-registers
-  -> JSON files are treated as FHIR-like source pulls
-  -> PDFs appear as extracted-pdf sources
-  -> user clicks Extract uploaded PDFs
-  -> background job writes <filename>.extracted.json
-  -> harmonize queries refresh
+  -> user runs harmonization or re-runs harmonization
+  -> backend writes a persisted run artifact
+  -> review queue blocks publish when source gaps or fact conflicts need judgment
   -> user reviews merged facts, unique/shared source contribution, and provenance
+
+Publish Chart
+  -> user activates a reviewed snapshot
+  -> FHIR Charts and Clinical Insights read the active published snapshot
 ```
 
 This is a strong foundation. The main gap is that the user experience does not yet clearly present this as a stepwise build process with artifact states.
@@ -49,8 +56,9 @@ The user should understand that uploaded files move through four states:
 ```text
 1. Stored source material
 2. Extracted candidate facts
-3. Validated structured data
-4. Harmonized longitudinal record
+3. Harmonization run
+4. Reviewed candidate record
+5. Published chart snapshot
 ```
 
 The app should avoid implying that "upload" equals "chart truth." It should show that upload starts a transformation process.
@@ -80,8 +88,8 @@ It should answer:
 
 Near-term UX improvements:
 
-- Add a stepper at the top:
-  `Add sources -> Extract facts -> Harmonize -> Review`
+- Use a compact local flow:
+  `Add files -> Prepare sources`
 - Replace generic `Confidence` with clearer `Parse readiness` or `Extraction readiness`.
 - Add per-file status text:
   - `Stored only`
@@ -89,11 +97,12 @@ Near-term UX improvements:
   - `PDF pending extraction`
   - `Extracted`
   - `Unsupported format`
-- Make `Harmonize uploads` read more like an action:
-  `Continue to extraction and harmonization`
+- Use `Open Harmonized Record` as the bridge once at least one source is
+  prepared. Keep `Run harmonization` on Harmonized Record so upload does not
+  imply chart truth.
 - Show that deleting a file also removes any derived extraction for that file.
 
-### Page 2: Extract and Harmonize
+### Page 2: Run Harmonization and Review Candidate Record
 
 The Harmonize page should become the operational build surface.
 
@@ -101,12 +110,13 @@ It should answer:
 
 - Which collection am I working on?
 - Which sources are available?
-- Which PDFs still need extraction?
-- Did extraction succeed?
+- Has harmonization been run?
+- Which sources are included in the run?
 - How many structured facts did each source contribute?
 - What facts are unique to a source?
 - What facts are shared across sources?
 - What source supports this merged fact?
+- What blocks publish?
 
 Near-term UX improvements:
 
@@ -121,11 +131,10 @@ Source readiness
   350 harmonized facts
 ```
 
-- Replace the single `Extract uploaded PDFs` button with a clearer two-step action:
-  - `Extract pending PDFs`
-  - `Refresh harmonized record`
-
-  The second can still happen automatically, but the mental model should be visible.
+- Make `Run harmonization` / `Re-run harmonization` the primary action when
+  sources have changed. The output should be a durable run artifact with source
+  fingerprints, matcher version, candidate facts, review items, and provenance
+  links.
 
 - After extraction completes, show:
   - files processed
@@ -140,7 +149,7 @@ Source readiness
   - `Shared harmonized facts`
   - `Status`
 
-### Page 3: Review Usable Data
+### Page 3: Review Candidate Data
 
 The current tabs already support review of Labs, Conditions, Medications, Allergies, and Immunizations.
 
@@ -158,6 +167,19 @@ Near-term UX improvements:
   `PDF-only findings`
 
 This is where the product wedge becomes obvious: the app is not just parsing documents; it is showing what each source added to the patient journey.
+
+### Page 4: Publish Chart
+
+Publish Chart should be the final activation surface, not a generic readiness
+checklist.
+
+It should answer:
+
+- Which candidate run is active?
+- Which run is currently published downstream?
+- Is publish blocked by review items or missing preparation?
+- Can the user activate, roll back, or delete workspace artifacts?
+- Which downstream modules are reading this snapshot?
 
 ## Storage and persistence
 
@@ -323,7 +345,7 @@ This gives us fast iteration without re-running expensive PDF extraction every t
 The current application is close to the right workflow. The near-term work is to make the transformation lifecycle visible:
 
 ```text
-files -> extracted facts -> validated bundles -> harmonized record -> reviewed clinical data
+files -> extracted facts -> harmonization run -> reviewed candidate record -> published chart snapshot
 ```
 
 For development, file-based persistence is enough if it is organized around manifests, job events, and explicit derived artifacts. The harmonized record can remain rebuildable. The expensive extraction outputs should persist.

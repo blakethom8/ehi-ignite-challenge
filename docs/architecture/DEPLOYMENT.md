@@ -28,7 +28,8 @@ The script detects `docker compose` vs `docker-compose`. Hetzner currently
 has Compose v1.29 installed, so the script removes/recreates only service
 containers after build to avoid the v1 `ContainerConfig` recreate bug. Patient
 profiles and uploaded files are preserved because they live in the bind-mounted
-`data/` directory, not in containers. The script also reloads the outer
+`data/` directory, not in containers. The script waits for the recreated API
+container to answer `/api/health`, then reloads the outer
 `personal-website_nginx_1` container so host-level nginx re-resolves the
 recreated Docker service names instead of returning stale-upstream `502`s.
 

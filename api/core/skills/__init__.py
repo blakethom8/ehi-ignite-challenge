@@ -1,6 +1,6 @@
 """Skill + Agent + Workspace runtime.
 
-See `docs/architecture/SKILL-AGENT-WORKSPACE.md` for the architecture; this
+See `docs/architecture/skill-runtime/SKILL-AGENT-WORKSPACE.md` for the architecture; this
 package implements Layer 1 of the three-layer model: skill loading,
 workspace primitives, and the citation graph contract.
 

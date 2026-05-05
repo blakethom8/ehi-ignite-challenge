@@ -1,6 +1,6 @@
 """Tests for the streaming/connection layer: EventHub + SSE endpoint.
 
-Companion doc: `docs/architecture/STREAMING-AND-GATEWAY.md`.
+Companion doc: `docs/architecture/skill-runtime/STREAMING-AND-GATEWAY.md`.
 
 The tests exercise:
 

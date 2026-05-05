@@ -1,6 +1,6 @@
 """Claude-driven agent loop — Layer 2 implementation.
 
-Per `docs/architecture/SKILL-AGENT-WORKSPACE.md` §6.0, the runtime is
+Per `docs/architecture/skill-runtime/SKILL-AGENT-WORKSPACE.md` §6.0, the runtime is
 layered: universal substrate (Layer 1), default agent loop (Layer 2),
 per-skill SKILL.md (Layer 3). This module is the Layer-2 implementation
 that wires Claude into the loop.

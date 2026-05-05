@@ -45,7 +45,7 @@ from api.core.skills.worker import get_pool, get_skill
 
 # Tuned for FastAPI behind nginx — keepalive bytes every ~15s prevent any
 # upstream proxy from killing an idle SSE connection. See
-# docs/architecture/STREAMING-AND-GATEWAY.md §5.2 for the contract.
+# docs/architecture/skill-runtime/STREAMING-AND-GATEWAY.md §5.2 for the contract.
 SSE_KEEPALIVE_INTERVAL_S = 15.0
 
 
@@ -304,7 +304,7 @@ async def stream_run_events(
     its close sentinel.
 
     Sent as `text/event-stream`. See
-    `docs/architecture/STREAMING-AND-GATEWAY.md` for the design rationale.
+    `docs/architecture/skill-runtime/STREAMING-AND-GATEWAY.md` for the design rationale.
     """
     skill = _resolve_skill(skill_name)
     workspace = _resolve_workspace(skill, patient_id, run_id)

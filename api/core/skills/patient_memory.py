@@ -1,6 +1,6 @@
 """Patient memory layer — cross-run, cross-skill persistence.
 
-Per `docs/architecture/SELF-MODIFYING-WORKSPACE.md` §4: each patient has a
+Per `docs/architecture/skill-runtime/SELF-MODIFYING-WORKSPACE.md` §4: each patient has a
 `/cases/{patient_id}/_memory/` directory that future skill runs read at
 session start. The agent never writes here directly; only the runtime
 mediates writes via clinician-initiated save destinations.

@@ -6,7 +6,7 @@ YAML frontmatter block followed by a markdown body, plus optional siblings:
 `evals/cohort.json`, `references/*.md`, `scripts/*.py`.
 
 The loader parses the frontmatter, validates it against the contract in
-`docs/architecture/SKILL-AGENT-WORKSPACE.md` §5.1–5.2, parses the JSON
+`docs/architecture/skill-runtime/SKILL-AGENT-WORKSPACE.md` §5.1–5.2, parses the JSON
 schemas it references, and returns a typed `Skill` object. The runtime
 refuses to register a skill that fails validation; the marketplace UI
 surfaces validation errors as the badge that gates "Live" promotion.

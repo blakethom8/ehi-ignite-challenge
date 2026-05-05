@@ -1,7 +1,7 @@
 # Skills
 
 Per-skill directories implementing the Skill + Agent + Workspace architecture
-(`docs/architecture/SKILL-AGENT-WORKSPACE.md`).
+(`docs/architecture/skill-runtime/SKILL-AGENT-WORKSPACE.md`).
 
 Each skill is a self-contained directory:
 

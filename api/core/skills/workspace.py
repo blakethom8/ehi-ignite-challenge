@@ -6,7 +6,7 @@ treats those primitives as the only legal write path so the audit trail and
 citation graph cannot be bypassed.
 
 This module also implements the three save destinations described in
-`docs/architecture/SELF-MODIFYING-WORKSPACE.md`: per-run edits, pinning to
+`docs/architecture/skill-runtime/SELF-MODIFYING-WORKSPACE.md`: per-run edits, pinning to
 the patient memory layer, and saving as a reusable patient context package.
 """
 

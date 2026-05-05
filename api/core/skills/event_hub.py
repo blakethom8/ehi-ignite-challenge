@@ -1,6 +1,6 @@
 """Per-run event hub — Layer-1 connection primitive.
 
-See `docs/architecture/STREAMING-AND-GATEWAY.md` for design + rationale.
+See `docs/architecture/skill-runtime/STREAMING-AND-GATEWAY.md` for design + rationale.
 
 One `EventHub` per active run. The runner publishes to the hub via
 non-blocking `publish_nowait`; SSE endpoints subscribe and yield events

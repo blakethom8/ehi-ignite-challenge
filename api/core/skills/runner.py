@@ -40,7 +40,7 @@ SKILLS_AGENT_FAKE = os.getenv("SKILLS_AGENT_FAKE", "").strip().lower() in {"1", 
 # Mode toggle: per-run brief override (`_run_mode`) wins over env var, env
 # var wins over the deterministic default. "auto" picks "agent" if an
 # Anthropic key is present, otherwise falls back to "deterministic". See
-# `docs/architecture/MODE-SWITCHING.md` for the full contract.
+# `docs/architecture/skill-runtime/MODE-SWITCHING.md` for the full contract.
 _VALID_MODES = frozenset({"deterministic", "agent", "auto"})
 
 

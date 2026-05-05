@@ -1,7 +1,7 @@
 """Tests for `api.core.skills.loader`.
 
 Covers the trial-matching reference skill and a battery of negative cases
-that exercise the manifest contract from `docs/architecture/SKILL-AGENT-WORKSPACE.md`
+that exercise the manifest contract from `docs/architecture/skill-runtime/SKILL-AGENT-WORKSPACE.md`
 §5.1–5.2.
 """
 

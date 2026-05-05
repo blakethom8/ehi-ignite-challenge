@@ -204,7 +204,7 @@ Keep this boundary explicit:
 ### Deployment
 - **Production:** https://ehi.healthcaredataai.com (Hetzner 2 — 5.78.148.70)
 - Docker Compose + nginx + Let's Encrypt SSL
-- Manual deploy: `ssh hetzner2 'cd /opt/ehi-ignite && git pull origin master && docker compose -f deploy/docker-compose.prod.yml up -d --build'`
+- Manual deploy: `ssh hetzner2 'cd /opt/ehi-ignite && ./deploy/deploy-prod.sh'`
 - See `deploy/` for configs, `docs/architecture/DEPLOYMENT.md` for full setup
 
 ### Design System

@@ -1,0 +1,36 @@
+.git
+.github
+.venv
+__pycache__
+*.pyc
+.DS_Store
+
+# Frontend build/install output. Dockerfile.app runs npm ci inside the image.
+app/node_modules
+app/dist
+
+# Runtime data is bind-mounted in production; keep it out of image contexts.
+data/
+
+# Large research/dev artifacts not needed by the production images.
+archive/
+docs/snapshot/
+research/
+fhir_explorer/
+patient-journey/
+
+# EHI Atlas production extraction only needs ehi-atlas/ehi_atlas.
+ehi-atlas/corpus/
+ehi-atlas/notebooks/
+ehi-atlas/notes/
+ehi-atlas/app/
+ehi-atlas/tests/
+ehi-atlas/.claude/
+ehi-atlas/.venv/
+ehi-atlas/uv.lock
+
+# Local/generated upload fixtures and scratch artifacts.
+*.log
+*.sqlite
+*.db
+*.db-*

@@ -80,7 +80,7 @@ See [`deploy/`](deploy/) for Docker Compose configs and nginx setup.
 cd /opt/ehi-ignite
 cp .env.example .env
 # Edit .env with real ANTHROPIC_API_KEY
-docker compose -f deploy/docker-compose.prod.yml up -d --build
+./deploy/deploy-prod.sh
 ```
 
 ## Project Structure

@@ -1,6 +1,6 @@
 # Deployment Guide
 
-*Mirrors the provider-search deployment pattern. Last updated: April 5, 2026.*
+*Mirrors the provider-search deployment pattern. Last updated: May 4, 2026.*
 
 ---
 
@@ -9,6 +9,26 @@
 **Provider:** Hetzner Cloud  
 **Server:** CX21 (2 vCPU, 4GB RAM, 40GB SSD) — ~€4.85/mo  
 **Stack:** Docker Compose + nginx + Let's Encrypt SSL
+
+Current production host:
+
+- URL: `https://ehi.healthcaredataai.com`
+- Server alias: `hetzner2`
+- Repo path: `/opt/ehi-ignite`
+- Compose file: `deploy/docker-compose.prod.yml`
+- Runtime data: `/opt/ehi-ignite/data`, bind-mounted into the API container at `/app/data`
+
+Deploy with:
+
+```bash
+ssh hetzner2 'cd /opt/ehi-ignite && ./deploy/deploy-prod.sh'
+```
+
+The script detects `docker compose` vs `docker-compose`. Hetzner currently
+has Compose v1.29 installed, so the script removes/recreates only service
+containers after build to avoid the v1 `ContainerConfig` recreate bug. Patient
+profiles and uploaded files are preserved because they live in the bind-mounted
+`data/` directory, not in containers.
 
 ---
 
@@ -164,7 +184,7 @@ docker run --rm -v ./certbot/conf:/etc/letsencrypt \
   -d your-domain.com
 
 # Launch
-docker compose -f docker-compose.prod.yml up -d
+./deploy/deploy-prod.sh
 ```
 
 ---
@@ -173,13 +193,13 @@ docker compose -f docker-compose.prod.yml up -d
 
 ```bash
 # View logs
-ssh root@<ip> 'docker compose -f /path/to/docker-compose.prod.yml logs -f api'
+ssh hetzner2 'cd /opt/ehi-ignite && docker-compose -f deploy/docker-compose.prod.yml logs -f api'
 
 # Restart after deploy
-ssh root@<ip> 'cd /path && git pull && docker compose -f docker-compose.prod.yml up -d --build'
+ssh hetzner2 'cd /opt/ehi-ignite && ./deploy/deploy-prod.sh'
 
 # Check status
-ssh root@<ip> 'docker compose -f docker-compose.prod.yml ps'
+ssh hetzner2 'cd /opt/ehi-ignite && docker-compose -f deploy/docker-compose.prod.yml ps'
 ```
 
 ---

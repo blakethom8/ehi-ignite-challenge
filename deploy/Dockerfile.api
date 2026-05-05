@@ -16,7 +16,6 @@ COPY lib/ ./lib/
 COPY api/ ./api/
 COPY scripts/ ./scripts/
 COPY ehi-atlas/ehi_atlas/ ./ehi-atlas/ehi_atlas/
-COPY data/ ./data/
 
 EXPOSE 8000
 

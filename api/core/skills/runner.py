@@ -37,6 +37,12 @@ from api.core.skills.workspace import (
 
 SKILLS_AGENT_FAKE = os.getenv("SKILLS_AGENT_FAKE", "").strip().lower() in {"1", "true", "yes"}
 
+# Mode toggle: per-run brief override (`_run_mode`) wins over env var, env
+# var wins over the deterministic default. "auto" picks "agent" if an
+# Anthropic key is present, otherwise falls back to "deterministic". See
+# `docs/architecture/MODE-SWITCHING.md` for the full contract.
+_VALID_MODES = frozenset({"deterministic", "agent", "auto"})
+
 
 @dataclass
 class RunResult:
@@ -78,6 +84,11 @@ class SkillRunner:
         if event_hub is not None and workspace.event_hub is None:
             workspace.event_hub = event_hub
         self._completed = asyncio.Event()
+        # Loose-typed scratch space for the active loop implementation
+        # (the deterministic loop ignores it; the Claude agent loop uses
+        # `escalation_signal`, `finalize_signal`, `final_artifact` here).
+        # Kept on the runner instance so the loop can stay a free function.
+        self.agent_state: dict[str, Any] = {}
 
     @property
     def event_hub(self) -> EventHub | None:
@@ -191,21 +202,64 @@ class SkillRunner:
 
     # ── Agent loop ──────────────────────────────────────────────────────
 
+    def resolve_run_mode(self) -> str:
+        """Decide which loop implementation to use for this run.
+
+        Precedence (highest first):
+        1. Per-run brief: `_run_mode` ("deterministic" | "agent" | "auto")
+        2. Env var: `SKILLS_RUN_MODE`
+        3. Default: "deterministic"
+
+        "auto" promotes to "agent" iff an Anthropic API key is configured;
+        otherwise it falls back to "deterministic" so a missing key never
+        crashes a run.
+        """
+        raw = (
+            self.brief.get("_run_mode")
+            or os.getenv("SKILLS_RUN_MODE", "")
+            or "deterministic"
+        )
+        mode = str(raw).strip().lower() or "deterministic"
+        if mode not in _VALID_MODES:
+            mode = "deterministic"
+        if mode == "auto":
+            from api.core.skills.agent_loop import load_config
+
+            mode = "agent" if load_config().has_credentials else "deterministic"
+        return mode
+
     async def _drive_agent_loop(self) -> dict[str, Any]:
         """Drive the agent until it produces a final artifact.
 
-        For commit 2 this ships a deterministic Phase-0..5 loop for the
-        `trial-matching` skill (the loop the SKILL.md body describes,
-        executed in Python). When `SKILLS_AGENT_FAKE` is set, tests can
-        substitute their own fake loop. Real Claude SDK integration with
-        tool dispatch lands in commit 4 — the workspace contract above is
-        already correct for that integration; the runner just needs a
-        different `_drive_agent_loop`.
+        Dispatches on `resolve_run_mode()`. Both modes write through the
+        same workspace contract; the difference is whether decisions are
+        made by hardcoded Python (deterministic) or by Claude (agent).
+        Tests can inject a scripted loop by setting
+        `brief["_agent_overrides"] = {"create_message": fake_fn}`.
         """
+        mode = self.resolve_run_mode()
+        self._emit("agent_loop_dispatched", mode=mode, skill=self.skill.name)
+
+        if mode == "agent":
+            from api.core.skills.agent_loop import (
+                AgentLoopAbort,
+                drive_claude_agent_loop,
+            )
+
+            overrides = self.brief.get("_agent_overrides") or {}
+            try:
+                return await drive_claude_agent_loop(self, **overrides)
+            except AgentLoopAbort as exc:
+                # Surface the abort as a deterministic failure rather
+                # than a 500. Caller's run() converts this into a
+                # `failed` RunResult.
+                raise WorkspaceContractError(f"agent loop aborted: {exc}") from exc
+
+        # Deterministic mode — per-skill hardcoded walks.
         if self.skill.name == "trial-matching":
             return await _trial_matching_deterministic_loop(self)
         raise WorkspaceContractError(
-            f"no agent loop registered for skill '{self.skill.name}'"
+            f"no deterministic loop registered for skill '{self.skill.name}'"
         )
 
 

@@ -1,11 +1,17 @@
 import {
   AlertOctagon,
+  ArrowRightLeft,
+  Bot,
   CheckCircle,
+  Cog,
   FileText,
   Hash,
+  MessageSquareText,
+  PauseCircle,
   Quote,
   Save,
   Wrench,
+  Zap,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { TranscriptEvent } from "../../../../types/skills";
@@ -30,6 +36,41 @@ const EVENT_TONE: Record<
   run_failed: { icon: AlertOctagon, bg: "#fef2f2", fg: "#991b1b", label: "Run failed" },
   save: { icon: Save, bg: "#ffe6cd", fg: "#9a5a16", label: "Save" },
   trial_skipped: { icon: Wrench, bg: "#f5f6f8", fg: "#555a6a", label: "Trial skipped" },
+  // Mode dispatch — emitted once per run when the loop kicks off.
+  agent_loop_dispatched: {
+    icon: Cog,
+    bg: "#eef1ff",
+    fg: "#3a4ca8",
+    label: "Loop mode selected",
+  },
+  // Claude agent loop event kinds — only present in agent mode.
+  agent_run_started: { icon: Bot, bg: "#eef1ff", fg: "#3a4ca8", label: "Agent started" },
+  agent_text: { icon: MessageSquareText, bg: "#f5f6f8", fg: "#555a6a", label: "Agent thinking" },
+  agent_turn: { icon: Zap, bg: "#eef1ff", fg: "#3a4ca8", label: "Agent turn" },
+  agent_tool_result: {
+    icon: ArrowRightLeft,
+    bg: "#f0fdf4",
+    fg: "#166534",
+    label: "Tool result",
+  },
+  agent_tool_error: {
+    icon: AlertOctagon,
+    bg: "#fef2f2",
+    fg: "#991b1b",
+    label: "Tool error",
+  },
+  agent_run_paused: {
+    icon: PauseCircle,
+    bg: "#fffbeb",
+    fg: "#92400e",
+    label: "Agent paused",
+  },
+  agent_run_finalized: {
+    icon: CheckCircle,
+    bg: "#f0fdf4",
+    fg: "#166534",
+    label: "Agent finalized",
+  },
 };
 
 const DEFAULT_TONE = {
@@ -123,6 +164,51 @@ function describeEvent(event: TranscriptEvent): string {
   }
   if (kind === "trial_skipped") {
     return `${event.nct_id}: ${truncate(String(event.reason ?? ""), 100)}`;
+  }
+  if (kind === "agent_loop_dispatched") {
+    return `mode: ${String(event.mode ?? "?")} · skill: ${String(event.skill ?? "?")}`;
+  }
+  if (kind === "agent_run_started") {
+    const tools = event.tool_count as number | undefined;
+    const max = event.max_turns as number | undefined;
+    const model = event.model as string | undefined;
+    const parts: string[] = [];
+    if (model) parts.push(`model: ${model}`);
+    if (tools !== undefined) parts.push(`${tools} tools`);
+    if (max !== undefined) parts.push(`max ${max} turns`);
+    return parts.join(" · ");
+  }
+  if (kind === "agent_text") {
+    return truncate(String(event.text ?? ""), 200);
+  }
+  if (kind === "agent_turn") {
+    const turn = event.turn as number | undefined;
+    const stop = event.stop_reason as string | undefined;
+    const tools = Array.isArray(event.tool_calls)
+      ? (event.tool_calls as Array<{ name?: string }>)
+          .map((t) => t.name)
+          .filter(Boolean)
+          .join(", ")
+      : "";
+    const parts: string[] = [];
+    if (turn !== undefined) parts.push(`turn ${turn}`);
+    if (stop) parts.push(`stop: ${stop}`);
+    if (tools) parts.push(`tools: ${tools}`);
+    return parts.join(" · ");
+  }
+  if (kind === "agent_tool_result") {
+    const preview = event.result_preview as string | undefined;
+    return `${String(event.tool ?? "")}${preview ? ` → ${truncate(preview, 120)}` : ""}`;
+  }
+  if (kind === "agent_tool_error") {
+    return `${String(event.tool ?? "")}: ${truncate(String(event.error ?? ""), 160)}`;
+  }
+  if (kind === "agent_run_paused") {
+    return String(event.reason ?? "paused");
+  }
+  if (kind === "agent_run_finalized") {
+    const turn = event.turn as number | undefined;
+    return turn !== undefined ? `at turn ${turn}` : "";
   }
   return "";
 }

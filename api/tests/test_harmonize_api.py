@@ -505,6 +505,18 @@ class UploadCollectionDiscoveryTests(unittest.TestCase):
         self.assertEqual(timeline.status_code, 200)
         self.assertGreaterEqual(len(timeline.json()["encounters"]), 1)
 
+        care_journey = self.client.get("/api/patients/workspace-downstream/care-journey")
+        self.assertEqual(care_journey.status_code, 200)
+        self.assertGreaterEqual(len(care_journey.json()["encounters"]), 1)
+
+        raw_fhir = self.client.get("/api/patients/workspace-downstream/fhir")
+        self.assertEqual(raw_fhir.status_code, 200)
+        bundle = raw_fhir.json()
+        self.assertEqual(bundle["resourceType"], "Bundle")
+        resource_types = {entry["resource"]["resourceType"] for entry in bundle["entry"]}
+        self.assertIn("Patient", resource_types)
+        self.assertIn("Observation", resource_types)
+
     def test_provider_assistant_uses_published_workspace_snapshot(self) -> None:
         sess = self._stage_session("workspace-assistant")
         (sess / "report.pdf").unlink()

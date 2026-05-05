@@ -1644,9 +1644,7 @@ def get_care_journey(patient_id: str) -> CareJourneyResponse:
     record, stats = result
 
     fhir_uuid = _patient_fhir_uuid(patient_id)
-    if fhir_uuid is None:
-        raise HTTPException(status_code=404, detail="Cannot resolve patient FHIR UUID")
-    patient_ref = f"urn:uuid:{fhir_uuid}"
+    patient_ref = f"urn:uuid:{fhir_uuid}" if fhir_uuid else None
     name = stats.name
 
     medication_episodes: list[MedicationEpisodeItem] = []
@@ -1654,7 +1652,7 @@ def get_care_journey(patient_id: str) -> CareJourneyResponse:
     encounters: list[EncounterMarker] = []
 
     db_path = _sof_db_path()
-    if db_path.exists():
+    if patient_ref and db_path.exists():
         conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
         conn.row_factory = sqlite3.Row
         try:

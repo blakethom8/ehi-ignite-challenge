@@ -469,7 +469,13 @@ function PreparedPreviewPane({
   });
 
   useEffect(() => {
-    setJsonModalOpen(false);
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) setJsonModalOpen(false);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [file?.file_id, selectedSource?.type]);
 
   const baselineRows = baselineSampleRows(overview);

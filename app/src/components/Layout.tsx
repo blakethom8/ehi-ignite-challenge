@@ -1324,9 +1324,16 @@ export function Layout({ children }: LayoutProps) {
   useEffect(() => {
     if (!activeModuleMap) return;
     const activeSectionIds = getActiveModuleMapSectionIds(activeModuleMap, location.pathname, location.hash);
-    setModuleMapOpen(true);
-    setOpenModuleMapSections(new Set((activeSectionIds.length ? activeSectionIds : [activeModuleMap.sections[0]?.id]).filter(Boolean) as string[]));
-    setSidebarCollapsed(true);
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setModuleMapOpen(true);
+      setOpenModuleMapSections(new Set((activeSectionIds.length ? activeSectionIds : [activeModuleMap.sections[0]?.id]).filter(Boolean) as string[]));
+      setSidebarCollapsed(true);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [activeModuleMap, location.pathname, location.hash]);
 
   const toggleModuleMapSection = useCallback((sectionId: string) => {

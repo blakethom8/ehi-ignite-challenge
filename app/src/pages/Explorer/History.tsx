@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -400,14 +400,13 @@ export function ExplorerHistory() {
   const currentEvents = eventsByTab[tab];
   const encounterClassOptions = Array.from(new Set((timelineQ.data?.encounters ?? []).map((encounter) => encounter.class_code || "Unknown")))
     .sort((a, b) => a.localeCompare(b));
+  const effectiveClassFilter =
+    classFilter === "all" || encounterClassOptions.includes(classFilter)
+      ? classFilter
+      : "all";
   const currentEncounters = (timelineQ.data?.encounters ?? [])
-    .filter((encounter) => classFilter === "all" || (encounter.class_code || "Unknown") === classFilter)
+    .filter((encounter) => effectiveClassFilter === "all" || (encounter.class_code || "Unknown") === effectiveClassFilter)
     .sort((a, b) => dateValue(b.start) - dateValue(a.start));
-
-  useEffect(() => {
-    if (classFilter === "all") return;
-    if (!encounterClassOptions.includes(classFilter)) setClassFilter("all");
-  }, [classFilter, encounterClassOptions]);
 
   if (!patientId) {
     return (
@@ -512,7 +511,7 @@ export function ExplorerHistory() {
               type="button"
               onClick={() => setClassFilter(classCode)}
               className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
-                classFilter === classCode
+                effectiveClassFilter === classCode
                   ? "bg-[#eef1ff] text-[#5b76fe]"
                   : "bg-[#f9fafb] text-[#667085] hover:bg-[#f2f4f7]"
               }`}

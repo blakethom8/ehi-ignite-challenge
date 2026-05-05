@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
@@ -65,11 +65,12 @@ export function PatientContext() {
 
   const patientId = patientFromUrl || patientsQuery.data?.[0]?.id || "";
 
-  useEffect(() => {
-    if (!selectedGapId && session?.gap_cards.length) {
-      const open = session.gap_cards.find((gap) => gap.status === "open");
-      setSelectedGapId(open?.id || session.gap_cards[0].id);
+  const activeGapId = useMemo(() => {
+    if (!session?.gap_cards.length) return null;
+    if (selectedGapId && session.gap_cards.some((gap) => gap.id === selectedGapId)) {
+      return selectedGapId;
     }
+    return session.gap_cards.find((gap) => gap.status === "open")?.id || session.gap_cards[0].id;
   }, [selectedGapId, session]);
 
   const createMutation = useMutation({
@@ -82,7 +83,7 @@ export function PatientContext() {
   });
 
   const turnMutation = useMutation({
-    mutationFn: () => api.sendPatientContextTurn(session!.session_id, message, selectedGapId),
+    mutationFn: () => api.sendPatientContextTurn(session!.session_id, message, activeGapId),
     onSuccess: (data) => {
       setSession(data);
       setMessage("");
@@ -109,8 +110,8 @@ export function PatientContext() {
   });
 
   const selectedGap = useMemo(
-    () => session?.gap_cards.find((gap) => gap.id === selectedGapId) || null,
-    [session, selectedGapId],
+    () => session?.gap_cards.find((gap) => gap.id === activeGapId) || null,
+    [session, activeGapId],
   );
 
   const answeredCount = session?.gap_cards.filter((gap) => gap.status === "answered").length ?? 0;
@@ -248,7 +249,7 @@ export function PatientContext() {
                 key={gap.id}
                 onClick={() => setSelectedGapId(gap.id)}
                 className={`w-full rounded-xl border p-3 text-left transition ${
-                  selectedGapId === gap.id ? "border-[#5b76fe] bg-[#f7f8ff]" : "border-[#e9eaef] bg-white hover:bg-[#fafbff]"
+                  activeGapId === gap.id ? "border-[#5b76fe] bg-[#f7f8ff]" : "border-[#e9eaef] bg-white hover:bg-[#fafbff]"
                 }`}
               >
                 <div className="flex items-start justify-between gap-3">

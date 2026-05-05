@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
@@ -950,15 +950,12 @@ function ProvenanceWorkspace({ collectionId }: { collectionId: string }) {
     enabled: !!collectionId,
   });
 
-  const facts: HarmonizeMergedObservation[] = data?.merged ?? [];
+  const facts: HarmonizeMergedObservation[] = useMemo(() => data?.merged ?? [], [data?.merged]);
+  const effectiveSelectedRef = selectedRef ?? facts[0]?.merged_ref ?? null;
   const selected = useMemo(
-    () => facts.find((item) => item.merged_ref === selectedRef) ?? facts[0] ?? null,
-    [facts, selectedRef],
+    () => facts.find((item) => item.merged_ref === effectiveSelectedRef) ?? facts[0] ?? null,
+    [facts, effectiveSelectedRef],
   );
-
-  useEffect(() => {
-    if (!selectedRef && selected?.merged_ref) setSelectedRef(selected.merged_ref);
-  }, [selected?.merged_ref, selectedRef]);
 
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,420px)_1fr]">
@@ -1022,11 +1019,20 @@ function ProvenanceWorkspace({ collectionId }: { collectionId: string }) {
 
 function useCrossSourceFilter(collectionId: string) {
   const shouldDefaultCrossOnly = (id: string) => !id.startsWith("upload-") && !id.startsWith("workspace-");
-  const [crossOnly, setCrossOnly] = useState(() => shouldDefaultCrossOnly(collectionId));
-
-  useEffect(() => {
-    setCrossOnly(shouldDefaultCrossOnly(collectionId));
-  }, [collectionId]);
+  const [filterState, setFilterState] = useState(() => ({
+    collectionId,
+    crossOnly: shouldDefaultCrossOnly(collectionId),
+  }));
+  const crossOnly =
+    filterState.collectionId === collectionId
+      ? filterState.crossOnly
+      : shouldDefaultCrossOnly(collectionId);
+  const setCrossOnly = useCallback(
+    (next: boolean) => {
+      setFilterState({ collectionId, crossOnly: next });
+    },
+    [collectionId],
+  );
 
   return [crossOnly, setCrossOnly] as const;
 }
@@ -1041,7 +1047,7 @@ function LabsTab({ collectionId }: { collectionId: string }) {
     enabled: !!collectionId,
   });
 
-  const merged: HarmonizeMergedObservation[] = data?.merged ?? [];
+  const merged: HarmonizeMergedObservation[] = useMemo(() => data?.merged ?? [], [data?.merged]);
   const selected = useMemo(
     () => merged.find((m) => m.merged_ref === selectedRef) ?? merged[0] ?? null,
     [merged, selectedRef],
@@ -1201,7 +1207,7 @@ function ConditionsTab({ collectionId }: { collectionId: string }) {
     enabled: !!collectionId,
   });
 
-  const merged: HarmonizeMergedCondition[] = data?.merged ?? [];
+  const merged: HarmonizeMergedCondition[] = useMemo(() => data?.merged ?? [], [data?.merged]);
   const selected = useMemo(
     () => merged.find((m) => m.merged_ref === selectedRef) ?? merged[0] ?? null,
     [merged, selectedRef],
@@ -1367,7 +1373,7 @@ function MedicationsTab({ collectionId }: { collectionId: string }) {
     enabled: !!collectionId,
   });
 
-  const merged: HarmonizeMergedMedication[] = data?.merged ?? [];
+  const merged: HarmonizeMergedMedication[] = useMemo(() => data?.merged ?? [], [data?.merged]);
   const selected = useMemo(
     () => merged.find((m) => m.merged_ref === selectedRef) ?? merged[0] ?? null,
     [merged, selectedRef],
@@ -1531,7 +1537,7 @@ function AllergiesTab({ collectionId }: { collectionId: string }) {
     enabled: !!collectionId,
   });
 
-  const merged: HarmonizeMergedAllergy[] = data?.merged ?? [];
+  const merged: HarmonizeMergedAllergy[] = useMemo(() => data?.merged ?? [], [data?.merged]);
   const selected = useMemo(
     () => merged.find((m) => m.merged_ref === selectedRef) ?? merged[0] ?? null,
     [merged, selectedRef],
@@ -1686,7 +1692,7 @@ function ImmunizationsTab({ collectionId }: { collectionId: string }) {
     enabled: !!collectionId,
   });
 
-  const merged: HarmonizeMergedImmunization[] = data?.merged ?? [];
+  const merged: HarmonizeMergedImmunization[] = useMemo(() => data?.merged ?? [], [data?.merged]);
   const selected = useMemo(
     () => merged.find((m) => m.merged_ref === selectedRef) ?? merged[0] ?? null,
     [merged, selectedRef],
@@ -1876,9 +1882,16 @@ export function HarmonizeView() {
   const [activeExtractJobId, setActiveExtractJobId] = useState<string | null>(null);
 
   useEffect(() => {
-    setManualCollectionId(requestedValidCollection);
-    setDeveloperPickerOpen(false);
-    setActiveExtractJobId(null);
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setManualCollectionId(requestedValidCollection);
+      setDeveloperPickerOpen(false);
+      setActiveExtractJobId(null);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [patientId, requestedValidCollection, collectionIdsKey]);
 
   const activeId =

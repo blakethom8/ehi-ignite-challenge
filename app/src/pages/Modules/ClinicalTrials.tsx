@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -373,6 +373,7 @@ function RecordSpanCard({
 export function ClinicalTrials() {
   const [searchParams] = useSearchParams();
   const patientId = searchParams.get("patient");
+  const [renderedAtMs] = useState(() => Date.now());
 
   const overviewQ = useQuery({
     queryKey: ["overview", patientId],
@@ -407,7 +408,7 @@ export function ClinicalTrials() {
 
   const recentProcedures = useMemo(() => {
     if (!proceduresQ.data) return [] as ProcedureItem[];
-    const cutoff = Date.now() - 365 * 24 * 60 * 60 * 1000;
+    const cutoff = renderedAtMs - 365 * 24 * 60 * 60 * 1000;
     return proceduresQ.data.procedures
       .filter((p) => {
         if (!p.performed_start) return false;
@@ -420,7 +421,7 @@ export function ClinicalTrials() {
         return tb - ta;
       })
       .slice(0, 6);
-  }, [proceduresQ.data]);
+  }, [proceduresQ.data, renderedAtMs]);
 
   if (!patientId) {
     return (

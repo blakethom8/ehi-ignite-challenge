@@ -660,8 +660,9 @@ class UploadCollectionDiscoveryTests(unittest.TestCase):
         self.assertNotIn("Patient not found", body["answer"])
 
     def test_extract_endpoint_rejects_static_collection(self) -> None:
-        # blake-real is static; extraction must 400
-        r = self.client.post("/api/harmonize/blake-real/extract")
+        # synthea-demo is a committed static collection; extraction must 400
+        # even on fresh checkouts that do not have Blake's private demo files.
+        r = self.client.post("/api/harmonize/synthea-demo/extract")
         self.assertEqual(r.status_code, 400)
 
     def test_extract_starts_async_job_with_no_pdfs(self) -> None:

@@ -294,7 +294,7 @@ function exportJsonFile(fileName: string, data: Record<string, unknown>) {
   URL.revokeObjectURL(url);
 }
 
-const JSON_MODAL_PREVIEW_LIMIT = 120_000;
+const JSON_MODAL_PREVIEW_LIMIT = 40_000;
 
 function baselineResourceEntries(
   overview: PatientOverview | undefined,
@@ -334,7 +334,7 @@ function baselineSampleRows(overview: PatientOverview | undefined): AggregationP
 function PreparedJsonModal({
   fileName,
   jsonData,
-  exportData,
+  onExport,
   isLoading,
   exportLoading,
   error,
@@ -342,7 +342,7 @@ function PreparedJsonModal({
 }: {
   fileName: string;
   jsonData: Record<string, unknown> | null;
-  exportData?: Record<string, unknown> | null;
+  onExport: () => void | Promise<void>;
   isLoading: boolean;
   exportLoading?: boolean;
   error: Error | null;
@@ -353,15 +353,14 @@ function PreparedJsonModal({
   const previewText = isTruncated
     ? `${jsonText.slice(0, JSON_MODAL_PREVIEW_LIMIT)}\n\n... Preview truncated. Export JSON for the complete prepared output.`
     : jsonText;
-  const downloadableJson = exportData ?? jsonData;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[#101828]/35 px-4 py-8 backdrop-blur-[2px]">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-contain bg-[#101828]/35 px-4 py-8 backdrop-blur-[2px]">
       <section
         role="dialog"
         aria-modal="true"
         aria-labelledby="prepared-json-title"
-        className="flex max-h-[calc(100vh-4rem)] w-full max-w-5xl flex-col overflow-hidden rounded-xl border border-[#dfe4ea] bg-white shadow-2xl"
+        className="flex max-h-[calc(100dvh-4rem)] w-full max-w-5xl flex-col overflow-hidden rounded-xl border border-[#dfe4ea] bg-white shadow-2xl"
       >
         <header className="flex flex-col gap-3 border-b border-[#eef0f5] px-5 py-4 md:flex-row md:items-start md:justify-between">
           <div className="min-w-0">
@@ -376,8 +375,8 @@ function PreparedJsonModal({
           <div className="flex shrink-0 items-center gap-2">
             <button
               type="button"
-              onClick={() => downloadableJson && exportJsonFile(fileName, downloadableJson)}
-              disabled={!downloadableJson}
+              onClick={onExport}
+              disabled={isLoading || exportLoading || !jsonData}
               className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#5b76fe] px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
             >
               {exportLoading ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
@@ -491,8 +490,14 @@ function PreparedPreviewPane({
   const preparedJsonQuery = useQuery({
     queryKey: ["aggregation-upload-json", patientId, file?.file_id],
     queryFn: () => api.getAggregationUploadJson(patientId, file!.file_id),
-    enabled: Boolean(jsonModalOpen && patientId && file && hasPreparedOutput && !selectedIsBaseline),
+    enabled: false,
   });
+
+  const exportPreparedJson = async () => {
+    if (!file || !preview?.json_preview) return;
+    const fullJson = preparedJsonQuery.data ?? (await preparedJsonQuery.refetch()).data;
+    exportJsonFile(file.file_name, fullJson ?? preview.json_preview);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -802,8 +807,11 @@ function PreparedPreviewPane({
       <PreparedJsonModal
         fileName={`${baselineSource.name}.json`}
         jsonData={rawFhirQuery.data ?? null}
-        exportData={rawFhirQuery.data ?? null}
+        onExport={() => {
+          if (rawFhirQuery.data) exportJsonFile(`${baselineSource.name}.json`, rawFhirQuery.data);
+        }}
         isLoading={rawFhirQuery.isLoading}
+        exportLoading={rawFhirQuery.isFetching}
         error={rawFhirQuery.error as Error | null}
         onClose={() => setJsonModalOpen(false)}
       />
@@ -812,9 +820,9 @@ function PreparedPreviewPane({
       <PreparedJsonModal
         fileName={file.file_name}
         jsonData={preview.json_preview}
-        exportData={preparedJsonQuery.data ?? preview.json_preview}
+        onExport={exportPreparedJson}
         isLoading={false}
-        exportLoading={preparedJsonQuery.isLoading}
+        exportLoading={preparedJsonQuery.isFetching}
         error={null}
         onClose={() => setJsonModalOpen(false)}
       />

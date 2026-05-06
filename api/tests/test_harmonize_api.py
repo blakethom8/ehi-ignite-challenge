@@ -681,6 +681,40 @@ class UploadCollectionDiscoveryTests(unittest.TestCase):
         self.assertEqual(body["patient_id"], "workspace-assistant")
         self.assertNotIn("Patient not found", body["answer"])
 
+    def test_published_workspace_numeric_string_observations_remain_labs(self) -> None:
+        from api.core.loader import _record_from_published_run
+
+        run = {
+            "collection_id": "workspace-string-labs",
+            "collection_name": "String Labs",
+            "candidate_record": {
+                "observations": [
+                    {
+                        "merged_ref": "obs-a1c",
+                        "canonical_name": "Hemoglobin A1c",
+                        "loinc_code": "4548-4",
+                        "canonical_unit": "%",
+                        "latest": {"value": "5.2", "unit": "%", "effective_date": "2025-11-29"},
+                        "sources": [
+                            {
+                                "source_label": "cedars-sinai.json",
+                                "source_observation_ref": "Observation/a1c",
+                                "value": "5.2",
+                                "unit": "%",
+                                "effective_date": "2025-11-29",
+                            }
+                        ],
+                    }
+                ]
+            },
+        }
+
+        record, _stats = _record_from_published_run("workspace-string-labs", run)
+
+        self.assertEqual(len(record.observations), 1)
+        self.assertEqual(record.observations[0].value_quantity, 5.2)
+        self.assertEqual(record.observations[0].value_type, "quantity")
+
     def test_extract_endpoint_rejects_static_collection(self) -> None:
         # synthea-demo is a committed static collection; extraction must 400
         # even on fresh checkouts that do not have Blake's private demo files.

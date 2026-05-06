@@ -206,6 +206,25 @@ def _parse_dt(value: Any) -> datetime | None:
     return parsed
 
 
+def _numeric_value(value: Any) -> float | None:
+    """Parse FHIR quantity values without treating free text as numeric."""
+    if isinstance(value, bool) or value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    if not isinstance(value, str):
+        return None
+    cleaned = value.strip().replace(",", "")
+    if not cleaned:
+        return None
+    if not re.fullmatch(r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)", cleaned):
+        return None
+    try:
+        return float(cleaned)
+    except ValueError:
+        return None
+
+
 def _safe_id(prefix: str, value: Any, index: int) -> str:
     raw = str(value or "").strip() or f"{prefix}-{index}"
     return re.sub(r"[^A-Za-z0-9_.-]+", "-", raw).strip(".-")[:160] or f"{prefix}-{index}"
@@ -381,7 +400,7 @@ def _record_from_published_run(patient_id: str, run: dict[str, Any]) -> tuple[Pa
         start = _parse_dt(enc.get("period_start"))
         end = _parse_dt(enc.get("period_end")) or start
         provider = str(enc.get("provider") or "").strip()
-        site = _source_display_label(enc.get("source_label"))
+        site = _source_display_label(enc.get("source_label") or source_id)
         encounter_record = EncounterRecord(
             encounter_id=encounter_id,
             patient_id=patient_id,
@@ -414,7 +433,7 @@ def _record_from_published_run(patient_id: str, run: dict[str, Any]) -> tuple[Pa
                 source.get("source_observation_ref") or f"{obs.get('merged_ref')}-{source_idx}",
                 obs_idx,
             )
-            value_quantity = float(raw_value) if isinstance(raw_value, (int, float)) else None
+            value_quantity = _numeric_value(raw_value)
             record_obs = ObservationRecord(
                 obs_id=obs_id,
                 patient_id=patient_id,

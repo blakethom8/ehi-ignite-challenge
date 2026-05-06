@@ -15,9 +15,9 @@ function fmt(dt: string | null): string {
   });
 }
 
-function fmtYear(dt: string | null): string {
+function fmtMonthYear(dt: string | null): string {
   if (!dt) return "—";
-  return new Date(dt).getFullYear().toString();
+  return new Date(dt).toLocaleDateString("en-US", { year: "numeric", month: "short" });
 }
 
 const TIER_STYLES: Record<string, string> = {
@@ -744,7 +744,7 @@ function OverviewContent({
     conditions: true,
     medications: true,
     allergies: true,
-    immunizations: false,
+    immunizations: true,
     keyLabs: true,
   });
 
@@ -884,7 +884,7 @@ function OverviewContent({
                           </span>
                         </td>
                         <td className="py-1.5 pr-3 text-[#1c1c1e]">{c.display}</td>
-                        <td className="py-1.5 text-[#a5a8b5]">{fmtYear(c.onset_dt)}</td>
+                        <td className="py-1.5 text-[#a5a8b5]">{fmtMonthYear(c.onset_dt)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -929,7 +929,7 @@ function OverviewContent({
                           </span>
                         </td>
                         <td className="py-1.5 pr-3 text-[#1c1c1e]">{m.display}</td>
-                        <td className="py-1.5 text-[#a5a8b5]">{fmtYear(m.authored_on)}</td>
+                        <td className="py-1.5 text-[#a5a8b5]">{fmtMonthYear(m.authored_on)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -968,15 +968,18 @@ function OverviewContent({
                 <span className="font-medium">No documented allergies</span>
               </div>
             ) : (
-              <div className="flex flex-wrap gap-2">
+              <div className="space-y-2">
                 {overview.allergy_labels.map((label) => (
-                  <span
+                  <div
                     key={label}
-                    className="inline-flex items-center gap-1.5 text-xs bg-[#fffbeb] text-[#744000] border border-[#f59e0b]/40 px-2.5 py-1.5 rounded-lg font-medium"
+                    className="flex items-start gap-2 rounded-lg border border-[#f59e0b]/30 bg-[#fffbeb] px-3 py-2 text-sm"
                   >
-                    <AlertTriangle size={12} className="text-[#f59e0b] shrink-0" />
-                    {label}
-                  </span>
+                    <AlertTriangle size={14} className="mt-0.5 shrink-0 text-[#f59e0b]" />
+                    <div>
+                      <p className="font-medium text-[#744000]">{label}</p>
+                      <p className="text-xs text-[#9a5a16]">Documented allergy or sensitivity</p>
+                    </div>
+                  </div>
                 ))}
               </div>
             )}
@@ -994,11 +997,15 @@ function OverviewContent({
             {overview.unique_vaccines.length === 0 ? (
               <p className="text-sm text-[#a5a8b5]">No immunizations recorded.</p>
             ) : (
-              <div className="flex flex-wrap gap-2">
+              <div className="space-y-2">
                 {overview.unique_vaccines.map((v) => (
-                  <span key={v} className="text-xs bg-[#f5f6f8] text-[#555a6a] border border-[#e9eaef] px-2.5 py-1 rounded-full">
-                    {v}
-                  </span>
+                  <div key={v} className="flex items-start gap-2 rounded-lg border border-[#e9eaef] bg-[#fafafa] px-3 py-2 text-sm">
+                    <Stethoscope size={14} className="mt-0.5 shrink-0 text-[#0f766e]" />
+                    <div>
+                      <p className="font-medium text-[#1c1c1e]">{v}</p>
+                      <p className="text-xs text-[#667085]">Immunization documented in source data</p>
+                    </div>
+                  </div>
                 ))}
               </div>
             )}

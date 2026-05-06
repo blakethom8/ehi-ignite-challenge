@@ -8,7 +8,8 @@ described in patient-journey/CONTEXT-ENGINEERING.md:
   Layer 0: Hard filters (remove billing noise, routine vitals, old resolved conditions)
   Layer 1: Episode compression (deduplicate meds, compress encounters)
   Layer 3: Format optimization (structured markdown, temporal markers)
-  Layer 4: Persona selection (surgical pre-op focus for Max Gibber)
+  Layer 4: Review posture selection (general chart review by default;
+           specialized context packages can narrow the workflow)
 
 Layer 2 (LLM batch enrichment) is deferred to Phase 2.
 
@@ -26,10 +27,11 @@ import sqlite3
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
-from api.core.loader import load_patient, patient_display_name, path_from_patient_id
+from api.core.loader import load_patient, path_from_patient_id
 from api.core.sof_tools import DEFAULT_SOF_DB
 
 # ---------------------------------------------------------------------------
@@ -174,7 +176,7 @@ def _patient_uuid_from_id(patient_id: str) -> str | None:
 
 
 # ---------------------------------------------------------------------------
-# Key lab codes (LOINC) that matter for surgical pre-op
+# Key lab codes (LOINC) that matter for high-speed clinical review
 # ---------------------------------------------------------------------------
 
 KEY_LAB_LOINCS = {
@@ -202,6 +204,130 @@ KEY_LAB_LOINCS = {
 }
 
 
+def _fmt_dt(dt: datetime | None) -> str:
+    if dt is None:
+        return "unknown"
+    return dt.strftime("%b %d, %Y")
+
+
+def _value_text(value: float | None, unit: str = "") -> str:
+    if value is None:
+        return "value not recorded"
+    try:
+        rendered = f"{float(value):.1f}" if float(value) != int(float(value)) else str(int(float(value)))
+    except (ValueError, TypeError):
+        rendered = str(value)
+    return f"{rendered} {unit}".strip()
+
+
+def _is_active_med_status(status: str) -> bool:
+    return status.lower() in {"active", "on-hold", "intended", "draft"}
+
+
+def _build_record_medication_context(record, classifier: Any) -> tuple[list[str], list[str]]:
+    active_meds: list[str] = []
+    historical_meds: list[str] = []
+    med_class_map = {
+        classified.medication.med_id: classified.matched_classes
+        for classified in classifier.classify_all(record.medications)
+    }
+    meds_sorted = sorted(record.medications, key=lambda med: med.authored_on or datetime.min, reverse=True)
+
+    for med in meds_sorted[:80]:
+        status = med.status or "unknown"
+        classes = med_class_map.get(med.med_id, [])
+        class_text = f" [{', '.join(classes)}]" if classes else ""
+        reason_text = f" — for {med.reason_display}" if med.reason_display else ""
+        line = f"- **{med.display or 'Unknown medication'}**{class_text}{reason_text} | {status} | {_fmt_dt(med.authored_on)}"
+        if _is_active_med_status(status):
+            active_meds.append(line)
+        else:
+            historical_meds.append(line.replace("**", ""))
+
+    return active_meds[:25], historical_meds[:25]
+
+
+def _build_record_condition_context(record) -> tuple[list[str], list[str]]:
+    active_conditions: list[str] = []
+    resolved_conditions: list[str] = []
+    conditions_sorted = sorted(
+        record.conditions,
+        key=lambda condition: condition.onset_dt or condition.recorded_dt or datetime.min,
+        reverse=True,
+    )
+
+    for condition in conditions_sorted[:80]:
+        label = condition.code.label()
+        status = condition.clinical_status or ("active" if condition.is_active else "unknown")
+        onset = condition.onset_dt or condition.recorded_dt
+        line = f"- **{label}** | {status} | {_fmt_dt(onset)}"
+        if condition.is_active or status in {"active", "recurrence", "relapse"}:
+            active_conditions.append(line)
+        else:
+            resolved_conditions.append(line.replace("**", ""))
+
+    return active_conditions[:30], resolved_conditions[:25]
+
+
+def _build_record_lab_context(record) -> list[str]:
+    quantity_observations = [
+        obs for obs in record.observations
+        if obs.value_quantity is not None and (obs.loinc_code or obs.display)
+    ]
+    latest_by_key = {}
+    for obs in quantity_observations:
+        key = obs.loinc_code or obs.display
+        current = latest_by_key.get(key)
+        if current is None or (obs.effective_dt or datetime.min) > (current.effective_dt or datetime.min):
+            latest_by_key[key] = obs
+
+    key_labs = [
+        latest_by_key[loinc]
+        for loinc in KEY_LAB_LOINCS
+        if loinc in latest_by_key
+    ]
+    if not key_labs:
+        key_labs = sorted(
+            latest_by_key.values(),
+            key=lambda obs: obs.effective_dt or datetime.min,
+            reverse=True,
+        )
+
+    lines: list[str] = []
+    for obs in key_labs[:16]:
+        lab_name = KEY_LAB_LOINCS.get(obs.loinc_code, obs.display or obs.loinc_code or "Observation")
+        status_text = f", {obs.status}" if obs.status else ""
+        lines.append(f"- **{lab_name}**: {_value_text(obs.value_quantity, obs.value_unit)} ({_fmt_dt(obs.effective_dt)}{status_text})")
+    return lines
+
+
+def _linked_resource_summary(encounter) -> str:
+    linked = {
+        "obs": len(encounter.linked_observations),
+        "conditions": len(encounter.linked_conditions),
+        "meds": len(encounter.linked_medications),
+        "procedures": len(encounter.linked_procedures),
+        "reports": len(encounter.linked_diagnostic_reports),
+        "immunizations": len(encounter.linked_immunizations),
+    }
+    parts = [f"{count} {label}" for label, count in linked.items() if count]
+    return "; ".join(parts)
+
+
+def _build_record_encounter_context(record) -> list[str]:
+    encounters = sorted(record.encounters, key=lambda enc: enc.period.start or datetime.min, reverse=True)
+    lines: list[str] = []
+    for encounter in encounters[:12]:
+        class_text = encounter.class_code or "UNK"
+        type_text = encounter.encounter_type or "Encounter"
+        reason = f" — {encounter.reason_display}" if encounter.reason_display else ""
+        provider = encounter.practitioner_name or encounter.provider_org or "provider/source unknown"
+        linked = _linked_resource_summary(encounter)
+        linked_text = f" | linked: {linked}" if linked else ""
+        lines.append(f"- {_fmt_dt(encounter.period.start)} | {class_text} | {type_text}{reason} | {provider}{linked_text}")
+    return lines
+
+
 # ---------------------------------------------------------------------------
 # Main builder
 # ---------------------------------------------------------------------------
@@ -221,22 +347,24 @@ def build_clinical_context(patient_id: str) -> ClinicalContext:
         raise ValueError(f"Patient not found: {patient_id}")
     record, stats = result
 
-    # Get patient demographics
+    # Get patient demographics. Uploaded/published workspace records do not have
+    # a backing Synthea file path, so prefer the parsed record summary.
     path = path_from_patient_id(patient_id)
-    name = patient_display_name(path) if path else "Unknown"
+    name = stats.name or record.summary.name or patient_id
 
     # Resolve FHIR UUID for SOF queries
     fhir_uuid = _patient_uuid_from_id(patient_id)
     patient_ref = f"urn:uuid:{fhir_uuid}" if fhir_uuid else None
 
     # --- Patient summary line ---
-    birth = ""
-    gender = ""
-    if record.encounters:
-        # Approximate age from encounter data
-        pass
-
-    patient_summary = f"{name}"
+    demographics: list[str] = [name]
+    if record.summary.birth_date:
+        demographics.append(f"DOB {record.summary.birth_date.isoformat()}")
+    if record.summary.gender:
+        demographics.append(record.summary.gender)
+    if record.summary.city or record.summary.state:
+        demographics.append(", ".join(part for part in [record.summary.city, record.summary.state] if part))
+    patient_summary = " · ".join(demographics)
 
     # --- Safety flags from drug classifier ---
     from lib.clinical.drug_classifier import DrugClassifier
@@ -291,23 +419,25 @@ def build_clinical_context(patient_id: str) -> ClinicalContext:
                 (patient_ref,),
             ).fetchall()
 
-            # Resolve reasons from FHIR bundle
+            # Resolve reasons from the source bundle when one exists. Uploaded
+            # workspaces can be backed only by server-local persisted artifacts.
             med_reasons: dict[str, str] = {}
-            with open(path) as f:
-                bundle = json.load(f)
-            ref_index = {e.get("fullUrl", ""): e["resource"] for e in bundle.get("entry", [])}
-            for entry in bundle.get("entry", []):
-                resource = entry.get("resource", {})
-                if resource.get("resourceType") == "MedicationRequest":
-                    drug_text = resource.get("medicationCodeableConcept", {}).get("text", "")
-                    for ref in resource.get("reasonReference", []):
-                        display = ref.get("display", "")
-                        if not display:
-                            target = ref_index.get(ref.get("reference", ""), {})
-                            display = target.get("code", {}).get("text", "")
-                        if drug_text and display:
-                            med_reasons[drug_text.strip().lower()] = display
-                            break
+            if path:
+                with open(path) as f:
+                    bundle = json.load(f)
+                ref_index = {e.get("fullUrl", ""): e["resource"] for e in bundle.get("entry", [])}
+                for entry in bundle.get("entry", []):
+                    resource = entry.get("resource", {})
+                    if resource.get("resourceType") == "MedicationRequest":
+                        drug_text = resource.get("medicationCodeableConcept", {}).get("text", "")
+                        for ref in resource.get("reasonReference", []):
+                            display = ref.get("display", "")
+                            if not display:
+                                target = ref_index.get(ref.get("reference", ""), {})
+                                display = target.get("code", {}).get("text", "")
+                            if drug_text and display:
+                                med_reasons[drug_text.strip().lower()] = display
+                                break
 
             for row in med_rows:
                 dur = _duration_str(row["start_date"], row["end_date"])
@@ -326,6 +456,9 @@ def build_clinical_context(patient_id: str) -> ClinicalContext:
 
         finally:
             conn.close()
+
+    if not active_meds and not historical_meds:
+        active_meds, historical_meds = _build_record_medication_context(record, classifier)
 
     # --- Active conditions (from SOF) ---
     active_conditions: list[str] = []
@@ -355,6 +488,9 @@ def build_clinical_context(patient_id: str) -> ClinicalContext:
                     )
         finally:
             conn.close()
+
+    if not active_conditions and not resolved_conditions:
+        active_conditions, resolved_conditions = _build_record_condition_context(record)
 
     # --- Key labs (from SOF observation_latest) ---
     key_labs: list[str] = []
@@ -388,6 +524,9 @@ def build_clinical_context(patient_id: str) -> ClinicalContext:
         finally:
             conn.close()
 
+    if not key_labs:
+        key_labs = _build_record_lab_context(record)
+
     # --- Recent encounters (from SOF, last 10 with diagnoses) ---
     recent_encounters: list[str] = []
 
@@ -416,6 +555,9 @@ def build_clinical_context(patient_id: str) -> ClinicalContext:
 
         finally:
             conn.close()
+
+    if not recent_encounters:
+        recent_encounters = _build_record_encounter_context(record)
 
     # --- Procedures summary (from FHIR, grouped) ---
     procedures_summary: list[str] = []

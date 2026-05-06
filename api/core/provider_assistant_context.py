@@ -32,8 +32,8 @@ from api.core.context_builder import build_clinical_context
 from api.core.provider_assistant import (
     AssistantCitationPayload,
     AssistantResult,
-    _build_facts,
     _collect_citations,
+    _rank_relevant_facts,
 )
 from api.core.tracing import SpanKind, start_span
 
@@ -54,7 +54,7 @@ def _resolve_api_key() -> str:
     return env_key
 
 
-_SYSTEM_TEMPLATE = """You are a clinical chart assistant helping a surgeon review a patient before a procedure.
+_SYSTEM_TEMPLATE = """You are a clinical chart assistant helping a clinician review a patient's published chart.
 
 INSTRUCTIONS:
 - Answer the question directly and concisely based ONLY on the patient data below.
@@ -62,9 +62,10 @@ INSTRUCTIONS:
 - If the data supports a clear clinical recommendation, state it.
 - If the evidence is weak or conflicting, explicitly say so. Push back on unsafe assumptions.
 - Cite specific data points (medication names, lab values, dates) in your answer.
+- Do not assume the workflow is surgical or pre-operative unless the user asks or an attached context package narrows the task.
 - Use the stance: {stance}. If "opinionated", give a direct recommendation. If "balanced", present both sides.
 - Format your response as plain text, not JSON. Use bullet points for lists.
-- At the end, suggest 2-3 follow-up questions the surgeon should consider.
+- At the end, suggest 2-3 follow-up questions the clinician or patient should consider.
 
 {context}
 
@@ -197,8 +198,13 @@ def answer_with_context(
     follow_ups = _extract_follow_ups(answer_text)
 
     # Step 5: Build citations from the context (deterministic)
-    facts_list, _ = _build_facts(patient_id)
-    citations = _collect_citations(facts_list[:8], max_items=6)
+    _intent, relevant_facts, _summary = _rank_relevant_facts(
+        patient_id=patient_id,
+        question=question,
+        history=history,
+        max_items=8,
+    )
+    citations = _collect_citations(relevant_facts, max_items=6)
 
     history_count = len([t for t in (history or []) if t.get("content", "").strip()])
 
@@ -209,6 +215,7 @@ def answer_with_context(
         follow_ups=follow_ups,
         engine="context-single-turn",
         retrieved_facts=[
+            *[f"[Evidence] {fact.text}" for fact in relevant_facts[:6]],
             *[f"[Safety] {s}" for s in clinical_ctx.safety_flags[:4]],
             *[f"[Med] {m}" for m in clinical_ctx.active_medications[:5]],
             *[f"[Lab] {l}" for l in clinical_ctx.key_labs[:5]],

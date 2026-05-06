@@ -48,6 +48,11 @@ _INTENT_EXPANSIONS: dict[str, set[str]] = {
     "visit": {"encounter", "timeline", "date"},
     "condition": {"diagnosis", "diagnoses", "problem"},
     "medication": {"med", "drug", "prescription", "active", "stopped"},
+    "lab": {"labs", "laboratory", "observation", "result", "results", "trend", "abnormal"},
+    "labs": {"lab", "laboratory", "observation", "result", "results", "trend", "abnormal"},
+    "creatinine": {"lab", "kidney", "renal"},
+    "glucose": {"lab", "diabetes", "metabolic"},
+    "cholesterol": {"lab", "lipid", "cardiometabolic"},
 }
 
 
@@ -104,6 +109,37 @@ def _fmt_dt(dt: datetime | None) -> str:
     return dt.strftime("%b %d, %Y")
 
 
+def _value_text(value: float | None, unit: str = "") -> str:
+    if value is None:
+        return "value not recorded"
+    try:
+        rendered = f"{float(value):.1f}" if float(value) != int(float(value)) else str(int(float(value)))
+    except (ValueError, TypeError):
+        rendered = str(value)
+    return f"{rendered} {unit}".strip()
+
+
+def _observation_value_text(obs: Any) -> str:
+    if obs.value_quantity is not None:
+        return _value_text(obs.value_quantity, obs.value_unit)
+    if obs.value_concept_display:
+        return obs.value_concept_display
+    components = getattr(obs, "components", []) or []
+    rendered_components: list[str] = []
+    for component in components[:4]:
+        label = getattr(component, "display", None) or getattr(component, "code", None) or "component"
+        value = getattr(component, "value_quantity", None)
+        unit = getattr(component, "value_unit", "") or ""
+        concept = getattr(component, "value_concept_display", None)
+        if value is not None:
+            rendered_components.append(f"{label}: {_value_text(value, unit)}")
+        elif concept:
+            rendered_components.append(f"{label}: {concept}")
+    if rendered_components:
+        return "; ".join(rendered_components)
+    return "value not recorded"
+
+
 def _detect_intent(query_tokens: set[str]) -> str:
     if {"anticoagulant", "antiplatelet", "blood", "thinner", "warfarin", "eliquis", "xarelto"} & query_tokens:
         return "anticoag"
@@ -115,6 +151,8 @@ def _detect_intent(query_tokens: set[str]) -> str:
         return "interactions"
     if {"allergy", "allergies", "criticality", "reaction"} & query_tokens:
         return "allergy"
+    if {"lab", "labs", "laboratory", "observation", "result", "results", "trend", "abnormal", "creatinine", "glucose", "cholesterol", "a1c"} & query_tokens:
+        return "lab"
     if {"last", "latest", "recent", "visit", "encounter"} & query_tokens:
         return "recent_encounter"
     return "general"
@@ -235,6 +273,30 @@ def _build_facts(patient_id: str) -> tuple[list[_Fact], dict]:
             priority=priority,
         ))
 
+    # Observation and lab facts
+    observations = sorted(record.observations, key=lambda obs: obs.effective_dt or datetime.min, reverse=True)
+    for obs in observations[:120]:
+        label = obs.display or obs.loinc_code or "Observation"
+        category = (obs.category or "observation").lower()
+        value_text = _observation_value_text(obs)
+        detail = f"{label}: {value_text}; status={obs.status or 'unknown'}; date={_fmt_dt(obs.effective_dt)}"
+        tags = {"observation", category}
+        if "laboratory" in category or obs.value_quantity is not None:
+            tags.add("lab")
+        facts.append(_Fact(
+            text=detail,
+            citation=AssistantCitationPayload(
+                source_type="Observation",
+                resource_id=obs.obs_id,
+                label=label,
+                detail=f"value={value_text}; category={obs.category or 'unknown'}; status={obs.status or 'unknown'}",
+                event_date=obs.effective_dt,
+            ),
+            keywords=_expand_tokens(_tokenize(f"{label} {obs.loinc_code} {obs.category} {value_text} {obs.status}")),
+            tags=tags,
+            priority=11 if "lab" in tags else 6,
+        ))
+
     # Allergy facts
     for allergy in record.allergies[:30]:
         allergy_label = allergy.code.label()
@@ -256,6 +318,25 @@ def _build_facts(patient_id: str) -> tuple[list[_Fact], dict]:
             keywords=_expand_tokens(_tokenize(f"{allergy_label} {allergy.criticality} {' '.join(allergy.categories)}")),
             tags={"allergy", (allergy.criticality or "unknown").lower()},
             priority=priority,
+        ))
+
+    # Immunization facts
+    immunizations = sorted(record.immunizations, key=lambda imm: imm.occurrence_dt or datetime.min, reverse=True)
+    for immunization in immunizations[:60]:
+        label = immunization.display or immunization.cvx_code or "Immunization"
+        detail = f"Immunization: {label}; status={immunization.status}; date={_fmt_dt(immunization.occurrence_dt)}"
+        facts.append(_Fact(
+            text=detail,
+            citation=AssistantCitationPayload(
+                source_type="Immunization",
+                resource_id=immunization.imm_id,
+                label=label,
+                detail=f"status={immunization.status}; cvx={immunization.cvx_code or 'unknown'}",
+                event_date=immunization.occurrence_dt,
+            ),
+            keywords=_expand_tokens(_tokenize(f"{label} {immunization.status} immunization vaccine")),
+            tags={"immunization", "vaccine"},
+            priority=7,
         ))
 
     # Encounter facts
@@ -286,6 +367,8 @@ def _build_facts(patient_id: str) -> tuple[list[_Fact], dict]:
         "interactions": interactions,
         "encounters": encounters,
         "allergies": record.allergies,
+        "lab_count": len(record.observations),
+        "immunization_count": len(record.immunizations),
         "active_high_risk_condition_count": len(active_high_risk_conditions),
         "parse_warning_count": stats.parse_warning_count,
     }
@@ -306,6 +389,8 @@ def _score_fact(fact: _Fact, query_tokens: set[str], intent: str) -> int:
     if intent == "interactions" and "interaction" in fact.tags:
         score += 8
     if intent == "allergy" and "allergy" in fact.tags:
+        score += 8
+    if intent == "lab" and ("lab" in fact.tags or "observation" in fact.tags):
         score += 8
     if intent == "recent_encounter" and "encounter" in fact.tags:
         score += 8
@@ -434,14 +519,14 @@ def _direct_answer(intent: str, summary: dict, question: str) -> tuple[str, str,
             return (
                 "Short answer: Yes. Active opioid exposure is present.",
                 "high",
-                "Recommendation: flag anesthesia and pain teams now; assume higher peri-op analgesic requirements.",
+                "Recommendation: flag the care team and confirm the current dose, duration, and tolerance before medication or procedure decisions.",
             )
         hist = [f for f in summary["historical_flags"] if f.class_key == "opioids"]
         if hist:
             return (
                 "Short answer: No active opioid class found, but historical opioid exposure exists.",
                 "medium",
-                "Recommendation: confirm timing, duration, and any tolerance or dependence risk before surgery.",
+                "Recommendation: confirm timing, duration, and any tolerance or dependence risk before making pain-management decisions.",
             )
         return (
             "Short answer: No opioid class was detected in this chart snapshot.",
@@ -455,7 +540,7 @@ def _direct_answer(intent: str, summary: dict, question: str) -> tuple[str, str,
             if top.severity == "contraindicated":
                 rec = "Recommendation: stop and resolve contraindicated combinations before proceeding."
             elif top.severity == "major":
-                rec = "Recommendation: treat as high priority; adjust regimen or monitoring before surgery."
+                rec = "Recommendation: treat as high priority; adjust regimen or monitoring before relying on this medication list."
             else:
                 rec = "Recommendation: proceed only with explicit mitigation documented."
             return (
@@ -483,6 +568,20 @@ def _direct_answer(intent: str, summary: dict, question: str) -> tuple[str, str,
             f"Short answer: Allergy history exists ({len(allergies)} records), without high-criticality flags.",
             "medium",
             "Recommendation: still verify reaction context before medication/procedure orders.",
+        )
+
+    if intent == "lab":
+        lab_count = summary.get("lab_count", 0)
+        if lab_count:
+            return (
+                f"Short answer: Lab and observation data is present ({lab_count} observation record(s)).",
+                "medium",
+                "Recommendation: review the dated values and trends in the cited evidence; sparse or old labs should not be treated as current status.",
+            )
+        return (
+            "Short answer: I do not see lab or observation values in this chart snapshot.",
+            "low",
+            "Recommendation: verify that the latest lab PDF or FHIR export has been uploaded, parsed, harmonized, and published.",
         )
 
     if intent == "recent_encounter":
@@ -554,6 +653,12 @@ def _follow_ups(intent: str) -> list[str]:
             "What are the top 3 blockers to clearance right now?",
             "Which risks are active vs historical?",
             "What concrete actions should happen before surgery date?",
+        ]
+    if intent == "lab":
+        return [
+            "Which lab values are most recent and clinically important?",
+            "Are there abnormal or missing labs that need follow-up?",
+            "What changed across the available lab timeline?",
         ]
     if intent == "allergy":
         return [

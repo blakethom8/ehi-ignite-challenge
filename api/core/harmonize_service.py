@@ -1515,11 +1515,15 @@ def facts_for_document_reference(
     if coll is None:
         return None
 
-    # Find the matching SourceDefinition (label + kind) for the doc ref.
+    # Find the matching SourceDefinition for the doc ref. Clinical note
+    # artifacts are source-scoped rather than merged-fact-scoped, so they use
+    # the source id instead of the DocumentReference edge.
+    matching_source_id: str | None = None
     matching_label: str | None = None
     matching_kind: str | None = None
     for s in coll.sources:
         if s.document_reference == document_reference:
+            matching_source_id = s.id
             matching_label = s.label
             matching_kind = s.kind
             break
@@ -1532,6 +1536,11 @@ def facts_for_document_reference(
     med_hits = [m for m in merged_medications(collection_id) if _has_doc_ref(m.sources)]
     allergy_hits = [m for m in merged_allergies(collection_id) if _has_doc_ref(m.sources)]
     im_hits = [m for m in merged_immunizations(collection_id) if _has_doc_ref(m.sources)]
+    note_hits = [
+        {**n, "text": str(n.get("text") or "")[:4000]}
+        for n in clinical_artifacts(collection_id).get("clinical_notes", [])
+        if matching_source_id is not None and n.get("source_id") == matching_source_id
+    ]
 
     return {
         "document_reference": document_reference,
@@ -1542,18 +1551,21 @@ def facts_for_document_reference(
         "medications": [serialize_medication(m) for m in med_hits],
         "allergies": [serialize_allergy(m) for m in allergy_hits],
         "immunizations": [serialize_immunization(m) for m in im_hits],
+        "clinical_notes": note_hits,
         "totals": {
             "observations": len(obs_hits),
             "conditions": len(cond_hits),
             "medications": len(med_hits),
             "allergies": len(allergy_hits),
             "immunizations": len(im_hits),
+            "clinical_notes": len(note_hits),
             "all": (
                 len(obs_hits)
                 + len(cond_hits)
                 + len(med_hits)
                 + len(allergy_hits)
                 + len(im_hits)
+                + len(note_hits)
             ),
         },
     }

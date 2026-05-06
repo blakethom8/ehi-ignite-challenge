@@ -22,6 +22,7 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from lib.fhir_parser.bundle_parser import parse_bundle
+from lib.fhir_parser.extractors import extract_patient
 from lib.patient_catalog.single_patient import compute_patient_stats, PatientStats
 from lib.fhir_parser.models import (
     AllergyRecord,
@@ -210,6 +211,64 @@ def _safe_id(prefix: str, value: Any, index: int) -> str:
     return re.sub(r"[^A-Za-z0-9_.-]+", "-", raw).strip(".-")[:160] or f"{prefix}-{index}"
 
 
+def _source_display_label(label: Any, kind: str | None = None) -> str:
+    """Turn upload/cache filenames into clinician-readable source labels."""
+    raw = str(label or "").strip()
+    if not raw:
+        return "Published chart"
+    cleaned = re.sub(r"^[0-9a-fA-F]{8,16}-", "", raw)
+    cleaned = cleaned.removesuffix(".extracted.json")
+    stem = Path(cleaned).stem
+    lower = stem.lower().replace("_", "-")
+    if "cedars" in lower:
+        return "Cedars-Sinai"
+    if "functionhealth" in lower or "function-health" in lower or "function" in lower:
+        return "Function Health"
+    if "quest" in lower:
+        return "Quest Diagnostics"
+    if "kaiser" in lower:
+        return "Kaiser Permanente"
+    if kind == "extracted-pdf":
+        return re.sub(r"[-_]+", " ", stem).strip().title() or "PDF source"
+    return re.sub(r"[-_]+", " ", stem).strip().title() or "Published chart"
+
+
+def _collection_patient_summary(
+    collection_id: str,
+    patient_id: str,
+    file_path: str,
+    fallback_name: str,
+) -> PatientSummary:
+    """Promote the first Patient resource from upload sources into the facade.
+
+    Published workspace charts keep their stable workspace id, but should still
+    surface real demographics from an uploaded FHIR export when present.
+    """
+    summary = PatientSummary(
+        patient_id=patient_id,
+        file_path=file_path,
+        name=fallback_name,
+        gender="workspace",
+    )
+    try:
+        from api.core import harmonize_service
+
+        resources_by_source = harmonize_service.load_collection_resources(collection_id)
+    except Exception:
+        return summary
+    for resources in resources_by_source.values():
+        for patient in resources.get("Patient", []):
+            if not isinstance(patient, dict):
+                continue
+            parsed = extract_patient(patient, file_path=file_path)
+            parsed.patient_id = patient_id
+            parsed.file_path = file_path
+            if not parsed.name:
+                parsed.name = fallback_name
+            return parsed
+    return summary
+
+
 def _best_source_date(sources: list[dict[str, Any]], field: str) -> datetime | None:
     dates = [_parse_dt(source.get(field)) for source in sources]
     present = [dt for dt in dates if dt is not None]
@@ -226,7 +285,8 @@ def _add_encounter(
 ) -> str | None:
     if event_dt is None:
         return None
-    key = (source_label or "Published chart", event_dt.date().isoformat())
+    display_source = _source_display_label(source_label)
+    key = (display_source, event_dt.date().isoformat())
     encounter = encounter_by_key.get(key)
     if encounter is None:
         encounter_id = _safe_id("enc", f"published-{key[0]}-{key[1]}", len(encounter_by_key))
@@ -238,7 +298,8 @@ def _add_encounter(
             encounter_type="Published chart source event",
             reason_display="Harmonized source fact",
             period=Period(start=event_dt, end=event_dt),
-            provider_org=source_label or "Published chart",
+            provider_org=display_source,
+            practitioner_name=display_source,
         )
         encounter_by_key[key] = encounter
         record.encounters.append(encounter)
@@ -296,12 +357,14 @@ def _record_from_published_run(patient_id: str, run: dict[str, Any]) -> tuple[Pa
     """
     collection_name = str(run.get("collection_name") or patient_id)
     display_name = collection_name.removesuffix(" — patient workspace")
+    collection_id = str(run.get("collection_id") or "")
+    artifact_path = str(run.get("artifact_path") or "")
     record = PatientRecord(
-        summary=PatientSummary(
-            patient_id=patient_id,
-            file_path=str(run.get("artifact_path") or ""),
-            name=display_name,
-            gender="workspace",
+        summary=_collection_patient_summary(
+            collection_id,
+            patient_id,
+            artifact_path,
+            display_name,
         )
     )
     encounter_by_key: dict[tuple[str, str], EncounterRecord] = {}
@@ -317,6 +380,8 @@ def _record_from_published_run(patient_id: str, run: dict[str, Any]) -> tuple[Pa
         encounter_id = _safe_id("enc", f"{source_id}-{raw_id}", idx)
         start = _parse_dt(enc.get("period_start"))
         end = _parse_dt(enc.get("period_end")) or start
+        provider = str(enc.get("provider") or "").strip()
+        site = _source_display_label(enc.get("source_label"))
         encounter_record = EncounterRecord(
             encounter_id=encounter_id,
             patient_id=patient_id,
@@ -325,7 +390,8 @@ def _record_from_published_run(patient_id: str, run: dict[str, Any]) -> tuple[Pa
             encounter_type=str(enc.get("type") or "Source encounter"),
             reason_display=str(enc.get("reason") or ""),
             period=Period(start=start, end=end),
-            provider_org=str(enc.get("provider") or enc.get("source_label") or "Published chart"),
+            provider_org=provider or site,
+            practitioner_name=provider or site,
         )
         record.encounters.append(encounter_record)
         if raw_id:

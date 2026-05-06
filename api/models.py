@@ -1252,7 +1252,18 @@ class HarmonizeContributionTotals(BaseModel):
     medications: int
     allergies: int
     immunizations: int
+    clinical_notes: int = 0
     all: int
+
+
+class HarmonizeClinicalNote(BaseModel):
+    source_id: str
+    source_label: str
+    resource_type: str
+    resource_id: str
+    note_index: int
+    date: str | None = None
+    text: str
 
 
 class HarmonizeContributionsResponse(BaseModel):
@@ -1267,6 +1278,7 @@ class HarmonizeContributionsResponse(BaseModel):
     medications: list[HarmonizeMergedMedication]
     allergies: list[HarmonizeMergedAllergy]
     immunizations: list[HarmonizeMergedImmunization]
+    clinical_notes: list[HarmonizeClinicalNote] = Field(default_factory=list)
     totals: HarmonizeContributionTotals
 
 

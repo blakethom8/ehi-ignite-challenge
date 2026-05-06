@@ -268,6 +268,16 @@ class UploadCollectionDiscoveryTests(unittest.TestCase):
                     "entry": [
                         {
                             "resource": {
+                                "resourceType": "Patient",
+                                "id": "patient-1",
+                                "name": [{"given": ["Workspace"], "family": "Downstream"}],
+                                "gender": "female",
+                                "birthDate": "1984-03-02",
+                                "address": [{"city": "Los Angeles", "state": "CA"}],
+                            }
+                        },
+                        {
+                            "resource": {
                                 "resourceType": "Observation",
                                 "code": {
                                     "coding": [
@@ -584,6 +594,9 @@ class UploadCollectionDiscoveryTests(unittest.TestCase):
         self.assertEqual(overview.status_code, 200)
         body = overview.json()
         self.assertEqual(body["id"], "workspace-downstream")
+        self.assertEqual(body["name"], "Workspace Downstream")
+        self.assertEqual(body["birth_date"], "1984-03-02")
+        self.assertEqual(body["gender"], "female")
         self.assertEqual(body["unique_loinc_count"], 1)
         self.assertGreaterEqual(body["total_resources"], 2)
 
@@ -632,6 +645,15 @@ class UploadCollectionDiscoveryTests(unittest.TestCase):
         resource_types = {entry["resource"]["resourceType"] for entry in raw_fhir.json()["entry"]}
         self.assertIn("Procedure", resource_types)
         self.assertIn("DiagnosticReport", resource_types)
+
+        contributions = self.client.get(
+            "/api/harmonize/workspace-workspace-clinical-artifacts/"
+            "contributions/DocumentReference/upload-clinical"
+        )
+        self.assertEqual(contributions.status_code, 200)
+        contribution_body = contributions.json()
+        self.assertGreaterEqual(contribution_body["totals"]["clinical_notes"], 2)
+        self.assertTrue(contribution_body["clinical_notes"][0]["text"])
 
     def test_provider_assistant_uses_published_workspace_snapshot(self) -> None:
         sess = self._stage_session("workspace-assistant")

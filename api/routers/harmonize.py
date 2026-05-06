@@ -32,6 +32,7 @@ from api.models import (
     HarmonizeAllergiesResponse,
     HarmonizeCollection,
     HarmonizeCollectionsResponse,
+    HarmonizeClinicalNote,
     HarmonizeConditionsResponse,
     HarmonizeContributionsResponse,
     HarmonizeContributionTotals,
@@ -551,6 +552,7 @@ def get_contributions(
         medications=[HarmonizeMergedMedication(**m) for m in payload["medications"]],
         allergies=[HarmonizeMergedAllergy(**m) for m in payload["allergies"]],
         immunizations=[HarmonizeMergedImmunization(**m) for m in payload["immunizations"]],
+        clinical_notes=[HarmonizeClinicalNote(**m) for m in payload.get("clinical_notes", [])],
         totals=HarmonizeContributionTotals(**payload["totals"]),
     )
 

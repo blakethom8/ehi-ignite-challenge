@@ -1034,7 +1034,18 @@ export interface HarmonizeContributionTotals {
   medications: number;
   allergies: number;
   immunizations: number;
+  clinical_notes: number;
   all: number;
+}
+
+export interface HarmonizeClinicalNote {
+  source_id: string;
+  source_label: string;
+  resource_type: string;
+  resource_id: string;
+  note_index: number;
+  date: string | null;
+  text: string;
 }
 
 export interface HarmonizeSourceDiffSourceTotals {
@@ -1074,6 +1085,7 @@ export interface HarmonizeContributionsResponse {
   medications: HarmonizeMergedMedication[];
   allergies: HarmonizeMergedAllergy[];
   immunizations: HarmonizeMergedImmunization[];
+  clinical_notes: HarmonizeClinicalNote[];
   totals: HarmonizeContributionTotals;
 }
 

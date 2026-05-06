@@ -653,12 +653,14 @@ function ContributionsPanel({
         medications: uniqueDiff.unique_facts.medications,
         allergies: uniqueDiff.unique_facts.allergies,
         immunizations: uniqueDiff.unique_facts.immunizations,
+        clinical_notes: [],
         totals: {
           observations: uniqueDiff.totals.unique.observations,
           conditions: uniqueDiff.totals.unique.conditions,
           medications: uniqueDiff.totals.unique.medications,
           allergies: uniqueDiff.totals.unique.allergies,
           immunizations: uniqueDiff.totals.unique.immunizations,
+          clinical_notes: uniqueDiff.totals.unique.clinical_notes ?? 0,
           all: uniqueDiff.totals.unique.all,
         },
       }
@@ -669,6 +671,7 @@ function ContributionsPanel({
           medications: data.medications,
           allergies: data.allergies,
           immunizations: data.immunizations,
+          clinical_notes: data.clinical_notes,
           totals: data.totals,
         }
       : null;
@@ -718,12 +721,13 @@ function ContributionsPanel({
         <p className="mt-3 text-sm text-[#667085]">Walking the Provenance graph…</p>
       ) : (
         <>
-          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
             <ContributionStat label="Labs" value={view.totals.observations} />
             <ContributionStat label="Conditions" value={view.totals.conditions} />
             <ContributionStat label="Medications" value={view.totals.medications} />
             <ContributionStat label="Allergies" value={view.totals.allergies} />
             <ContributionStat label="Immunizations" value={view.totals.immunizations} />
+            <ContributionStat label="Clinical notes" value={view.totals.clinical_notes ?? 0} />
           </div>
           {showUniqueOnly && view.totals.all === 0 && (
             <p className="mt-3 rounded-lg bg-amber-50 p-3 text-xs text-amber-800">
@@ -770,6 +774,13 @@ function ContributionsPanel({
                   : a.rxnorm
                     ? `RxNorm ${a.rxnorm}`
                     : "text-only",
+              }))}
+            />
+            <ContributionList
+              title="Clinical notes"
+              items={view.clinical_notes.map((note) => ({
+                primary: note.text.length > 96 ? `${note.text.slice(0, 96)}...` : note.text,
+                secondary: `${note.resource_type}${note.date ? ` · ${reviewDateLabel(note.date)}` : ""}`,
               }))}
             />
           </div>

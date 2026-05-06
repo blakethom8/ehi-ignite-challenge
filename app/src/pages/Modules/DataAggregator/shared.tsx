@@ -134,13 +134,18 @@ function PdfPageProgressMap({ job }: { job: HarmonizeExtractJobResponse | null }
   const visiblePages = totalPages ? Math.min(totalPages, 8) : 4;
   const processedPages = job?.processed_pages ?? 0;
   const isRunning = job?.status === "pending" || job?.status === "running";
+  const hasExactPageProgress = Boolean(totalPages && processedPages > 0);
 
   return (
     <div className="rounded-lg border border-[#ead3b9] bg-white px-3 py-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs font-semibold uppercase tracking-wider text-[#9a5a16]">Page processing map</p>
+        <p className="text-xs font-semibold uppercase tracking-wider text-[#9a5a16]">Estimated page stages</p>
         <p className="text-xs text-[#667085]">
-          {totalPages ? `${processedPages}/${totalPages} pages complete` : "Counting pages when extraction starts"}
+          {hasExactPageProgress
+            ? `${processedPages}/${totalPages} pages reported`
+            : totalPages
+              ? `${totalPages} pages detected; server progress is coarse`
+              : "Counting pages when extraction starts"}
         </p>
       </div>
       <div className="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-8">
@@ -165,6 +170,9 @@ function PdfPageProgressMap({ job }: { job: HarmonizeExtractJobResponse | null }
           );
         })}
       </div>
+      <p className="mt-2 text-xs leading-5 text-[#667085]">
+        Page tiles are an orientation aid while the server runs the multipass job. The backend currently reports coarse job progress and may complete several pages at once.
+      </p>
       {totalPages && totalPages > visiblePages && (
         <p className="mt-2 text-xs text-[#667085]">Showing the first {visiblePages} pages; remaining pages continue in the same server job.</p>
       )}
@@ -478,7 +486,7 @@ function PreparedPreviewPane({
   const extractionProgress = extractJob?.progress_percent ?? (extractInProgress ? 10 : 0);
   const extractionEstimateDetail = extractJob?.total_pages
     ? `${extractJob.total_pages} page${extractJob.total_pages === 1 ? "" : "s"} detected`
-    : "often 30-90s/page";
+    : "usually page-dependent";
   const extractionStage = extractJob?.stage ?? (extractInProgress ? "Starting processor" : "Waiting to start");
   const preparedJsonQuery = useQuery({
     queryKey: ["aggregation-upload-json", patientId, file?.file_id],
@@ -657,7 +665,7 @@ function PreparedPreviewPane({
                       <div>
                         <p className="text-sm font-semibold text-[#1c1c1e]">{extractionStage}</p>
                         <p className="mt-1 text-xs leading-5 text-[#667085]">
-                          {extractJob?.detail ?? "Runs on the server, so you can leave this page and come back later."}
+                          {extractJob?.detail ?? "Runs on the server, so you can leave this page and come back later. Progress updates are coarse until page-level events are wired in."}
                         </p>
                       </div>
                       <p className="text-sm font-semibold text-[#5b76fe]">{extractionProgress}%</p>

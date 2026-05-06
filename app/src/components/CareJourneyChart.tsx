@@ -81,6 +81,10 @@ function fmtDate(d: string | null | undefined): string {
   return new Date(d).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
 }
 
+function fmtMonthYear(ms: number): string {
+  return new Date(ms).toLocaleDateString("en-US", { year: "numeric", month: "short" });
+}
+
 function drugClassLabel(cls: string): string {
   return cls.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
@@ -728,20 +732,32 @@ export function CareJourneyChart({ data, dateRange, onDateRangeChange, onRowClic
       })()}
 
       {/* ── Minimap / range selector (pinned at top) ────────────────── */}
-      <Minimap
-        fullMin={fullMin}
-        fullMax={fullMax}
-        viewMin={viewMin}
-        viewMax={viewMax}
-        width={svgWidth}
-        leftOffset={LEFT_W}
-        allRows={allRows}
-        onRangeChange={(min, max) => {
-          if (onDateRangeChange) {
-            onDateRangeChange([new Date(min).toISOString(), new Date(max).toISOString()]);
-          }
-        }}
-      />
+      <div className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
+        <div className="flex h-8 items-center border-b border-slate-100 text-[10px] font-medium text-slate-500">
+          <div className="shrink-0 border-r border-slate-200 px-2 uppercase tracking-wider" style={{ width: LEFT_W }}>
+            Visible timeline
+          </div>
+          <div className="flex flex-1 items-center justify-between px-2">
+            <span>{fmtMonthYear(viewMin)}</span>
+            <span className="text-slate-400">Scroll rows with this time range pinned</span>
+            <span>{fmtMonthYear(viewMax)}</span>
+          </div>
+        </div>
+        <Minimap
+          fullMin={fullMin}
+          fullMax={fullMax}
+          viewMin={viewMin}
+          viewMax={viewMax}
+          width={svgWidth}
+          leftOffset={LEFT_W}
+          allRows={allRows}
+          onRangeChange={(min, max) => {
+            if (onDateRangeChange) {
+              onDateRangeChange([new Date(min).toISOString(), new Date(max).toISOString()]);
+            }
+          }}
+        />
+      </div>
 
       <div className="flex" style={{ height: totalH + 36 }}>
         {/* ── Left panel: tree labels ────────────────────────────────── */}
@@ -786,7 +802,7 @@ export function CareJourneyChart({ data, dateRange, onDateRangeChange, onRowClic
                     : row.level === 1
                     ? "font-medium text-slate-700"
                     : "text-slate-600"
-                } ${row.sourceKind ? "cursor-pointer hover:bg-blue-50/50" : ""}`}
+                } ${row.sourceKind || row.collapsible ? "cursor-pointer hover:bg-blue-50/50" : ""}`}
                 style={{
                   height: ROW_H,
                   paddingLeft: row.level === 0 ? 8 : row.level === 1 ? 24 : 40,
@@ -797,6 +813,8 @@ export function CareJourneyChart({ data, dateRange, onDateRangeChange, onRowClic
                 onClick={() => {
                   if (row.sourceKind && row.sourceData && onRowClick) {
                     onRowClick({ kind: row.sourceKind, rowId: row.id, data: row.sourceData });
+                  } else if (row.collapsible) {
+                    toggleCollapse(row.id);
                   }
                 }}
               >

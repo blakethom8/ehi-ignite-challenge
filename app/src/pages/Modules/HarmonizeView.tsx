@@ -66,6 +66,27 @@ function sourceStatusClass(status: string): string {
   return "bg-red-50 text-red-700";
 }
 
+function reviewDateLabel(value: string | null | undefined): string {
+  if (!value) return "No date";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function reviewValueLabel(value: number | null, unit: string | null, rawValue?: number | null, rawUnit?: string | null): string {
+  const displayValue = value ?? rawValue;
+  const displayUnit = unit ?? rawUnit ?? "";
+  if (displayValue == null) return "No numeric value";
+  return `${displayValue}${displayUnit ? ` ${displayUnit}` : ""}`;
+}
+
+function shortReference(value: string | null | undefined): string {
+  if (!value) return "No technical reference";
+  const [resourceType, id] = value.split("/");
+  if (!id) return value;
+  return `${resourceType}/${id.slice(0, 10)}…`;
+}
+
 function MetricCard({
   label,
   value,
@@ -469,6 +490,7 @@ function ReviewQueuePanel({
           {openRunItems.map((item) => {
             const observation = matchingObservation(item);
             const label = sourceLabel(item);
+            const recommended = observation?.latest ?? null;
             return (
               <article
                 key={item.id}
@@ -485,11 +507,38 @@ function ReviewQueuePanel({
                       </span>
                     </div>
                     <h3 className="mt-2 text-sm font-semibold text-[#1c1c1e]">
-                      {item.title}
+                      {observation?.canonical_name ?? item.title}
                     </h3>
                     <p className="mt-1 text-sm leading-6 text-[#667085]">
                       {item.body}
                     </p>
+                    {observation && (
+                      <div className="mt-3 grid gap-2 rounded-lg border border-amber-200 bg-white p-3 md:grid-cols-3">
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-wider text-[#667085]">Fact under review</p>
+                          <p className="mt-1 text-sm font-semibold text-[#1c1c1e]">{observation.canonical_name}</p>
+                          <p className="mt-0.5 text-xs text-[#667085]">
+                            {observation.loinc_code ? `LOINC ${observation.loinc_code}` : item.resource_type ?? "Clinical fact"}
+                            {observation.canonical_unit ? ` · canonical unit ${observation.canonical_unit}` : ""}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-wider text-[#667085]">Current candidate</p>
+                          <p className="mt-1 text-sm font-semibold text-[#1c1c1e]">
+                            {recommended ? reviewValueLabel(recommended.value, observation.canonical_unit ?? recommended.unit) : "Needs judgment"}
+                          </p>
+                          <p className="mt-0.5 text-xs text-[#667085]">
+                            {recommended ? `${reviewDateLabel(recommended.effective_date)} · ${recommended.source_label}` : "No recommended value was found."}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-wider text-[#667085]">Decision effect</p>
+                          <p className="mt-1 text-sm leading-5 text-[#667085]">
+                            Accepting keeps this candidate in the canonical record and preserves every source row below as provenance.
+                          </p>
+                        </div>
+                      </div>
+                    )}
                     {label && (
                       <p className="mt-1 text-xs text-[#667085]">
                         Source: <span className="font-semibold text-[#1c1c1e]">{label}</span>
@@ -524,14 +573,14 @@ function ReviewQueuePanel({
                       ) : (
                         <CheckCircle2 size={14} />
                       )}
-                      {item.category === "fact" ? "Accept candidate" : "Mark reviewed"}
+                      {item.category === "fact" ? "Accept current candidate" : "Mark reviewed"}
                     </button>
                   </div>
                 </div>
                 {observation && (
                   <div className="mt-3 overflow-hidden rounded-lg border border-amber-200 bg-white">
                     <div className="border-b border-amber-100 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-[#667085]">
-                      Values under review
+                      Source values under review
                     </div>
                     <div className="divide-y divide-[#eef1f5]">
                       {observation.sources.map((source) => (
@@ -543,15 +592,18 @@ function ReviewQueuePanel({
                             <p className="font-semibold text-[#1c1c1e]">
                               {source.source_label}
                             </p>
-                            <p className="text-xs text-[#667085]">
-                              {source.source_observation_ref}
-                            </p>
+                            <details className="mt-0.5 text-xs text-[#667085]">
+                              <summary className="cursor-pointer list-none text-[#667085] hover:text-[#5b76fe]">
+                                {shortReference(source.source_observation_ref)}
+                              </summary>
+                              <p className="mt-1 break-all font-mono text-[11px]">{source.source_observation_ref}</p>
+                            </details>
                           </div>
                           <p className="font-semibold text-[#1c1c1e]">
-                            {source.value ?? source.raw_value ?? "—"} {source.unit ?? source.raw_unit ?? ""}
+                            {reviewValueLabel(source.value, source.unit, source.raw_value, source.raw_unit)}
                           </p>
                           <p className="text-[#667085]">
-                            {source.effective_date ?? "No date"}
+                            {reviewDateLabel(source.effective_date)}
                           </p>
                         </div>
                       ))}

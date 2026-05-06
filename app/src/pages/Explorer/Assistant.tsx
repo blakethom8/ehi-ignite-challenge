@@ -13,6 +13,7 @@ import {
   Eye,
   Layers3,
   MessageSquare,
+  RotateCcw,
   Search,
   Send,
   Sparkles,
@@ -34,10 +35,10 @@ import type {
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 const STARTER_PROMPTS = [
-  "Is this patient safe for surgery this week?",
-  "Any active blood thinner or interaction risk?",
-  "What changed recently that affects peri-op risk?",
-  "Summarize the active problem list.",
+  "What should I review first in this chart?",
+  "Are there any concerning labs or trends?",
+  "What changed recently in this patient's record?",
+  "Summarize active problems and medications.",
 ];
 
 const CONTEXT_LIBRARY_PACKAGES: ProviderAssistantContextPackage[] = [
@@ -653,6 +654,7 @@ function SessionContextPanel({
   setStance,
   settings,
   onUpdateSettings,
+  onResetChat,
 }: {
   openTab: SessionPanelTab;
   onTabChange: (tab: SessionPanelTab) => void;
@@ -665,6 +667,7 @@ function SessionContextPanel({
   setStance: (stance: "opinionated" | "balanced") => void;
   settings: ReturnType<typeof useChatForPatient>["agentSettings"];
   onUpdateSettings: ReturnType<typeof useChatForPatient>["setAgentSettings"];
+  onResetChat: ReturnType<typeof useChatForPatient>["resetChat"];
 }) {
   const [previewPackage, setPreviewPackage] = useState<ProviderAssistantContextPackage | null>(null);
   const activeIds = new Set(activePackages.map((contextPackage) => contextPackage.id));
@@ -725,6 +728,23 @@ function SessionContextPanel({
 
       {openTab === "context" && (
         <div className="flex-1 overflow-y-auto p-2.5">
+          <div className="mb-2.5 grid gap-2">
+            <div className="rounded-xl border border-slate-200 bg-white p-3">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-[#5b76fe]">Agent profile</p>
+              <h3 className="mt-1 text-xs font-semibold text-[#1c1c1e]">General chart review</h3>
+              <p className="mt-1 text-[11px] leading-4 text-slate-500">
+                Uses the active published chart, citations, and attached packages. It does not assume a surgical workflow unless you ask for one.
+              </p>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-white p-3">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">System context</p>
+              <h3 className="mt-1 text-xs font-semibold text-[#1c1c1e]">Published chart boundary</h3>
+              <p className="mt-1 text-[11px] leading-4 text-slate-500">
+                Chart facts come from the active published snapshot. Context packages guide review style but do not replace patient evidence.
+              </p>
+            </div>
+          </div>
+
           <div
             onDragOver={(event) => event.preventDefault()}
             onDrop={handleDrop}
@@ -824,7 +844,22 @@ function SessionContextPanel({
 
       {openTab === "settings" && (
         <div className="flex-1 overflow-y-auto p-3">
-          <div className="rounded-xl bg-slate-50 p-3">
+          <div className="rounded-xl border border-slate-200 bg-white p-3">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Session</p>
+            <p className="mt-1 text-[11px] leading-4 text-slate-500">
+              Start over when changing the review posture or testing a different chart question path.
+            </p>
+            <button
+              type="button"
+              onClick={onResetChat}
+              className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[12px] font-semibold text-slate-700 transition-colors hover:border-[#5b76fe] hover:text-[#5b76fe]"
+            >
+              <RotateCcw size={13} />
+              Reset conversation
+            </button>
+          </div>
+
+          <div className="mt-3 rounded-xl bg-slate-50 p-3">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Review posture</p>
             <div className="mt-2 grid grid-cols-2 gap-1 rounded-lg bg-white p-1 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
               {(["opinionated", "balanced"] as const).map((nextStance) => (
@@ -1112,6 +1147,7 @@ export function ExplorerAssistant() {
 
   const hasPatient = Boolean(patientId);
   const hasMessages = chat.messages.length > 0;
+  const showBottomComposer = !hasPatient || hasMessages || chat.isPending || chat.isError;
 
   return (
     <div className="flex h-full overflow-hidden">
@@ -1132,6 +1168,17 @@ export function ExplorerAssistant() {
           </div>
         </div>
 
+        {hasMessages && (
+          <button
+            type="button"
+            onClick={chat.resetChat}
+            disabled={chat.isPending}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[12px] font-semibold text-slate-600 transition-colors hover:border-[#5b76fe] hover:text-[#5b76fe] disabled:opacity-50"
+          >
+            <RotateCcw size={13} />
+            New chat
+          </button>
+        )}
       </div>
 
       {/* Chat area */}
@@ -1179,6 +1226,32 @@ export function ExplorerAssistant() {
                 </button>
               ))}
             </div>
+            <form
+              onSubmit={onSubmit}
+              className="mt-2 flex w-full max-w-2xl items-end gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-[0_14px_40px_rgba(15,23,42,0.08)]"
+            >
+              <textarea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSubmit(input);
+                  }
+                }}
+                rows={2}
+                placeholder="Ask about labs, medications, conditions, encounters, or source evidence..."
+                className="min-h-[52px] flex-1 resize-none rounded-xl border border-transparent px-3 py-2 text-[13px] text-[#1c1c1e] outline-none focus:border-blue-200 focus:ring-1 focus:ring-blue-100 placeholder:text-slate-400"
+              />
+              <button
+                type="submit"
+                disabled={chat.isPending || input.trim().length === 0}
+                className="inline-flex h-[38px] shrink-0 items-center gap-1.5 rounded-lg bg-[#5b76fe] px-3 text-[12px] font-semibold text-white transition-colors hover:bg-[#4a65ed] disabled:opacity-50"
+              >
+                <Send size={13} />
+                Send
+              </button>
+            </form>
           </div>
         )}
 
@@ -1217,6 +1290,7 @@ export function ExplorerAssistant() {
       </div>
 
       {/* Input bar */}
+      {showBottomComposer && (
       <div className="shrink-0 border-t border-slate-200 pt-3">
         <form onSubmit={onSubmit} className="flex items-end gap-2">
           <textarea
@@ -1244,6 +1318,7 @@ export function ExplorerAssistant() {
           </button>
         </form>
       </div>
+      )}
       </div>
 
       <SessionContextPanel
@@ -1258,6 +1333,7 @@ export function ExplorerAssistant() {
         setStance={chat.setStance}
         settings={chat.agentSettings}
         onUpdateSettings={chat.setAgentSettings}
+        onResetChat={chat.resetChat}
       />
     </div>
   );

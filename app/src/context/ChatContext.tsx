@@ -52,6 +52,7 @@ interface ChatContextInner {
   setContextPackages: (packages: ProviderAssistantContextPackage[]) => void;
   toggleContextPackage: (contextPackage: ProviderAssistantContextPackage) => void;
   submitQuestion: (patientId: string, question: string) => void;
+  resetChat: (patientId?: string) => void;
   isPending: boolean;
   isError: boolean;
   error: unknown;
@@ -68,6 +69,7 @@ export interface PatientChatHandle {
   setContextPackages: (packages: ProviderAssistantContextPackage[]) => void;
   toggleContextPackage: (contextPackage: ProviderAssistantContextPackage) => void;
   submitQuestion: (question: string) => void;
+  resetChat: () => void;
   isPending: boolean;
   isError: boolean;
   error: unknown;
@@ -199,6 +201,22 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     [messagesByPatient, mutation, stance, agentSettings, contextPackages],
   );
 
+  const resetChat = useCallback((patientId?: string) => {
+    if (!patientId) {
+      setMessagesByPatient({});
+      mutation.reset();
+      return;
+    }
+
+    setMessagesByPatient((prev) => {
+      if (!prev[patientId]) return prev;
+      const next = { ...prev };
+      delete next[patientId];
+      return next;
+    });
+    mutation.reset();
+  }, [mutation]);
+
   const value = useMemo<ChatContextInner>(
     () => ({
       messagesByPatient,
@@ -210,11 +228,12 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       setContextPackages,
       toggleContextPackage,
       submitQuestion,
+      resetChat,
       isPending: mutation.isPending,
       isError: mutation.isError,
       error: mutation.error,
     }),
-    [messagesByPatient, stance, agentSettings, updateSettings, contextPackages, setContextPackages, toggleContextPackage, submitQuestion, mutation.isPending, mutation.isError, mutation.error],
+    [messagesByPatient, stance, agentSettings, updateSettings, contextPackages, setContextPackages, toggleContextPackage, submitQuestion, resetChat, mutation.isPending, mutation.isError, mutation.error],
   );
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
@@ -239,6 +258,10 @@ export function useChatForPatient(patientId: string | null): PatientChatHandle {
     [ctx, patientId],
   );
 
+  const reset = useCallback(() => {
+    if (patientId) ctx.resetChat(patientId);
+  }, [ctx, patientId]);
+
   return {
     messages,
     stance: ctx.stance,
@@ -249,6 +272,7 @@ export function useChatForPatient(patientId: string | null): PatientChatHandle {
     setContextPackages: ctx.setContextPackages,
     toggleContextPackage: ctx.toggleContextPackage,
     submitQuestion: submit,
+    resetChat: reset,
     isPending: ctx.isPending,
     isError: ctx.isError,
     error: ctx.error,

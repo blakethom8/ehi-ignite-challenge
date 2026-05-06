@@ -33,6 +33,7 @@ from api.models import (
     HarmonizeCollection,
     HarmonizeCollectionsResponse,
     HarmonizeClinicalNote,
+    HarmonizeClinicalArtifact,
     HarmonizeConditionsResponse,
     HarmonizeContributionsResponse,
     HarmonizeContributionTotals,
@@ -341,6 +342,7 @@ def resolve_harmonization_review_item(
             item_id=decision.item_id,
             decision=decision.decision,
             notes=decision.notes,
+            selected_source_ref=decision.selected_source_ref,
         )
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail=f"Harmonization run not found: {run_id}") from None
@@ -427,6 +429,27 @@ def _job_progress_from_work(job: harmonize_service.ExtractJob) -> int:
     return round(max(progress_candidates))
 
 
+def _job_estimated_processed_pages(job: harmonize_service.ExtractJob) -> int:
+    """Best-effort page position for UI orientation, not a true parser event.
+
+    The current PDF extraction pipeline runs as one blocking multipass call.
+    Until that worker can emit page-level checkpoints, this estimate lets the
+    frontend show a gentle "current page" orientation without claiming pages
+    have actually completed.
+    """
+    if not job.total_pages:
+        return 0
+    if job.status == "complete":
+        return job.total_pages
+    if job.processed_pages > 0:
+        return min(job.processed_pages, job.total_pages)
+    if job.status not in {"pending", "running"} or not job.estimated_seconds:
+        return 0
+    elapsed_seconds = max(0.0, (datetime.now() - job.started_at).total_seconds())
+    estimated_pages = int((elapsed_seconds / job.estimated_seconds) * job.total_pages)
+    return min(max(0, estimated_pages), max(job.total_pages - 1, 0))
+
+
 def _job_detail(job: harmonize_service.ExtractJob) -> str:
     source = f" Current file: {job.current_source_label}." if job.current_source_label else ""
     return f"Runs on the server, so you can leave this page and come back later.{source}"
@@ -448,6 +471,7 @@ def _job_to_response(job: harmonize_service.ExtractJob) -> HarmonizeExtractJobRe
         processed_files=job.processed_files,
         total_pages=job.total_pages,
         processed_pages=job.processed_pages,
+        estimated_processed_pages=_job_estimated_processed_pages(job),
         current_source_label=job.current_source_label,
         estimated_seconds=job.estimated_seconds,
     )
@@ -552,6 +576,12 @@ def get_contributions(
         medications=[HarmonizeMergedMedication(**m) for m in payload["medications"]],
         allergies=[HarmonizeMergedAllergy(**m) for m in payload["allergies"]],
         immunizations=[HarmonizeMergedImmunization(**m) for m in payload["immunizations"]],
+        encounters=[HarmonizeClinicalArtifact(**m) for m in payload.get("encounters", [])],
+        procedures=[HarmonizeClinicalArtifact(**m) for m in payload.get("procedures", [])],
+        diagnostic_reports=[
+            HarmonizeClinicalArtifact(**m)
+            for m in payload.get("diagnostic_reports", [])
+        ],
         clinical_notes=[HarmonizeClinicalNote(**m) for m in payload.get("clinical_notes", [])],
         totals=HarmonizeContributionTotals(**payload["totals"]),
     )
@@ -574,4 +604,8 @@ def get_provenance(collection_id: str, merged_ref: str) -> HarmonizeProvenanceRe
         collection_id=collection_id,
         merged_ref=merged_ref,
         provenance=prov,
+        canonical_selection=harmonization_runs.latest_canonical_selection(
+            collection_id,
+            merged_ref,
+        ),
     )

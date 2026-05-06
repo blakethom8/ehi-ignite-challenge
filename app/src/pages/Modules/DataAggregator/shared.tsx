@@ -132,46 +132,64 @@ function uploadErrorMessage(error: unknown): string | null {
 function PdfPageProgressMap({ job }: { job: HarmonizeExtractJobResponse | null }) {
   const totalPages = job?.total_pages ?? null;
   const visiblePages = totalPages ? Math.min(totalPages, 8) : 4;
-  const processedPages = job?.processed_pages ?? 0;
+  const reportedPages = job?.processed_pages ?? 0;
+  const estimatedPages = Math.max(reportedPages, job?.estimated_processed_pages ?? reportedPages);
   const isRunning = job?.status === "pending" || job?.status === "running";
-  const hasExactPageProgress = Boolean(totalPages && processedPages > 0);
+  const hasReportedPageProgress = Boolean(totalPages && reportedPages > 0);
+  const hasEstimatedPageProgress = Boolean(totalPages && isRunning && estimatedPages > reportedPages);
+  const activePage = totalPages ? Math.min(totalPages, Math.max(1, estimatedPages + 1)) : 1;
 
   return (
     <div className="rounded-lg border border-[#ead3b9] bg-white px-3 py-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs font-semibold uppercase tracking-wider text-[#9a5a16]">Estimated page stages</p>
+        <p className="text-xs font-semibold uppercase tracking-wider text-[#9a5a16]">Estimated page position</p>
         <p className="text-xs text-[#667085]">
-          {hasExactPageProgress
-            ? `${processedPages}/${totalPages} pages reported`
+          {hasReportedPageProgress
+            ? `${reportedPages}/${totalPages} pages completed`
+            : hasEstimatedPageProgress
+              ? `Estimating page ${activePage} of ${totalPages}`
             : totalPages
-              ? `${totalPages} pages detected; server progress is coarse`
+              ? `${totalPages} pages detected; waiting for first checkpoint`
               : "Counting pages when extraction starts"}
         </p>
       </div>
       <div className="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-8">
         {Array.from({ length: visiblePages }).map((_, index) => {
           const pageNumber = index + 1;
-          const isComplete = totalPages ? pageNumber <= processedPages : false;
-          const isActive = isRunning && !isComplete && (totalPages ? pageNumber === processedPages + 1 : index === 0);
+          const isReportedComplete = totalPages ? pageNumber <= reportedPages : false;
+          const isEstimatedPassed = totalPages ? pageNumber <= estimatedPages && !isReportedComplete : false;
+          const isActive = isRunning && !isReportedComplete && (totalPages ? pageNumber === activePage : index === 0);
           return (
             <div
               key={pageNumber}
               className={`flex h-16 flex-col justify-between rounded-md border px-2 py-2 text-[11px] ${
-                isComplete
+                isReportedComplete
                   ? "border-emerald-200 bg-emerald-50 text-emerald-800"
                   : isActive
                     ? "border-[#5b76fe] bg-[#f4f6ff] text-[#4157d8]"
+                    : isEstimatedPassed
+                      ? "border-[#f1d4a9] bg-[#fff8ed] text-[#9a5a16]"
                     : "border-[#eef0f4] bg-[#f7f9fc] text-[#667085]"
               }`}
             >
               <span className="font-semibold">{totalPages ? `Page ${pageNumber}` : ["Read", "Extract", "Map", "Validate"][index]}</span>
-              <span className={isActive ? "h-1.5 rounded-full bg-[#5b76fe]" : "h-1.5 rounded-full bg-[#dfe4ea]"} />
+              <span
+                className={`h-1.5 rounded-full ${
+                  isReportedComplete
+                    ? "bg-emerald-400"
+                    : isActive
+                      ? "bg-[#5b76fe]"
+                      : isEstimatedPassed
+                        ? "bg-[#d99a35]"
+                        : "bg-[#dfe4ea]"
+                }`}
+              />
             </div>
           );
         })}
       </div>
       <p className="mt-2 text-xs leading-5 text-[#667085]">
-        Page tiles are an orientation aid while the server runs the multipass job. The backend currently reports coarse job progress and may complete several pages at once.
+        Blue shows the estimated current page while the server runs. Green only appears after the backend reports pages complete; the current worker may still finish several pages at once.
       </p>
       {totalPages && totalPages > visiblePages && (
         <p className="mt-2 text-xs text-[#667085]">Showing the first {visiblePages} pages; remaining pages continue in the same server job.</p>
@@ -1471,6 +1489,47 @@ function ReadinessPage({
           </div>
         </div>
       </section>
+
+      {activeSnapshot && (
+        <section className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-1 text-xs font-semibold text-emerald-800">
+                  <CheckCircle2 size={13} />
+                  Active chart snapshot
+                </span>
+                {latestRunIsActive && (
+                  <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-800">
+                    Latest run is live
+                  </span>
+                )}
+              </div>
+              <p className="mt-2 text-sm leading-6 text-emerald-950">
+                FHIR Charts and Clinical Insights should now read from snapshot{" "}
+                <span className="font-mono">{activeSnapshot.snapshot_id.slice(0, 8)}</span>{" "}
+                from run <span className="font-mono">{activeSnapshot.run_id.slice(0, 8)}</span>.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Link
+                to={`/charts?patient=${patientId}`}
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#5b76fe] px-3 py-2 text-sm font-semibold text-white"
+              >
+                <Layers3 size={15} />
+                Open FHIR Charts
+              </Link>
+              <Link
+                to={`/clinical-insights?patient=${patientId}`}
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-100"
+              >
+                Clinical Insights
+                <ArrowRight size={14} />
+              </Link>
+            </div>
+          </div>
+        </section>
+      )}
 
       <section className="grid gap-3 md:grid-cols-4">
         <MetricCard label="Active snapshot" value={activeSnapshot ? "Published" : "None"} detail={activeSnapshot ? `Run ${activeSnapshot.run_id.slice(0, 8)}` : "No chart is active."} />

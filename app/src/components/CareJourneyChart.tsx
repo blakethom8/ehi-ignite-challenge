@@ -544,9 +544,9 @@ export function CareJourneyChart({ data, dateRange, onDateRangeChange, onRowClic
         s.add(r.id);
       }
     }
-    // Collapse entire sections that aren't medications/conditions
+    // Collapse sections with dense secondary data, but keep encounter groups visible
+    // because they are the main way users orient the chart chronologically.
     s.add("proc");
-    s.add("enc");
     s.add("dx_reports");
     return s;
   });
@@ -692,6 +692,14 @@ export function CareJourneyChart({ data, dateRange, onDateRangeChange, onRowClic
     (ms: number) => ((ms - viewMin) / (viewMax - viewMin)) * svgWidth,
     [viewMin, viewMax, svgWidth],
   );
+  const timeToPct = useCallback(
+    (ms: number) => {
+      const span = viewMax - viewMin;
+      if (span <= 0) return 0;
+      return Math.max(0, Math.min(100, ((ms - viewMin) / span) * 100));
+    },
+    [viewMin, viewMax],
+  );
 
   const ticks = useMemo(() => computeTicks(viewMin, viewMax), [viewMin, viewMax]);
   const totalH = visibleRows.length * ROW_H;
@@ -741,6 +749,31 @@ export function CareJourneyChart({ data, dateRange, onDateRangeChange, onRowClic
             <span>{fmtMonthYear(viewMin)}</span>
             <span className="text-slate-400">Scroll rows with this time range pinned</span>
             <span>{fmtMonthYear(viewMax)}</span>
+          </div>
+        </div>
+        <div className="flex h-7 items-center border-b border-slate-100 bg-white/90 text-[10px] text-slate-500">
+          <div className="shrink-0 border-r border-slate-200 px-2 uppercase tracking-wider text-slate-400" style={{ width: LEFT_W }}>
+            Date ruler
+          </div>
+          <div className="relative h-full flex-1 overflow-hidden">
+            {ticks.map((tick, index) => {
+              const left = timeToPct(tick.ms);
+              return (
+                <div
+                  key={`${tick.ms}-${index}`}
+                  className="absolute top-0 h-full"
+                  style={{ left: `${left}%` }}
+                  aria-hidden="true"
+                >
+                  <div className={`h-2 border-l ${tick.isMajor ? "border-slate-500" : "border-slate-300"}`} />
+                  {tick.isMajor && (
+                    <span className="inline-block -translate-x-1/2 whitespace-nowrap text-[10px] font-medium text-slate-600">
+                      {tick.label}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
         <Minimap

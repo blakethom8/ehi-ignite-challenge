@@ -27,8 +27,15 @@ import type {
   HarmonizeMergedImmunization,
   HarmonizeMergedMedication,
   HarmonizeMergedObservation,
+  HarmonizeLatestObservation,
   HarmonizeProvenanceResponse,
+  HarmonizeCanonicalSelection,
+  HarmonizeCanonicalSelectionLatest,
   HarmonizeRunReviewItem,
+  HarmonizeObservationSource,
+  HarmonizeClinicalNote,
+  HarmonizeClinicalArtifact,
+  HarmonizeReviewDecisionPayload,
 } from "../../types";
 
 type ResourceTab =
@@ -43,6 +50,8 @@ type WorkspaceTab =
   | "review"
   | "sources"
   | "provenance";
+
+type ReviewDecision = HarmonizeReviewDecisionPayload["decision"];
 
 function cls(...parts: (string | false | null | undefined)[]): string {
   return parts.filter(Boolean).join(" ");
@@ -80,11 +89,133 @@ function reviewValueLabel(value: number | null, unit: string | null, rawValue?: 
   return `${displayValue}${displayUnit ? ` ${displayUnit}` : ""}`;
 }
 
+function canonicalSelectionValueLabel(value: HarmonizeCanonicalSelectionLatest | null | undefined): string {
+  if (!value) return "No selected value";
+  if (value.value == null) return "No selected value";
+  return `${value.value}${value.unit ? ` ${value.unit}` : ""}`;
+}
+
+function sourceMatchesLatest(
+  source: HarmonizeObservationSource,
+  latest: HarmonizeLatestObservation | null,
+): boolean {
+  if (!latest) return false;
+  const sourceValue = source.value ?? source.raw_value;
+  const latestValue = latest.value;
+  return (
+    sourceValue === latestValue &&
+    source.source_label === latest.source_label &&
+    source.effective_date === latest.effective_date
+  );
+}
+
+function conflictSpreadLabel(
+  sources: HarmonizeObservationSource[],
+  canonicalUnit: string | null,
+): string | null {
+  const values = sources
+    .map((source) => source.value ?? source.raw_value)
+    .filter((value): value is number => typeof value === "number");
+  if (values.length < 2) return null;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  if (min === max) return null;
+  const unit = canonicalUnit ?? sources.find((source) => source.unit || source.raw_unit)?.unit ?? sources.find((source) => source.raw_unit)?.raw_unit ?? "";
+  return `${min}-${max}${unit ? ` ${unit}` : ""}`;
+}
+
+function reviewDecisionLabel(decision: string | null): string {
+  if (decision === "accepted") return "Accepted candidate";
+  if (decision === "dismissed") return "Dismissed";
+  if (decision === "source_fixed") return "Source fixed";
+  if (decision === "overridden") return "Alternate applied";
+  if (decision === "kept_separate") return "Kept separate";
+  if (decision === "deferred") return "Deferred";
+  return "Decision saved";
+}
+
 function shortReference(value: string | null | undefined): string {
   if (!value) return "No technical reference";
   const [resourceType, id] = value.split("/");
   if (!id) return value;
   return `${resourceType}/${id.slice(0, 10)}…`;
+}
+
+type ContributionTimelineEvent = {
+  id: string;
+  date: string;
+  kind: string;
+  primary: string;
+  secondary: string;
+  tone: "blue" | "red" | "purple" | "amber" | "teal" | "slate";
+};
+
+type ContributionTimelineCluster = {
+  key: string;
+  date: string;
+  events: ContributionTimelineEvent[];
+};
+
+function matchingContributionSources<T extends { document_reference: string | null }>(
+  sources: T[],
+  documentReference: string,
+): T[] {
+  const matched = sources.filter((source) => source.document_reference === documentReference);
+  return matched.length > 0 ? matched : sources;
+}
+
+function contributionEventTimestamp(value: string): number {
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? 0 : parsed.getTime();
+}
+
+function contributionEventDayKey(value: string): string {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toISOString().slice(0, 10);
+}
+
+function groupContributionTimeline(events: ContributionTimelineEvent[]): ContributionTimelineCluster[] {
+  const clusters = new Map<string, ContributionTimelineCluster>();
+
+  events.forEach((event) => {
+    const key = contributionEventDayKey(event.date);
+    const existing = clusters.get(key);
+    if (existing) {
+      existing.events.push(event);
+      return;
+    }
+    clusters.set(key, { key, date: event.date, events: [event] });
+  });
+
+  return Array.from(clusters.values())
+    .map((cluster) => ({
+      ...cluster,
+      events: cluster.events.sort((a, b) => contributionEventTimestamp(b.date) - contributionEventTimestamp(a.date)),
+    }))
+    .sort((a, b) => contributionEventTimestamp(b.date) - contributionEventTimestamp(a.date));
+}
+
+function timelineToneClass(tone: ContributionTimelineEvent["tone"]): string {
+  if (tone === "red") return "bg-red-50 text-red-700";
+  if (tone === "purple") return "bg-violet-50 text-violet-700";
+  if (tone === "amber") return "bg-amber-50 text-amber-800";
+  if (tone === "teal") return "bg-teal-50 text-teal-700";
+  if (tone === "blue") return "bg-blue-50 text-blue-700";
+  return "bg-slate-100 text-slate-700";
+}
+
+function artifactActorLabel(artifact: HarmonizeClinicalArtifact): string {
+  return (
+    artifact.provider ||
+    artifact.service_provider ||
+    artifact.site ||
+    artifact.performer_organization_labels[0] ||
+    artifact.performer_practitioner_labels[0] ||
+    artifact.performer_labels[0] ||
+    artifact.source_label ||
+    "Source record"
+  );
 }
 
 function MetricCard({
@@ -380,16 +511,19 @@ function ReviewQueuePanel({
       item,
       decision,
       notes,
+      selectedSourceRef,
     }: {
       runId: string;
       item: HarmonizeRunReviewItem;
-      decision: "accepted" | "dismissed" | "source_fixed" | "overridden";
+      decision: ReviewDecision;
       notes: string;
+      selectedSourceRef?: string | null;
     }) =>
       api.resolveHarmonizationReviewItem(collectionId, runId, {
         item_id: item.id,
         decision,
         notes,
+        selected_source_ref: selectedSourceRef ?? null,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["harmonize-run-latest", collectionId] });
@@ -424,11 +558,12 @@ function ReviewQueuePanel({
 
   const resolveItem = (
     item: HarmonizeRunReviewItem,
-    decision: "accepted" | "dismissed" | "source_fixed" | "overridden",
+    decision: ReviewDecision,
     notes: string,
+    selectedSourceRef?: string | null,
   ) => {
     if (!latestRun) return;
-    resolveMutation.mutate({ runId: latestRun.run_id, item, decision, notes });
+    resolveMutation.mutate({ runId: latestRun.run_id, item, decision, notes, selectedSourceRef });
   };
 
   return (
@@ -491,6 +626,7 @@ function ReviewQueuePanel({
             const observation = matchingObservation(item);
             const label = sourceLabel(item);
             const recommended = observation?.latest ?? null;
+            const spread = observation ? conflictSpreadLabel(observation.sources, observation.canonical_unit) : null;
             return (
               <article
                 key={item.id}
@@ -532,11 +668,21 @@ function ReviewQueuePanel({
                           </p>
                         </div>
                         <div>
-                          <p className="text-xs font-semibold uppercase tracking-wider text-[#667085]">Decision effect</p>
+                          <p className="text-xs font-semibold uppercase tracking-wider text-[#667085]">Why review</p>
                           <p className="mt-1 text-sm leading-5 text-[#667085]">
-                            Accepting keeps this candidate in the canonical record and preserves every source row below as provenance.
+                            {spread
+                              ? `Same-day values span ${spread}; confirm which value should represent this fact.`
+                              : "Multiple source values share the same day or fact identity and need a reviewer decision."}
                           </p>
                         </div>
+                      </div>
+                    )}
+                    {observation && (
+                      <div className="mt-3 rounded-lg border border-amber-200 bg-white px-3 py-2">
+                        <p className="text-xs font-semibold uppercase tracking-wider text-amber-800">Recommendation</p>
+                        <p className="mt-1 text-sm leading-6 text-[#555a6a]">
+                          Accept the current candidate only if the value, date, and source below match the canonical fact you want downstream charts and agents to use. This records reviewer sign-off for the current harmonization run; alternate rows remain retained as provenance, not deleted.
+                        </p>
                       </div>
                     )}
                     {label && (
@@ -545,7 +691,7 @@ function ReviewQueuePanel({
                       </p>
                     )}
                   </div>
-                  <div className="flex shrink-0 flex-wrap gap-2">
+                  <div className="flex shrink-0 flex-col gap-2 lg:w-[300px]">
                     {item.category === "source" && (
                       <Link
                         to={`/aggregate/sources${patientId ? `?patient=${encodeURIComponent(patientId)}` : ""}`}
@@ -573,8 +719,48 @@ function ReviewQueuePanel({
                       ) : (
                         <CheckCircle2 size={14} />
                       )}
-                      {item.category === "fact" ? "Accept current candidate" : "Mark reviewed"}
+                      {item.category === "fact" ? "Use candidate in canonical record" : "Mark reviewed"}
                     </button>
+                    {item.category === "fact" && (
+                      <div className="space-y-2">
+                        <button
+                          type="button"
+                          disabled={resolveMutation.isPending}
+                          onClick={() =>
+                            resolveItem(
+                              item,
+                              "kept_separate",
+                              "Reviewer kept conflicting values separate and preserved each value as source-backed evidence.",
+                            )
+                          }
+                          className="inline-flex w-full items-center justify-center rounded-lg border border-[#dfe4ea] bg-white px-3 py-2 text-sm font-semibold text-[#555a6a] hover:border-[#5b76fe] hover:text-[#5b76fe] disabled:bg-[#f4f6f8] disabled:text-[#98a2b3]"
+                        >
+                          Keep values separate
+                        </button>
+                        <button
+                          type="button"
+                          disabled={resolveMutation.isPending}
+                          onClick={() =>
+                            resolveItem(
+                              item,
+                              "deferred",
+                              "Reviewer deferred this conflict. It remains blocking until a final decision is recorded.",
+                            )
+                          }
+                          className="inline-flex w-full items-center justify-center rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-50 disabled:bg-[#f4f6f8] disabled:text-[#98a2b3]"
+                        >
+                          Defer review
+                        </button>
+                        <div className="rounded-lg border border-amber-200 bg-white px-3 py-2 text-xs leading-5 text-[#667085]">
+                          <p className="font-semibold uppercase tracking-wider text-amber-800">
+                            Decision model
+                          </p>
+                          <p className="mt-1">
+                            Accept uses the current candidate. Keep separate resolves the blocker while retaining all source-backed values. Alternate preference updates this run's candidate pick before publish. Defer keeps this run blocked.
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
                 {observation && (
@@ -583,30 +769,81 @@ function ReviewQueuePanel({
                       Source values under review
                     </div>
                     <div className="divide-y divide-[#eef1f5]">
-                      {observation.sources.map((source) => (
-                        <div
-                          key={`${item.id}-${source.source_observation_ref}`}
-                          className="grid gap-2 px-3 py-2 text-sm md:grid-cols-[1fr_140px_140px]"
-                        >
-                          <div>
-                            <p className="font-semibold text-[#1c1c1e]">
-                              {source.source_label}
-                            </p>
-                            <details className="mt-0.5 text-xs text-[#667085]">
-                              <summary className="cursor-pointer list-none text-[#667085] hover:text-[#5b76fe]">
-                                {shortReference(source.source_observation_ref)}
-                              </summary>
-                              <p className="mt-1 break-all font-mono text-[11px]">{source.source_observation_ref}</p>
-                            </details>
+                      {observation.sources.map((source) => {
+                        const isCandidate = sourceMatchesLatest(source, recommended);
+                        return (
+                          <div
+                            key={`${item.id}-${source.source_observation_ref}`}
+                            className={cls(
+                              "grid gap-2 px-3 py-2 text-sm md:grid-cols-[1fr_150px_160px_170px]",
+                              isCandidate && "bg-emerald-50/60",
+                            )}
+                          >
+                            <div>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <p className="font-semibold text-[#1c1c1e]">
+                                  {observation.canonical_name}
+                                </p>
+                                <span
+                                  className={cls(
+                                    "rounded-full px-2 py-0.5 text-[11px] font-semibold",
+                                    isCandidate
+                                      ? "bg-emerald-100 text-emerald-800"
+                                      : "bg-slate-100 text-slate-700",
+                                  )}
+                                >
+                                  {isCandidate ? "Candidate" : "Alternate"}
+                                </span>
+                              </div>
+                              <p className="mt-0.5 text-xs text-[#667085]">
+                                {source.source_label}
+                                {observation.loinc_code ? ` · LOINC ${observation.loinc_code}` : ""}
+                              </p>
+                              <details className="mt-0.5 text-xs text-[#667085]">
+                                <summary className="cursor-pointer list-none text-[#667085] hover:text-[#5b76fe]">
+                                  Technical reference: {shortReference(source.source_observation_ref)}
+                                </summary>
+                                <p className="mt-1 break-all font-mono text-[11px]">{source.source_observation_ref}</p>
+                              </details>
+                            </div>
+                            <div>
+                              <p className="text-xs font-semibold uppercase tracking-wider text-[#667085]">Value</p>
+                              <p className="mt-1 font-semibold text-[#1c1c1e]">
+                                {reviewValueLabel(source.value, source.unit, source.raw_value, source.raw_unit)}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs font-semibold uppercase tracking-wider text-[#667085]">Observed date</p>
+                              <p className="mt-1 text-[#555a6a]">
+                                {reviewDateLabel(source.effective_date)}
+                              </p>
+                            </div>
+                            <div className="flex items-center md:justify-end">
+                              {isCandidate ? (
+                                <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-800">
+                                  Current pick
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  disabled={resolveMutation.isPending}
+                                  onClick={() =>
+                                    resolveItem(
+                                      item,
+                                      "overridden",
+                                      "Reviewer selected this alternate source value as the candidate for this run.",
+                                      source.source_observation_ref,
+                                    )
+                                  }
+                                  className="inline-flex items-center justify-center rounded-lg border border-[#dfe4ea] bg-white px-2.5 py-1.5 text-xs font-semibold text-[#555a6a] hover:border-[#5b76fe] hover:text-[#5b76fe] disabled:bg-[#f4f6f8] disabled:text-[#98a2b3]"
+                                >
+                                  Use this value
+                                </button>
+                              )}
+                            </div>
                           </div>
-                          <p className="font-semibold text-[#1c1c1e]">
-                            {reviewValueLabel(source.value, source.unit, source.raw_value, source.raw_unit)}
-                          </p>
-                          <p className="text-[#667085]">
-                            {reviewDateLabel(source.effective_date)}
-                          </p>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -614,6 +851,75 @@ function ReviewQueuePanel({
             );
           })}
         </div>
+      )}
+      {!isLoading && latestRun && resolvedRunItems.length > 0 && (
+        <details className="mt-4 rounded-lg border border-[#dfe4ea] bg-[#f7f9fc]">
+          <summary className="cursor-pointer list-none px-3 py-2 text-sm font-semibold text-[#1c1c1e] hover:text-[#5b76fe]">
+            Resolved decisions ({resolvedRunItems.length})
+          </summary>
+          <div className="divide-y divide-[#eef1f5] border-t border-[#dfe4ea]">
+            {resolvedRunItems.slice(0, 6).map((item) => {
+              const observation = matchingObservation(item);
+              const selectedSource = observation?.sources.find(
+                (source) => source.source_observation_ref === item.selected_source_ref,
+              ) ?? null;
+              const selectedValue = selectedSource
+                ? reviewValueLabel(
+                    selectedSource.value,
+                    selectedSource.unit,
+                    selectedSource.raw_value,
+                    selectedSource.raw_unit,
+                  )
+                : observation?.latest
+                  ? reviewValueLabel(observation.latest.value, observation.canonical_unit ?? observation.latest.unit)
+                  : null;
+              return (
+                <div key={item.id} className="grid gap-2 px-3 py-2 text-sm md:grid-cols-[220px_1fr_220px]">
+                  <div>
+                    <p className="font-semibold text-[#1c1c1e]">{reviewDecisionLabel(item.decision)}</p>
+                    <p className="text-xs text-[#667085]">{item.resolved_at ? reviewDateLabel(item.resolved_at) : "No timestamp"}</p>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold text-[#1c1c1e]">
+                      {observation?.canonical_name ?? item.title}
+                    </p>
+                    <p className="line-clamp-2 text-xs leading-5 text-[#667085]">
+                      {item.decision_notes || item.body}
+                    </p>
+                    {observation?.loinc_code && (
+                      <p className="mt-0.5 text-xs text-[#98a2b3]">
+                        LOINC {observation.loinc_code}
+                        {observation.canonical_unit ? ` · canonical unit ${observation.canonical_unit}` : ""}
+                      </p>
+                    )}
+                  </div>
+                  <div className="text-xs text-[#667085] md:text-right">
+                    {selectedValue ? (
+                      <div>
+                        <p className="font-semibold text-[#1c1c1e]">{selectedValue}</p>
+                        <p className="mt-0.5">
+                          {selectedSource?.source_label ?? observation?.latest?.source_label ?? "Current candidate"}
+                        </p>
+                        {item.selected_source_ref && (
+                          <p className="mt-0.5 font-mono text-[11px]" title={item.selected_source_ref}>
+                            {shortReference(item.selected_source_ref)}
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <span>{item.category === "fact" ? item.resource_type ?? "Fact" : "Source"}</span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+            {resolvedRunItems.length > 6 && (
+              <div className="px-3 py-2 text-xs text-[#667085]">
+                Showing 6 of {resolvedRunItems.length} saved decisions.
+              </div>
+            )}
+          </div>
+        </details>
       )}
       {resolveMutation.error && (
         <p className="mt-3 text-sm text-red-700">
@@ -637,6 +943,7 @@ function ContributionsPanel({
   onClose: () => void;
 }) {
   const [showUniqueOnly, setShowUniqueOnly] = useState(false);
+  const [selectedNote, setSelectedNote] = useState<HarmonizeClinicalNote | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ["harmonize-contributions", collectionId, documentReference],
@@ -653,6 +960,9 @@ function ContributionsPanel({
         medications: uniqueDiff.unique_facts.medications,
         allergies: uniqueDiff.unique_facts.allergies,
         immunizations: uniqueDiff.unique_facts.immunizations,
+        encounters: [],
+        procedures: [],
+        diagnostic_reports: [],
         clinical_notes: [],
         totals: {
           observations: uniqueDiff.totals.unique.observations,
@@ -660,6 +970,9 @@ function ContributionsPanel({
           medications: uniqueDiff.totals.unique.medications,
           allergies: uniqueDiff.totals.unique.allergies,
           immunizations: uniqueDiff.totals.unique.immunizations,
+          encounters: uniqueDiff.totals.unique.encounters ?? 0,
+          procedures: uniqueDiff.totals.unique.procedures ?? 0,
+          diagnostic_reports: uniqueDiff.totals.unique.diagnostic_reports ?? 0,
           clinical_notes: uniqueDiff.totals.unique.clinical_notes ?? 0,
           all: uniqueDiff.totals.unique.all,
         },
@@ -671,10 +984,163 @@ function ContributionsPanel({
           medications: data.medications,
           allergies: data.allergies,
           immunizations: data.immunizations,
+          encounters: data.encounters,
+          procedures: data.procedures,
+          diagnostic_reports: data.diagnostic_reports,
           clinical_notes: data.clinical_notes,
           totals: data.totals,
         }
       : null;
+
+  const timelineEvents = useMemo<ContributionTimelineEvent[]>(() => {
+    if (!view) return [];
+    const events: ContributionTimelineEvent[] = [];
+
+    view.observations.forEach((observation) => {
+      matchingContributionSources(observation.sources, documentReference).forEach((source) => {
+        if (!source.effective_date) return;
+        const valueLabel = reviewValueLabel(source.value, source.unit, source.raw_value, source.raw_unit);
+        events.push({
+          id: `lab-${source.source_observation_ref}`,
+          date: source.effective_date,
+          kind: "Lab",
+          primary: observation.canonical_name,
+          secondary: `${valueLabel}${observation.loinc_code ? ` · LOINC ${observation.loinc_code}` : ""}`,
+          tone: "blue",
+        });
+      });
+    });
+
+    view.conditions.forEach((condition) => {
+      matchingContributionSources(condition.sources, documentReference).forEach((source) => {
+        if (!source.onset_date) return;
+        events.push({
+          id: `condition-${source.source_condition_ref}`,
+          date: source.onset_date,
+          kind: "Condition",
+          primary: condition.canonical_name,
+          secondary: `${source.clinical_status ?? (condition.is_active ? "active" : "inactive")}${
+            condition.snomed ? ` · SCT ${condition.snomed}` : ""
+          }`,
+          tone: "red",
+        });
+      });
+    });
+
+    view.medications.forEach((medication) => {
+      matchingContributionSources(medication.sources, documentReference).forEach((source) => {
+        if (!source.authored_on) return;
+        events.push({
+          id: `medication-${source.source_request_ref}`,
+          date: source.authored_on,
+          kind: "Medication",
+          primary: medication.canonical_name,
+          secondary: `${source.status ?? (medication.is_active ? "active" : "recorded")}${
+            medication.rxnorm_codes[0] ? ` · RxNorm ${medication.rxnorm_codes[0]}` : ""
+          }`,
+          tone: "purple",
+        });
+      });
+    });
+
+    view.allergies.forEach((allergy) => {
+      matchingContributionSources(allergy.sources, documentReference).forEach((source) => {
+        if (!source.recorded_date) return;
+        events.push({
+          id: `allergy-${source.source_allergy_ref}`,
+          date: source.recorded_date,
+          kind: "Allergy",
+          primary: allergy.canonical_name,
+          secondary: `${source.criticality ?? allergy.highest_criticality ?? "criticality unknown"}${
+            allergy.snomed ? ` · SCT ${allergy.snomed}` : ""
+          }`,
+          tone: "amber",
+        });
+      });
+    });
+
+    view.immunizations.forEach((immunization) => {
+      matchingContributionSources(immunization.sources, documentReference).forEach((source) => {
+        if (!source.occurrence_date) return;
+        events.push({
+          id: `immunization-${source.source_immunization_ref}`,
+          date: source.occurrence_date,
+          kind: "Immunization",
+          primary: immunization.canonical_name,
+          secondary: `${source.status ?? "recorded"}${immunization.cvx ? ` · CVX ${immunization.cvx}` : ""}`,
+          tone: "teal",
+        });
+      });
+    });
+
+    view.encounters.forEach((encounter) => {
+      const date = encounter.period_start ?? encounter.period_end;
+      if (!date) return;
+      events.push({
+        id: `encounter-${encounter.source_id}-${encounter.id}`,
+        date,
+        kind: "Encounter",
+        primary: encounter.type || encounter.reason || "Encounter",
+        secondary: [
+          artifactActorLabel(encounter),
+          encounter.class_code ? `Class ${encounter.class_code}` : "",
+          encounter.status,
+        ].filter(Boolean).join(" · "),
+        tone: "slate",
+      });
+    });
+
+    view.procedures.forEach((procedure) => {
+      const date = procedure.performed_start ?? procedure.performed_end;
+      if (!date) return;
+      events.push({
+        id: `procedure-${procedure.source_id}-${procedure.id}`,
+        date,
+        kind: "Procedure",
+        primary: procedure.display || procedure.type || "Procedure",
+        secondary: [
+          procedure.status,
+          artifactActorLabel(procedure),
+          procedure.encounter_id ? `Encounter ${shortReference(procedure.encounter_id)}` : "",
+        ].filter(Boolean).join(" · "),
+        tone: "teal",
+      });
+    });
+
+    view.diagnostic_reports.forEach((report) => {
+      if (!report.effective_date) return;
+      events.push({
+        id: `report-${report.source_id}-${report.id}`,
+        date: report.effective_date,
+        kind: "Report",
+        primary: report.display || report.type || "Diagnostic report",
+        secondary: [
+          report.category,
+          report.status,
+          report.result_refs.length > 0 ? `${report.result_refs.length} result refs` : "",
+          report.has_presented_form ? "attached note" : "",
+        ].filter(Boolean).join(" · "),
+        tone: "amber",
+      });
+    });
+
+    view.clinical_notes.forEach((note) => {
+      const date = note.time ?? note.date;
+      if (!date) return;
+      events.push({
+        id: `note-${note.resource_id}-${note.note_index}`,
+        date,
+        kind: "Clinical note",
+        primary: note.section_title || note.resource_type || "Clinical note",
+        secondary: `${note.author ? `${note.author} · ` : ""}${note.encounter_id ? `Encounter ${shortReference(note.encounter_id)}` : shortReference(`${note.resource_type}/${note.resource_id}`)}`,
+        tone: "slate",
+      });
+    });
+
+    return events
+      .sort((a, b) => contributionEventTimestamp(b.date) - contributionEventTimestamp(a.date))
+      .slice(0, 16);
+  }, [documentReference, view]);
 
   return (
     <div className="mt-4 rounded-xl border border-[#dfe4ea] bg-[#fafbfd] p-4">
@@ -727,6 +1193,9 @@ function ContributionsPanel({
             <ContributionStat label="Medications" value={view.totals.medications} />
             <ContributionStat label="Allergies" value={view.totals.allergies} />
             <ContributionStat label="Immunizations" value={view.totals.immunizations} />
+            <ContributionStat label="Encounters" value={view.totals.encounters ?? 0} />
+            <ContributionStat label="Procedures" value={view.totals.procedures ?? 0} />
+            <ContributionStat label="Reports" value={view.totals.diagnostic_reports ?? 0} />
             <ContributionStat label="Clinical notes" value={view.totals.clinical_notes ?? 0} />
           </div>
           {showUniqueOnly && view.totals.all === 0 && (
@@ -736,6 +1205,7 @@ function ContributionsPanel({
               data — but would lose the cross-source confirmation.
             </p>
           )}
+          <SourceContributionTimeline events={timelineEvents} />
           <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
             <ContributionList
               title="Conditions"
@@ -777,11 +1247,41 @@ function ContributionsPanel({
               }))}
             />
             <ContributionList
-              title="Clinical notes"
-              items={view.clinical_notes.map((note) => ({
-                primary: note.text.length > 96 ? `${note.text.slice(0, 96)}...` : note.text,
-                secondary: `${note.resource_type}${note.date ? ` · ${reviewDateLabel(note.date)}` : ""}`,
+              title="Encounters"
+              items={view.encounters.map((encounter) => ({
+                primary: encounter.type || encounter.reason || "Encounter",
+                secondary: [
+                  encounter.period_start ? reviewDateLabel(encounter.period_start) : "",
+                  encounter.class_code ? `Class ${encounter.class_code}` : "",
+                  artifactActorLabel(encounter),
+                ].filter(Boolean).join(" · "),
               }))}
+            />
+            <ContributionList
+              title="Procedures"
+              items={view.procedures.map((procedure) => ({
+                primary: procedure.display || procedure.type || "Procedure",
+                secondary: [
+                  procedure.performed_start ? reviewDateLabel(procedure.performed_start) : "",
+                  procedure.status,
+                  artifactActorLabel(procedure),
+                ].filter(Boolean).join(" · "),
+              }))}
+            />
+            <ContributionList
+              title="Reports"
+              items={view.diagnostic_reports.map((report) => ({
+                primary: report.display || report.type || "Diagnostic report",
+                secondary: [
+                  report.effective_date ? reviewDateLabel(report.effective_date) : "",
+                  report.result_refs.length > 0 ? `${report.result_refs.length} result refs` : "",
+                  report.has_presented_form ? "note attached" : "",
+                ].filter(Boolean).join(" · "),
+              }))}
+            />
+            <ClinicalNoteContributionList
+              notes={view.clinical_notes}
+              onOpen={setSelectedNote}
             />
           </div>
           {view.totals.observations > 0 && (
@@ -793,7 +1293,96 @@ function ContributionsPanel({
           )}
         </>
       )}
+      {selectedNote && (
+        <ClinicalNoteModal note={selectedNote} onClose={() => setSelectedNote(null)} />
+      )}
     </div>
+  );
+}
+
+function SourceContributionTimeline({ events }: { events: ContributionTimelineEvent[] }) {
+  const clusters = groupContributionTimeline(events);
+
+  return (
+    <section className="mt-4 rounded-lg border border-[#dfe4ea] bg-white">
+      <div className="flex flex-wrap items-start justify-between gap-2 border-b border-[#eef0f4] px-3 py-2.5">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-[#667085]">
+            Source timeline
+          </p>
+          <p className="mt-1 text-xs leading-5 text-[#667085]">
+            Dated facts captured from this source, grouped by clinical date.
+          </p>
+        </div>
+        {events.length > 0 && (
+          <span className="rounded-full bg-[#f0f3fa] px-2 py-1 text-xs font-medium text-[#667085]">
+            {clusters.length} date cluster{clusters.length === 1 ? "" : "s"} · {events.length} facts
+          </span>
+        )}
+      </div>
+      {events.length === 0 ? (
+        <p className="px-3 py-3 text-sm text-[#667085]">
+          No dated facts found for this source yet. Undated facts still appear in the resource lists below.
+        </p>
+      ) : (
+        <div className="max-h-80 divide-y divide-[#eef0f4] overflow-y-auto">
+          {clusters.map((cluster) => {
+            const kinds = Array.from(new Set(cluster.events.map((event) => event.kind)));
+            return (
+              <div key={cluster.key} className="grid gap-3 px-3 py-3 text-sm sm:grid-cols-[132px_minmax(0,1fr)]">
+                <div>
+                  <p className="font-semibold tabular-nums text-[#1c1c1e]">
+                    {reviewDateLabel(cluster.date)}
+                  </p>
+                  <p className="mt-1 text-[11px] font-medium text-[#8b90a0]">
+                    {cluster.events.length} fact{cluster.events.length === 1 ? "" : "s"}
+                  </p>
+                </div>
+                <div className="min-w-0 space-y-2">
+                  <div className="flex flex-wrap gap-1.5">
+                    {kinds.slice(0, 5).map((kind) => {
+                      const tone = cluster.events.find((event) => event.kind === kind)?.tone ?? "slate";
+                      return (
+                        <span
+                          key={kind}
+                          className={cls(
+                            "inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold",
+                            timelineToneClass(tone),
+                          )}
+                        >
+                          {kind}
+                        </span>
+                      );
+                    })}
+                    {kinds.length > 5 && (
+                      <span className="inline-flex rounded-full bg-[#f0f3fa] px-2 py-0.5 text-[11px] font-semibold text-[#667085]">
+                        +{kinds.length - 5} more
+                      </span>
+                    )}
+                  </div>
+                  <div className="rounded-lg border border-[#eef0f4] bg-[#fafbfd]">
+                    {cluster.events.slice(0, 5).map((event) => (
+                      <div key={event.id} className="border-b border-[#eef0f4] px-3 py-2 last:border-b-0">
+                        <div className="flex min-w-0 items-start justify-between gap-2">
+                          <p className="min-w-0 truncate font-semibold text-[#1c1c1e]">{event.primary}</p>
+                          <span className="shrink-0 text-[11px] font-semibold text-[#667085]">{event.kind}</span>
+                        </div>
+                        <p className="mt-0.5 truncate text-xs text-[#667085]">{event.secondary}</p>
+                      </div>
+                    ))}
+                    {cluster.events.length > 5 && (
+                      <p className="px-3 py-2 text-xs font-medium text-[#667085]">
+                        + {cluster.events.length - 5} more facts on this date.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -835,6 +1424,194 @@ function ContributionList({
   );
 }
 
+function ClinicalNoteContributionList({
+  notes,
+  onOpen,
+}: {
+  notes: HarmonizeClinicalNote[];
+  onOpen: (note: HarmonizeClinicalNote) => void;
+}) {
+  if (notes.length === 0) return null;
+  return (
+    <div className="rounded-lg border border-[#dfe4ea] bg-white p-3">
+      <p className="text-xs font-semibold uppercase tracking-wider text-[#667085]">
+        Clinical notes · {notes.length}
+      </p>
+      <ul className="mt-2 divide-y divide-[#eef0f4] text-sm">
+        {notes.slice(0, 12).map((note) => {
+          const preview = note.text.length > 150 ? `${note.text.slice(0, 150)}...` : note.text;
+          return (
+            <li key={`${note.resource_id}-${note.note_index}`} className="py-2 first:pt-0 last:pb-0">
+              <button
+                type="button"
+                onClick={() => onOpen(note)}
+                className="block w-full rounded-md text-left hover:bg-[#f7f9fc]"
+              >
+                <span className="block font-medium leading-5 text-[#1c1c1e]">
+                  {preview}
+                </span>
+                <span className="mt-1 block text-xs text-[#667085]">
+                  {note.resource_type}
+                  {note.date ? ` · ${reviewDateLabel(note.date)}` : ""}
+                  {note.encounter_id ? ` · Encounter ${note.encounter_id}` : ""}
+                  {note.source_label ? ` · ${note.source_label}` : ""}
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+      {notes.length > 12 && (
+        <p className="mt-2 text-xs text-[#a5a8b5]">
+          Showing first 12 notes from this source. Use the prepared JSON export for the complete artifact set.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function ClinicalNoteModal({
+  note,
+  onClose,
+}: {
+  note: HarmonizeClinicalNote;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#101828]/45 px-4 py-6">
+      <div className="flex max-h-[86vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-[#dfe4ea] bg-white shadow-xl">
+        <div className="flex items-start justify-between gap-4 border-b border-[#eef0f4] px-5 py-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-[#5b76fe]">
+              Clinical note
+            </p>
+            <h3 className="mt-1 text-lg font-semibold text-[#1c1c1e]">
+              {note.resource_type}
+              {note.date ? ` · ${reviewDateLabel(note.date)}` : ""}
+            </h3>
+            <p className="mt-1 text-sm text-[#667085]">
+              {note.source_label || "Source document"} · {note.resource_id || "No resource id"}
+              {note.encounter_id ? ` · Encounter ${note.encounter_id}` : ""}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-[#dfe4ea] bg-white px-3 py-2 text-sm font-semibold text-[#667085] hover:bg-[#f7f9fc]"
+          >
+            Close
+          </button>
+        </div>
+        <div className="overflow-y-auto px-5 py-4">
+          <pre className="whitespace-pre-wrap break-words rounded-lg bg-[#0f172a] p-4 font-mono text-xs leading-6 text-[#e5e7eb]">
+            {note.text}
+          </pre>
+          <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+            <div className="rounded-lg border border-[#dfe4ea] bg-[#f7f9fc] p-3">
+              <dt className="text-xs font-semibold uppercase tracking-wider text-[#667085]">Source</dt>
+              <dd className="mt-1 font-medium text-[#1c1c1e]">{note.source_label || note.source_id}</dd>
+            </div>
+            <div className="rounded-lg border border-[#dfe4ea] bg-[#f7f9fc] p-3">
+              <dt className="text-xs font-semibold uppercase tracking-wider text-[#667085]">FHIR reference</dt>
+              <dd className="mt-1 break-all font-mono text-xs text-[#1c1c1e]">
+                {note.resource_type}/{note.resource_id || "unknown"}#{note.note_index}
+              </dd>
+            </div>
+            {note.encounter_id && (
+              <div className="rounded-lg border border-[#dfe4ea] bg-[#f7f9fc] p-3">
+                <dt className="text-xs font-semibold uppercase tracking-wider text-[#667085]">Encounter</dt>
+                <dd className="mt-1 break-all font-mono text-xs text-[#1c1c1e]">
+                  Encounter/{note.encounter_id}
+                </dd>
+              </div>
+            )}
+            {(note.author || note.time || note.section_title || note.attachment_content_type) && (
+              <div className="rounded-lg border border-[#dfe4ea] bg-[#f7f9fc] p-3">
+                <dt className="text-xs font-semibold uppercase tracking-wider text-[#667085]">Note metadata</dt>
+                <dd className="mt-1 space-y-1 text-xs text-[#1c1c1e]">
+                  {note.author && <p>Author: {note.author}</p>}
+                  {note.time && <p>Time: {reviewDateLabel(note.time)}</p>}
+                  {note.section_title && <p>Section: {note.section_title}</p>}
+                  {note.attachment_content_type && <p>Attachment: {note.attachment_content_type}</p>}
+                </dd>
+              </div>
+            )}
+          </dl>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CanonicalSelectionCard({
+  selection,
+}: {
+  selection: HarmonizeCanonicalSelection;
+}) {
+  const selected = selection.selected_latest;
+  const previous = selection.previous_latest;
+  const decision = selection.decision ?? "reviewed";
+
+  return (
+    <div className="rounded-lg border border-[#b7c4ff] bg-[#f5f7ff] p-3 text-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-[#5b76fe]">
+            Canonical selection
+          </p>
+          <p className="mt-1 font-semibold text-[#1c1c1e]">
+            {reviewDecisionLabel(decision)}
+          </p>
+        </div>
+        <span className="rounded-full bg-white px-2 py-1 text-xs font-medium text-[#667085]">
+          {selection.applied ? "Applied to latest run" : "Decision recorded"}
+        </span>
+      </div>
+      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        <div className="rounded-lg border border-[#dfe4ea] bg-white p-2.5">
+          <p className="text-xs font-semibold uppercase tracking-wider text-[#667085]">
+            Selected value
+          </p>
+          <p className="mt-1 font-semibold text-[#1c1c1e]">
+            {canonicalSelectionValueLabel(selected)}
+          </p>
+          <p className="mt-1 text-xs text-[#667085]">
+            {selected?.effective_date ? reviewDateLabel(selected.effective_date) : "No date"} ·{" "}
+            {selection.selected_source_label ?? selected?.source_label ?? "Unknown source"}
+          </p>
+        </div>
+        <div className="rounded-lg border border-[#dfe4ea] bg-white p-2.5">
+          <p className="text-xs font-semibold uppercase tracking-wider text-[#667085]">
+            Previous candidate
+          </p>
+          <p className="mt-1 font-semibold text-[#1c1c1e]">
+            {canonicalSelectionValueLabel(previous)}
+          </p>
+          <p className="mt-1 text-xs text-[#667085]">
+            {previous?.effective_date ? reviewDateLabel(previous.effective_date) : "No date"} ·{" "}
+            {previous?.source_label ?? "Unknown source"}
+          </p>
+        </div>
+      </div>
+      {selection.selected_source_ref && (
+        <code className="mt-2 block rounded bg-white px-2 py-1 text-xs text-[#667085]">
+          Selected source: {shortReference(selection.selected_source_ref)}
+        </code>
+      )}
+      {selection.notes && (
+        <p className="mt-2 rounded bg-white px-2 py-1.5 text-xs leading-5 text-[#667085]">
+          {selection.notes}
+        </p>
+      )}
+      {selection.warning && (
+        <p className="mt-2 rounded border border-amber-200 bg-amber-50 px-2 py-1.5 text-xs text-amber-800">
+          {selection.warning}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function ProvenancePanel({
   collectionId,
   mergedRef,
@@ -862,6 +1639,9 @@ function ProvenancePanel({
   const activity = prov.activity?.coding?.[0]?.code ?? "—";
   return (
     <div className="space-y-3">
+      {data.canonical_selection && (
+        <CanonicalSelectionCard selection={data.canonical_selection} />
+      )}
       <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-[#667085]">
         <Link2 size={14} />
         <span className="font-semibold">Activity:</span>

@@ -125,6 +125,7 @@ class EncounterTypeSummary(BaseModel):
 
 class CareTeamSummaryItem(BaseModel):
     name: str
+    specialty: str = ""
     organizations: list[str]
     encounter_count: int
     latest_encounter_dt: datetime | None
@@ -133,6 +134,7 @@ class CareTeamSummaryItem(BaseModel):
 
 class SiteOfServiceSummaryItem(BaseModel):
     name: str
+    specialty: str = ""
     provider_count: int
     encounter_count: int
     latest_encounter_dt: datetime | None
@@ -661,6 +663,8 @@ class DiagnosticReportItem(BaseModel):
     category: str
     date: str | None
     result_count: int
+    has_presented_form: bool = False
+    note_preview: str = ""
 
 
 class CareJourneyResponse(BaseModel):
@@ -1143,6 +1147,7 @@ class HarmonizeProvenanceResponse(BaseModel):
     collection_id: str
     merged_ref: str
     provenance: dict
+    canonical_selection: dict[str, Any] | None = None
 
 
 class HarmonizeExtractItem(BaseModel):
@@ -1252,6 +1257,9 @@ class HarmonizeContributionTotals(BaseModel):
     medications: int
     allergies: int
     immunizations: int
+    encounters: int = 0
+    procedures: int = 0
+    diagnostic_reports: int = 0
     clinical_notes: int = 0
     all: int
 
@@ -1262,8 +1270,40 @@ class HarmonizeClinicalNote(BaseModel):
     resource_type: str
     resource_id: str
     note_index: int
+    encounter_id: str | None = None
     date: str | None = None
+    author: str | None = None
+    time: str | None = None
+    section_title: str | None = None
+    attachment_content_type: str | None = None
     text: str
+
+
+class HarmonizeClinicalArtifact(BaseModel):
+    source_id: str
+    source_label: str
+    id: str
+    status: str = ""
+    display: str = ""
+    type: str = ""
+    reason: str = ""
+    category: str = ""
+    class_code: str = ""
+    period_start: str | None = None
+    period_end: str | None = None
+    performed_start: str | None = None
+    performed_end: str | None = None
+    effective_date: str | None = None
+    encounter_id: str | None = None
+    provider: str = ""
+    site: str = ""
+    service_provider: str = ""
+    performer_labels: list[str] = Field(default_factory=list)
+    performer_organization_labels: list[str] = Field(default_factory=list)
+    performer_practitioner_labels: list[str] = Field(default_factory=list)
+    result_refs: list[str] = Field(default_factory=list)
+    has_presented_form: bool = False
+    note_preview: str = ""
 
 
 class HarmonizeContributionsResponse(BaseModel):
@@ -1278,6 +1318,9 @@ class HarmonizeContributionsResponse(BaseModel):
     medications: list[HarmonizeMergedMedication]
     allergies: list[HarmonizeMergedAllergy]
     immunizations: list[HarmonizeMergedImmunization]
+    encounters: list[HarmonizeClinicalArtifact] = Field(default_factory=list)
+    procedures: list[HarmonizeClinicalArtifact] = Field(default_factory=list)
+    diagnostic_reports: list[HarmonizeClinicalArtifact] = Field(default_factory=list)
     clinical_notes: list[HarmonizeClinicalNote] = Field(default_factory=list)
     totals: HarmonizeContributionTotals
 
@@ -1324,6 +1367,7 @@ class HarmonizeExtractJobResponse(BaseModel):
     processed_files: int = 0
     total_pages: int | None = None
     processed_pages: int = 0
+    estimated_processed_pages: int = 0
     current_source_label: str | None = None
     estimated_seconds: int | None = None
 
@@ -1381,13 +1425,22 @@ class HarmonizeRunReviewItem(BaseModel):
     resolved: bool = False
     decision: str | None = None
     decision_notes: str = ""
+    selected_source_ref: str | None = None
     resolved_at: datetime | None = None
 
 
 class HarmonizeReviewDecisionRequest(BaseModel):
     item_id: str
-    decision: Literal["accepted", "dismissed", "source_fixed", "overridden"]
+    decision: Literal[
+        "accepted",
+        "dismissed",
+        "source_fixed",
+        "overridden",
+        "kept_separate",
+        "deferred",
+    ]
     notes: str = ""
+    selected_source_ref: str | None = None
 
 
 class HarmonizeRunResponse(BaseModel):

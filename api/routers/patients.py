@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from collections import defaultdict
 from datetime import date, datetime
 from functools import lru_cache
@@ -121,6 +122,63 @@ def _encounter_date_sort(value: datetime | None) -> int:
     return value.toordinal() if value else 0
 
 
+def _clean_network_label(value: str | None) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+    cleaned = re.sub(r"^[0-9a-fA-F]{8,16}-", "", raw)
+    cleaned = cleaned.removesuffix(".extracted.json")
+    stem = Path(cleaned).stem
+    lower = stem.lower().replace("_", "-")
+    if "cedars" in lower:
+        return "Cedars-Sinai"
+    if "functionhealth" in lower or "function-health" in lower or "function" in lower:
+        return "Function Health"
+    if "quest" in lower:
+        return "Quest Diagnostics"
+    if "kaiser" in lower:
+        return "Kaiser Permanente"
+    if raw != cleaned:
+        return re.sub(r"[-_]+", " ", stem).strip().title() or raw
+    return raw
+
+
+def _network_specialty(name: str, related: list[str], class_breakdown: dict[str, int]) -> str:
+    haystack = " ".join([name, *related, *class_breakdown.keys()]).lower()
+    if any(term in haystack for term in ("nephro", "renal", "kidney")):
+        return "Nephrology"
+    if any(term in haystack for term in ("cardio", "heart", "ekg", "ecg")):
+        return "Cardiology"
+    if any(term in haystack for term in ("dermat", "skin")):
+        return "Dermatology"
+    if any(term in haystack for term in ("lab", "diagnostic", "quest", "function health", "blood draw")):
+        return "Laboratory / diagnostics"
+    if any(term in haystack for term in ("medication", "pharmacy")):
+        return "Medication records"
+    if any(term in haystack for term in ("problem list", "condition")):
+        return "Problem list"
+    if "immunization" in haystack:
+        return "Immunization records"
+    if "cedars-sinai" in haystack or "kaiser permanente" in haystack:
+        return "Health system records"
+    return "Clinical source records"
+
+
+def _fallback_provider_label(site_name: str, encounter_type: str) -> str:
+    if not site_name or site_name == "Unknown organization":
+        return "Unknown provider"
+    event_type = encounter_type.lower()
+    if "lab" in event_type or "diagnostic" in event_type:
+        return f"{site_name} lab / diagnostic records"
+    if "medication" in event_type:
+        return f"{site_name} medication records"
+    if "problem list" in event_type or "condition" in event_type:
+        return f"{site_name} problem list"
+    if "immunization" in event_type:
+        return f"{site_name} immunization records"
+    return f"{site_name} records"
+
+
 def _care_network_summary(record) -> tuple[list[CareTeamSummaryItem], list[SiteOfServiceSummaryItem]]:
     provider_rows: dict[str, dict] = {}
     site_rows: dict[str, dict] = {}
@@ -128,8 +186,11 @@ def _care_network_summary(record) -> tuple[list[CareTeamSummaryItem], list[SiteO
     for enc in record.encounters:
         class_code = enc.class_code or "Unknown"
         start = enc.period.start
-        provider_name = enc.practitioner_name or "Unknown provider"
-        site_name = enc.provider_org or "Unknown organization"
+        site_name = _clean_network_label(enc.provider_org) or "Unknown organization"
+        provider_name = _clean_network_label(enc.practitioner_name) or _fallback_provider_label(
+            site_name,
+            enc.encounter_type or "",
+        )
 
         provider = provider_rows.setdefault(
             provider_name,
@@ -164,6 +225,7 @@ def _care_network_summary(record) -> tuple[list[CareTeamSummaryItem], list[SiteO
     care_team = [
         CareTeamSummaryItem(
             name=name,
+            specialty=_network_specialty(name, sorted(row["organizations"]), dict(row["class_breakdown"])),
             organizations=sorted(row["organizations"]),
             encounter_count=row["encounter_count"],
             latest_encounter_dt=row["latest_encounter_dt"],
@@ -183,6 +245,7 @@ def _care_network_summary(record) -> tuple[list[CareTeamSummaryItem], list[SiteO
     sites_of_service = [
         SiteOfServiceSummaryItem(
             name=name,
+            specialty=_network_specialty(name, sorted(row["providers"]), dict(row["class_breakdown"])),
             provider_count=len(row["providers"]),
             encounter_count=row["encounter_count"],
             latest_encounter_dt=row["latest_encounter_dt"],
@@ -1620,6 +1683,12 @@ def _record_procedure_markers(record) -> list[ProcedureMarker]:
 
 
 def _record_diagnostic_reports(record) -> list[DiagnosticReportItem]:
+    def note_preview(text: str) -> str:
+        compact = " ".join(text.split())
+        if len(compact) > 260:
+            return f"{compact[:260].rstrip()}..."
+        return compact
+
     return [
         DiagnosticReportItem(
             report_id=report.report_id,
@@ -1627,6 +1696,8 @@ def _record_diagnostic_reports(record) -> list[DiagnosticReportItem]:
             category=report.category or "",
             date=_dt_to_iso(report.effective_dt),
             result_count=len(report.result_refs),
+            has_presented_form=report.has_presented_form,
+            note_preview=note_preview(report.presented_form_text),
         )
         for report in sorted(record.diagnostic_reports, key=lambda r: _dt_sort_key(r.effective_dt))
     ]

@@ -246,10 +246,20 @@ interface CareJourneyDetailProps {
 
 function DiagnosticReportDetail({ report }: { report: DiagnosticReportItem }) {
   return (
-    <div className="space-y-0">
-      <Row label="Category">{report.category || "Laboratory"}</Row>
-      <Row label="Date">{fmtDate(report.date)}</Row>
-      <Row label="Results">{report.result_count} observations</Row>
+    <div className="space-y-3">
+      <div className="space-y-0">
+        <Row label="Category">{report.category || "Laboratory"}</Row>
+        <Row label="Date">{fmtDate(report.date)}</Row>
+        <Row label="Results">{report.result_count} observations</Row>
+      </div>
+      {report.has_presented_form && report.note_preview && (
+        <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+            Clinical note
+          </p>
+          <p className="mt-1 text-sm leading-5 text-slate-700">{report.note_preview}</p>
+        </div>
+      )}
     </div>
   );
 }

@@ -90,17 +90,21 @@ function groupByYear(events: HistoryEvent[]): Array<{ year: string; events: Hist
     });
 }
 
+function encounterToHistoryEvent(encounter: EncounterEvent): HistoryEvent {
+  return {
+    id: encounter.encounter_id,
+    date: encounter.start,
+    title: encounter.reason_display || encounter.encounter_type || encounter.class_code || "Encounter",
+    meta: `${encounter.class_code || "Unknown"} encounter`,
+    detail: `${encounter.linked_observation_count} labs/vitals · ${encounter.linked_condition_count} conditions · ${encounter.linked_procedure_count} procedures`,
+    tone: (encounter.class_code === "EMER" ? "rose" : "blue") as Tone,
+  };
+}
+
 function encounterEvents(data: TimelineResponse | undefined): HistoryEvent[] {
   if (!data) return [];
   return data.encounters
-    .map((encounter: EncounterEvent) => ({
-      id: encounter.encounter_id,
-      date: encounter.start,
-      title: encounter.reason_display || encounter.encounter_type || encounter.class_code || "Encounter",
-      meta: `${encounter.class_code || "Unknown"} encounter`,
-      detail: `${encounter.linked_observation_count} labs/vitals · ${encounter.linked_condition_count} conditions · ${encounter.linked_procedure_count} procedures`,
-      tone: (encounter.class_code === "EMER" ? "rose" : "blue") as Tone,
-    }))
+    .map(encounterToHistoryEvent)
     .sort((a, b) => dateValue(b.date) - dateValue(a.date));
 }
 
@@ -307,6 +311,13 @@ function providerSecondaryLabel(encounter: EncounterEvent): string {
   return "Site not captured";
 }
 
+function providerFilterLabel(encounter: EncounterEvent): string {
+  const primary = providerPrimaryLabel(encounter);
+  const secondary = providerSecondaryLabel(encounter).replace(/^Source: /, "");
+  if (!secondary || secondary === "Site not captured" || secondary === primary) return primary;
+  return `${primary} · ${secondary}`;
+}
+
 function EncounterDetailModal({
   encounter,
   onClose,
@@ -485,6 +496,7 @@ export function ExplorerHistory() {
   const [tab, setTab] = useState<HistoryTab>("encounters");
   const [view, setView] = useState<ViewMode>("table");
   const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [providerFilter, setProviderFilter] = useState<string>("all");
   const [selectedEncounter, setSelectedEncounter] = useState<EncounterEvent | null>(null);
 
   const timelineQ = useQuery({
@@ -558,16 +570,26 @@ export function ExplorerHistory() {
           ? proceduresQ.isError
           : immunizationsQ.isError;
   const patientName = timelineQ.data?.name || careQ.data?.name || overviewQ.data?.name || proceduresQ.data?.name || immunizationsQ.data?.name || "Patient";
-  const currentEvents = eventsByTab[tab];
   const encounterTypeOptions = Array.from(new Set((timelineQ.data?.encounters ?? []).map((encounter) => encounterTypeLabel(encounter))))
+    .sort((a, b) => a.localeCompare(b));
+  const encounterProviderOptions = Array.from(new Set((timelineQ.data?.encounters ?? []).map(providerFilterLabel)))
     .sort((a, b) => a.localeCompare(b));
   const effectiveTypeFilter =
     typeFilter === "all" || encounterTypeOptions.includes(typeFilter)
       ? typeFilter
       : "all";
+  const effectiveProviderFilter =
+    providerFilter === "all" || encounterProviderOptions.includes(providerFilter)
+      ? providerFilter
+      : "all";
   const currentEncounters = (timelineQ.data?.encounters ?? [])
     .filter((encounter) => effectiveTypeFilter === "all" || encounterTypeLabel(encounter) === effectiveTypeFilter)
+    .filter((encounter) => effectiveProviderFilter === "all" || providerFilterLabel(encounter) === effectiveProviderFilter)
     .sort((a, b) => dateValue(b.start) - dateValue(a.start));
+  const currentEvents =
+    tab === "encounters"
+      ? currentEncounters.map(encounterToHistoryEvent)
+      : eventsByTab[tab];
 
   if (!patientId) {
     return (
@@ -661,25 +683,42 @@ export function ExplorerHistory() {
       </div>
 
       {tab === "encounters" && (
-        <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-[#e9eaef] bg-white px-3 py-2 shadow-sm">
-          <div className="inline-flex items-center gap-1.5 px-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#98a2b3]">
-            <Filter size={13} />
-            Type
+        <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-[#e9eaef] bg-white px-3 py-2 shadow-sm">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex items-center gap-1.5 px-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#98a2b3]">
+              <Filter size={13} />
+              Type
+            </div>
+            {["all", ...encounterTypeOptions].map((typeOption) => (
+              <button
+                key={typeOption}
+                type="button"
+                onClick={() => setTypeFilter(typeOption)}
+                className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  effectiveTypeFilter === typeOption
+                    ? "bg-[#eef1ff] text-[#5b76fe]"
+                    : "bg-[#f9fafb] text-[#667085] hover:bg-[#f2f4f7]"
+                }`}
+              >
+                {typeOption === "all" ? "All" : typeOption}
+              </button>
+            ))}
           </div>
-          {["all", ...encounterTypeOptions].map((typeOption) => (
-            <button
-              key={typeOption}
-              type="button"
-              onClick={() => setTypeFilter(typeOption)}
-              className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
-                effectiveTypeFilter === typeOption
-                  ? "bg-[#eef1ff] text-[#5b76fe]"
-                  : "bg-[#f9fafb] text-[#667085] hover:bg-[#f2f4f7]"
-              }`}
+          <label className="ml-auto flex min-w-[240px] items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-[#98a2b3]">
+            Provider / site
+            <select
+              value={effectiveProviderFilter}
+              onChange={(event) => setProviderFilter(event.target.value)}
+              className="min-w-0 flex-1 rounded-lg border border-[#dfe4ea] bg-white px-2 py-1.5 text-xs font-medium normal-case tracking-normal text-[#475467] outline-none focus:border-[#5b76fe]"
             >
-              {typeOption === "all" ? "All" : typeOption}
-            </button>
-          ))}
+              <option value="all">All providers and sites</option>
+              {encounterProviderOptions.map((providerOption) => (
+                <option key={providerOption} value={providerOption}>
+                  {providerOption}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
       )}
 

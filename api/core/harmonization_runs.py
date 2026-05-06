@@ -63,6 +63,7 @@ def _run_review_decision_defaults(item: dict[str, Any]) -> dict[str, Any]:
     item.setdefault("resolved", False)
     item.setdefault("decision", None)
     item.setdefault("decision_notes", "")
+    item.setdefault("selected_source_ref", None)
     item.setdefault("resolved_at", None)
     return item
 
@@ -239,6 +240,125 @@ def _recompute_summary(payload: dict[str, Any]) -> None:
     )
 
 
+def _latest_from_observation_source(source: dict[str, Any]) -> dict[str, Any]:
+    value = source.get("value")
+    unit = source.get("unit")
+    if value is None and source.get("raw_value") is not None:
+        value = source.get("raw_value")
+        unit = unit or source.get("raw_unit")
+    return {
+        "value": value,
+        "unit": unit,
+        "source_label": source.get("source_label"),
+        "effective_date": source.get("effective_date"),
+    }
+
+
+def _source_matches_latest(source: dict[str, Any], latest: dict[str, Any] | None) -> bool:
+    if not latest:
+        return False
+    source_value = source.get("value")
+    if source_value is None and source.get("raw_value") is not None:
+        source_value = source.get("raw_value")
+    return (
+        source_value == latest.get("value")
+        and source.get("source_label") == latest.get("source_label")
+        and source.get("effective_date") == latest.get("effective_date")
+    )
+
+
+def _apply_review_decision_to_candidate(
+    payload: dict[str, Any],
+    item: dict[str, Any],
+    decision: str,
+    notes: str,
+    selected_source_ref: str | None,
+    resolved_at: str | None,
+) -> None:
+    """Apply review decisions that change the candidate record for this run.
+
+    The raw source-backed observations stay intact. Reviewer choices only update
+    the run's canonical candidate selection metadata and, for an alternate
+    preference, the candidate `latest` value that publish will activate.
+    """
+    if item.get("resource_type") != "Observation" or not item.get("merged_ref"):
+        return
+
+    observations = (payload.get("candidate_record") or {}).get("observations") or []
+    observation = next(
+        (obs for obs in observations if obs.get("merged_ref") == item.get("merged_ref")),
+        None,
+    )
+    if observation is None:
+        return
+
+    previous_latest = observation.get("latest")
+    selection: dict[str, Any] = {
+        "decision": decision,
+        "review_item_id": item.get("id"),
+        "resolved_at": resolved_at,
+        "notes": notes.strip(),
+        "previous_latest": previous_latest,
+    }
+
+    if decision == "overridden":
+        source = next(
+            (
+                src
+                for src in observation.get("sources") or []
+                if src.get("source_observation_ref") == selected_source_ref
+            ),
+            None,
+        )
+        selection["selected_source_ref"] = selected_source_ref
+        if source is None:
+            selection["applied"] = False
+            selection["warning"] = "Selected source observation was not found in the candidate record."
+        else:
+            latest = _latest_from_observation_source(source)
+            observation["latest"] = latest
+            selection.update(
+                {
+                    "applied": True,
+                    "selected_source_ref": selected_source_ref,
+                    "selected_source_label": source.get("source_label"),
+                    "selected_latest": latest,
+                }
+            )
+    elif decision == "accepted":
+        source = next(
+            (
+                src
+                for src in observation.get("sources") or []
+                if _source_matches_latest(src, previous_latest)
+            ),
+            None,
+        )
+        selection.update(
+            {
+                "applied": True,
+                "selected_source_ref": source.get("source_observation_ref") if source else None,
+                "selected_source_label": source.get("source_label") if source else previous_latest.get("source_label") if previous_latest else None,
+                "selected_latest": previous_latest,
+            }
+        )
+    elif decision == "kept_separate":
+        selection.update(
+            {
+                "applied": True,
+                "selected_source_ref": None,
+                "selected_latest": previous_latest,
+                "retains_all_source_values": True,
+            }
+        )
+    elif decision == "deferred":
+        selection.update({"applied": False})
+    else:
+        return
+
+    observation["canonical_selection"] = selection
+
+
 def _write_run(collection_id: str, payload: dict[str, Any]) -> None:
     out_dir = _collection_dir(collection_id)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -397,6 +517,22 @@ def latest_run(collection_id: str) -> dict[str, Any] | None:
         return None
 
 
+def latest_canonical_selection(collection_id: str, merged_ref: str) -> dict[str, Any] | None:
+    """Return the latest reviewer-selected canonical value for a merged fact."""
+    payload = latest_run(collection_id)
+    if payload is None:
+        return None
+    observations = (payload.get("candidate_record") or {}).get("observations") or []
+    observation = next(
+        (obs for obs in observations if obs.get("merged_ref") == merged_ref),
+        None,
+    )
+    if observation is None:
+        return None
+    selection = observation.get("canonical_selection")
+    return selection if isinstance(selection, dict) else None
+
+
 def get_run(collection_id: str, run_id: str) -> dict[str, Any] | None:
     path = _run_path(collection_id, run_id)
     if not path.exists():
@@ -413,6 +549,7 @@ def resolve_review_item(
     item_id: str,
     decision: str,
     notes: str = "",
+    selected_source_ref: str | None = None,
 ) -> dict[str, Any]:
     """Record a reviewer decision on a persisted run review item."""
     payload = get_run(collection_id, run_id)
@@ -424,10 +561,23 @@ def resolve_review_item(
     if target is None:
         raise KeyError(item_id)
 
-    target["resolved"] = True
     target["decision"] = decision
     target["decision_notes"] = notes.strip()
-    target["resolved_at"] = _now().isoformat()
+    target["selected_source_ref"] = selected_source_ref
+    if decision == "deferred":
+        target["resolved"] = False
+        target["resolved_at"] = None
+    else:
+        target["resolved"] = True
+        target["resolved_at"] = _now().isoformat()
+    _apply_review_decision_to_candidate(
+        payload,
+        target,
+        decision,
+        notes,
+        selected_source_ref,
+        target.get("resolved_at"),
+    )
     for item in review_items:
         _run_review_decision_defaults(item)
     _recompute_summary(payload)

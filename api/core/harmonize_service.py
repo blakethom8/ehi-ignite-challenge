@@ -767,6 +767,134 @@ def _reference_id(value: Any) -> str | None:
     return ref.rsplit("/", 1)[-1].removeprefix("urn:uuid:")
 
 
+def _reference_type_and_id(value: Any) -> tuple[str, str]:
+    if not isinstance(value, dict):
+        return "", ""
+    ref = value.get("reference")
+    if not isinstance(ref, str) or not ref.strip():
+        return "", ""
+    cleaned = ref.strip()
+    if cleaned.startswith("urn:uuid:"):
+        return "", cleaned.removeprefix("urn:uuid:")
+    if "/" not in cleaned:
+        return "", cleaned
+    resource_type, resource_id = cleaned.rsplit("/", 1)
+    return resource_type.rsplit("/", 1)[-1], resource_id
+
+
+def _human_name_text(value: Any) -> str:
+    if isinstance(value, list):
+        for item in value:
+            text = _human_name_text(item)
+            if text:
+                return text
+        return ""
+    if not isinstance(value, dict):
+        return ""
+    if isinstance(value.get("text"), str) and value["text"].strip():
+        return value["text"].strip()
+    parts: list[str] = []
+    for key in ("prefix", "given"):
+        raw = value.get(key)
+        if isinstance(raw, list):
+            parts.extend(str(item).strip() for item in raw if str(item).strip())
+        elif isinstance(raw, str) and raw.strip():
+            parts.append(raw.strip())
+    family = value.get("family")
+    if isinstance(family, str) and family.strip():
+        parts.append(family.strip())
+    suffix = value.get("suffix")
+    if isinstance(suffix, list):
+        parts.extend(str(item).strip() for item in suffix if str(item).strip())
+    elif isinstance(suffix, str) and suffix.strip():
+        parts.append(suffix.strip())
+    return " ".join(parts)
+
+
+def _resource_display(resource: dict[str, Any]) -> str:
+    resource_type = resource.get("resourceType")
+    if resource_type == "Organization":
+        name = resource.get("name")
+        return name.strip() if isinstance(name, str) and name.strip() else ""
+    if resource_type == "Practitioner":
+        return _human_name_text(resource.get("name"))
+    if resource_type == "Location":
+        name = resource.get("name")
+        return name.strip() if isinstance(name, str) and name.strip() else ""
+    return ""
+
+
+def _reference_display(value: Any, display_index: dict[tuple[str, str], str], id_index: dict[str, str]) -> str:
+    if not isinstance(value, dict):
+        return ""
+    display = value.get("display")
+    if isinstance(display, str) and display.strip():
+        return display.strip()
+    resource_type, resource_id = _reference_type_and_id(value)
+    if resource_type and resource_id:
+        indexed = display_index.get((resource_type, resource_id))
+        if indexed:
+            return indexed
+    if resource_id:
+        return id_index.get(resource_id, "")
+    return ""
+
+
+def _reference_display_list(
+    values: Any,
+    display_index: dict[tuple[str, str], str],
+    id_index: dict[str, str],
+) -> list[str]:
+    out: list[str] = []
+    for value in values or []:
+        label = _reference_display(value, display_index, id_index)
+        if label and label not in out:
+            out.append(label)
+    return out
+
+
+def _reference_display_pairs(
+    values: Any,
+    display_index: dict[tuple[str, str], str],
+    id_index: dict[str, str],
+) -> list[tuple[str, str]]:
+    refs = values if isinstance(values, list) else [values]
+    out: list[tuple[str, str]] = []
+    for value in refs or []:
+        resource_type, _resource_id = _reference_type_and_id(value)
+        label = _reference_display(value, display_index, id_index)
+        if label and (resource_type, label) not in out:
+            out.append((resource_type, label))
+    return out
+
+
+def _labels_for_type(pairs: list[tuple[str, str]], *resource_types: str) -> list[str]:
+    wanted = set(resource_types)
+    labels: list[str] = []
+    for resource_type, label in pairs:
+        if resource_type in wanted and label not in labels:
+            labels.append(label)
+    return labels
+
+
+def _resource_display_indexes(
+    resources_by_source: dict[str, dict[str, list[dict]]],
+) -> tuple[dict[tuple[str, str], str], dict[str, str]]:
+    display_index: dict[tuple[str, str], str] = {}
+    id_index: dict[str, str] = {}
+    for source_resources in resources_by_source.values():
+        for resource_type in ("Organization", "Practitioner", "Location"):
+            for resource in source_resources.get(resource_type, []):
+                if not isinstance(resource, dict):
+                    continue
+                resource_id = str(resource.get("id") or "").strip()
+                label = _resource_display(resource)
+                if resource_id and label:
+                    display_index[(resource_type, resource_id)] = label
+                    id_index.setdefault(resource_id, label)
+    return display_index, id_index
+
+
 def _resource_date(resource: dict[str, Any]) -> str | None:
     for key in (
         "effectiveDateTime",
@@ -852,16 +980,44 @@ def _attachment_text(attachment: Any) -> str:
     return ""
 
 
-def _resource_notes(resource: dict[str, Any]) -> list[str]:
-    out: list[str] = []
+def _annotation_author(note: dict[str, Any]) -> str:
+    author = note.get("authorString")
+    if isinstance(author, str) and author.strip():
+        return author.strip()
+    author_ref = note.get("authorReference")
+    if isinstance(author_ref, dict):
+        display = author_ref.get("display")
+        if isinstance(display, str) and display.strip():
+            return display.strip()
+        reference = author_ref.get("reference")
+        if isinstance(reference, str) and reference.strip():
+            return reference.strip()
+    return ""
+
+
+def _resource_note_entries(resource: dict[str, Any]) -> list[dict[str, str]]:
+    out: list[dict[str, str]] = []
     for note in resource.get("note") or []:
         if isinstance(note, dict) and isinstance(note.get("text"), str) and note["text"].strip():
-            out.append(note["text"].strip())
+            out.append(
+                {
+                    "text": note["text"].strip(),
+                    "author": _annotation_author(note),
+                    "time": note.get("time") if isinstance(note.get("time"), str) else "",
+                }
+            )
     if resource.get("resourceType") == "DiagnosticReport":
         for attachment in resource.get("presentedForm") or []:
             text = _attachment_text(attachment)
             if text:
-                out.append(text)
+                out.append(
+                    {
+                        "text": text,
+                        "attachment_content_type": attachment.get("contentType")
+                        if isinstance(attachment, dict) and isinstance(attachment.get("contentType"), str)
+                        else "",
+                    }
+                )
     if resource.get("resourceType") == "Composition":
         for section in resource.get("section") or []:
             if not isinstance(section, dict):
@@ -870,12 +1026,21 @@ def _resource_notes(resource: dict[str, Any]) -> list[str]:
             if isinstance(text, dict) and isinstance(text.get("div"), str):
                 stripped = _strip_html(text["div"])
                 if stripped:
-                    out.append(stripped)
+                    out.append(
+                        {
+                            "text": stripped,
+                            "section_title": section.get("title") if isinstance(section.get("title"), str) else "",
+                        }
+                    )
     if resource.get("resourceType") == "DocumentReference":
         description = resource.get("description")
         if isinstance(description, str) and description.strip():
-            out.append(description.strip())
+            out.append({"text": description.strip()})
     return out
+
+
+def _resource_notes(resource: dict[str, Any]) -> list[str]:
+    return [entry["text"] for entry in _resource_note_entries(resource) if entry.get("text")]
 
 
 def clinical_artifacts(collection_id: str) -> dict[str, list[dict[str, Any]]]:
@@ -889,16 +1054,27 @@ def clinical_artifacts(collection_id: str) -> dict[str, list[dict[str, Any]]]:
     coll = get_collection(collection_id)
     if not coll:
         return {
+            "patients": [],
             "documents": [],
+            "organizations": [],
+            "practitioners": [],
+            "locations": [],
             "encounters": [],
+            "observations": [],
             "procedures": [],
             "diagnostic_reports": [],
             "clinical_notes": [],
         }
 
     resources_by_source = load_collection_resources(collection_id)
+    display_index, id_index = _resource_display_indexes(resources_by_source)
     documents: list[dict[str, Any]] = []
+    patients: list[dict[str, Any]] = []
+    organizations: list[dict[str, Any]] = []
+    practitioners: list[dict[str, Any]] = []
+    locations: list[dict[str, Any]] = []
     encounters: list[dict[str, Any]] = []
+    observations: list[dict[str, Any]] = []
     procedures: list[dict[str, Any]] = []
     diagnostic_reports: list[dict[str, Any]] = []
     clinical_notes: list[dict[str, Any]] = []
@@ -908,6 +1084,13 @@ def clinical_artifacts(collection_id: str) -> dict[str, list[dict[str, Any]]]:
         counts = {rtype: len(items) for rtype, items in source_resources.items()}
         span = _date_span(source_resources)
         context = _document_context(source)
+        document_author_pairs: list[tuple[str, str]] = []
+        for document_resource in source_resources.get("DocumentReference", []):
+            if not isinstance(document_resource, dict):
+                continue
+            document_author_pairs.extend(
+                _reference_display_pairs(document_resource.get("author"), display_index, id_index)
+            )
         documents.append(
             {
                 "source_id": source.id,
@@ -917,6 +1100,13 @@ def clinical_artifacts(collection_id: str) -> dict[str, list[dict[str, Any]]]:
                 "path": str(source.path),
                 "available": source.path.exists(),
                 "document_context": context,
+                "author_labels": _reference_display_list(
+                    (context or {}).get("authors") if isinstance((context or {}).get("authors"), list) else [],
+                    display_index,
+                    id_index,
+                ),
+                "author_organization_labels": _labels_for_type(document_author_pairs, "Organization"),
+                "author_practitioner_labels": _labels_for_type(document_author_pairs, "Practitioner"),
                 "date_start": span["start"] or (context or {}).get("encounter_date"),
                 "date_end": span["end"] or (context or {}).get("encounter_date"),
                 "resource_counts": counts,
@@ -924,8 +1114,54 @@ def clinical_artifacts(collection_id: str) -> dict[str, list[dict[str, Any]]]:
             }
         )
 
+        for resource_type, target in (
+            ("Organization", organizations),
+            ("Practitioner", practitioners),
+            ("Location", locations),
+        ):
+            for resource in source_resources.get(resource_type, []):
+                if not isinstance(resource, dict):
+                    continue
+                target.append(
+                    {
+                        "source_id": source.id,
+                        "source_label": source.label,
+                        "id": str(resource.get("id") or ""),
+                        "display": _resource_display(resource),
+                        "resource": resource,
+                    }
+                )
+
+        for resource in source_resources.get("Patient", []):
+            if not isinstance(resource, dict):
+                continue
+            patients.append(
+                {
+                    "source_id": source.id,
+                    "source_label": source.label,
+                    "id": str(resource.get("id") or ""),
+                    "resource": resource,
+                }
+            )
+
         for resource in source_resources.get("Encounter", []):
             period = _period(resource, "period")
+            service_provider = _reference_display(resource.get("serviceProvider"), display_index, id_index)
+            participant_labels = []
+            for participant in resource.get("participant") or []:
+                if not isinstance(participant, dict):
+                    continue
+                label = _reference_display(participant.get("individual"), display_index, id_index)
+                if label and label not in participant_labels:
+                    participant_labels.append(label)
+            location_labels = []
+            for location in resource.get("location") or []:
+                if not isinstance(location, dict):
+                    continue
+                label = _reference_display(location.get("location"), display_index, id_index)
+                if label and label not in location_labels:
+                    location_labels.append(label)
+            provider = participant_labels[0] if participant_labels else ""
             encounters.append(
                 {
                     "source_id": source.id,
@@ -937,9 +1173,35 @@ def clinical_artifacts(collection_id: str) -> dict[str, list[dict[str, Any]]]:
                     "reason": _codeable_text((resource.get("reasonCode") or [{}])[0]),
                     "period_start": period["start"],
                     "period_end": period["end"],
-                    "provider": (resource.get("serviceProvider") or {}).get("display")
-                    if isinstance(resource.get("serviceProvider"), dict)
-                    else "",
+                    "provider": provider,
+                    "service_provider": service_provider,
+                    "participant_labels": participant_labels,
+                    "practitioner_labels": participant_labels,
+                    "location_labels": location_labels,
+                    "site": service_provider or (location_labels[0] if location_labels else ""),
+                }
+            )
+
+        for resource in source_resources.get("Observation", []):
+            if not isinstance(resource, dict):
+                continue
+            performer_labels = _reference_display_list(resource.get("performer"), display_index, id_index)
+            performer_pairs = _reference_display_pairs(resource.get("performer"), display_index, id_index)
+            observations.append(
+                {
+                    "source_id": source.id,
+                    "source_label": source.label,
+                    "id": str(resource.get("id") or ""),
+                    "status": str(resource.get("status") or ""),
+                    "category": _codeable_text((resource.get("category") or [{}])[0]),
+                    "code": _codeable_code(resource.get("code")),
+                    "system": _codeable_system(resource.get("code")),
+                    "display": _codeable_text(resource.get("code")) or "Observation",
+                    "effective_date": _resource_date(resource),
+                    "encounter_id": _reference_id(resource.get("encounter")),
+                    "performer_labels": performer_labels,
+                    "performer_organization_labels": _labels_for_type(performer_pairs, "Organization"),
+                    "performer_practitioner_labels": _labels_for_type(performer_pairs, "Practitioner"),
                 }
             )
 
@@ -947,6 +1209,17 @@ def clinical_artifacts(collection_id: str) -> dict[str, list[dict[str, Any]]]:
             period = _period(resource, "performedPeriod")
             if not period["start"] and isinstance(resource.get("performedDateTime"), str):
                 period = {"start": resource["performedDateTime"], "end": resource["performedDateTime"]}
+            performer_labels = []
+            performer_pairs: list[tuple[str, str]] = []
+            for performer in resource.get("performer") or []:
+                if not isinstance(performer, dict):
+                    continue
+                label = _reference_display(performer.get("actor"), display_index, id_index)
+                if label and label not in performer_labels:
+                    performer_labels.append(label)
+                performer_pairs.extend(
+                    _reference_display_pairs(performer.get("actor"), display_index, id_index)
+                )
             procedures.append(
                 {
                     "source_id": source.id,
@@ -960,12 +1233,27 @@ def clinical_artifacts(collection_id: str) -> dict[str, list[dict[str, Any]]]:
                     "performed_end": period["end"],
                     "reason": _codeable_text((resource.get("reasonCode") or [{}])[0]),
                     "encounter_id": _reference_id(resource.get("encounter")),
+                    "performer_labels": performer_labels,
+                    "performer_organization_labels": _labels_for_type(performer_pairs, "Organization"),
+                    "performer_practitioner_labels": _labels_for_type(performer_pairs, "Practitioner"),
                 }
             )
 
         for resource in source_resources.get("DiagnosticReport", []):
             presented_text = "\n\n".join(_attachment_text(a) for a in resource.get("presentedForm") or [])
             presented_text = presented_text.strip()
+            performer_labels = _reference_display_list(resource.get("performer"), display_index, id_index)
+            performer_pairs = _reference_display_pairs(resource.get("performer"), display_index, id_index)
+            results_interpreter_labels = _reference_display_list(
+                resource.get("resultsInterpreter"),
+                display_index,
+                id_index,
+            )
+            results_interpreter_pairs = _reference_display_pairs(
+                resource.get("resultsInterpreter"),
+                display_index,
+                id_index,
+            )
             diagnostic_reports.append(
                 {
                     "source_id": source.id,
@@ -983,6 +1271,18 @@ def clinical_artifacts(collection_id: str) -> dict[str, list[dict[str, Any]]]:
                         if ref
                     ],
                     "encounter_id": _reference_id(resource.get("encounter")),
+                    "performer_labels": performer_labels,
+                    "performer_organization_labels": _labels_for_type(performer_pairs, "Organization"),
+                    "performer_practitioner_labels": _labels_for_type(performer_pairs, "Practitioner"),
+                    "results_interpreter_labels": results_interpreter_labels,
+                    "results_interpreter_organization_labels": _labels_for_type(
+                        results_interpreter_pairs,
+                        "Organization",
+                    ),
+                    "results_interpreter_practitioner_labels": _labels_for_type(
+                        results_interpreter_pairs,
+                        "Practitioner",
+                    ),
                     "has_presented_form": bool(resource.get("presentedForm")),
                     "presented_form_text": presented_text,
                 }
@@ -990,7 +1290,10 @@ def clinical_artifacts(collection_id: str) -> dict[str, list[dict[str, Any]]]:
 
         for resource_type, resources in source_resources.items():
             for resource in resources:
-                for idx, text in enumerate(_resource_notes(resource)):
+                if not isinstance(resource, dict):
+                    continue
+                encounter_id = _reference_id(resource.get("encounter"))
+                for idx, note_entry in enumerate(_resource_note_entries(resource)):
                     clinical_notes.append(
                         {
                             "source_id": source.id,
@@ -998,14 +1301,24 @@ def clinical_artifacts(collection_id: str) -> dict[str, list[dict[str, Any]]]:
                             "resource_type": resource_type,
                             "resource_id": str(resource.get("id") or ""),
                             "note_index": idx,
+                            "encounter_id": encounter_id,
                             "date": _resource_date(resource),
-                            "text": text,
+                            "author": note_entry.get("author") or "",
+                            "time": note_entry.get("time") or "",
+                            "section_title": note_entry.get("section_title") or "",
+                            "attachment_content_type": note_entry.get("attachment_content_type") or "",
+                            "text": note_entry.get("text") or "",
                         }
                     )
 
     return {
+        "patients": patients,
         "documents": documents,
+        "organizations": organizations,
+        "practitioners": practitioners,
+        "locations": locations,
         "encounters": encounters,
+        "observations": observations,
         "procedures": procedures,
         "diagnostic_reports": diagnostic_reports,
         "clinical_notes": clinical_notes,
@@ -1536,9 +1849,29 @@ def facts_for_document_reference(
     med_hits = [m for m in merged_medications(collection_id) if _has_doc_ref(m.sources)]
     allergy_hits = [m for m in merged_allergies(collection_id) if _has_doc_ref(m.sources)]
     im_hits = [m for m in merged_immunizations(collection_id) if _has_doc_ref(m.sources)]
+    artifacts = clinical_artifacts(collection_id)
+
+    def _source_artifacts(name: str) -> list[dict[str, Any]]:
+        if matching_source_id is None:
+            return []
+        return [
+            a
+            for a in artifacts.get(name, [])
+            if isinstance(a, dict) and a.get("source_id") == matching_source_id
+        ]
+
+    def _report_payload(report: dict[str, Any]) -> dict[str, Any]:
+        payload = {k: v for k, v in report.items() if k != "presented_form_text"}
+        text = str(report.get("presented_form_text") or "").strip()
+        payload["note_preview"] = text[:500]
+        return payload
+
+    encounter_hits = _source_artifacts("encounters")
+    procedure_hits = _source_artifacts("procedures")
+    report_hits = [_report_payload(r) for r in _source_artifacts("diagnostic_reports")]
     note_hits = [
         {**n, "text": str(n.get("text") or "")[:4000]}
-        for n in clinical_artifacts(collection_id).get("clinical_notes", [])
+        for n in artifacts.get("clinical_notes", [])
         if matching_source_id is not None and n.get("source_id") == matching_source_id
     ]
 
@@ -1551,6 +1884,9 @@ def facts_for_document_reference(
         "medications": [serialize_medication(m) for m in med_hits],
         "allergies": [serialize_allergy(m) for m in allergy_hits],
         "immunizations": [serialize_immunization(m) for m in im_hits],
+        "encounters": encounter_hits,
+        "procedures": procedure_hits,
+        "diagnostic_reports": report_hits,
         "clinical_notes": note_hits,
         "totals": {
             "observations": len(obs_hits),
@@ -1558,6 +1894,9 @@ def facts_for_document_reference(
             "medications": len(med_hits),
             "allergies": len(allergy_hits),
             "immunizations": len(im_hits),
+            "encounters": len(encounter_hits),
+            "procedures": len(procedure_hits),
+            "diagnostic_reports": len(report_hits),
             "clinical_notes": len(note_hits),
             "all": (
                 len(obs_hits)
@@ -1565,6 +1904,9 @@ def facts_for_document_reference(
                 + len(med_hits)
                 + len(allergy_hits)
                 + len(im_hits)
+                + len(encounter_hits)
+                + len(procedure_hits)
+                + len(report_hits)
                 + len(note_hits)
             ),
         },

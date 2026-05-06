@@ -24,6 +24,7 @@ import { ExplorerAssistant } from "./pages/Explorer/Assistant";
 import { ExplorerCareJourney } from "./pages/Explorer/CareJourney";
 import { ExplorerPatientData } from "./pages/Explorer/PatientData";
 import { ExplorerHistory } from "./pages/Explorer/History";
+import { ExplorerLabs } from "./pages/Explorer/Labs";
 import { PatientJourney } from "./pages/Journey/PatientJourney";
 import { PatientRecordOverview } from "./pages/Modules/PatientRecordOverview";
 import { PreOpOverview } from "./pages/Modules/PreOpOverview";
@@ -86,6 +87,7 @@ export default function App() {
     { path: "/marketplace/publish", element: <MarketplaceConcept /> },
     { path: "/explorer", element: <ExplorerOverview /> },
     { path: "/explorer/timeline", element: <ExplorerTimeline /> },
+    { path: "/explorer/labs", element: <ExplorerLabs /> },
     { path: "/explorer/history", element: <ExplorerHistory /> },
     { path: "/explorer/care-journey", element: <ExplorerCareJourney /> },
     { path: "/explorer/corpus", element: <ExplorerCorpus /> },

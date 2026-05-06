@@ -5,11 +5,14 @@ import {
   CalendarDays,
   ChevronRight,
   Clock3,
+  FileText,
   Filter,
+  Info,
   List,
   Pill,
   Scissors,
   Syringe,
+  X,
 } from "lucide-react";
 import { api } from "../../api/client";
 import { EmptyState } from "../../components/EmptyState";
@@ -273,7 +276,148 @@ function resourceSummary(encounter: EncounterEvent): string {
   return parts.length > 0 ? parts.join(" / ") : "No linked resources";
 }
 
-function EncounterHistoryTable({ encounters }: { encounters: EncounterEvent[] }) {
+function encounterTypeLabel(encounter: EncounterEvent): string {
+  return encounter.encounter_type || encounter.reason_display || encounterClassLabel(encounter.class_code) || "Encounter";
+}
+
+function looksLikeSourceName(value: string | null | undefined): boolean {
+  if (!value) return false;
+  return /\.(json|pdf|csv|xml|txt)$/i.test(value) || /^[a-f0-9]{8,}-/i.test(value);
+}
+
+function friendlySourceName(value: string | null | undefined): string {
+  if (!value) return "Source unavailable";
+  return value.replace(/^[a-f0-9]{8,}-/i, "").replace(/_/g, " ");
+}
+
+function providerPrimaryLabel(encounter: EncounterEvent): string {
+  if (encounter.practitioner_name && !looksLikeSourceName(encounter.practitioner_name)) return encounter.practitioner_name;
+  if (encounter.provider_org && !looksLikeSourceName(encounter.provider_org)) return encounter.provider_org;
+  return "Provider not captured";
+}
+
+function providerSecondaryLabel(encounter: EncounterEvent): string {
+  const sourceCandidate = looksLikeSourceName(encounter.provider_org)
+    ? encounter.provider_org
+    : looksLikeSourceName(encounter.practitioner_name)
+      ? encounter.practitioner_name
+      : "";
+  if (sourceCandidate) return `Source: ${friendlySourceName(sourceCandidate)}`;
+  if (encounter.provider_org) return encounter.provider_org;
+  return "Site not captured";
+}
+
+function EncounterDetailModal({
+  encounter,
+  onClose,
+}: {
+  encounter: EncounterEvent;
+  onClose: () => void;
+}) {
+  const resources = [
+    { label: "Observations", count: encounter.linked_observation_count },
+    { label: "Conditions", count: encounter.linked_condition_count },
+    { label: "Procedures", count: encounter.linked_procedure_count },
+    { label: "Medications", count: encounter.linked_medication_count },
+  ];
+  const linkedTotal = resources.reduce((sum, item) => sum + item.count, 0);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[#101828]/35 px-4 py-8 backdrop-blur-[2px]">
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="encounter-detail-title"
+        className="w-full max-w-3xl overflow-hidden rounded-2xl border border-[#dfe4ea] bg-white shadow-2xl"
+      >
+        <header className="flex items-start justify-between gap-4 border-b border-[#eef0f5] px-5 py-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#087d75]">Encounter detail</p>
+            <h2 id="encounter-detail-title" className="mt-1 text-lg font-semibold text-[#1c1c1e]">
+              {encounterTypeLabel(encounter)}
+            </h2>
+            <p className="mt-1 text-sm text-[#667085]">{fmtDate(encounter.start)}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#dfe4ea] text-[#667085] hover:border-[#5b76fe] hover:text-[#5b76fe]"
+            aria-label="Close encounter detail"
+          >
+            <X size={16} />
+          </button>
+        </header>
+
+        <div className="space-y-4 p-5">
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="rounded-xl border border-[#e9eaef] bg-[#f9fafb] p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#98a2b3]">Provider / site</p>
+              <p className="mt-2 text-sm font-semibold text-[#1c1c1e]">{providerPrimaryLabel(encounter)}</p>
+              <p className="mt-1 text-xs leading-5 text-[#667085]">{providerSecondaryLabel(encounter)}</p>
+            </div>
+            <div className="rounded-xl border border-[#e9eaef] bg-[#f9fafb] p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#98a2b3]">FHIR class</p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${encounterClassTone(encounter.class_code)}`}>
+                  {encounterClassLabel(encounter.class_code)}
+                </span>
+                <span className="text-xs text-[#667085]">{encounter.class_code || "No class code"}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-[#e9eaef]">
+            <div className="border-b border-[#eef0f5] px-4 py-3">
+              <p className="text-sm font-semibold text-[#1c1c1e]">Linked chart resources</p>
+              <p className="mt-1 text-xs text-[#667085]">
+                These counts show what the encounter can currently explain in the published chart.
+              </p>
+            </div>
+            {linkedTotal === 0 ? (
+              <div className="flex items-start gap-3 p-4 text-sm text-[#667085]">
+                <Info size={16} className="mt-0.5 shrink-0 text-[#f59e0b]" />
+                <p>
+                  No labs, conditions, procedures, or medications are linked to this encounter yet. This is a data-model gap to resolve in the harmonization layer, not a user decision.
+                </p>
+              </div>
+            ) : (
+              <div className="grid gap-2 p-4 sm:grid-cols-4">
+                {resources.map((item) => (
+                  <div key={item.label} className="rounded-lg border border-[#e9eaef] bg-white p-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#98a2b3]">{item.label}</p>
+                    <p className="mt-1 text-xl font-semibold text-[#1c1c1e]">{item.count}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <details className="rounded-xl border border-[#e9eaef] bg-[#f9fafb] p-4">
+            <summary className="cursor-pointer text-sm font-semibold text-[#475467]">Technical provenance</summary>
+            <dl className="mt-3 grid gap-2 text-xs text-[#667085]">
+              <div>
+                <dt className="font-semibold uppercase tracking-[0.12em] text-[#98a2b3]">Encounter ID</dt>
+                <dd className="mt-1 break-all font-mono">{encounter.encounter_id}</dd>
+              </div>
+              <div>
+                <dt className="font-semibold uppercase tracking-[0.12em] text-[#98a2b3]">Source label</dt>
+                <dd className="mt-1">{friendlySourceName(encounter.provider_org || encounter.practitioner_name)}</dd>
+              </div>
+            </dl>
+          </details>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function EncounterHistoryTable({
+  encounters,
+  onSelectEncounter,
+}: {
+  encounters: EncounterEvent[];
+  onSelectEncounter: (encounter: EncounterEvent) => void;
+}) {
   if (encounters.length === 0) {
     return (
       <div className="rounded-2xl border border-[#e9eaef] bg-white p-8 text-center text-sm text-[#6b7280]">
@@ -297,20 +441,36 @@ function EncounterHistoryTable({ encounters }: { encounters: EncounterEvent[] })
         </thead>
         <tbody>
           {encounters.map((encounter) => (
-            <tr key={encounter.encounter_id} className="border-b border-[#f0f1f5] last:border-0 hover:bg-[#fafafa]">
+            <tr
+              key={encounter.encounter_id}
+              tabIndex={0}
+              onClick={() => onSelectEncounter(encounter)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  onSelectEncounter(encounter);
+                }
+              }}
+              className="cursor-pointer border-b border-[#f0f1f5] last:border-0 hover:bg-[#fafafa] focus:bg-[#f4f6ff] focus:outline-none"
+            >
               <td className="whitespace-nowrap px-4 py-3 font-medium text-[#1c1c1e]">{fmtDate(encounter.start)}</td>
               <td className="px-4 py-3">
                 <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${encounterClassTone(encounter.class_code)}`}>
                   {encounterClassLabel(encounter.class_code)}
                 </span>
               </td>
-              <td className="px-4 py-3 text-[#475467]">{encounter.encounter_type || "Encounter"}</td>
+              <td className="px-4 py-3 text-[#475467]">{encounterTypeLabel(encounter)}</td>
               <td className="px-4 py-3 text-[#475467]">{encounter.reason_display || "-"}</td>
               <td className="px-4 py-3 text-[#475467]">
-                <div className="font-medium text-[#1c1c1e]">{encounter.practitioner_name || "Provider unknown"}</div>
-                <div className="mt-0.5 text-xs text-[#667085]">{encounter.provider_org || "Organization unknown"}</div>
+                <div className="font-medium text-[#1c1c1e]">{providerPrimaryLabel(encounter)}</div>
+                <div className="mt-0.5 text-xs text-[#667085]">{providerSecondaryLabel(encounter)}</div>
               </td>
-              <td className="px-4 py-3 text-xs font-semibold text-[#5b76fe]">{resourceSummary(encounter)}</td>
+              <td className="px-4 py-3">
+                <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#5b76fe]">
+                  <FileText size={13} />
+                  {resourceSummary(encounter)}
+                </span>
+              </td>
             </tr>
           ))}
         </tbody>
@@ -324,7 +484,8 @@ export function ExplorerHistory() {
   const patientId = params.get("patient");
   const [tab, setTab] = useState<HistoryTab>("encounters");
   const [view, setView] = useState<ViewMode>("table");
-  const [classFilter, setClassFilter] = useState<string>("all");
+  const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [selectedEncounter, setSelectedEncounter] = useState<EncounterEvent | null>(null);
 
   const timelineQ = useQuery({
     queryKey: ["timeline", patientId],
@@ -398,14 +559,14 @@ export function ExplorerHistory() {
           : immunizationsQ.isError;
   const patientName = timelineQ.data?.name || careQ.data?.name || overviewQ.data?.name || proceduresQ.data?.name || immunizationsQ.data?.name || "Patient";
   const currentEvents = eventsByTab[tab];
-  const encounterClassOptions = Array.from(new Set((timelineQ.data?.encounters ?? []).map((encounter) => encounter.class_code || "Unknown")))
+  const encounterTypeOptions = Array.from(new Set((timelineQ.data?.encounters ?? []).map((encounter) => encounterTypeLabel(encounter))))
     .sort((a, b) => a.localeCompare(b));
-  const effectiveClassFilter =
-    classFilter === "all" || encounterClassOptions.includes(classFilter)
-      ? classFilter
+  const effectiveTypeFilter =
+    typeFilter === "all" || encounterTypeOptions.includes(typeFilter)
+      ? typeFilter
       : "all";
   const currentEncounters = (timelineQ.data?.encounters ?? [])
-    .filter((encounter) => effectiveClassFilter === "all" || (encounter.class_code || "Unknown") === effectiveClassFilter)
+    .filter((encounter) => effectiveTypeFilter === "all" || encounterTypeLabel(encounter) === effectiveTypeFilter)
     .sort((a, b) => dateValue(b.start) - dateValue(a.start));
 
   if (!patientId) {
@@ -503,20 +664,20 @@ export function ExplorerHistory() {
         <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-[#e9eaef] bg-white px-3 py-2 shadow-sm">
           <div className="inline-flex items-center gap-1.5 px-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#98a2b3]">
             <Filter size={13} />
-            Class
+            Type
           </div>
-          {["all", ...encounterClassOptions].map((classCode) => (
+          {["all", ...encounterTypeOptions].map((typeOption) => (
             <button
-              key={classCode}
+              key={typeOption}
               type="button"
-              onClick={() => setClassFilter(classCode)}
+              onClick={() => setTypeFilter(typeOption)}
               className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
-                effectiveClassFilter === classCode
+                effectiveTypeFilter === typeOption
                   ? "bg-[#eef1ff] text-[#5b76fe]"
                   : "bg-[#f9fafb] text-[#667085] hover:bg-[#f2f4f7]"
               }`}
             >
-              {classCode === "all" ? "All" : encounterClassLabel(classCode)}
+              {typeOption === "all" ? "All" : typeOption}
             </button>
           ))}
         </div>
@@ -524,12 +685,18 @@ export function ExplorerHistory() {
 
       {tab === "encounters" && view === "table" ? (
         <div className="overflow-x-auto">
-          <EncounterHistoryTable encounters={currentEncounters} />
+          <EncounterHistoryTable encounters={currentEncounters} onSelectEncounter={setSelectedEncounter} />
         </div>
       ) : view === "timeline" ? (
         <TimelineList events={currentEvents} />
       ) : (
         <TableView events={currentEvents} />
+      )}
+      {selectedEncounter && (
+        <EncounterDetailModal
+          encounter={selectedEncounter}
+          onClose={() => setSelectedEncounter(null)}
+        />
       )}
     </main>
   );

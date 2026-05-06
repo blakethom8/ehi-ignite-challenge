@@ -286,6 +286,8 @@ function exportJsonFile(fileName: string, data: Record<string, unknown>) {
   URL.revokeObjectURL(url);
 }
 
+const JSON_MODAL_PREVIEW_LIMIT = 120_000;
+
 function baselineResourceEntries(
   overview: PatientOverview | undefined,
   counts: Record<string, number> | null | undefined,
@@ -324,23 +326,34 @@ function baselineSampleRows(overview: PatientOverview | undefined): AggregationP
 function PreparedJsonModal({
   fileName,
   jsonData,
+  exportData,
   isLoading,
+  exportLoading,
   error,
   onClose,
 }: {
   fileName: string;
   jsonData: Record<string, unknown> | null;
+  exportData?: Record<string, unknown> | null;
   isLoading: boolean;
+  exportLoading?: boolean;
   error: Error | null;
   onClose: () => void;
 }) {
+  const jsonText = useMemo(() => JSON.stringify(jsonData ?? {}, null, 2), [jsonData]);
+  const isTruncated = jsonText.length > JSON_MODAL_PREVIEW_LIMIT;
+  const previewText = isTruncated
+    ? `${jsonText.slice(0, JSON_MODAL_PREVIEW_LIMIT)}\n\n... Preview truncated. Export JSON for the complete prepared output.`
+    : jsonText;
+  const downloadableJson = exportData ?? jsonData;
+
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[#101828]/35 px-4 py-8 backdrop-blur-[2px]">
       <section
         role="dialog"
         aria-modal="true"
         aria-labelledby="prepared-json-title"
-        className="w-full max-w-5xl overflow-hidden rounded-xl border border-[#dfe4ea] bg-white shadow-2xl"
+        className="flex max-h-[calc(100vh-4rem)] w-full max-w-5xl flex-col overflow-hidden rounded-xl border border-[#dfe4ea] bg-white shadow-2xl"
       >
         <header className="flex flex-col gap-3 border-b border-[#eef0f5] px-5 py-4 md:flex-row md:items-start md:justify-between">
           <div className="min-w-0">
@@ -355,12 +368,12 @@ function PreparedJsonModal({
           <div className="flex shrink-0 items-center gap-2">
             <button
               type="button"
-              onClick={() => jsonData && exportJsonFile(fileName, jsonData)}
-              disabled={!jsonData}
+              onClick={() => downloadableJson && exportJsonFile(fileName, downloadableJson)}
+              disabled={!downloadableJson}
               className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#5b76fe] px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
             >
-              <Download size={15} />
-              Export JSON
+              {exportLoading ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
+              {exportLoading ? "Preparing export" : "Export JSON"}
             </button>
             <button
               type="button"
@@ -372,18 +385,23 @@ function PreparedJsonModal({
             </button>
           </div>
         </header>
-        <div className="bg-[#101828]">
+        {isTruncated && !isLoading && !error && (
+          <div className="border-b border-[#dfe4ea] bg-[#f8fafc] px-5 py-2 text-xs text-[#667085]">
+            Showing a bounded preview for performance. Export JSON downloads the complete prepared structure.
+          </div>
+        )}
+        <div className="min-h-0 flex-1 overflow-hidden bg-[#101828]">
           {isLoading ? (
             <div className="flex min-h-[320px] items-center justify-center text-sm text-white/70">
-              Loading full JSON...
+              Loading JSON preview...
             </div>
           ) : error ? (
             <div className="m-4 rounded-lg bg-red-50 p-4 text-sm text-red-700">
               Could not load prepared JSON: {error.message}
             </div>
           ) : (
-            <pre className="max-h-[70vh] overflow-auto p-4 text-xs leading-5 text-[#f8faff]">
-              {JSON.stringify(jsonData ?? {}, null, 2)}
+            <pre className="h-full max-h-[calc(100vh-14rem)] overflow-auto p-4 text-xs leading-5 text-[#f8faff]">
+              {previewText}
             </pre>
           )}
         </div>
@@ -776,6 +794,7 @@ function PreparedPreviewPane({
       <PreparedJsonModal
         fileName={`${baselineSource.name}.json`}
         jsonData={rawFhirQuery.data ?? null}
+        exportData={rawFhirQuery.data ?? null}
         isLoading={rawFhirQuery.isLoading}
         error={rawFhirQuery.error as Error | null}
         onClose={() => setJsonModalOpen(false)}
@@ -784,9 +803,11 @@ function PreparedPreviewPane({
     {jsonModalOpen && !selectedIsBaseline && preview?.json_preview && file && (
       <PreparedJsonModal
         fileName={file.file_name}
-        jsonData={preparedJsonQuery.data ?? preview.json_preview}
-        isLoading={preparedJsonQuery.isLoading}
-        error={preparedJsonQuery.error as Error | null}
+        jsonData={preview.json_preview}
+        exportData={preparedJsonQuery.data ?? preview.json_preview}
+        isLoading={false}
+        exportLoading={preparedJsonQuery.isLoading}
+        error={null}
         onClose={() => setJsonModalOpen(false)}
       />
     )}
@@ -1442,8 +1463,8 @@ function ReadinessPage({
         <MetricCard label="Sources" value={uploadedCount} detail="Uploaded files in this workspace." />
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-[1fr_0.8fr]">
-        <div className="overflow-hidden rounded-lg border border-[#dfe4ea] bg-white">
+      <section className="grid gap-4 lg:grid-cols-[1.05fr_0.8fr]">
+        <div className="order-2 overflow-hidden rounded-lg border border-[#dfe4ea] bg-white lg:order-2">
           <div className="border-b border-[#eef0f5] px-4 py-3">
             <h2 className="text-base font-semibold text-[#1c1c1e]">Snapshot history</h2>
             <p className="mt-1 text-sm text-[#667085]">
@@ -1492,7 +1513,7 @@ function ReadinessPage({
           )}
         </div>
 
-        <div className="rounded-lg border border-[#dfe4ea] bg-white p-4">
+        <div className="order-1 rounded-lg border border-[#dfe4ea] bg-white p-4 shadow-[0_12px_30px_rgba(91,118,254,0.08)] lg:order-1">
           <div className="flex items-start justify-between gap-3">
             <div>
               <h2 className="text-base font-semibold text-[#1c1c1e]">Publish latest run</h2>
@@ -1539,7 +1560,7 @@ function ReadinessPage({
             type="button"
             disabled={!canPublishLatest || isPublishing}
             onClick={onPublish}
-            className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#5b76fe] px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-[#dfe4ea] disabled:text-[#667085]"
+            className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#5b76fe] px-4 py-3 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(91,118,254,0.28)] hover:bg-[#4a65ed] disabled:cursor-not-allowed disabled:bg-[#dfe4ea] disabled:text-[#667085] disabled:shadow-none"
           >
             <ShieldCheck size={15} />
             {isPublishing ? "Publishing..." : activeSnapshot ? "Publish newer run" : "Publish canonical record"}

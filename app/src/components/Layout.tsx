@@ -297,6 +297,7 @@ const CLINICAL_INSIGHTS_NAV_GROUPS: NavGroup[] = [
 const PATIENT_RECORD_NAV_ITEMS: NavItem[] = [
   { to: "/charts", label: "Module Overview", icon: Database, description: "Record intelligence" },
   { to: "/explorer", label: "Clinical Snapshot", icon: UserRound, description: "Patient summary" },
+  { to: "/explorer/labs", label: "Labs", icon: TestTubeDiagonal, description: "Lab history" },
   { to: "/explorer/history", label: "History", icon: CalendarDays, description: "Tables and timelines" },
   { to: "/explorer/care-journey", label: "Care Journey", icon: Heart, description: "Visual care timeline" },
   { to: "/explorer/patient-data", label: "FHIR Sources", icon: FileJson2, description: "Bundle metrics" },
@@ -1363,6 +1364,7 @@ export function Layout({ children }: LayoutProps) {
   const chartLinks: { key: string; label: string; to: string }[] = [
     { key: "chartHome", label: "Module Overview", to: withPatientQuery("/charts", patientId) },
     { key: "snapshot", label: "Clinical Snapshot", to: withPatientQuery("/explorer", patientId) },
+    { key: "labs", label: "Labs", to: withPatientQuery("/explorer/labs", patientId) },
     { key: "history", label: "History", to: withPatientQuery("/explorer/history", patientId) },
     { key: "journey", label: "Care Journey", to: withPatientQuery("/explorer/care-journey", patientId) },
     { key: "sources", label: "FHIR Sources", to: withPatientQuery("/explorer/patient-data", patientId) },
@@ -1460,6 +1462,7 @@ export function Layout({ children }: LayoutProps) {
     if (key === "secondOpinion") return location.pathname.startsWith("/second-opinion");
     if (key === "chartHome") return location.pathname.startsWith("/charts") || location.pathname.startsWith("/record");
     if (key === "snapshot") return location.pathname === "/explorer";
+    if (key === "labs") return location.pathname.startsWith("/explorer/labs");
     if (key === "history") return location.pathname.startsWith("/explorer/history");
     if (key === "journey") return location.pathname.startsWith("/explorer/care-journey");
     if (key === "sources") return location.pathname.startsWith("/explorer/patient-data");

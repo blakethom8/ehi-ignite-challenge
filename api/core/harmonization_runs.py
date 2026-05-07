@@ -72,6 +72,65 @@ def _is_open_review_item(item: dict[str, Any]) -> bool:
     return not bool(item.get("resolved"))
 
 
+def _review_decision_summary(payload: dict[str, Any]) -> dict[str, Any]:
+    events = payload.get("review_events") or []
+    review_items = payload.get("review_items") or []
+    decisions: dict[str, int] = {}
+    latest_event_at: str | None = None
+    for event in events:
+        decision = str(event.get("decision") or "unknown")
+        decisions[decision] = decisions.get(decision, 0) + 1
+        created_at = event.get("created_at")
+        if isinstance(created_at, str) and (latest_event_at is None or created_at > latest_event_at):
+            latest_event_at = created_at
+    return {
+        "event_count": len(events),
+        "resolved_item_count": sum(1 for item in review_items if bool(item.get("resolved"))),
+        "open_item_count": sum(1 for item in review_items if _is_open_review_item(item)),
+        "latest_event_at": latest_event_at,
+        "decisions": decisions,
+    }
+
+
+def _sync_review_decision_summary(payload: dict[str, Any]) -> None:
+    payload.setdefault("review_events", [])
+    payload["review_decision_summary"] = _review_decision_summary(payload)
+
+
+def _review_event(
+    *,
+    payload: dict[str, Any],
+    item: dict[str, Any],
+    decision: str,
+    notes: str,
+    selected_source_ref: str | None,
+    previous_state: dict[str, Any],
+) -> dict[str, Any]:
+    created_at = _now().isoformat()
+    return {
+        "event_id": uuid.uuid4().hex,
+        "event_type": "review_decision",
+        "collection_id": payload.get("collection_id"),
+        "run_id": payload.get("run_id"),
+        "item_id": item.get("id"),
+        "category": item.get("category"),
+        "severity": item.get("severity"),
+        "source_id": item.get("source_id"),
+        "resource_type": item.get("resource_type"),
+        "merged_ref": item.get("merged_ref"),
+        "decision": decision,
+        "notes": notes.strip(),
+        "selected_source_ref": selected_source_ref,
+        "resolved": bool(item.get("resolved")),
+        "resolved_at": item.get("resolved_at"),
+        "created_at": created_at,
+        "actor": "local-reviewer",
+        "previous_decision": previous_state.get("decision"),
+        "previous_resolved": bool(previous_state.get("resolved")),
+        "previous_selected_source_ref": previous_state.get("selected_source_ref"),
+    }
+
+
 def _file_hash(path: Path) -> str | None:
     if not path.exists() or not path.is_file():
         return None
@@ -238,6 +297,7 @@ def _recompute_summary(payload: dict[str, Any]) -> None:
         candidate_record.get("clinical_artifacts") or {},
         payload.get("review_items") or [],
     )
+    _sync_review_decision_summary(payload)
 
 
 def _latest_from_observation_source(source: dict[str, Any]) -> dict[str, Any]:
@@ -422,6 +482,14 @@ def _build_run(collection_id: str, run_id: str, started_at: datetime) -> dict[st
         "sources": sources,
         "summary": summary,
         "review_items": review_items,
+        "review_events": [],
+        "review_decision_summary": {
+            "event_count": 0,
+            "resolved_item_count": 0,
+            "open_item_count": summary["review_item_count"],
+            "latest_event_at": None,
+            "decisions": {},
+        },
         "candidate_record": {
             "observations": observations,
             "conditions": conditions,
@@ -482,6 +550,14 @@ def run_harmonization(collection_id: str) -> dict[str, Any]:
                     "resolved_at": None,
                 }
             ],
+            "review_events": [],
+            "review_decision_summary": {
+                "event_count": 0,
+                "resolved_item_count": 0,
+                "open_item_count": 1,
+                "latest_event_at": None,
+                "decisions": {},
+            },
             "candidate_record": {
                 "observations": [],
                 "conditions": [],
@@ -512,9 +588,13 @@ def latest_run(collection_id: str) -> dict[str, Any] | None:
     if not path.exists():
         return None
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return None
+    if isinstance(payload, dict):
+        _sync_review_decision_summary(payload)
+        return payload
+    return None
 
 
 def latest_canonical_selection(collection_id: str, merged_ref: str) -> dict[str, Any] | None:
@@ -522,6 +602,7 @@ def latest_canonical_selection(collection_id: str, merged_ref: str) -> dict[str,
     payload = latest_run(collection_id)
     if payload is None:
         return None
+    _sync_review_decision_summary(payload)
     observations = (payload.get("candidate_record") or {}).get("observations") or []
     observation = next(
         (obs for obs in observations if obs.get("merged_ref") == merged_ref),
@@ -538,9 +619,13 @@ def get_run(collection_id: str, run_id: str) -> dict[str, Any] | None:
     if not path.exists():
         return None
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return None
+    if isinstance(payload, dict):
+        _sync_review_decision_summary(payload)
+        return payload
+    return None
 
 
 def resolve_review_item(
@@ -561,6 +646,11 @@ def resolve_review_item(
     if target is None:
         raise KeyError(item_id)
 
+    previous_state = {
+        "decision": target.get("decision"),
+        "resolved": target.get("resolved"),
+        "selected_source_ref": target.get("selected_source_ref"),
+    }
     target["decision"] = decision
     target["decision_notes"] = notes.strip()
     target["selected_source_ref"] = selected_source_ref
@@ -577,6 +667,16 @@ def resolve_review_item(
         notes,
         selected_source_ref,
         target.get("resolved_at"),
+    )
+    payload.setdefault("review_events", []).append(
+        _review_event(
+            payload=payload,
+            item=target,
+            decision=decision,
+            notes=notes,
+            selected_source_ref=selected_source_ref,
+            previous_state=previous_state,
+        )
     )
     for item in review_items:
         _run_review_decision_defaults(item)

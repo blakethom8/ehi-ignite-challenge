@@ -55,6 +55,11 @@ class ObservationSource:
     """If the source is a document (PDF), the FHIR DocumentReference
     pointing at the source document. Used by the Provenance graph."""
 
+    reference_low: float | None = None
+    reference_high: float | None = None
+    reference_unit: str | None = None
+    """Numeric source-provided reference range for lab interpretation, when available."""
+
 
 @dataclass(frozen=True)
 class ProvenanceEdge:

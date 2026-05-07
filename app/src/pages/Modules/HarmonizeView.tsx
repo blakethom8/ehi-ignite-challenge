@@ -134,6 +134,13 @@ function reviewDecisionLabel(decision: string | null): string {
   return "Decision saved";
 }
 
+function reviewDecisionSummaryLabel(decisions: Record<string, number>): string {
+  const parts = Object.entries(decisions)
+    .filter(([, count]) => count > 0)
+    .map(([decision, count]) => `${count} ${reviewDecisionLabel(decision).toLowerCase()}`);
+  return parts.length ? parts.join(" · ") : "No saved decisions yet";
+}
+
 function shortReference(value: string | null | undefined): string {
   if (!value) return "No technical reference";
   const [resourceType, id] = value.split("/");
@@ -693,12 +700,18 @@ function ReviewQueuePanel({
                   </div>
                   <div className="flex shrink-0 flex-col gap-2 lg:w-[300px]">
                     {item.category === "source" && (
-                      <Link
-                        to={`/aggregate/sources${patientId ? `?patient=${encodeURIComponent(patientId)}` : ""}`}
-                        className="inline-flex items-center justify-center rounded-lg border border-[#dfe4ea] bg-white px-3 py-2 text-sm font-semibold text-[#555a6a] hover:border-[#5b76fe] hover:text-[#5b76fe]"
-                      >
-                        Fix source
-                      </Link>
+                      <div className="rounded-lg border border-amber-200 bg-white p-3">
+                        <p className="text-xs font-semibold uppercase tracking-wider text-amber-800">Source fix workflow</p>
+                        <p className="mt-1 text-xs leading-5 text-[#667085]">
+                          Open Source Intake on this file, repair or extract it, then re-run harmonization before publishing.
+                        </p>
+                        <Link
+                          to={`/aggregate/sources${patientId ? `?patient=${encodeURIComponent(patientId)}${item.source_id ? `&source=${encodeURIComponent(item.source_id)}` : ""}` : item.source_id ? `?source=${encodeURIComponent(item.source_id)}` : ""}`}
+                          className="mt-2 inline-flex w-full items-center justify-center rounded-lg border border-[#dfe4ea] bg-white px-3 py-2 text-sm font-semibold text-[#555a6a] hover:border-[#5b76fe] hover:text-[#5b76fe]"
+                        >
+                          Fix in Source Intake
+                        </Link>
+                      </div>
                     )}
                     <button
                       type="button"
@@ -857,6 +870,24 @@ function ReviewQueuePanel({
           <summary className="cursor-pointer list-none px-3 py-2 text-sm font-semibold text-[#1c1c1e] hover:text-[#5b76fe]">
             Resolved decisions ({resolvedRunItems.length})
           </summary>
+          <div className="grid gap-2 border-t border-[#dfe4ea] bg-white px-3 py-3 text-sm md:grid-cols-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-[#667085]">Audit events</p>
+              <p className="mt-1 font-semibold text-[#1c1c1e]">{latestRun.review_decision_summary.event_count}</p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-[#667085]">Decision mix</p>
+              <p className="mt-1 text-[#555a6a]">{reviewDecisionSummaryLabel(latestRun.review_decision_summary.decisions)}</p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-[#667085]">Latest event</p>
+              <p className="mt-1 text-[#555a6a]">
+                {latestRun.review_decision_summary.latest_event_at
+                  ? reviewDateLabel(latestRun.review_decision_summary.latest_event_at)
+                  : "No timestamp"}
+              </p>
+            </div>
+          </div>
           <div className="divide-y divide-[#eef1f5] border-t border-[#dfe4ea]">
             {resolvedRunItems.slice(0, 6).map((item) => {
               const observation = matchingObservation(item);
@@ -919,6 +950,26 @@ function ReviewQueuePanel({
               </div>
             )}
           </div>
+          {latestRun.review_events.length > 0 && (
+            <div className="border-t border-[#dfe4ea] bg-white px-3 py-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-[#667085]">
+                Event ledger
+              </p>
+              <div className="mt-2 divide-y divide-[#eef1f5] rounded-lg border border-[#eef1f5]">
+                {latestRun.review_events.slice(-4).reverse().map((event) => (
+                  <div key={event.event_id} className="grid gap-2 px-3 py-2 text-xs md:grid-cols-[150px_1fr_160px]">
+                    <p className="font-semibold text-[#1c1c1e]">{reviewDecisionLabel(event.decision)}</p>
+                    <p className="min-w-0 truncate text-[#667085]">
+                      {event.notes || event.item_id}
+                    </p>
+                    <p className="text-[#8d92a3] md:text-right">
+                      {reviewDateLabel(event.created_at)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </details>
       )}
       {resolveMutation.error && (

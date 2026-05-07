@@ -76,7 +76,8 @@ export function ExplorerCareJourney() {
             {data.conditions.length} conditions &middot;{" "}
             {data.procedures.length} procedures &middot;{" "}
             {data.encounters.length} encounters &middot;{" "}
-            {data.diagnostic_reports.length} lab reports &middot; {dateSpan}
+            {data.diagnostic_reports.length} lab reports &middot;{" "}
+            {data.clinical_notes.length} notes &middot; {dateSpan}
           </p>
         </div>
 

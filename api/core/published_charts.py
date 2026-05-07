@@ -60,7 +60,78 @@ def _write_state(collection_id: str, state: dict[str, Any]) -> dict[str, Any]:
     return state
 
 
-def _snapshot_from_run(run: dict[str, Any]) -> dict[str, Any]:
+def _fact_counts(summary: dict[str, Any]) -> dict[str, int]:
+    counts = summary.get("candidate_counts")
+    if not isinstance(counts, dict):
+        return {}
+    return {str(key): int(value or 0) for key, value in counts.items()}
+
+
+def _count_delta(current: dict[str, int], previous: dict[str, int]) -> dict[str, int]:
+    keys = set(current) | set(previous)
+    return {key: current.get(key, 0) - previous.get(key, 0) for key in keys}
+
+
+def _change_headline(change: dict[str, Any]) -> str:
+    if not change.get("previous_snapshot_id"):
+        return "Initial published chart snapshot."
+
+    parts: list[str] = []
+    fact_delta = int(change.get("fact_delta") or 0)
+    source_delta = int(change.get("source_delta") or 0)
+    if fact_delta:
+        parts.append(f"{fact_delta:+d} candidate facts")
+    if source_delta:
+        parts.append(f"{source_delta:+d} sources")
+    if not parts:
+        return "No top-level fact or source count change from the prior active snapshot."
+    return "Changed " + " and ".join(parts) + " from the prior active snapshot."
+
+
+def _change_summary(run: dict[str, Any], previous_snapshot: dict[str, Any] | None) -> dict[str, Any]:
+    summary = run.get("summary", {})
+    previous_summary = previous_snapshot.get("summary", {}) if isinstance(previous_snapshot, dict) else {}
+    current_counts = _fact_counts(summary)
+    previous_counts = _fact_counts(previous_summary)
+    change = {
+        "previous_snapshot_id": previous_snapshot.get("snapshot_id") if previous_snapshot else None,
+        "previous_run_id": previous_snapshot.get("run_id") if previous_snapshot else None,
+        "fact_delta": int(summary.get("total_candidate_facts") or 0)
+        - int(previous_summary.get("total_candidate_facts") or 0),
+        "source_delta": int(summary.get("source_count") or 0)
+        - int(previous_summary.get("source_count") or 0),
+        "review_item_delta": int(summary.get("review_item_count") or 0)
+        - int(previous_summary.get("review_item_count") or 0),
+        "candidate_count_delta": _count_delta(current_counts, previous_counts),
+    }
+    change["headline"] = _change_headline(change)
+    return change
+
+
+def _review_decision_summary(run: dict[str, Any]) -> dict[str, Any]:
+    summary = run.get("review_decision_summary")
+    if isinstance(summary, dict):
+        return summary
+    events = run.get("review_events") or []
+    review_items = run.get("review_items") or []
+    decisions: dict[str, int] = {}
+    latest_event_at: str | None = None
+    for event in events:
+        decision = str(event.get("decision") or "unknown")
+        decisions[decision] = decisions.get(decision, 0) + 1
+        created_at = event.get("created_at")
+        if isinstance(created_at, str) and (latest_event_at is None or created_at > latest_event_at):
+            latest_event_at = created_at
+    return {
+        "event_count": len(events),
+        "resolved_item_count": sum(1 for item in review_items if bool(item.get("resolved"))),
+        "open_item_count": sum(1 for item in review_items if not bool(item.get("resolved"))),
+        "latest_event_at": latest_event_at,
+        "decisions": decisions,
+    }
+
+
+def _snapshot_from_run(run: dict[str, Any], previous_snapshot: dict[str, Any] | None = None) -> dict[str, Any]:
     published_at = _now().isoformat()
     return {
         "snapshot_id": uuid.uuid4().hex,
@@ -75,6 +146,10 @@ def _snapshot_from_run(run: dict[str, Any]) -> dict[str, Any]:
         "source_count": run["summary"]["source_count"],
         "candidate_fact_count": run["summary"]["total_candidate_facts"],
         "review_item_count": run["summary"]["review_item_count"],
+        "review_decision_summary": _review_decision_summary(run),
+        "activated_at": published_at,
+        "activated_from_snapshot_id": previous_snapshot.get("snapshot_id") if previous_snapshot else None,
+        "change_summary": _change_summary(run, previous_snapshot),
     }
 
 
@@ -83,6 +158,13 @@ def state(collection_id: str) -> dict[str, Any]:
     active_snapshot_id = current.get("active_snapshot_id")
     active = None
     for snapshot in current["snapshots"]:
+        snapshot.setdefault("review_decision_summary", {
+            "event_count": 0,
+            "resolved_item_count": 0,
+            "open_item_count": snapshot.get("review_item_count", 0),
+            "latest_event_at": None,
+            "decisions": {},
+        })
         snapshot["is_active"] = snapshot.get("snapshot_id") == active_snapshot_id
         if snapshot["is_active"]:
             active = snapshot
@@ -106,7 +188,15 @@ def publish_run(collection_id: str, run_id: str) -> dict[str, Any]:
         raise ValueError("Cannot publish a run with no candidate facts.")
 
     current = _load_state(collection_id)
-    snapshot = _snapshot_from_run(run)
+    previous_snapshot = next(
+        (
+            snapshot
+            for snapshot in current["snapshots"]
+            if snapshot.get("snapshot_id") == current.get("active_snapshot_id")
+        ),
+        None,
+    )
+    snapshot = _snapshot_from_run(run, previous_snapshot)
     current["snapshots"].append(snapshot)
     current["active_snapshot_id"] = snapshot["snapshot_id"]
     _write_state(collection_id, current)
@@ -115,8 +205,12 @@ def publish_run(collection_id: str, run_id: str) -> dict[str, Any]:
 
 def activate_snapshot(collection_id: str, snapshot_id: str) -> dict[str, Any]:
     current = _load_state(collection_id)
-    if not any(snapshot.get("snapshot_id") == snapshot_id for snapshot in current["snapshots"]):
+    previous_snapshot_id = current.get("active_snapshot_id")
+    target = next((snapshot for snapshot in current["snapshots"] if snapshot.get("snapshot_id") == snapshot_id), None)
+    if target is None:
         raise FileNotFoundError(snapshot_id)
+    target["activated_at"] = _now().isoformat()
+    target["activated_from_snapshot_id"] = previous_snapshot_id if previous_snapshot_id != snapshot_id else None
     current["active_snapshot_id"] = snapshot_id
     _write_state(collection_id, current)
     return state(collection_id)

@@ -35,6 +35,7 @@ import type {
   HarmonizeRunResponse,
   PatientListItem,
   PatientOverview,
+  PublishedChartSnapshot,
   PublishedChartStateResponse,
 } from "../../../types";
 
@@ -138,11 +139,14 @@ function PdfPageProgressMap({ job }: { job: HarmonizeExtractJobResponse | null }
   const hasReportedPageProgress = Boolean(totalPages && reportedPages > 0);
   const hasEstimatedPageProgress = Boolean(totalPages && isRunning && estimatedPages > reportedPages);
   const activePage = totalPages ? Math.min(totalPages, Math.max(1, estimatedPages + 1)) : 1;
+  const progressMode = job?.progress_mode ?? "lifecycle";
 
   return (
     <div className="rounded-lg border border-[#ead3b9] bg-white px-3 py-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs font-semibold uppercase tracking-wider text-[#9a5a16]">Estimated page position</p>
+        <p className="text-xs font-semibold uppercase tracking-wider text-[#9a5a16]">
+          {progressMode === "reported" ? "Reported page checkpoints" : "Estimated page position"}
+        </p>
         <p className="text-xs text-[#667085]">
           {hasReportedPageProgress
             ? `${reportedPages}/${totalPages} pages completed`
@@ -189,11 +193,58 @@ function PdfPageProgressMap({ job }: { job: HarmonizeExtractJobResponse | null }
         })}
       </div>
       <p className="mt-2 text-xs leading-5 text-[#667085]">
-        Blue shows the estimated current page while the server runs. Green only appears after the backend reports pages complete; the current worker may still finish several pages at once.
+        {progressMode === "reported"
+          ? "Green pages come from backend checkpoint events. The current worker reports by completed file, so multiple pages may complete at once."
+          : "Blue shows estimated position while the server runs. Green appears only after the backend reports a completed checkpoint."}
       </p>
       {totalPages && totalPages > visiblePages && (
         <p className="mt-2 text-xs text-[#667085]">Showing the first {visiblePages} pages; remaining pages continue in the same server job.</p>
       )}
+    </div>
+  );
+}
+
+function PdfExtractionEventTimeline({ job }: { job: HarmonizeExtractJobResponse | null }) {
+  const events = job?.events ?? [];
+  if (!events.length) return null;
+  const visibleEvents = events.slice(-6).reverse();
+
+  return (
+    <div className="rounded-lg border border-[#dfe4ea] bg-white px-3 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs font-semibold uppercase tracking-wider text-[#667085]">Worker events</p>
+        <p className="text-xs text-[#667085]">
+          {job?.progress_mode === "reported" ? "reported checkpoints" : "lifecycle + estimates"}
+        </p>
+      </div>
+      <div className="mt-2 divide-y divide-[#eef1f5] rounded-lg border border-[#eef1f5]">
+        {visibleEvents.map((event) => {
+          const pages =
+            event.page_start && event.page_end
+              ? event.page_start === event.page_end
+                ? `Page ${event.page_start}`
+                : `Pages ${event.page_start}-${event.page_end}`
+              : event.page_count
+                ? `${event.page_count} pages`
+                : null;
+          return (
+            <div key={event.event_id} className="grid gap-2 px-3 py-2 text-xs md:grid-cols-[160px_minmax(0,1fr)_150px]">
+              <div>
+                <p className="font-semibold text-[#1c1c1e]">{event.stage}</p>
+                <p className="mt-0.5 text-[#8d92a3]">{dateLabel(event.created_at)}</p>
+              </div>
+              <p className="min-w-0 text-[#667085]">{event.message}</p>
+              <div className="md:text-right">
+                <p className="font-semibold text-[#555a6a]">{pages ?? event.progress_basis}</p>
+                <p className="mt-0.5 text-[#8d92a3]">
+                  {event.processed_files}/{event.total_files} files
+                  {event.total_pages ? ` · ${event.processed_pages}/${event.total_pages} pages` : ""}
+                </p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -233,6 +284,10 @@ const emptyUploadForm = {
   description: "",
   context_notes: "",
 };
+
+function cls(...parts: (string | false | null | undefined)[]): string {
+  return parts.filter(Boolean).join(" ");
+}
 
 function bytesLabel(bytes: number): string {
   if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
@@ -297,6 +352,31 @@ function dateLabel(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value.slice(0, 10);
   return date.toLocaleDateString();
+}
+
+function signedCount(value: number): string {
+  if (value === 0) return "No change";
+  return value > 0 ? `+${value}` : `${value}`;
+}
+
+function snapshotDeltaLabel(snapshot: PublishedChartSnapshot): string {
+  const change = snapshot.change_summary;
+  if (!change?.previous_snapshot_id) return "Initial published snapshot";
+  return `${signedCount(change.fact_delta)} facts · ${signedCount(change.source_delta)} sources`;
+}
+
+function snapshotRollbackWarning(snapshot: PublishedChartSnapshot, activeSnapshot: PublishedChartSnapshot | null): string {
+  const lines = [
+    `Activate snapshot ${snapshot.snapshot_id.slice(0, 8)} as the active chart?`,
+    "",
+    "FHIR Charts and Clinical Insights will read from this snapshot after activation.",
+    `Selected snapshot: ${snapshot.candidate_fact_count} facts from ${snapshot.source_count} sources.`,
+  ];
+  if (activeSnapshot) {
+    lines.push(`Current active snapshot: ${activeSnapshot.candidate_fact_count} facts from ${activeSnapshot.source_count} sources.`);
+    lines.push(`Activation difference: ${signedCount(snapshot.candidate_fact_count - activeSnapshot.candidate_fact_count)} facts, ${signedCount(snapshot.source_count - activeSnapshot.source_count)} sources.`);
+  }
+  return lines.join("\n");
 }
 
 function exportJsonFile(fileName: string, data: Record<string, unknown>) {
@@ -688,7 +768,7 @@ function PreparedPreviewPane({
                       <div>
                         <p className="text-sm font-semibold text-[#1c1c1e]">{extractionStage}</p>
                         <p className="mt-1 text-xs leading-5 text-[#667085]">
-                          {extractJob?.detail ?? "Runs on the server, so you can leave this page and come back later. Progress updates are coarse until page-level events are wired in."}
+                          {extractJob?.detail ?? "Runs on the server, so you can leave this page and come back later. Page checkpoints appear when the worker reports them."}
                         </p>
                       </div>
                       <p className="text-sm font-semibold text-[#5b76fe]">{extractionProgress}%</p>
@@ -701,6 +781,7 @@ function PreparedPreviewPane({
                     </div>
                   </div>
                   <PdfPageProgressMap job={extractJob} />
+                  <PdfExtractionEventTimeline job={extractJob} />
                 </div>
               )}
               {extractError && (
@@ -1008,10 +1089,12 @@ function SourceInventoryPage({
   patientId,
   sources,
   refreshAll,
+  highlightedSourceId,
 }: {
   patientId: string;
   sources: AggregationEnvironmentResponse;
   refreshAll: () => void;
+  highlightedSourceId?: string | null;
 }) {
   const queryClient = useQueryClient();
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
@@ -1078,8 +1161,14 @@ function SourceInventoryPage({
       return status === "pending" || status === "running" ? 1500 : false;
     },
   });
+  const highlightedUpload = highlightedSourceId
+    ? sources.uploaded_files.find((file) => file.file_id === highlightedSourceId) ?? null
+    : null;
   const activeSelection =
     selectedSource ??
+    (highlightedUpload
+      ? ({ type: "upload", id: highlightedUpload.file_id } as const)
+      : null) ??
     (baselineSource
       ? ({ type: "baseline", id: "synthea-fhir" } as const)
       : sources.uploaded_files[0]
@@ -1110,6 +1199,10 @@ function SourceInventoryPage({
       }
       return;
     }
+    if (!selectedSource && highlightedUpload) {
+      setSelectedSource({ type: "upload", id: highlightedUpload.file_id });
+      return;
+    }
     if (selectedSource?.type === "baseline" && baselineSource) return;
     if (selectedSource?.type === "upload" && sources.uploaded_files.some((file) => file.file_id === selectedSource.id)) return;
     if (baselineSource) {
@@ -1121,7 +1214,7 @@ function SourceInventoryPage({
       return;
     }
     setSelectedSource(null);
-  }, [baselineSource, selectedSource, sources.uploaded_files]);
+  }, [baselineSource, highlightedUpload, selectedSource, sources.uploaded_files]);
 
   useEffect(() => {
     if (!extractJob || (extractJob.status !== "complete" && extractJob.status !== "failed")) return;
@@ -1216,6 +1309,26 @@ function SourceInventoryPage({
           </div>
         </div>
       </section>
+
+      {highlightedSourceId && (
+        <section className={cls(
+          "rounded-lg border px-4 py-3 text-sm leading-6",
+          highlightedUpload
+            ? "border-amber-200 bg-amber-50 text-amber-900"
+            : "border-[#dfe4ea] bg-[#f7f9fc] text-[#667085]",
+        )}>
+          {highlightedUpload ? (
+            <>
+              <span className="font-semibold">Source fix requested from Review Queue:</span>{" "}
+              {highlightedUpload.file_name}. Review the status, prepared preview, extraction controls, and context fields before re-running harmonization.
+            </>
+          ) : (
+            <>
+              Review Queue requested source <span className="font-mono">{highlightedSourceId}</span>, but that staged file is no longer present in Source Intake.
+            </>
+          )}
+        </section>
+      )}
 
       <section className="space-y-4">
         <div className="overflow-hidden rounded-lg border border-[#dfe4ea] bg-white">
@@ -1510,6 +1623,13 @@ function ReadinessPage({
                 <span className="font-mono">{activeSnapshot.snapshot_id.slice(0, 8)}</span>{" "}
                 from run <span className="font-mono">{activeSnapshot.run_id.slice(0, 8)}</span>.
               </p>
+              <p className="mt-1 text-xs leading-5 text-emerald-900">
+                Active since {dateLabel(activeSnapshot.activated_at ?? activeSnapshot.published_at)}
+                {activeSnapshot.activated_from_snapshot_id
+                  ? ` · rolled from ${activeSnapshot.activated_from_snapshot_id.slice(0, 8)}`
+                  : ""}{" "}
+                · {activeSnapshot.change_summary.headline}
+              </p>
             </div>
             <div className="flex flex-wrap gap-2">
               <Link
@@ -1550,7 +1670,7 @@ function ReadinessPage({
           {snapshots.length ? (
             <div className="divide-y divide-[#eef0f4]">
               {snapshots.map((snapshot) => (
-                <div key={snapshot.snapshot_id} className="grid gap-3 px-4 py-3 md:grid-cols-[minmax(0,1fr)_170px_150px] md:items-center">
+                <div key={snapshot.snapshot_id} className="grid gap-3 px-4 py-3 md:grid-cols-[minmax(0,1fr)_180px_150px] md:items-center">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="truncate text-sm font-semibold text-[#1c1c1e]">
@@ -1565,10 +1685,20 @@ function ReadinessPage({
                     <p className="mt-1 text-xs text-[#8d92a3]">
                       Published {dateLabel(snapshot.published_at)} · run {snapshot.run_id.slice(0, 8)} · {snapshot.rule_version}
                     </p>
+                    <p className="mt-1 text-xs leading-5 text-[#667085]">
+                      {snapshot.change_summary.headline}
+                    </p>
+                    {snapshot.review_decision_summary.event_count > 0 && (
+                      <p className="mt-1 text-xs leading-5 text-[#667085]">
+                        {snapshot.review_decision_summary.event_count} review event
+                        {snapshot.review_decision_summary.event_count === 1 ? "" : "s"} captured before publish.
+                      </p>
+                    )}
                   </div>
-                  <p className="text-sm text-[#555a6a]">
-                    {snapshot.candidate_fact_count} facts · {snapshot.source_count} sources
-                  </p>
+                  <div className="text-sm text-[#555a6a]">
+                    <p>{snapshot.candidate_fact_count} facts · {snapshot.source_count} sources</p>
+                    <p className="mt-1 text-xs text-[#8d92a3]">{snapshotDeltaLabel(snapshot)}</p>
+                  </div>
                   <button
                     type="button"
                     disabled={snapshot.is_active || activatingSnapshotId === snapshot.snapshot_id}
@@ -1623,6 +1753,15 @@ function ReadinessPage({
                   <span className="text-[#667085]">Review items</span>
                   <span className="font-semibold text-[#1c1c1e]">{latestRun.summary.review_item_count}</span>
                 </div>
+                {activeSnapshot && !latestRunIsActive && (
+                  <div className="rounded-lg border border-[#dfe4ea] bg-white px-3 py-2">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-[#667085]">If published now</p>
+                    <p className="mt-1 text-sm text-[#1c1c1e]">
+                      {signedCount(latestRun.summary.total_candidate_facts - activeSnapshot.candidate_fact_count)} facts ·{" "}
+                      {signedCount(latestRun.summary.source_count - activeSnapshot.source_count)} sources vs active snapshot.
+                    </p>
+                  </div>
+                )}
               </div>
             ) : (
               <p className="mt-2 text-sm leading-6 text-[#667085]">
@@ -2199,6 +2338,8 @@ export function WorkspaceLibraryPage() {
 
 export function SourceIntakePage() {
   const { patientId, patientsQuery } = useSelectedAggregationPatient();
+  const [searchParams] = useSearchParams();
+  const highlightedSourceId = searchParams.get("source");
   const sourcesQuery = useQuery({
     queryKey: ["aggregation-sources", patientId],
     queryFn: () => api.getAggregationSources(patientId),
@@ -2216,7 +2357,12 @@ export function SourceIntakePage() {
       hasError={patientsQuery.isError || sourcesQuery.isError}
     >
       {sourcesQuery.data && (
-        <SourceInventoryPage patientId={patientId} sources={sourcesQuery.data} refreshAll={refreshAll} />
+        <SourceInventoryPage
+          patientId={patientId}
+          sources={sourcesQuery.data}
+          refreshAll={refreshAll}
+          highlightedSourceId={highlightedSourceId}
+        />
       )}
     </AggregatorPageShell>
   );
@@ -2300,7 +2446,12 @@ export function PublishReadinessPage() {
           activatingSnapshotId={activateMutation.variables ?? null}
           isUnpublishing={unpublishMutation.isPending}
           onPublish={() => publishMutation.mutate()}
-          onActivateSnapshot={(snapshotId) => activateMutation.mutate(snapshotId)}
+          onActivateSnapshot={(snapshotId) => {
+            const snapshot = publishedQuery.data?.snapshots.find((item) => item.snapshot_id === snapshotId) ?? null;
+            if (!snapshot) return;
+            if (!window.confirm(snapshotRollbackWarning(snapshot, publishedQuery.data?.active_snapshot ?? null))) return;
+            activateMutation.mutate(snapshotId);
+          }}
           onUnpublish={() => {
             if (!window.confirm("Remove the active published chart snapshot? Snapshot history will remain available.")) return;
             unpublishMutation.mutate();

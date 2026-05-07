@@ -115,6 +115,38 @@ def get_period(obj: dict, key: str = "period") -> Period:
     )
 
 
+def _quantity_value(quantity: dict[str, Any] | None) -> float | None:
+    if not isinstance(quantity, dict):
+        return None
+    value = quantity.get("value")
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _quantity_unit(quantity: dict[str, Any] | None) -> str:
+    if not isinstance(quantity, dict):
+        return ""
+    return str(quantity.get("unit") or quantity.get("code") or "")
+
+
+def _observation_reference_range(resource: dict[str, Any]) -> tuple[float | None, float | None, str]:
+    for reference_range in resource.get("referenceRange") or []:
+        if not isinstance(reference_range, dict):
+            continue
+        low = reference_range.get("low")
+        high = reference_range.get("high")
+        low_value = _quantity_value(low)
+        high_value = _quantity_value(high)
+        if low_value is None and high_value is None:
+            continue
+        return low_value, high_value, _quantity_unit(low) or _quantity_unit(high)
+    return None, None, ""
+
+
 # ---------------------------------------------------------------------------
 # Resource extractors
 # ---------------------------------------------------------------------------
@@ -308,6 +340,7 @@ def extract_observation(resource: dict) -> ObservationRecord:
         vq = resource["valueQuantity"]
         obs.value_quantity = vq.get("value")
         obs.value_unit = vq.get("unit") or vq.get("code", "")
+        obs.reference_low, obs.reference_high, obs.reference_unit = _observation_reference_range(resource)
 
     elif "valueCodeableConcept" in resource:
         obs.value_type = "codeable_concept"

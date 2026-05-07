@@ -434,13 +434,16 @@ def build_clinical_context(patient_id: str) -> ClinicalContext:
         raise ValueError(f"Patient not found: {patient_id}")
     record, stats = result
 
+    active_published_run = load_active_published_run(patient_id)
+
     # Get patient demographics. Uploaded/published workspace records do not have
     # a backing Synthea file path, so prefer the parsed record summary.
     path = path_from_patient_id(patient_id)
     name = stats.name or record.summary.name or patient_id
 
-    # Resolve FHIR UUID for SOF queries
-    fhir_uuid = _patient_uuid_from_id(patient_id)
+    # Resolve FHIR UUID for SOF queries. When an active published snapshot
+    # exists, the selected chart scope is the published facade, not global SOF.
+    fhir_uuid = None if active_published_run is not None else _patient_uuid_from_id(patient_id)
     patient_ref = f"urn:uuid:{fhir_uuid}" if fhir_uuid else None
 
     # --- Patient summary line ---

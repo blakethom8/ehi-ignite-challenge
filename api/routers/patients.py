@@ -20,6 +20,7 @@ from api.core.loader import (
     patient_id_from_path,
     path_from_patient_id,
     load_patient,
+    load_active_published_run,
     data_dir,
 )
 from api.core.aggregation import list_upload_workspaces
@@ -65,6 +66,8 @@ from api.models import (
     EncounterMarker,
     ProcedureMarker,
     DiagnosticReportItem,
+    ClinicalNoteItem,
+    ClinicalNotesResponse,
     CareJourneyResponse,
 )
 from api.core.interaction_checker import check_interactions
@@ -179,6 +182,48 @@ def _fallback_provider_label(site_name: str, encounter_type: str) -> str:
     return f"{site_name} records"
 
 
+def _encounter_source_category(encounter_type: str, class_code: str, reason: str, provider_org: str, practitioner: str) -> str:
+    haystack = " ".join([encounter_type, class_code, reason, provider_org, practitioner]).lower()
+    if any(term in haystack for term in ("lab", "diagnostic", "blood draw", "observation", "function health", "quest")):
+        return "Lab / diagnostic event"
+    if any(term in haystack for term in ("document", "source", "report", "summary", "note", "pdf")):
+        return "Source document event"
+    if any(term in haystack for term in ("office", "ambulatory", "outpatient", "wellness", "consult")):
+        return "Office / outpatient visit"
+    if any(term in haystack for term in ("emergency", "urgent", "emer")):
+        return "Emergency / urgent care"
+    if any(term in haystack for term in ("inpatient", "hospital", "admission")):
+        return "Inpatient encounter"
+    if any(term in haystack for term in ("procedure", "surgery", "imaging")):
+        return "Procedure / imaging event"
+    if any(term in haystack for term in ("immunization", "vaccine")):
+        return "Immunization event"
+    if any(term in haystack for term in ("medication", "pharmacy")):
+        return "Medication record event"
+    if any(term in haystack for term in ("condition", "problem list")):
+        return "Problem-list event"
+    return "Clinical encounter"
+
+
+def _encounter_semantics(enc) -> tuple[str, str, str]:
+    provider_org = _clean_network_label(enc.provider_org) or enc.provider_org or ""
+    practitioner = _clean_network_label(enc.practitioner_name) or enc.practitioner_name or ""
+    source_category = _encounter_source_category(
+        enc.encounter_type or "",
+        enc.class_code or "",
+        enc.reason_display or "",
+        provider_org,
+        practitioner,
+    )
+    specialty = _network_specialty(
+        practitioner or provider_org or source_category,
+        [provider_org, enc.encounter_type or "", enc.reason_display or "", source_category],
+        {enc.class_code or "Unknown": 1},
+    )
+    provenance_label = provider_org or practitioner or "Published chart snapshot"
+    return specialty, source_category, provenance_label
+
+
 def _care_network_summary(record) -> tuple[list[CareTeamSummaryItem], list[SiteOfServiceSummaryItem]]:
     provider_rows: dict[str, dict] = {}
     site_rows: dict[str, dict] = {}
@@ -263,6 +308,111 @@ def _care_network_summary(record) -> tuple[list[CareTeamSummaryItem], list[SiteO
     )
 
     return care_team[:8], sites_of_service[:8]
+
+
+def _published_safe_id(prefix: str, value: object, index: int) -> str:
+    raw = str(value or "").strip() or f"{prefix}-{index}"
+    return re.sub(r"[^A-Za-z0-9_.-]+", "-", raw).strip(".-")[:160] or f"{prefix}-{index}"
+
+
+def _active_published_artifacts(patient_id: str) -> dict:
+    run = load_active_published_run(patient_id)
+    if not isinstance(run, dict):
+        return {}
+    candidate = run.get("candidate_record")
+    if not isinstance(candidate, dict):
+        return {}
+    artifacts = candidate.get("clinical_artifacts")
+    return artifacts if isinstance(artifacts, dict) else {}
+
+
+def _note_preview(text: str, limit: int = 280) -> str:
+    compact = " ".join(str(text or "").split())
+    if len(compact) > limit:
+        return f"{compact[:limit].rstrip()}..."
+    return compact
+
+
+def _note_document_type(note: dict) -> str:
+    section = str(note.get("section_title") or "").strip()
+    if section:
+        return section
+    resource_type = str(note.get("resource_type") or "").strip()
+    content_type = str(note.get("attachment_content_type") or "").strip()
+    if resource_type == "DiagnosticReport":
+        return "Diagnostic report narrative"
+    if resource_type == "Composition":
+        return "Clinical document section"
+    if resource_type == "DocumentReference":
+        return "Source document description"
+    if content_type:
+        return content_type
+    return f"{resource_type} note" if resource_type else "Clinical note"
+
+
+def _clinical_notes_for_patient(patient_id: str, record) -> list[ClinicalNoteItem]:
+    artifacts = _active_published_artifacts(patient_id)
+    raw_notes = [note for note in artifacts.get("clinical_notes") or [] if isinstance(note, dict)]
+    if not raw_notes:
+        return []
+
+    encounter_lookup: dict[tuple[str, str], str] = {}
+    for idx, enc in enumerate(artifacts.get("encounters") or []):
+        if not isinstance(enc, dict):
+            continue
+        source_id = str(enc.get("source_id") or "")
+        raw_id = str(enc.get("id") or "")
+        if source_id and raw_id:
+            encounter_lookup[(source_id, raw_id)] = _published_safe_id("enc", f"{source_id}-{raw_id}", idx)
+
+    notes: list[ClinicalNoteItem] = []
+    for idx, note in enumerate(raw_notes):
+        source_id = str(note.get("source_id") or "")
+        raw_encounter_id = str(note.get("encounter_id") or "")
+        linked_encounter_id = encounter_lookup.get((source_id, raw_encounter_id)) if raw_encounter_id else None
+        linked_encounter = record.encounter_index.get(linked_encounter_id) if linked_encounter_id else None
+        text = str(note.get("text") or "")
+        organization = str(
+            note.get("organization")
+            or note.get("author_organization")
+            or (linked_encounter.provider_org if linked_encounter else "")
+            or note.get("source_label")
+            or ""
+        )
+        provider = str(note.get("author") or (linked_encounter.practitioner_name if linked_encounter else "") or "")
+        note_id = _published_safe_id(
+            "note",
+            f"{source_id}-{note.get('resource_type')}-{note.get('resource_id')}-{note.get('note_index', idx)}",
+            idx,
+        )
+        notes.append(
+            ClinicalNoteItem(
+                note_id=note_id,
+                source_id=source_id,
+                source_label=str(note.get("source_label") or source_id or "Published chart"),
+                resource_type=str(note.get("resource_type") or ""),
+                resource_id=str(note.get("resource_id") or ""),
+                note_index=int(note.get("note_index") or 0),
+                date=note.get("date") if isinstance(note.get("date"), str) else None,
+                author=provider,
+                organization=organization,
+                document_type=str(note.get("document_type") or _note_document_type(note)),
+                category=str(note.get("category") or note.get("resource_type") or ""),
+                encounter_id=raw_encounter_id or None,
+                linked_encounter_id=linked_encounter_id,
+                linked_encounter_type=linked_encounter.encounter_type if linked_encounter else "",
+                linked_encounter_start=_dt_to_iso(linked_encounter.period.start) if linked_encounter else None,
+                provider=provider,
+                site=linked_encounter.provider_org if linked_encounter else organization,
+                section_title=str(note.get("section_title") or ""),
+                attachment_content_type=str(note.get("attachment_content_type") or ""),
+                preview=_note_preview(text),
+                text=text,
+            )
+        )
+
+    notes.sort(key=lambda item: item.date or item.linked_encounter_start or "", reverse=True)
+    return notes
 
 # ---------------------------------------------------------------------------
 # Pre-operative hold/bridge protocol notes — keyed by drug class
@@ -614,10 +764,15 @@ def patient_timeline(patient_id: str) -> TimelineResponse:
 
     year_counts: dict[str, int] = defaultdict(int)
     events: list[EncounterEvent] = []
+    notes_by_encounter: dict[str, int] = defaultdict(int)
+    for note in _clinical_notes_for_patient(patient_id, record):
+        if note.linked_encounter_id:
+            notes_by_encounter[note.linked_encounter_id] += 1
 
     for enc in encounters_sorted:
         if enc.period.start:
             year_counts[str(enc.period.start.year)] += 1
+        specialty, source_category, provenance_label = _encounter_semantics(enc)
 
         events.append(EncounterEvent(
             encounter_id=enc.encounter_id,
@@ -628,10 +783,14 @@ def patient_timeline(patient_id: str) -> TimelineResponse:
             end=enc.period.end,
             provider_org=enc.provider_org or "",
             practitioner_name=enc.practitioner_name or "",
+            specialty=specialty,
+            source_category=source_category,
+            provenance_label=provenance_label,
             linked_observation_count=len(enc.linked_observations),
             linked_condition_count=len(enc.linked_conditions),
             linked_procedure_count=len(enc.linked_procedures),
             linked_medication_count=len(enc.linked_medications),
+            linked_clinical_note_count=notes_by_encounter.get(enc.encounter_id, 0),
         ))
 
     return TimelineResponse(
@@ -653,6 +812,11 @@ def encounter_detail(patient_id: str, encounter_id: str) -> EncounterDetail:
     enc = record.encounter_index.get(encounter_id)
     if enc is None:
         raise HTTPException(status_code=404, detail=f"Encounter not found: {encounter_id}")
+    specialty, source_category, provenance_label = _encounter_semantics(enc)
+    clinical_notes = [
+        note for note in _clinical_notes_for_patient(patient_id, record)
+        if note.linked_encounter_id == encounter_id
+    ]
 
     # Duration
     duration_hours: float | None = None
@@ -729,12 +893,32 @@ def encounter_detail(patient_id: str, encounter_id: str) -> EncounterDetail:
         duration_hours=duration_hours,
         provider_org=enc.provider_org or "",
         practitioner_name=enc.practitioner_name or "",
+        specialty=specialty,
+        source_category=source_category,
+        provenance_label=provenance_label,
         observations=observations,
         conditions=conditions,
         procedures=procedures,
         medications=medications,
         diagnostic_report_count=len(enc.linked_diagnostic_reports),
         imaging_study_count=len(enc.linked_imaging_studies),
+        clinical_notes=clinical_notes,
+    )
+
+
+@router.get("/{patient_id}/clinical-notes", response_model=ClinicalNotesResponse)
+def patient_clinical_notes(patient_id: str) -> ClinicalNotesResponse:
+    """Return narrative note artifacts from the active published chart snapshot."""
+    result = load_patient(patient_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"Patient not found: {patient_id}")
+    record, stats = result
+    notes = _clinical_notes_for_patient(patient_id, record)
+    return ClinicalNotesResponse(
+        patient_id=patient_id,
+        name=stats.name,
+        total_count=len(notes),
+        notes=notes,
     )
 
 
@@ -747,15 +931,93 @@ def encounter_detail(patient_id: str, encounter_id: str) -> EncounterDetail:
 ALERT_THRESHOLDS: dict[str, tuple[str, float | None, float | None, float | None, float | None, str]] = {
     "718-7":  ("Hemoglobin",  6.0,  8.0,   17.5, 20.0,  "g/dL"),
     "4544-3": ("Hematocrit",  18.0, 24.0,  52.0, 60.0,  "%"),
-    "777-3":  ("Platelets",   50.0, 100.0, 400.0, 1000.0, "K/uL"),
+    "20570-8": ("Hematocrit", 18.0, 24.0,  52.0, 60.0,  "%"),
+    "777-3":  ("Platelets",   50.0, 100.0, 400.0, 1000.0, "10*3/uL"),
+    "6690-2": ("WBC",         2.0,  4.0,   11.0, 20.0,  "10*3/uL"),
     "6301-6": ("INR",         None, None,  3.0,  5.0,   ""),
+    "34714-6": ("INR",        None, None,  3.0,  5.0,   ""),
     "2160-0": ("Creatinine",  None, None,  1.5,  3.0,   "mg/dL"),
-    "2823-3": ("Potassium",   3.0,  3.5,   5.5,  6.5,   "mEq/L"),
-    "2951-2": ("Sodium",      125.0, 130.0, 148.0, 155.0, "mEq/L"),
+    "2823-3": ("Potassium",   3.0,  3.5,   5.5,  6.5,   "mmol/L"),
+    "2951-2": ("Sodium",      125.0, 130.0, 148.0, 155.0, "mmol/L"),
     "2345-7": ("Glucose",     50.0, 70.0,  200.0, 400.0, "mg/dL"),
+    "3094-0": ("BUN",         None, 7.0,   20.0, 40.0,  "mg/dL"),
     "1751-7": ("Albumin",     None, 2.5,   None, None,  "g/dL"),
     "6768-6": ("Alk Phos",    None, None,  120.0, 300.0, "U/L"),
 }
+
+
+def _lab_reference_label(
+    low_reference: float | None,
+    high_reference: float | None,
+    unit: str,
+) -> str:
+    unit_suffix = f" {unit}" if unit else ""
+    if low_reference is not None and high_reference is not None:
+        return f"{low_reference:g}-{high_reference:g}{unit_suffix}"
+    if low_reference is not None:
+        return f">= {low_reference:g}{unit_suffix}"
+    if high_reference is not None:
+        return f"<= {high_reference:g}{unit_suffix}"
+    return ""
+
+
+def _interpret_lab_value(
+    loinc_code: str,
+    value: float | None,
+    source_reference_low: float | None = None,
+    source_reference_high: float | None = None,
+    source_reference_unit: str = "",
+) -> tuple[str, str | None, float | None, float | None, str, str]:
+    """Return abnormality, alert severity, reference bounds, unit, and label."""
+    threshold = ALERT_THRESHOLDS.get(loinc_code)
+    has_source_reference = source_reference_low is not None or source_reference_high is not None
+    if value is None or (threshold is None and not has_source_reference):
+        return "unknown", None, None, None, "", ""
+
+    low_critical: float | None = None
+    low_warning: float | None = None
+    high_warning: float | None = None
+    high_critical: float | None = None
+    threshold_unit = ""
+    if threshold is not None:
+        _display, low_critical, low_warning, high_warning, high_critical, threshold_unit = threshold
+
+    low_reference = source_reference_low if has_source_reference else low_warning
+    high_reference = source_reference_high if has_source_reference else high_warning
+    unit = source_reference_unit if has_source_reference else threshold_unit
+    abnormality = "normal"
+    severity: str | None = None
+    threshold_direction: str | None = None
+
+    if low_critical is not None and value < low_critical:
+        severity = "critical"
+        threshold_direction = "low"
+    elif high_critical is not None and value > high_critical:
+        severity = "critical"
+        threshold_direction = "high"
+    elif low_warning is not None and value < low_warning:
+        severity = "warning"
+        threshold_direction = "low"
+    elif high_warning is not None and value > high_warning:
+        severity = "warning"
+        threshold_direction = "high"
+
+    if low_reference is not None and value < low_reference:
+        abnormality = "low"
+    elif high_reference is not None and value > high_reference:
+        abnormality = "high"
+
+    if threshold_direction is not None and threshold_direction != abnormality:
+        severity = None
+
+    return (
+        abnormality,
+        severity,
+        low_reference,
+        high_reference,
+        unit,
+        _lab_reference_label(low_reference, high_reference, unit),
+    )
 
 
 def _obs_date_to_date(obs_dt: datetime | None) -> date | None:
@@ -1046,14 +1308,33 @@ def patient_key_labs(patient_id: str) -> KeyLabsResponse:
         # Build history: take up to 10 readings, oldest first
         history_obs = observations_sorted[:10]
         history_obs.reverse()  # oldest first for sparkline
-        history = [
-            LabHistoryPoint(
-                effective_dt=obs.effective_dt,
-                value=obs.value_quantity,
+        history = []
+        for obs in history_obs:
+            if obs.value_quantity is None:
+                continue
+            point_abnormality, point_severity, _low, _high, _unit, _label = _interpret_lab_value(
+                loinc_code,
+                obs.value_quantity,
+                obs.reference_low,
+                obs.reference_high,
+                obs.reference_unit or obs.value_unit or "",
             )
-            for obs in history_obs
-            if obs.value_quantity is not None
-        ]
+            history.append(
+                LabHistoryPoint(
+                    effective_dt=obs.effective_dt,
+                    value=obs.value_quantity,
+                    abnormality=point_abnormality,  # type: ignore[arg-type]
+                    alert_severity=point_severity,  # type: ignore[arg-type]
+                )
+            )
+
+        abnormality, alert_severity, reference_low, reference_high, reference_unit, reference_label = _interpret_lab_value(
+            loinc_code,
+            most_recent.value_quantity,
+            most_recent.reference_low,
+            most_recent.reference_high,
+            most_recent.reference_unit or most_recent.value_unit or "",
+        )
 
         lab = LabValue(
             loinc_code=loinc_code,
@@ -1062,7 +1343,13 @@ def patient_key_labs(patient_id: str) -> KeyLabsResponse:
             unit=most_recent.value_unit or "",
             effective_dt=most_recent.effective_dt,
             trend=trend,
-            is_abnormal=None,  # No reference range data available in Synthea
+            is_abnormal=abnormality in {"low", "high"} if abnormality != "unknown" else None,
+            abnormality=abnormality,  # type: ignore[arg-type]
+            alert_severity=alert_severity,  # type: ignore[arg-type]
+            reference_low=reference_low,
+            reference_high=reference_high,
+            reference_unit=reference_unit or most_recent.value_unit or "",
+            reference_range_label=reference_label,
             history=history,
         )
 
@@ -1714,7 +2001,8 @@ def get_care_journey(patient_id: str) -> CareJourneyResponse:
 
     record, stats = result
 
-    fhir_uuid = _patient_fhir_uuid(patient_id)
+    active_published_run = load_active_published_run(patient_id)
+    fhir_uuid = None if active_published_run is not None else _patient_fhir_uuid(patient_id)
     patient_ref = f"urn:uuid:{fhir_uuid}" if fhir_uuid else None
     name = stats.name
 
@@ -1811,6 +2099,7 @@ def get_care_journey(patient_id: str) -> CareJourneyResponse:
 
     procedures = _record_procedure_markers(record)
     diagnostic_reports = _record_diagnostic_reports(record)
+    clinical_notes = _clinical_notes_for_patient(patient_id, record)
 
     # Compute date bounds and distinct drug classes
     all_dates: list[str] = []
@@ -1831,6 +2120,9 @@ def get_care_journey(patient_id: str) -> CareJourneyResponse:
     for dr in diagnostic_reports:
         if dr.date:
             all_dates.append(dr.date)
+    for note in clinical_notes:
+        if note.date:
+            all_dates.append(note.date)
 
     earliest = min(all_dates) if all_dates else None
     latest = max(all_dates) if all_dates else None
@@ -1849,5 +2141,6 @@ def get_care_journey(patient_id: str) -> CareJourneyResponse:
         encounters=encounters,
         procedures=procedures,
         diagnostic_reports=diagnostic_reports,
+        clinical_notes=clinical_notes,
         drug_classes_present=drug_classes,
     )

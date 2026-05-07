@@ -34,7 +34,7 @@ import binascii
 import json
 import os
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
@@ -821,7 +821,34 @@ def _resource_display(resource: dict[str, Any]) -> str:
     if resource_type == "Location":
         name = resource.get("name")
         return name.strip() if isinstance(name, str) and name.strip() else ""
+    if resource_type == "PractitionerRole":
+        practitioner = resource.get("practitioner")
+        if isinstance(practitioner, dict) and isinstance(practitioner.get("display"), str) and practitioner["display"].strip():
+            return practitioner["display"].strip()
+        specialty = resource.get("specialty")
+        if isinstance(specialty, list) and specialty:
+            label = _codeable_text(specialty[0])
+            if label:
+                return label
+        organization = resource.get("organization")
+        if isinstance(organization, dict) and isinstance(organization.get("display"), str) and organization["display"].strip():
+            return organization["display"].strip()
     return ""
+
+
+def _specialty_labels(resource: dict[str, Any]) -> list[str]:
+    labels: list[str] = []
+    for item in resource.get("specialty") or []:
+        label = _codeable_text(item) if isinstance(item, dict) else ""
+        if label and label not in labels:
+            labels.append(label)
+    for qualification in resource.get("qualification") or []:
+        if not isinstance(qualification, dict):
+            continue
+        label = _codeable_text(qualification.get("code"))
+        if label and label not in labels:
+            labels.append(label)
+    return labels
 
 
 def _reference_display(value: Any, display_index: dict[tuple[str, str], str], id_index: dict[str, str]) -> str:
@@ -877,13 +904,27 @@ def _labels_for_type(pairs: list[tuple[str, str]], *resource_types: str) -> list
     return labels
 
 
+def _specialty_labels_for_refs(values: Any, resource_index: dict[tuple[str, str], dict[str, Any]]) -> list[str]:
+    refs = values if isinstance(values, list) else [values]
+    labels: list[str] = []
+    for value in refs or []:
+        resource_type, resource_id = _reference_type_and_id(value)
+        resource = resource_index.get((resource_type, resource_id)) if resource_type and resource_id else None
+        if not isinstance(resource, dict):
+            continue
+        for label in _specialty_labels(resource):
+            if label and label not in labels:
+                labels.append(label)
+    return labels
+
+
 def _resource_display_indexes(
     resources_by_source: dict[str, dict[str, list[dict]]],
 ) -> tuple[dict[tuple[str, str], str], dict[str, str]]:
     display_index: dict[tuple[str, str], str] = {}
     id_index: dict[str, str] = {}
     for source_resources in resources_by_source.values():
-        for resource_type in ("Organization", "Practitioner", "Location"):
+        for resource_type in ("Organization", "Practitioner", "PractitionerRole", "Location"):
             for resource in source_resources.get(resource_type, []):
                 if not isinstance(resource, dict):
                     continue
@@ -1058,6 +1099,7 @@ def clinical_artifacts(collection_id: str) -> dict[str, list[dict[str, Any]]]:
             "documents": [],
             "organizations": [],
             "practitioners": [],
+            "practitioner_roles": [],
             "locations": [],
             "encounters": [],
             "observations": [],
@@ -1068,10 +1110,17 @@ def clinical_artifacts(collection_id: str) -> dict[str, list[dict[str, Any]]]:
 
     resources_by_source = load_collection_resources(collection_id)
     display_index, id_index = _resource_display_indexes(resources_by_source)
+    resource_index: dict[tuple[str, str], dict[str, Any]] = {}
+    for source_resources in resources_by_source.values():
+        for resource_type, resources in source_resources.items():
+            for resource in resources:
+                if isinstance(resource, dict) and isinstance(resource.get("id"), str):
+                    resource_index[(resource_type, resource["id"])] = resource
     documents: list[dict[str, Any]] = []
     patients: list[dict[str, Any]] = []
     organizations: list[dict[str, Any]] = []
     practitioners: list[dict[str, Any]] = []
+    practitioner_roles: list[dict[str, Any]] = []
     locations: list[dict[str, Any]] = []
     encounters: list[dict[str, Any]] = []
     observations: list[dict[str, Any]] = []
@@ -1117,6 +1166,7 @@ def clinical_artifacts(collection_id: str) -> dict[str, list[dict[str, Any]]]:
         for resource_type, target in (
             ("Organization", organizations),
             ("Practitioner", practitioners),
+            ("PractitionerRole", practitioner_roles),
             ("Location", locations),
         ):
             for resource in source_resources.get(resource_type, []):
@@ -1128,6 +1178,7 @@ def clinical_artifacts(collection_id: str) -> dict[str, list[dict[str, Any]]]:
                         "source_label": source.label,
                         "id": str(resource.get("id") or ""),
                         "display": _resource_display(resource),
+                        "specialty_labels": _specialty_labels(resource),
                         "resource": resource,
                     }
                 )
@@ -1148,9 +1199,11 @@ def clinical_artifacts(collection_id: str) -> dict[str, list[dict[str, Any]]]:
             period = _period(resource, "period")
             service_provider = _reference_display(resource.get("serviceProvider"), display_index, id_index)
             participant_labels = []
+            participant_refs = []
             for participant in resource.get("participant") or []:
                 if not isinstance(participant, dict):
                     continue
+                participant_refs.append(participant.get("individual"))
                 label = _reference_display(participant.get("individual"), display_index, id_index)
                 if label and label not in participant_labels:
                     participant_labels.append(label)
@@ -1177,6 +1230,7 @@ def clinical_artifacts(collection_id: str) -> dict[str, list[dict[str, Any]]]:
                     "service_provider": service_provider,
                     "participant_labels": participant_labels,
                     "practitioner_labels": participant_labels,
+                    "specialty_labels": _specialty_labels_for_refs(participant_refs, resource_index),
                     "location_labels": location_labels,
                     "site": service_provider or (location_labels[0] if location_labels else ""),
                 }
@@ -1201,7 +1255,8 @@ def clinical_artifacts(collection_id: str) -> dict[str, list[dict[str, Any]]]:
                     "encounter_id": _reference_id(resource.get("encounter")),
                     "performer_labels": performer_labels,
                     "performer_organization_labels": _labels_for_type(performer_pairs, "Organization"),
-                    "performer_practitioner_labels": _labels_for_type(performer_pairs, "Practitioner"),
+                    "performer_practitioner_labels": _labels_for_type(performer_pairs, "Practitioner", "PractitionerRole"),
+                    "specialty_labels": _specialty_labels_for_refs(resource.get("performer"), resource_index),
                 }
             )
 
@@ -1235,7 +1290,11 @@ def clinical_artifacts(collection_id: str) -> dict[str, list[dict[str, Any]]]:
                     "encounter_id": _reference_id(resource.get("encounter")),
                     "performer_labels": performer_labels,
                     "performer_organization_labels": _labels_for_type(performer_pairs, "Organization"),
-                    "performer_practitioner_labels": _labels_for_type(performer_pairs, "Practitioner"),
+                    "performer_practitioner_labels": _labels_for_type(performer_pairs, "Practitioner", "PractitionerRole"),
+                    "specialty_labels": _specialty_labels_for_refs(
+                        [performer.get("actor") for performer in resource.get("performer") or [] if isinstance(performer, dict)],
+                        resource_index,
+                    ),
                 }
             )
 
@@ -1273,7 +1332,7 @@ def clinical_artifacts(collection_id: str) -> dict[str, list[dict[str, Any]]]:
                     "encounter_id": _reference_id(resource.get("encounter")),
                     "performer_labels": performer_labels,
                     "performer_organization_labels": _labels_for_type(performer_pairs, "Organization"),
-                    "performer_practitioner_labels": _labels_for_type(performer_pairs, "Practitioner"),
+                    "performer_practitioner_labels": _labels_for_type(performer_pairs, "Practitioner", "PractitionerRole"),
                     "results_interpreter_labels": results_interpreter_labels,
                     "results_interpreter_organization_labels": _labels_for_type(
                         results_interpreter_pairs,
@@ -1282,7 +1341,14 @@ def clinical_artifacts(collection_id: str) -> dict[str, list[dict[str, Any]]]:
                     "results_interpreter_practitioner_labels": _labels_for_type(
                         results_interpreter_pairs,
                         "Practitioner",
+                        "PractitionerRole",
                     ),
+                    "specialty_labels": _specialty_labels_for_refs(resource.get("performer"), resource_index)
+                    + [
+                        label
+                        for label in _specialty_labels_for_refs(resource.get("resultsInterpreter"), resource_index)
+                        if label not in _specialty_labels_for_refs(resource.get("performer"), resource_index)
+                    ],
                     "has_presented_form": bool(resource.get("presentedForm")),
                     "presented_form_text": presented_text,
                 }
@@ -1293,6 +1359,9 @@ def clinical_artifacts(collection_id: str) -> dict[str, list[dict[str, Any]]]:
                 if not isinstance(resource, dict):
                     continue
                 encounter_id = _reference_id(resource.get("encounter"))
+                author_pairs = _reference_display_pairs(resource.get("author"), display_index, id_index)
+                performer_pairs = _reference_display_pairs(resource.get("performer"), display_index, id_index)
+                organization_labels = _labels_for_type(author_pairs + performer_pairs, "Organization")
                 for idx, note_entry in enumerate(_resource_note_entries(resource)):
                     clinical_notes.append(
                         {
@@ -1304,6 +1373,12 @@ def clinical_artifacts(collection_id: str) -> dict[str, list[dict[str, Any]]]:
                             "encounter_id": encounter_id,
                             "date": _resource_date(resource),
                             "author": note_entry.get("author") or "",
+                            "organization": organization_labels[0] if organization_labels else "",
+                            "document_type": _codeable_text(resource.get("type"))
+                            or _codeable_text(resource.get("code"))
+                            or note_entry.get("section_title")
+                            or resource_type,
+                            "category": _codeable_text((resource.get("category") or [{}])[0]),
                             "time": note_entry.get("time") or "",
                             "section_title": note_entry.get("section_title") or "",
                             "attachment_content_type": note_entry.get("attachment_content_type") or "",
@@ -1316,6 +1391,7 @@ def clinical_artifacts(collection_id: str) -> dict[str, list[dict[str, Any]]]:
         "documents": documents,
         "organizations": organizations,
         "practitioners": practitioners,
+        "practitioner_roles": practitioner_roles,
         "locations": locations,
         "encounters": encounters,
         "observations": observations,
@@ -1429,6 +1505,9 @@ def serialize_observation(m: MergedObservation) -> dict[str, Any]:
                 "raw_unit": s.raw_unit,
                 "effective_date": _iso(s.effective_date),
                 "document_reference": s.document_reference,
+                "reference_low": s.reference_low,
+                "reference_high": s.reference_high,
+                "reference_unit": s.reference_unit,
             }
             for s in m.sources
         ],
@@ -1552,6 +1631,26 @@ class ExtractResult:
     elapsed_seconds: float
 
 
+@dataclass(frozen=True)
+class ExtractJobEvent:
+    event_id: str
+    event_type: str
+    created_at: datetime
+    stage: str
+    message: str
+    source_id: str | None = None
+    source_label: str | None = None
+    page_start: int | None = None
+    page_end: int | None = None
+    page_count: int | None = None
+    processed_pages: int = 0
+    total_pages: int | None = None
+    processed_files: int = 0
+    total_files: int = 0
+    progress_basis: str = "lifecycle"
+    is_estimate: bool = False
+
+
 # ---------------------------------------------------------------------------
 # Async extract job store
 # ---------------------------------------------------------------------------
@@ -1590,6 +1689,7 @@ class ExtractJob:
     current_source_label: str | None = None
     stage: str = "queued"
     estimated_seconds: int | None = None
+    events: list[ExtractJobEvent] = field(default_factory=list)
 
 
 _EXTRACT_JOBS: dict[str, ExtractJob] = {}
@@ -1612,6 +1712,46 @@ def get_latest_extract_job(collection_id: str) -> ExtractJob | None:
     with _EXTRACT_JOBS_LOCK:
         job_id = _EXTRACT_COLLECTION_JOBS.get(collection_id)
         return _EXTRACT_JOBS.get(job_id) if job_id else None
+
+
+def _append_extract_event(
+    job: ExtractJob,
+    event_type: str,
+    *,
+    stage: str | None = None,
+    message: str,
+    source_id: str | None = None,
+    source_label: str | None = None,
+    page_start: int | None = None,
+    page_end: int | None = None,
+    page_count: int | None = None,
+    progress_basis: str = "lifecycle",
+    is_estimate: bool = False,
+) -> None:
+    job.events.append(
+        ExtractJobEvent(
+            event_id=uuid.uuid4().hex,
+            event_type=event_type,
+            created_at=datetime.now(),
+            stage=stage or job.stage,
+            message=message,
+            source_id=source_id,
+            source_label=source_label,
+            page_start=page_start,
+            page_end=page_end,
+            page_count=page_count,
+            processed_pages=job.processed_pages,
+            total_pages=job.total_pages,
+            processed_files=job.processed_files,
+            total_files=job.total_files,
+            progress_basis=progress_basis,
+            is_estimate=is_estimate,
+        )
+    )
+    # Keep the in-memory job bounded. The frontend only needs recent lifecycle
+    # and checkpoint events, not an unbounded stream.
+    if len(job.events) > 200:
+        del job.events[:-200]
 
 
 def _pdf_page_count(pdf_path: Path) -> int | None:
@@ -1653,6 +1793,12 @@ def _run_extract_job(job_id: str, collection_id: str) -> None:
         return
     job.status = "running"
     job.stage = "Preparing PDF pipeline"
+    _append_extract_event(
+        job,
+        "job_started",
+        stage=job.stage,
+        message="Extraction worker started.",
+    )
     _set_job_state(job)
     try:
         results = extract_pending_pdfs(collection_id, job_id=job_id) or []
@@ -1663,10 +1809,22 @@ def _run_extract_job(job_id: str, collection_id: str) -> None:
         job.processed_files = max(job.processed_files, job.total_files)
         if job.total_pages is not None:
             job.processed_pages = max(job.processed_pages, job.total_pages)
+        _append_extract_event(
+            job,
+            "job_completed",
+            stage=job.stage,
+            message="Extraction job completed.",
+        )
     except Exception as exc:
         job.status = "failed"
         job.error = f"{type(exc).__name__}: {exc}"
         job.stage = "Extraction failed"
+        _append_extract_event(
+            job,
+            "job_failed",
+            stage=job.stage,
+            message=job.error,
+        )
     finally:
         job.completed_at = datetime.now()
         _set_job_state(job)
@@ -1703,6 +1861,36 @@ def start_extract_job(collection_id: str) -> ExtractJob | None:
         stage="Queued",
         estimated_seconds=(max(30, total_pages * 45) if total_pages else (len(pending_work) * 60 or 30)),
     )
+    _append_extract_event(
+        job,
+        "job_queued",
+        stage=job.stage,
+        message=(
+            f"Queued {len(pending_work)} PDF file"
+            f"{'' if len(pending_work) == 1 else 's'} for extraction."
+        ),
+    )
+    page_cursor = 1
+    for src, _pdf_path, _extracted_json, page_count in pending_work:
+        page_start = page_cursor if page_count else None
+        page_end = page_cursor + page_count - 1 if page_count else None
+        _append_extract_event(
+            job,
+            "file_queued",
+            stage=job.stage,
+            message=(
+                f"Queued {src.label}"
+                + (f" with {page_count} page{'' if page_count == 1 else 's'}." if page_count else ".")
+            ),
+            source_id=src.id,
+            source_label=src.label,
+            page_start=page_start,
+            page_end=page_end,
+            page_count=page_count,
+            progress_basis="metadata",
+        )
+        if page_count:
+            page_cursor += page_count
     _set_job_state(job)
     thread = threading.Thread(
         target=_run_extract_job,
@@ -1764,20 +1952,52 @@ def extract_pending_pdfs(collection_id: str, job_id: str | None = None) -> list[
             )
             continue
         job = get_extract_job(job_id) if job_id else None
+        page_count = _pdf_page_count(pdf_path)
         if job is not None:
             job.current_source_label = src.label
             job.stage = "Reading pages and running FHIR passes"
+            page_start = job.processed_pages + 1 if page_count else None
+            page_end = job.processed_pages + page_count if page_count else None
+            _append_extract_event(
+                job,
+                "file_started",
+                stage=job.stage,
+                message=(
+                    f"Started extracting {src.label}"
+                    + (f" ({page_count} page{'' if page_count == 1 else 's'})." if page_count else ".")
+                ),
+                source_id=src.id,
+                source_label=src.label,
+                page_start=page_start,
+                page_end=page_end,
+                page_count=page_count,
+                progress_basis="reported",
+            )
             _set_job_state(job)
         t0 = time.time()
         bundle = pipeline.extract(pdf_path)
         elapsed = time.time() - t0
         extracted_json.write_text(json.dumps(bundle, indent=2))
-        page_count = _pdf_page_count(pdf_path)
         if job is not None:
             job.processed_files += 1
             if page_count is not None:
                 job.processed_pages += page_count
             job.stage = "Writing extracted FHIR bundle"
+            _append_extract_event(
+                job,
+                "file_completed",
+                stage=job.stage,
+                message=(
+                    f"Completed {src.label}"
+                    + (f" and reported {page_count} page{'' if page_count == 1 else 's'} complete." if page_count else ".")
+                ),
+                source_id=src.id,
+                source_label=src.label,
+                page_start=(job.processed_pages - page_count + 1 if page_count else None),
+                page_end=(job.processed_pages if page_count else None),
+                page_count=page_count,
+                progress_basis="reported",
+            )
             _set_job_state(job)
         results.append(
             ExtractResult(

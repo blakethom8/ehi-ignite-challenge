@@ -589,6 +589,58 @@ class UploadCollectionDiscoveryTests(unittest.TestCase):
         )
         self.assertEqual(published.status_code, 201)
 
+    def test_review_decisions_append_audit_events_and_publish_summary(self) -> None:
+        self._stage_session("review-audit")
+        run = self.client.post("/api/harmonize/upload-review-audit/runs").json()
+        item_id = run["review_items"][0]["id"]
+        self.assertEqual(run["review_events"], [])
+        self.assertEqual(run["review_decision_summary"]["event_count"], 0)
+
+        deferred = self.client.post(
+            f"/api/harmonize/upload-review-audit/runs/{run['run_id']}/review-items/resolve",
+            json={
+                "item_id": item_id,
+                "decision": "deferred",
+                "notes": "Needs source owner confirmation.",
+            },
+        )
+        self.assertEqual(deferred.status_code, 200)
+        deferred_run = deferred.json()
+        self.assertEqual(deferred_run["summary"]["review_item_count"], 1)
+        self.assertEqual(deferred_run["review_decision_summary"]["event_count"], 1)
+        self.assertEqual(deferred_run["review_decision_summary"]["decisions"]["deferred"], 1)
+        self.assertFalse(deferred_run["review_events"][0]["previous_resolved"])
+        self.assertEqual(deferred_run["review_events"][0]["decision"], "deferred")
+
+        dismissed = self.client.post(
+            f"/api/harmonize/upload-review-audit/runs/{run['run_id']}/review-items/resolve",
+            json={
+                "item_id": item_id,
+                "decision": "dismissed",
+                "notes": "Reviewed and accepted source gap for this run.",
+            },
+        )
+        self.assertEqual(dismissed.status_code, 200)
+        dismissed_run = dismissed.json()
+        self.assertEqual(dismissed_run["summary"]["review_item_count"], 0)
+        self.assertTrue(dismissed_run["summary"]["publishable"])
+        self.assertEqual(len(dismissed_run["review_events"]), 2)
+        self.assertEqual(dismissed_run["review_decision_summary"]["event_count"], 2)
+        self.assertEqual(dismissed_run["review_decision_summary"]["resolved_item_count"], 1)
+        self.assertEqual(dismissed_run["review_decision_summary"]["open_item_count"], 0)
+        self.assertEqual(dismissed_run["review_decision_summary"]["decisions"]["deferred"], 1)
+        self.assertEqual(dismissed_run["review_decision_summary"]["decisions"]["dismissed"], 1)
+        self.assertEqual(dismissed_run["review_events"][1]["previous_decision"], "deferred")
+        self.assertFalse(dismissed_run["review_events"][1]["previous_resolved"])
+
+        published = self.client.post(
+            f"/api/harmonize/upload-review-audit/runs/{run['run_id']}/publish"
+        )
+        self.assertEqual(published.status_code, 201)
+        active = published.json()["active_snapshot"]
+        self.assertEqual(active["review_decision_summary"]["event_count"], 2)
+        self.assertEqual(active["review_decision_summary"]["decisions"]["dismissed"], 1)
+
     def test_deferring_review_item_keeps_publish_blocked(self) -> None:
         self._stage_session("defer-review")
         run = self.client.post("/api/harmonize/upload-defer-review/runs").json()
@@ -749,6 +801,8 @@ class UploadCollectionDiscoveryTests(unittest.TestCase):
         self.assertIsNotNone(body["active_snapshot"])
         self.assertEqual(body["active_snapshot"]["run_id"], run["run_id"])
         self.assertEqual(len(body["snapshots"]), 1)
+        self.assertIsNotNone(body["active_snapshot"]["activated_at"])
+        self.assertEqual(body["active_snapshot"]["change_summary"]["previous_snapshot_id"], None)
 
         snapshot_id = body["active_snapshot"]["snapshot_id"]
         activated = self.client.post(
@@ -761,6 +815,57 @@ class UploadCollectionDiscoveryTests(unittest.TestCase):
         self.assertEqual(unpublished.status_code, 200)
         self.assertIsNone(unpublished.json()["active_snapshot"])
         self.assertEqual(len(unpublished.json()["snapshots"]), 1)
+
+    def test_publish_snapshot_change_summary_and_rollback_metadata(self) -> None:
+        sess = self._stage_session("compare-publish")
+        (sess / "report.pdf").unlink()
+
+        first_run = self.client.post("/api/harmonize/upload-compare-publish/runs").json()
+        first_state = self.client.post(
+            f"/api/harmonize/upload-compare-publish/runs/{first_run['run_id']}/publish"
+        ).json()
+        first_snapshot_id = first_state["active_snapshot"]["snapshot_id"]
+
+        (sess / "renal.json").write_text(
+            json.dumps(
+                {
+                    "resourceType": "Bundle",
+                    "entry": [
+                        {
+                            "resource": {
+                                "resourceType": "Observation",
+                                "id": "creatinine-compare",
+                                "status": "final",
+                                "code": {"coding": [{"system": "http://loinc.org", "code": "2160-0", "display": "Creatinine"}]},
+                                "effectiveDateTime": "2024-03-02T10:00:00Z",
+                                "valueQuantity": {"value": 1.2, "unit": "mg/dL"},
+                            }
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        second_run = self.client.post("/api/harmonize/upload-compare-publish/runs").json()
+        second_state = self.client.post(
+            f"/api/harmonize/upload-compare-publish/runs/{second_run['run_id']}/publish"
+        ).json()
+        active = second_state["active_snapshot"]
+        self.assertEqual(active["change_summary"]["previous_snapshot_id"], first_snapshot_id)
+        self.assertGreater(active["change_summary"]["fact_delta"], 0)
+        self.assertGreater(active["change_summary"]["source_delta"], 0)
+        self.assertIn("candidate facts", active["change_summary"]["headline"])
+
+        rollback = self.client.post(
+            f"/api/harmonize/upload-compare-publish/published/{first_snapshot_id}/activate"
+        ).json()
+        self.assertEqual(rollback["active_snapshot"]["snapshot_id"], first_snapshot_id)
+        self.assertEqual(
+            rollback["active_snapshot"]["activated_from_snapshot_id"],
+            active["snapshot_id"],
+        )
+        self.assertIsNotNone(rollback["active_snapshot"]["activated_at"])
 
     def test_published_workspace_feeds_patient_read_endpoints(self) -> None:
         sess = self._stage_session("workspace-downstream")
@@ -857,8 +962,11 @@ class UploadCollectionDiscoveryTests(unittest.TestCase):
         )
         self.assertEqual(office_visit["provider_org"], "Cedars-Sinai Nephrology")
         self.assertEqual(office_visit["practitioner_name"], "Dr. Riley Renal")
+        self.assertEqual(office_visit["specialty"], "Nephrology")
+        self.assertEqual(office_visit["source_category"], "Office / outpatient visit")
         self.assertEqual(office_visit["linked_observation_count"], 1)
         self.assertEqual(office_visit["linked_procedure_count"], 1)
+        self.assertGreaterEqual(office_visit["linked_clinical_note_count"], 1)
 
         encounter_detail = self.client.get(
             f"/api/patients/workspace-clinical-artifacts/encounters/{office_visit['encounter_id']}"
@@ -867,8 +975,12 @@ class UploadCollectionDiscoveryTests(unittest.TestCase):
         detail = encounter_detail.json()
         self.assertEqual(detail["provider_org"], "Cedars-Sinai Nephrology")
         self.assertEqual(detail["practitioner_name"], "Dr. Riley Renal")
+        self.assertEqual(detail["specialty"], "Nephrology")
         self.assertEqual(len(detail["observations"]), 1)
         self.assertEqual(detail["procedures"][0]["display"], "Renal ultrasound")
+        self.assertTrue(
+            any("chronic kidney disease risk discussed" in note["text"] for note in detail["clinical_notes"])
+        )
 
         care_journey = self.client.get("/api/patients/workspace-clinical-artifacts/care-journey")
         self.assertEqual(care_journey.status_code, 200)
@@ -876,6 +988,18 @@ class UploadCollectionDiscoveryTests(unittest.TestCase):
         self.assertEqual(len(diagnostic_reports), 1)
         self.assertTrue(diagnostic_reports[0]["has_presented_form"])
         self.assertIn("chronic kidney disease risk discussed", diagnostic_reports[0]["note_preview"])
+        self.assertGreaterEqual(len(care_journey.json()["clinical_notes"]), 2)
+
+        clinical_notes = self.client.get("/api/patients/workspace-clinical-artifacts/clinical-notes")
+        self.assertEqual(clinical_notes.status_code, 200)
+        notes_body = clinical_notes.json()
+        self.assertGreaterEqual(notes_body["total_count"], 2)
+        self.assertTrue(
+            any(note["linked_encounter_id"] == office_visit["encounter_id"] for note in notes_body["notes"])
+        )
+        self.assertTrue(
+            any("chronic kidney disease risk discussed" in note["text"] for note in notes_body["notes"])
+        )
 
         raw_fhir = self.client.get("/api/patients/workspace-clinical-artifacts/fhir")
         self.assertEqual(raw_fhir.status_code, 200)
@@ -1014,6 +1138,66 @@ class UploadCollectionDiscoveryTests(unittest.TestCase):
         self.assertEqual(poll["status"], "complete")
         self.assertEqual(poll["progress_percent"], 100)
         self.assertEqual(poll["results"], [])
+        self.assertGreaterEqual(len(poll["events"]), 2)
+        event_types = [event["event_type"] for event in poll["events"]]
+        self.assertIn("job_queued", event_types)
+        self.assertIn("job_completed", event_types)
+        self.assertEqual(poll["progress_mode"], "lifecycle")
+
+    def test_extract_job_reports_file_page_checkpoint_events(self) -> None:
+        self._stage_session("pdf-events")
+
+        class FakePipeline:
+            def extract(self, _pdf_path: Path) -> dict:
+                return {
+                    "resourceType": "Bundle",
+                    "type": "document",
+                    "entry": [
+                        {
+                            "resource": {
+                                "resourceType": "Observation",
+                                "id": "pdf-a1c",
+                                "code": {"text": "A1C"},
+                            }
+                        }
+                    ],
+                }
+
+        def fake_get_pipeline(name: str):
+            self.assertEqual(name, "multipass-fhir")
+            return FakePipeline
+
+        def fake_page_count(path: Path) -> int | None:
+            return 3 if path.name == "report.pdf" else None
+
+        with (
+            patch("ehi_atlas.extract.pipelines.get", side_effect=fake_get_pipeline),
+            patch("api.core.harmonize_service._pdf_page_count", side_effect=fake_page_count),
+        ):
+            r = self.client.post("/api/harmonize/upload-pdf-events/extract")
+            self.assertEqual(r.status_code, 202)
+            job_id = r.json()["job_id"]
+
+            import time
+            deadline = time.time() + 10
+            while time.time() < deadline:
+                poll = self.client.get(f"/api/harmonize/extract-jobs/{job_id}").json()
+                if poll["status"] in ("complete", "failed"):
+                    break
+                time.sleep(0.05)
+
+        self.assertEqual(poll["status"], "complete")
+        self.assertEqual(poll["total_pages"], 3)
+        self.assertEqual(poll["processed_pages"], 3)
+        self.assertEqual(poll["progress_mode"], "reported")
+        event_types = [event["event_type"] for event in poll["events"]]
+        self.assertIn("file_queued", event_types)
+        self.assertIn("file_started", event_types)
+        self.assertIn("file_completed", event_types)
+        completed_event = next(event for event in poll["events"] if event["event_type"] == "file_completed")
+        self.assertEqual(completed_event["page_start"], 1)
+        self.assertEqual(completed_event["page_end"], 3)
+        self.assertEqual(completed_event["progress_basis"], "reported")
 
     def test_extract_job_unknown_id_404s(self) -> None:
         r = self.client.get("/api/harmonize/extract-jobs/does-not-exist")

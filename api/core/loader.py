@@ -672,6 +672,9 @@ def _record_from_published_run(patient_id: str, run: dict[str, Any]) -> tuple[Pa
                 value_quantity=value_quantity,
                 value_unit=str(unit),
                 value_concept_display=None if value_quantity is not None else (str(raw_value) if raw_value is not None else None),
+                reference_low=_numeric_value(source.get("reference_low")),
+                reference_high=_numeric_value(source.get("reference_high")),
+                reference_unit=str(source.get("reference_unit") or unit or ""),
             )
             source_id = _artifact_source_id(source, source_lookup)
             source_ref = str(source.get("source_observation_ref") or "")

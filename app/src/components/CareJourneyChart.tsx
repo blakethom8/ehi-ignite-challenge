@@ -7,6 +7,7 @@ import type {
   EncounterMarker,
   ProcedureMarker,
   DiagnosticReportItem,
+  ClinicalNoteItem,
 } from "../types";
 import { CONDITION_STATUS_COLORS, DRUG_CLASS_COLORS } from "./careJourneyColors";
 
@@ -23,6 +24,7 @@ const ENCOUNTER_CLASS_COLORS: Record<string, string> = {
 
 const PROCEDURE_COLOR = "#8b5cf6";
 const DIAGNOSTIC_COLOR = "#0891b2"; // cyan/teal for lab reports
+const NOTE_COLOR = "#475467";
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
@@ -33,7 +35,7 @@ const BAR_PAD = 4; // vertical padding inside each row for the bar
 
 // ── Row model ───────────────────────────────────────────────────────────────
 
-export type SourceKind = "medication" | "condition" | "procedure" | "encounter" | "diagnostic_report";
+export type SourceKind = "medication" | "condition" | "procedure" | "encounter" | "diagnostic_report" | "clinical_note";
 
 interface DotMarker {
   ms: number;
@@ -445,6 +447,88 @@ function buildRows(data: CareJourneyResponse): GanttRow[] {
     }
   }
 
+  // ── Clinical Notes (grouped by document type, shown as dated markers) ──
+  if (data.clinical_notes.length > 0) {
+    rows.push({
+      id: "notes",
+      label: "Clinical Notes",
+      level: 0,
+      childCount: data.clinical_notes.length,
+      collapsible: true,
+      startMs: null, endMs: null, isOngoing: false,
+      color: NOTE_COLOR, opacity: 1,
+      tooltip: `${data.clinical_notes.length} clinical note artifacts`,
+      parentId: null,
+    });
+
+    const byType = new Map<string, ClinicalNoteItem[]>();
+    for (const note of data.clinical_notes) {
+      const key = note.document_type || note.resource_type || "Clinical note";
+      if (!byType.has(key)) byType.set(key, []);
+      byType.get(key)!.push(note);
+    }
+
+    const noteGroups = [...byType.entries()].sort((a, b) => b[1].length - a[1].length);
+    for (const [documentType, items] of noteGroups) {
+      const groupId = `note_${documentType.replace(/\W/g, "_").slice(0, 30)}`;
+      rows.push({
+        id: groupId,
+        label: `${truncate(documentType, 28)} (${items.length})`,
+        level: 1,
+        childCount: items.length,
+        collapsible: items.length > 1,
+        startMs: null, endMs: null, isOngoing: false,
+        color: NOTE_COLOR,
+        opacity: 1,
+        dotMarkers: items
+          .filter((note) => note.date || note.linked_encounter_start)
+          .map((note) => ({
+            ms: toMs(note.date || note.linked_encounter_start)!,
+            color: NOTE_COLOR,
+            tooltip:
+              `${documentType}\nDate: ${fmtDate(note.date || note.linked_encounter_start)}\n` +
+              `${note.linked_encounter_type ? `Encounter: ${truncate(note.linked_encounter_type, 44)}\n` : ""}` +
+              truncate(note.preview || note.text || "Clinical note", 120),
+            sourceKind: "clinical_note" as SourceKind,
+            sourceData: note,
+          })),
+        tooltip: `${items.length}× ${documentType}`,
+        parentId: "notes",
+      });
+
+      if (items.length === 1) {
+        rows[rows.length - 1].sourceKind = "clinical_note";
+        rows[rows.length - 1].sourceData = items[0];
+      } else {
+        const sorted = [...items]
+          .filter((note) => note.date || note.linked_encounter_start)
+          .sort((a, b) => new Date(b.date || b.linked_encounter_start || 0).getTime() - new Date(a.date || a.linked_encounter_start || 0).getTime());
+        for (const note of sorted) {
+          const noteDate = note.date || note.linked_encounter_start;
+          const dateLabel = noteDate ? new Date(noteDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "Undated";
+          rows.push({
+            id: `note_item_${note.note_id}`,
+            label: `${dateLabel} — ${truncate(note.preview || note.text || documentType, 44)}`,
+            level: 2,
+            collapsible: false,
+            startMs: toMs(noteDate),
+            endMs: toMs(noteDate) ? toMs(noteDate)! + 24 * 60 * 60 * 1000 : null,
+            isOngoing: false,
+            color: NOTE_COLOR,
+            opacity: 0.65,
+            sourceKind: "clinical_note",
+            sourceData: note,
+            tooltip:
+              `${documentType}\nDate: ${fmtDate(noteDate)}\n` +
+              `${note.linked_encounter_type ? `Encounter: ${note.linked_encounter_type}\n` : ""}` +
+              truncate(note.preview || note.text || "Clinical note", 180),
+            parentId: groupId,
+          });
+        }
+      }
+    }
+  }
+
   return rows;
 }
 
@@ -548,6 +632,7 @@ export function CareJourneyChart({ data, dateRange, onDateRangeChange, onRowClic
     // because they are the main way users orient the chart chronologically.
     s.add("proc");
     s.add("dx_reports");
+    s.add("notes");
     return s;
   });
 
@@ -633,6 +718,10 @@ export function CareJourneyChart({ data, dateRange, onDateRangeChange, onRowClic
     }
     for (const p of data.procedures) {
       if (p.start) dates.push(new Date(p.start).getTime());
+    }
+    for (const note of data.clinical_notes) {
+      const noteDate = note.date || note.linked_encounter_start;
+      if (noteDate) dates.push(new Date(noteDate).getTime());
     }
     if (dates.length === 0) {
       return [CHART_TODAY_MS - 5 * 365.25 * 24 * 3600 * 1000, CHART_TODAY_MS];

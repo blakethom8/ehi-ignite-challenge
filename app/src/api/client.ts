@@ -16,6 +16,7 @@ import type {
   FieldCoverageResponse,
   AllergyCriticalityBreakdown,
   ProceduresResponse,
+  ClinicalNotesResponse,
   ProviderAssistantRequest,
   ProviderAssistantResponse,
   CareJourneyResponse,
@@ -152,6 +153,10 @@ export const api = {
   /** Procedure history */
   getProcedures: (patientId: string): Promise<ProceduresResponse> =>
     http.get<ProceduresResponse>(`/patients/${patientId}/procedures`).then((r) => r.data),
+
+  /** Clinical notes from the active published chart snapshot */
+  getClinicalNotes: (patientId: string): Promise<ClinicalNotesResponse> =>
+    http.get<ClinicalNotesResponse>(`/patients/${patientId}/clinical-notes`).then((r) => r.data),
 
   /** Provider-facing chart Q&A */
   chatProviderAssistant: (payload: ProviderAssistantRequest): Promise<ProviderAssistantResponse> =>

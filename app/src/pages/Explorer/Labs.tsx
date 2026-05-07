@@ -6,6 +6,10 @@ import { api } from "../../api/client";
 import { EmptyState } from "../../components/EmptyState";
 import type { KeyLabsResponse, LabValue, PatientOverview } from "../../types";
 
+function cls(...parts: (string | false | null | undefined)[]): string {
+  return parts.filter(Boolean).join(" ");
+}
+
 function fmtDate(value: string | null): string {
   if (!value) return "-";
   const date = new Date(value);
@@ -56,6 +60,34 @@ function formatLabValue(lab: LabValue): string {
   return `${lab.value}${lab.unit ? ` ${lab.unit}` : ""}`;
 }
 
+function labIsFlagged(lab: LabValue, keyLabs?: KeyLabsResponse): boolean {
+  return Boolean(lab.is_abnormal || lab.alert_severity || keyLabs?.alert_flags.some((flag) => flag.loinc_code === lab.loinc_code));
+}
+
+function labStatusLabel(lab: LabValue): string {
+  if (lab.alert_severity === "critical") return lab.abnormality === "low" ? "Critical low" : "Critical high";
+  if (lab.alert_severity === "warning") return lab.abnormality === "low" ? "Low" : "High";
+  if (lab.is_abnormal) return lab.abnormality === "low" ? "Low" : "High";
+  if (lab.is_abnormal === false) return "In range";
+  return "Range unknown";
+}
+
+function labStatusTone(lab: LabValue): string {
+  if (lab.alert_severity === "critical") return "border-red-200 bg-red-50 text-red-700";
+  if (lab.alert_severity === "warning" || lab.is_abnormal) return "border-amber-200 bg-amber-50 text-amber-800";
+  if (lab.is_abnormal === false) return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  return "border-[#e1e6ef] bg-[#f8fafc] text-[#667085]";
+}
+
+function referenceLabel(lab: LabValue): string {
+  return lab.reference_range_label || "Not provided";
+}
+
+function fmtReferenceNumber(value: number | null): string {
+  if (value == null) return "";
+  return Number.isInteger(value) ? value.toFixed(0) : value.toFixed(1);
+}
+
 function Sparkline({ lab }: { lab: LabValue }) {
   const points = lab.history ?? [];
   if (points.length < 2) {
@@ -89,7 +121,14 @@ function Sparkline({ lab }: { lab: LabValue }) {
       {points.map((point, index) => {
         const x = points.length === 1 ? width : (index / (points.length - 1)) * width;
         const y = height - ((point.value - min) / spread) * height;
-        return <circle key={`${point.effective_dt ?? "undated"}-${index}`} cx={x} cy={y} r="2" fill={lab.trend === "down" ? "#f43f5e" : "#5b76fe"} />;
+        const fill = point.alert_severity === "critical"
+          ? "#dc2626"
+          : point.alert_severity === "warning"
+            ? "#d97706"
+            : lab.trend === "down"
+              ? "#f43f5e"
+              : "#5b76fe";
+        return <circle key={`${point.effective_dt ?? "undated"}-${index}`} cx={x} cy={y} r="2" fill={fill} />;
       })}
     </svg>
   );
@@ -122,6 +161,9 @@ function LabDetailPanel({ lab, panelName }: { lab: LabValue | null; panelName: s
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#667085]">Latest</p>
           <p className="mt-1 text-xl font-semibold text-[#111827]">{formatLabValue(lab)}</p>
           <p className="mt-1 text-xs text-[#667085]">{fmtDate(lab.effective_dt)}</p>
+          <div className={`mt-2 inline-flex rounded-full border px-2 py-1 text-xs font-semibold ${labStatusTone(lab)}`}>
+            {labStatusLabel(lab)}
+          </div>
         </div>
         <div className="rounded-lg border border-[#e1e6ef] bg-[#f8fafc] p-3">
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#667085]">Trend</p>
@@ -131,6 +173,37 @@ function LabDetailPanel({ lab, panelName }: { lab: LabValue | null; panelName: s
           </div>
           <p className="mt-2 text-xs text-[#667085]">{delta == null ? "Need two results" : `${delta > 0 ? "+" : ""}${delta.toFixed(2)} since prior`}</p>
         </div>
+      </div>
+
+      <div className="rounded-lg border border-[#e1e6ef] p-3">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#667085]">Reference range</p>
+            <p className="mt-1 text-sm font-semibold text-[#111827]">{referenceLabel(lab)}</p>
+          </div>
+          <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${labStatusTone(lab)}`}>
+            {labStatusLabel(lab)}
+          </span>
+        </div>
+        {lab.reference_low != null && lab.reference_high != null && lab.value != null && (
+          <div className="mt-3">
+            <div className="h-2 overflow-hidden rounded-full bg-[#eef0f4]">
+              <div
+                className={cls(
+                  "h-full rounded-full",
+                  lab.is_abnormal ? "bg-amber-500" : "bg-emerald-500",
+                )}
+                style={{
+                  width: `${Math.max(8, Math.min(100, ((lab.value - lab.reference_low) / Math.max(1, lab.reference_high - lab.reference_low)) * 100))}%`,
+                }}
+              />
+            </div>
+            <div className="mt-1 flex justify-between text-[11px] font-medium text-[#98a2b3]">
+              <span>{fmtReferenceNumber(lab.reference_low)}</span>
+              <span>{fmtReferenceNumber(lab.reference_high)}</span>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="rounded-lg border border-[#e1e6ef] p-3">
@@ -145,7 +218,10 @@ function LabDetailPanel({ lab, panelName }: { lab: LabValue | null; panelName: s
           {(lab.history ?? []).slice().reverse().map((point, index) => (
             <div key={`${point.effective_dt ?? "undated"}-${index}`} className="flex items-center justify-between border-t border-[#f2f4f7] py-2 text-sm">
               <span className="text-[#667085]">{fmtDate(point.effective_dt)}</span>
-              <span className="font-semibold text-[#111827]">
+              <span className="flex items-center gap-2 font-semibold text-[#111827]">
+                {point.alert_severity && (
+                  <span className={point.alert_severity === "critical" ? "h-2 w-2 rounded-full bg-red-500" : "h-2 w-2 rounded-full bg-amber-500"} />
+                )}
                 {point.value} <span className="text-xs font-medium text-[#667085]">{lab.unit}</span>
               </span>
             </div>
@@ -153,8 +229,8 @@ function LabDetailPanel({ lab, panelName }: { lab: LabValue | null; panelName: s
         </div>
       </div>
 
-      <div className="rounded-lg border border-[#fedf89] bg-[#fffbeb] p-3 text-sm leading-6 text-[#92400e]">
-        Reference ranges and abnormal interpretation are only shown when present in the source record. This source currently provides values without validated reference limits.
+      <div className="rounded-lg border border-[#dfe4ea] bg-[#f8fafc] p-3 text-sm leading-6 text-[#667085]">
+        Structured source values drive the timeline. Reference ranges use configured clinical review thresholds when source-provided ranges are unavailable.
       </div>
     </aside>
   );
@@ -170,6 +246,7 @@ function LabsContent({
   const [selectedPanel, setSelectedPanel] = useState("All");
   const [selectedLabKey, setSelectedLabKey] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "flagged" | "in-range" | "unknown">("all");
 
   const populatedPanels = useMemo(
     () => Object.entries(keyLabs.panels).filter(([, labs]) => labs.length > 0).sort(([a], [b]) => a.localeCompare(b)),
@@ -186,8 +263,14 @@ function LabsContent({
         if (!normalized) return true;
         return `${lab.display} ${lab.loinc_code} ${lab.unit}`.toLowerCase().includes(normalized);
       })
+      .filter((lab) => {
+        if (statusFilter === "flagged") return labIsFlagged(lab, keyLabs);
+        if (statusFilter === "in-range") return lab.is_abnormal === false;
+        if (statusFilter === "unknown") return lab.is_abnormal == null;
+        return true;
+      })
       .sort((a, b) => a.display.localeCompare(b.display));
-  }, [allLabs, keyLabs.panels, query, selectedPanel]);
+  }, [allLabs, keyLabs, keyLabs.panels, query, selectedPanel, statusFilter]);
 
   const selectedLab = useMemo(() => {
     return filteredLabs.find((lab) => labKey(lab) === selectedLabKey) ?? filteredLabs[0] ?? null;
@@ -290,14 +373,44 @@ function LabsContent({
                   );
                 })}
               </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {[
+                  ["all", "All markers", allLabs.length],
+                  ["flagged", "Flagged", allLabs.filter((lab) => labIsFlagged(lab, keyLabs)).length],
+                  ["in-range", "In range", allLabs.filter((lab) => lab.is_abnormal === false).length],
+                  ["unknown", "Range unknown", allLabs.filter((lab) => lab.is_abnormal == null).length],
+                ].map(([id, label, count]) => {
+                  const active = statusFilter === id;
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => {
+                        setStatusFilter(id as typeof statusFilter);
+                        setSelectedLabKey(null);
+                      }}
+                      className={cls(
+                        "rounded-lg border px-3 py-1.5 text-xs font-semibold transition",
+                        active
+                          ? "border-[#087d75] bg-[#ecfdf7] text-[#087d75]"
+                          : "border-[#e1e6ef] bg-white text-[#667085] hover:border-[#b8c1d4]",
+                      )}
+                    >
+                      {label} <span className="ml-1 text-[#98a2b3]">{count}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[820px] text-sm">
+              <table className="w-full min-w-[980px] text-sm">
                 <thead>
                   <tr className="border-b border-[#eef0f4] bg-[#f8fafc] text-left text-xs uppercase tracking-[0.12em] text-[#98a2b3]">
                     <th className="px-4 py-3 font-semibold">Marker</th>
                     <th className="px-4 py-3 text-right font-semibold">Latest</th>
+                    <th className="px-4 py-3 font-semibold">Reference</th>
+                    <th className="px-4 py-3 font-semibold">Status</th>
                     <th className="px-4 py-3 text-center font-semibold">Trend</th>
                     <th className="px-4 py-3 font-semibold">History</th>
                     <th className="px-4 py-3 text-right font-semibold">Date</th>
@@ -319,6 +432,14 @@ function LabsContent({
                         <td className="px-4 py-3 text-right">
                           <span className={lab.is_abnormal ? "font-semibold text-[#b42318]" : "font-semibold text-[#1c1c1e]"}>{formatLabValue(lab)}</span>
                         </td>
+                        <td className="px-4 py-3 text-[#667085]">
+                          {referenceLabel(lab)}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex rounded-full border px-2 py-1 text-xs font-semibold ${labStatusTone(lab)}`}>
+                            {labStatusLabel(lab)}
+                          </span>
+                        </td>
                         <td className="px-4 py-3">
                           <div className={`mx-auto inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs font-semibold ${trendTone(lab.trend)}`}>
                             {trendIcon(lab.trend)}
@@ -334,7 +455,7 @@ function LabsContent({
                   })}
                   {filteredLabs.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="px-4 py-10 text-center text-sm text-[#667085]">
+                      <td colSpan={7} className="px-4 py-10 text-center text-sm text-[#667085]">
                         No lab markers match this filter.
                       </td>
                     </tr>

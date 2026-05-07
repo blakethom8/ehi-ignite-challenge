@@ -450,9 +450,19 @@ def _job_estimated_processed_pages(job: harmonize_service.ExtractJob) -> int:
     return min(max(0, estimated_pages), max(job.total_pages - 1, 0))
 
 
+def _job_progress_mode(job: harmonize_service.ExtractJob) -> str:
+    if job.processed_pages > 0 or any(event.progress_basis == "reported" for event in job.events):
+        return "reported"
+    if job.status in {"pending", "running"} and job.estimated_seconds:
+        return "estimated"
+    return "lifecycle"
+
+
 def _job_detail(job: harmonize_service.ExtractJob) -> str:
     source = f" Current file: {job.current_source_label}." if job.current_source_label else ""
-    return f"Runs on the server, so you can leave this page and come back later.{source}"
+    if _job_progress_mode(job) == "reported":
+        return f"Runs on the server, so you can leave this page and come back later. Reported checkpoints are shown in the event timeline.{source}"
+    return f"Runs on the server, so you can leave this page and come back later. Page position remains estimated until the worker reports a checkpoint.{source}"
 
 
 def _job_to_response(job: harmonize_service.ExtractJob) -> HarmonizeExtractJobResponse:
@@ -474,6 +484,8 @@ def _job_to_response(job: harmonize_service.ExtractJob) -> HarmonizeExtractJobRe
         estimated_processed_pages=_job_estimated_processed_pages(job),
         current_source_label=job.current_source_label,
         estimated_seconds=job.estimated_seconds,
+        progress_mode=_job_progress_mode(job),  # type: ignore[arg-type]
+        events=[vars(event) for event in job.events],
     )
 
 

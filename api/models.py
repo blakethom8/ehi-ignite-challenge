@@ -224,10 +224,14 @@ class EncounterEvent(BaseModel):
     end: datetime | None
     provider_org: str
     practitioner_name: str
+    specialty: str = ""
+    source_category: str = ""
+    provenance_label: str = ""
     linked_observation_count: int
     linked_condition_count: int
     linked_procedure_count: int
     linked_medication_count: int
+    linked_clinical_note_count: int = 0
 
 
 class TimelineResponse(BaseModel):
@@ -288,6 +292,9 @@ class EncounterDetail(BaseModel):
     duration_hours: float | None
     provider_org: str
     practitioner_name: str
+    specialty: str = ""
+    source_category: str = ""
+    provenance_label: str = ""
     # Linked resources
     observations: list[ObservationDetail]
     conditions: list[ConditionDetail]
@@ -295,6 +302,7 @@ class EncounterDetail(BaseModel):
     medications: list[MedicationDetail]
     diagnostic_report_count: int
     imaging_study_count: int
+    clinical_notes: list["ClinicalNoteItem"] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -304,6 +312,8 @@ class EncounterDetail(BaseModel):
 class LabHistoryPoint(BaseModel):
     effective_dt: datetime | None
     value: float
+    abnormality: Literal["low", "high", "normal", "unknown"] = "unknown"
+    alert_severity: Literal["critical", "warning"] | None = None
 
 
 class LabValue(BaseModel):
@@ -316,6 +326,12 @@ class LabValue(BaseModel):
     trend: str | None
     # reference range flag if value is present
     is_abnormal: bool | None  # None = unknown (no reference range data)
+    abnormality: Literal["low", "high", "normal", "unknown"] = "unknown"
+    alert_severity: Literal["critical", "warning"] | None = None
+    reference_low: float | None = None
+    reference_high: float | None = None
+    reference_unit: str = ""
+    reference_range_label: str = ""
     # historical readings for sparkline (oldest first, up to 10)
     history: list[LabHistoryPoint]
 
@@ -667,6 +683,37 @@ class DiagnosticReportItem(BaseModel):
     note_preview: str = ""
 
 
+class ClinicalNoteItem(BaseModel):
+    note_id: str
+    source_id: str
+    source_label: str
+    resource_type: str
+    resource_id: str
+    note_index: int
+    date: str | None = None
+    author: str = ""
+    organization: str = ""
+    document_type: str = ""
+    category: str = ""
+    encounter_id: str | None = None
+    linked_encounter_id: str | None = None
+    linked_encounter_type: str = ""
+    linked_encounter_start: str | None = None
+    provider: str = ""
+    site: str = ""
+    section_title: str = ""
+    attachment_content_type: str = ""
+    preview: str = ""
+    text: str = ""
+
+
+class ClinicalNotesResponse(BaseModel):
+    patient_id: str
+    name: str
+    total_count: int
+    notes: list[ClinicalNoteItem] = Field(default_factory=list)
+
+
 class CareJourneyResponse(BaseModel):
     patient_id: str
     name: str
@@ -677,6 +724,7 @@ class CareJourneyResponse(BaseModel):
     encounters: list[EncounterMarker]
     procedures: list[ProcedureMarker]
     diagnostic_reports: list[DiagnosticReportItem]
+    clinical_notes: list[ClinicalNoteItem] = Field(default_factory=list)
     drug_classes_present: list[str]
 
 
@@ -1082,6 +1130,9 @@ class HarmonizeObservationSource(BaseModel):
     raw_unit: str | None
     effective_date: str | None
     document_reference: str | None
+    reference_low: float | None = None
+    reference_high: float | None = None
+    reference_unit: str | None = None
 
 
 class HarmonizeLatestObservation(BaseModel):
@@ -1157,6 +1208,33 @@ class HarmonizeExtractItem(BaseModel):
     cache_hit: bool
     entry_count: int
     elapsed_seconds: float
+
+
+class HarmonizeExtractJobEvent(BaseModel):
+    event_id: str
+    event_type: Literal[
+        "job_queued",
+        "file_queued",
+        "job_started",
+        "file_started",
+        "file_completed",
+        "job_completed",
+        "job_failed",
+    ]
+    created_at: datetime
+    stage: str
+    message: str
+    source_id: str | None = None
+    source_label: str | None = None
+    page_start: int | None = None
+    page_end: int | None = None
+    page_count: int | None = None
+    processed_pages: int = 0
+    total_pages: int | None = None
+    processed_files: int = 0
+    total_files: int = 0
+    progress_basis: Literal["lifecycle", "metadata", "reported", "estimated"] = "lifecycle"
+    is_estimate: bool = False
 
 
 class HarmonizeExtractResponse(BaseModel):
@@ -1273,6 +1351,9 @@ class HarmonizeClinicalNote(BaseModel):
     encounter_id: str | None = None
     date: str | None = None
     author: str | None = None
+    organization: str | None = None
+    document_type: str | None = None
+    category: str | None = None
     time: str | None = None
     section_title: str | None = None
     attachment_content_type: str | None = None
@@ -1301,6 +1382,7 @@ class HarmonizeClinicalArtifact(BaseModel):
     performer_labels: list[str] = Field(default_factory=list)
     performer_organization_labels: list[str] = Field(default_factory=list)
     performer_practitioner_labels: list[str] = Field(default_factory=list)
+    specialty_labels: list[str] = Field(default_factory=list)
     result_refs: list[str] = Field(default_factory=list)
     has_presented_form: bool = False
     note_preview: str = ""
@@ -1370,6 +1452,8 @@ class HarmonizeExtractJobResponse(BaseModel):
     estimated_processed_pages: int = 0
     current_source_label: str | None = None
     estimated_seconds: int | None = None
+    progress_mode: Literal["reported", "estimated", "lifecycle"] = "lifecycle"
+    events: list[HarmonizeExtractJobEvent] = Field(default_factory=list)
 
 
 class HarmonizeRunFactCounts(BaseModel):
@@ -1429,6 +1513,37 @@ class HarmonizeRunReviewItem(BaseModel):
     resolved_at: datetime | None = None
 
 
+class HarmonizeReviewEvent(BaseModel):
+    event_id: str
+    event_type: Literal["review_decision"] = "review_decision"
+    collection_id: str | None = None
+    run_id: str | None = None
+    item_id: str
+    category: str | None = None
+    severity: str | None = None
+    source_id: str | None = None
+    resource_type: str | None = None
+    merged_ref: str | None = None
+    decision: str
+    notes: str = ""
+    selected_source_ref: str | None = None
+    resolved: bool = False
+    resolved_at: datetime | None = None
+    created_at: datetime
+    actor: str = "local-reviewer"
+    previous_decision: str | None = None
+    previous_resolved: bool = False
+    previous_selected_source_ref: str | None = None
+
+
+class HarmonizeReviewDecisionSummary(BaseModel):
+    event_count: int = 0
+    resolved_item_count: int = 0
+    open_item_count: int = 0
+    latest_event_at: datetime | None = None
+    decisions: dict[str, int] = Field(default_factory=dict)
+
+
 class HarmonizeReviewDecisionRequest(BaseModel):
     item_id: str
     decision: Literal[
@@ -1455,12 +1570,26 @@ class HarmonizeRunResponse(BaseModel):
     sources: list[HarmonizeRunSource]
     summary: HarmonizeRunSummary
     review_items: list[HarmonizeRunReviewItem]
+    review_events: list[HarmonizeReviewEvent] = Field(default_factory=list)
+    review_decision_summary: HarmonizeReviewDecisionSummary = Field(
+        default_factory=HarmonizeReviewDecisionSummary
+    )
     artifact_path: str
 
 
 class HarmonizeRunStateResponse(BaseModel):
     collection_id: str
     latest_run: HarmonizeRunResponse | None = None
+
+
+class PublishedChartChangeSummary(BaseModel):
+    previous_snapshot_id: str | None = None
+    previous_run_id: str | None = None
+    fact_delta: int = 0
+    source_delta: int = 0
+    review_item_delta: int = 0
+    candidate_count_delta: HarmonizeRunFactCounts = Field(default_factory=HarmonizeRunFactCounts)
+    headline: str = "Initial published chart snapshot."
 
 
 class PublishedChartSnapshot(BaseModel):
@@ -1476,6 +1605,12 @@ class PublishedChartSnapshot(BaseModel):
     source_count: int
     candidate_fact_count: int
     review_item_count: int
+    review_decision_summary: HarmonizeReviewDecisionSummary = Field(
+        default_factory=HarmonizeReviewDecisionSummary
+    )
+    activated_at: datetime | None = None
+    activated_from_snapshot_id: str | None = None
+    change_summary: PublishedChartChangeSummary = Field(default_factory=PublishedChartChangeSummary)
     is_active: bool = False
 
 

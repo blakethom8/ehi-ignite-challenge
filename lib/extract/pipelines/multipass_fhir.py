@@ -618,10 +618,11 @@ class MultiPassFHIRPipeline:
         for i in imm_extraction.immunizations:
             entries.append({"resource": self._immunization_to_fhir(i, common_meta_template, layout)})
 
-        # Lab Observations + LOINC + interpretation post-passes
+        # Lab Observations + LOINC + interpretation + clinical-category post-passes
         obs_extraction: LabObservationExtraction = per_pass.get("lab_observations") or LabObservationExtraction()
         loinc_sources = self._apply_loinc_post_pass(obs_extraction)
         interp_sources = self._apply_interpretation_post_pass(obs_extraction)
+        clinical_categories = self._lookup_clinical_categories(obs_extraction)
         for o in obs_extraction.observations:
             entries.append(
                 {
@@ -632,6 +633,7 @@ class MultiPassFHIRPipeline:
                         doc_context,
                         loinc_resolution_source=loinc_sources.get(id(o)),
                         interpretation_source=interp_sources.get(id(o)),
+                        clinical_category=clinical_categories.get(id(o)),
                     )
                 }
             )
@@ -912,6 +914,30 @@ class MultiPassFHIRPipeline:
             sources[id(o)] = "computed"
         return sources
 
+    def _lookup_clinical_categories(
+        self,
+        obs_extraction: "LabObservationExtraction",
+    ) -> dict[int, str]:
+        """For each Observation with a resolved LOINC code, look up the clinical
+        category (Metabolic / Kidney / Liver / Blood / Heart / Urine / etc.)
+        from the curated reference table.
+
+        Must run AFTER ``_apply_loinc_post_pass`` so codes are populated.
+        Returns a dict mapping ``id(entry) → category`` for entries that have
+        a category match. Entries without a LOINC code or with a code missing
+        from the category table are simply absent from the dict.
+        """
+        from lib.extract.terminology.loinc_matcher import lookup_clinical_category
+
+        categories: dict[int, str] = {}
+        for o in obs_extraction.observations:
+            if not o.loinc_code:
+                continue
+            cat = lookup_clinical_category(o.loinc_code)
+            if cat is not None:
+                categories[id(o)] = cat
+        return categories
+
     def _lab_observation_to_fhir(
         self,
         o: LabObservationEntry,
@@ -920,13 +946,14 @@ class MultiPassFHIRPipeline:
         doc_context: DocumentContext,
         loinc_resolution_source: str | None = None,
         interpretation_source: str | None = None,
+        clinical_category: str | None = None,
     ) -> dict[str, Any]:
         bbox_locator = self._bbox_locator_for(o.test_name, o.page, layout)
         codings: list[dict[str, Any]] = []
         if o.loinc_code:
             codings.append({"system": "http://loinc.org", "code": o.loinc_code})
         meta = self._add_bbox_to_meta(common_meta, bbox_locator)
-        if loinc_resolution_source or interpretation_source:
+        if loinc_resolution_source or interpretation_source or clinical_category:
             meta = {**meta, "extension": [*meta.get("extension", [])]}
         if loinc_resolution_source:
             meta["extension"].append(
@@ -940,6 +967,13 @@ class MultiPassFHIRPipeline:
                 {
                     "url": "https://ehi-atlas.example/fhir/StructureDefinition/interpretation-source",
                     "valueString": interpretation_source,
+                }
+            )
+        if clinical_category:
+            meta["extension"].append(
+                {
+                    "url": "https://ehi-atlas.example/fhir/StructureDefinition/clinical-category",
+                    "valueString": clinical_category,
                 }
             )
         resource: dict[str, Any] = {

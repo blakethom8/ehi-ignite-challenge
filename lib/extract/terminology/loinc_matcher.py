@@ -80,10 +80,13 @@ def _load_table(path: str | None = None) -> dict:
 
     # Build alias lookup: normalized alias → list of (code, display, unit)
     alias_index: dict[str, list[tuple[str, str, str | None]]] = {}
+    # Build code lookup: code → entry (for category / unit / display lookups)
+    by_code: dict[str, dict] = {}
     for entry in entries:
         code = entry["code"]
         display = entry["display"]
         unit = entry.get("unit")
+        by_code[code] = entry
         # The canonical display itself is the strongest alias
         for alias in [display] + entry.get("aliases", []):
             key = _normalize(alias)
@@ -91,7 +94,24 @@ def _load_table(path: str | None = None) -> dict:
                 continue
             alias_index.setdefault(key, []).append((code, display, unit))
 
-    return {"entries": entries, "alias_index": alias_index}
+    return {"entries": entries, "alias_index": alias_index, "by_code": by_code}
+
+
+def lookup_clinical_category(loinc_code: str, *, table_path: str | None = None) -> str | None:
+    """Look up the clinical category for a LOINC code.
+
+    Returns one of the category strings used by the curated table
+    (e.g. "Metabolic", "Kidney", "Liver", "Blood", "Heart", "Urine",
+    "Immune Regulation", "Electrolytes"), or ``None`` if the code is
+    not in the table or has no category assigned.
+    """
+    if not loinc_code:
+        return None
+    table = _load_table(table_path)
+    entry = table["by_code"].get(loinc_code)
+    if entry is None:
+        return None
+    return entry.get("clinical_category")
 
 
 def _pick_unit_match(

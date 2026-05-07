@@ -11,6 +11,10 @@ The reference data lives at ``ehi-atlas/corpus/reference/<terminology>/`` and
 is curated via the ``_curate.py`` scripts there.
 """
 
-from lib.extract.terminology.loinc_matcher import LoincMatch, match_loinc
+from lib.extract.terminology.loinc_matcher import (
+    LoincMatch,
+    lookup_clinical_category,
+    match_loinc,
+)
 
-__all__ = ["LoincMatch", "match_loinc"]
+__all__ = ["LoincMatch", "lookup_clinical_category", "match_loinc"]

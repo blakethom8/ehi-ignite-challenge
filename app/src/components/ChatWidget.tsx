@@ -2,13 +2,58 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { Bot, ChevronRight, Maximize2, MessageSquareText, Minus, Send, Sparkles, X } from "lucide-react";
 import { useChatForPatient } from "../context/ChatContext";
-import { ChatMessageBubble } from "../pages/Explorer/Assistant";
+import type { ChatMessage } from "../context/ChatContext";
 
 const QUICK_PROMPTS = [
   "Is this patient safe for surgery?",
   "Summarize active problems",
   "Any blood thinner risks?",
 ];
+
+function WidgetMessageBubble({
+  msg,
+  onSubmitFollowUp,
+}: {
+  msg: ChatMessage;
+  onSubmitFollowUp: (question: string) => void;
+}) {
+  if (msg.role === "user") {
+    return (
+      <div className="flex gap-2.5">
+        <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-200">
+          <span className="text-[10px] font-semibold text-slate-600">You</span>
+        </div>
+        <p className="text-[12px] font-medium leading-relaxed text-[#1c1c1e]">{msg.content}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex gap-2.5">
+      <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100">
+        <Bot size={12} className="text-blue-600" />
+      </div>
+      <div className="min-w-0 flex-1 space-y-2">
+        <p className="whitespace-pre-wrap text-[12px] leading-relaxed text-slate-700">{msg.content}</p>
+        {msg.followUps.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {msg.followUps.map((followUp) => (
+              <button
+                key={followUp}
+                type="button"
+                onClick={() => onSubmitFollowUp(followUp)}
+                className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] text-slate-600 transition-colors hover:border-blue-300 hover:text-blue-700"
+              >
+                <ChevronRight size={10} className="text-blue-400" />
+                {followUp.length > 60 ? `${followUp.slice(0, 57)}...` : followUp}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export function ChatWidget() {
   const [searchParams] = useSearchParams();
@@ -160,11 +205,10 @@ export function ChatWidget() {
         )}
 
         {chat.messages.map((msg) => (
-          <ChatMessageBubble
+          <WidgetMessageBubble
             key={msg.id}
             msg={msg}
             onSubmitFollowUp={handleSubmit}
-            compact
           />
         ))}
 

@@ -31,7 +31,7 @@ from typing import Any
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
-from api.core.loader import load_patient, path_from_patient_id
+from api.core.loader import load_active_published_run, load_patient, path_from_patient_id
 from api.core.sof_tools import DEFAULT_SOF_DB
 
 # ---------------------------------------------------------------------------
@@ -47,6 +47,7 @@ class ClinicalContext:
     active_medications: list[str] # current meds with drug class + reason
     active_conditions: list[str]  # current problem list
     key_labs: list[str]           # latest clinically important lab values
+    clinical_notes: list[str]     # narrative note/document context
     recent_encounters: list[str]  # last N encounters with diagnosis
     procedures_summary: list[str] # recent/significant procedures
     historical_meds: list[str]    # compressed stopped medication episodes
@@ -88,6 +89,11 @@ class ClinicalContext:
             sections.extend(self.key_labs)
             sections.append("")
 
+        if self.clinical_notes:
+            sections.append("## CLINICAL NOTES AND DOCUMENT CONTEXT")
+            sections.extend(self.clinical_notes)
+            sections.append("")
+
         if self.recent_encounters:
             sections.append("## RECENT ENCOUNTERS")
             sections.extend(self.recent_encounters)
@@ -119,7 +125,7 @@ class ClinicalContext:
         self.fact_count = (
             len(self.safety_flags) + len(self.interactions) +
             len(self.active_medications) + len(self.active_conditions) +
-            len(self.key_labs) + len(self.recent_encounters) +
+            len(self.key_labs) + len(self.clinical_notes) + len(self.recent_encounters) +
             len(self.procedures_summary) + len(self.historical_meds) +
             len(self.resolved_conditions) + len(self.absences)
         )
@@ -182,19 +188,30 @@ def _patient_uuid_from_id(patient_id: str) -> str | None:
 KEY_LAB_LOINCS = {
     "4548-4":  "HbA1c",
     "2160-0":  "Creatinine",
+    "3094-0":  "BUN",
     "6299-2":  "BUN",
+    "2951-2":  "Sodium",
     "2947-0":  "Sodium",
+    "2823-3":  "Potassium",
     "6298-4":  "Potassium",
     "2093-3":  "Cholesterol",
     "2571-8":  "Triglycerides",
     "718-7":   "Hemoglobin",
+    "20570-8": "Hematocrit",
     "4544-3":  "Hematocrit",
     "777-3":   "Platelets",
     "6690-2":  "WBC",
     "5902-2":  "PT (Prothrombin Time)",
+    "34714-6": "INR",
     "6301-6":  "INR",
+    "62238-1": "eGFR",
     "33914-3": "eGFR",
+    "2345-7":  "Glucose",
     "2339-0":  "Glucose",
+    "3173-2":  "PTT",
+    "10839-9": "Troponin",
+    "42637-9": "BNP",
+    "33762-6": "proBNP",
     "1742-6":  "ALT",
     "1920-8":  "AST",
     "1975-2":  "Bilirubin",
@@ -218,6 +235,15 @@ def _value_text(value: float | None, unit: str = "") -> str:
     except (ValueError, TypeError):
         rendered = str(value)
     return f"{rendered} {unit}".strip()
+
+
+def _compact_text(value: Any, max_chars: int = 700) -> str:
+    if not isinstance(value, str):
+        return ""
+    text = " ".join(value.split())
+    if len(text) <= max_chars:
+        return text
+    return f"{text[: max_chars - 1].rstrip()}…"
 
 
 def _is_active_med_status(status: str) -> bool:
@@ -286,18 +312,79 @@ def _build_record_lab_context(record) -> list[str]:
         for loinc in KEY_LAB_LOINCS
         if loinc in latest_by_key
     ]
-    if not key_labs:
-        key_labs = sorted(
-            latest_by_key.values(),
-            key=lambda obs: obs.effective_dt or datetime.min,
-            reverse=True,
-        )
+    recent_labs = sorted(
+        latest_by_key.values(),
+        key=lambda obs: obs.effective_dt or datetime.min,
+        reverse=True,
+    )
+    selected_keys = {obs.loinc_code or obs.display for obs in key_labs}
+    for obs in recent_labs:
+        key = obs.loinc_code or obs.display
+        if key not in selected_keys:
+            key_labs.append(obs)
+            selected_keys.add(key)
+        if len(key_labs) >= 16:
+            break
 
     lines: list[str] = []
     for obs in key_labs[:16]:
         lab_name = KEY_LAB_LOINCS.get(obs.loinc_code, obs.display or obs.loinc_code or "Observation")
         status_text = f", {obs.status}" if obs.status else ""
         lines.append(f"- **{lab_name}**: {_value_text(obs.value_quantity, obs.value_unit)} ({_fmt_dt(obs.effective_dt)}{status_text})")
+    return lines
+
+
+def _build_published_clinical_note_context(patient_id: str, limit: int = 8) -> list[str]:
+    """Surface note/document artifacts from the active published workspace.
+
+    The shared PatientRecord facade intentionally focuses on normalized FHIR
+    facts. Published harmonization runs also carry narrative artifacts that are
+    important for chart-grounded Q&A, so the assistant context reads them from
+    the durable run artifact when a workspace has been published.
+    """
+    run = load_active_published_run(patient_id)
+    if not run:
+        return []
+    candidate = run.get("candidate_record")
+    if not isinstance(candidate, dict):
+        return []
+    artifacts = candidate.get("clinical_artifacts")
+    if not isinstance(artifacts, dict):
+        return []
+    raw_notes = [note for note in artifacts.get("clinical_notes") or [] if isinstance(note, dict)]
+    raw_notes.sort(key=lambda note: str(note.get("date") or ""), reverse=True)
+
+    seen: set[str] = set()
+    lines: list[str] = []
+    for note in raw_notes:
+        text = _compact_text(note.get("text"))
+        if not text or text in seen:
+            continue
+        seen.add(text)
+        source = str(note.get("source_label") or note.get("source_id") or "source document")
+        resource_type = str(note.get("resource_type") or "Clinical note")
+        date = _fmt_date(str(note.get("date") or "")) if note.get("date") else "date unknown"
+        resource_id = str(note.get("resource_id") or "").strip()
+        encounter_id = str(note.get("encounter_id") or "").strip()
+        ref = f" | {resource_type}/{resource_id}" if resource_id else f" | {resource_type}"
+        if encounter_id:
+            ref += f" | Encounter/{encounter_id}"
+        lines.append(f"- **{resource_type} note** from {source} ({date}){ref}: {text}")
+        if len(lines) >= limit:
+            break
+    return lines
+
+
+def _build_record_clinical_note_context(record, limit: int = 6) -> list[str]:
+    lines: list[str] = []
+    for report in sorted(record.diagnostic_reports, key=lambda r: r.effective_dt or datetime.min, reverse=True):
+        text = _compact_text(report.presented_form_text)
+        if not text:
+            continue
+        label = report.code.label() or "Diagnostic report"
+        lines.append(f"- **DiagnosticReport note** {label} ({_fmt_dt(report.effective_dt)} | {report.status or 'status unknown'}): {text}")
+        if len(lines) >= limit:
+            break
     return lines
 
 
@@ -347,13 +434,16 @@ def build_clinical_context(patient_id: str) -> ClinicalContext:
         raise ValueError(f"Patient not found: {patient_id}")
     record, stats = result
 
+    active_published_run = load_active_published_run(patient_id)
+
     # Get patient demographics. Uploaded/published workspace records do not have
     # a backing Synthea file path, so prefer the parsed record summary.
     path = path_from_patient_id(patient_id)
     name = stats.name or record.summary.name or patient_id
 
-    # Resolve FHIR UUID for SOF queries
-    fhir_uuid = _patient_uuid_from_id(patient_id)
+    # Resolve FHIR UUID for SOF queries. When an active published snapshot
+    # exists, the selected chart scope is the published facade, not global SOF.
+    fhir_uuid = None if active_published_run is not None else _patient_uuid_from_id(patient_id)
     patient_ref = f"urn:uuid:{fhir_uuid}" if fhir_uuid else None
 
     # --- Patient summary line ---
@@ -527,6 +617,11 @@ def build_clinical_context(patient_id: str) -> ClinicalContext:
     if not key_labs:
         key_labs = _build_record_lab_context(record)
 
+    # --- Clinical notes and narrative document context ---
+    clinical_notes = _build_published_clinical_note_context(patient_id)
+    if not clinical_notes:
+        clinical_notes = _build_record_clinical_note_context(record)
+
     # --- Recent encounters (from SOF, last 10 with diagnoses) ---
     recent_encounters: list[str] = []
 
@@ -596,6 +691,7 @@ def build_clinical_context(patient_id: str) -> ClinicalContext:
         active_medications=active_meds,
         active_conditions=active_conditions,
         key_labs=key_labs,
+        clinical_notes=clinical_notes,
         recent_encounters=recent_encounters,
         procedures_summary=procedures_summary,
         historical_meds=historical_meds,

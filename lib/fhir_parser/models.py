@@ -126,6 +126,11 @@ class ObservationRecord:
     value_concept_display: str | None = None
     components: list[ObservationComponent] = field(default_factory=list)
 
+    # Numeric source-provided reference range, when the FHIR Observation carries one.
+    reference_low: float | None = None
+    reference_high: float | None = None
+    reference_unit: str = ""
+
 
 @dataclass
 class EncounterRecord:

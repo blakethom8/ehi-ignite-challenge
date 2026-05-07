@@ -34,7 +34,9 @@ from api.core.provider_assistant import (
     AssistantResult,
     get_relevant_provider_evidence,
 )
+from api.core.loader import load_active_published_run
 from api.core.sof_tools import (
+    SqlRunResult,
     build_tool_description as _sof_build_tool_description,
     run_sql as _sof_run_sql,
     tool_result_payload as _sof_tool_result_payload,
@@ -146,6 +148,23 @@ def _parse_result_json(raw: str) -> dict[str, Any]:
             raise AgentExecutionError("Agent returned invalid JSON") from exc
 
     raise AgentExecutionError("Agent did not return a JSON object")
+
+
+def _run_sql_for_patient_scope(patient_id: str, query_text: str, limit: int) -> SqlRunResult:
+    """Run SQL only when the selected chart scope is the global SOF warehouse."""
+    if load_active_published_run(patient_id) is not None:
+        return SqlRunResult(
+            columns=[],
+            rows=[],
+            row_count=0,
+            truncated=False,
+            query=query_text,
+            error=(
+                "global SQL-on-FHIR is disabled because this patient has an active "
+                "published chart snapshot; use chart evidence tools for the active snapshot."
+            ),
+        )
+    return _sof_run_sql(query_text, limit=limit)
 
 
 def _citation_from_dict(raw: dict[str, Any]) -> AssistantCitationPayload | None:
@@ -308,7 +327,7 @@ async def _run_agent(
             "run_sql",
             input_data={"query": query_text, "limit": limit_int},
         ) as _sql_span:
-            result = _sof_run_sql(query_text, limit=limit_int)
+            result = _run_sql_for_patient_scope(patient_id, query_text, limit_int)
             if _sql_span:
                 _sql_span.output_data = json.dumps(
                     {

@@ -3,6 +3,7 @@ import { Code2, X } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { CONDITION_STATUS_COLORS, DRUG_CLASS_COLORS } from "./careJourneyColors";
+import { ClinicalNoteReader, ClinicalNoteSummary } from "./ClinicalNoteReader";
 import type { SelectedCareItem } from "./CareJourneyChart";
 import type {
   MedicationEpisodeItem,
@@ -10,6 +11,7 @@ import type {
   ProcedureMarker,
   EncounterMarker,
   DiagnosticReportItem,
+  ClinicalNoteItem,
 } from "../types";
 
 const DETAIL_NOW_MS = Date.now();
@@ -177,6 +179,8 @@ function EncounterFullDetail({ patientId, enc }: { patientId: string; enc: Encou
       {data.reason_display && <Row label="Reason">{data.reason_display}</Row>}
       {data.practitioner_name && <Row label="Provider">{data.practitioner_name}</Row>}
       {data.provider_org && <Row label="Organization">{data.provider_org}</Row>}
+      {data.specialty && <Row label="Specialty">{data.specialty}</Row>}
+      {data.source_category && <Row label="Event type">{data.source_category}</Row>}
 
       {/* Linked resources */}
       {(data.observations.length > 0 || data.conditions.length > 0 || data.procedures.length > 0 || data.medications.length > 0) && (
@@ -207,6 +211,17 @@ function EncounterFullDetail({ patientId, enc }: { patientId: string; enc: Encou
                 <div className="text-[10px] text-slate-500">Medications</div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {data.clinical_notes.length > 0 && (
+        <div className="mt-3 pt-3 border-t border-slate-200">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-[#a5a8b5] mb-2">Clinical notes</p>
+          <div className="space-y-2">
+            {data.clinical_notes.slice(0, 3).map((note) => (
+              <ClinicalNoteSummary key={note.note_id} note={note} />
+            ))}
           </div>
         </div>
       )}
@@ -246,12 +261,26 @@ interface CareJourneyDetailProps {
 
 function DiagnosticReportDetail({ report }: { report: DiagnosticReportItem }) {
   return (
-    <div className="space-y-0">
-      <Row label="Category">{report.category || "Laboratory"}</Row>
-      <Row label="Date">{fmtDate(report.date)}</Row>
-      <Row label="Results">{report.result_count} observations</Row>
+    <div className="space-y-3">
+      <div className="space-y-0">
+        <Row label="Category">{report.category || "Laboratory"}</Row>
+        <Row label="Date">{fmtDate(report.date)}</Row>
+        <Row label="Results">{report.result_count} observations</Row>
+      </div>
+      {report.has_presented_form && report.note_preview && (
+        <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+            Clinical note
+          </p>
+          <p className="mt-1 text-sm leading-5 text-slate-700">{report.note_preview}</p>
+        </div>
+      )}
     </div>
   );
+}
+
+function ClinicalNoteDetail({ note }: { note: ClinicalNoteItem }) {
+  return <ClinicalNoteReader note={note} />;
 }
 
 const KIND_LABELS: Record<string, string> = {
@@ -260,6 +289,7 @@ const KIND_LABELS: Record<string, string> = {
   procedure: "Procedure",
   encounter: "Encounter",
   diagnostic_report: "Lab Report",
+  clinical_note: "Clinical Note",
 };
 
 const KIND_COLORS: Record<string, string> = {
@@ -268,6 +298,7 @@ const KIND_COLORS: Record<string, string> = {
   procedure: "#8b5cf6",
   encounter: "#5b76fe",
   diagnostic_report: "#0891b2",
+  clinical_note: "#475467",
 };
 
 export function CareJourneyDetail({ item, patientId, onClose }: CareJourneyDetailProps) {
@@ -276,6 +307,7 @@ export function CareJourneyDetail({ item, patientId, onClose }: CareJourneyDetai
     if (item.kind === "condition") return (item.data as ConditionEpisodeItem).display;
     if (item.kind === "procedure") return (item.data as ProcedureMarker).display;
     if (item.kind === "diagnostic_report") return (item.data as DiagnosticReportItem).display;
+    if (item.kind === "clinical_note") return (item.data as ClinicalNoteItem).document_type || "Clinical note";
     if (item.kind === "encounter") {
       const enc = item.data as EncounterMarker;
       // Show diagnosis as the name if available
@@ -314,6 +346,7 @@ export function CareJourneyDetail({ item, patientId, onClose }: CareJourneyDetai
         {item.kind === "procedure" && <ProcedureDetail proc={item.data as ProcedureMarker} />}
         {item.kind === "encounter" && <EncounterFullDetail patientId={patientId} enc={item.data as EncounterMarker} />}
         {item.kind === "diagnostic_report" && <DiagnosticReportDetail report={item.data as DiagnosticReportItem} />}
+        {item.kind === "clinical_note" && <ClinicalNoteDetail note={item.data as ClinicalNoteItem} />}
       </div>
     </div>
   );

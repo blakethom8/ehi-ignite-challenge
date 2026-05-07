@@ -26,6 +26,7 @@ import { AgentSettingsPanel } from "../../components/AgentSettingsPanel";
 import { useChatForPatient } from "../../context/ChatContext";
 import type { ChatMessage } from "../../context/ChatContext";
 import type {
+  PatientOverview,
   ProviderAssistantResponse,
   ProviderAssistantContextPackage,
   TraceDetail,
@@ -645,6 +646,9 @@ function ContextPackagePreviewModal({
 function SessionContextPanel({
   openTab,
   onTabChange,
+  overview,
+  overviewError,
+  hasPatient,
   activePackages,
   onTogglePackage,
   messages,
@@ -658,6 +662,9 @@ function SessionContextPanel({
 }: {
   openTab: SessionPanelTab;
   onTabChange: (tab: SessionPanelTab) => void;
+  overview: PatientOverview | null | undefined;
+  overviewError: unknown;
+  hasPatient: boolean;
   activePackages: ProviderAssistantContextPackage[];
   onTogglePackage: (contextPackage: ProviderAssistantContextPackage) => void;
   messages: ChatMessage[];
@@ -729,6 +736,50 @@ function SessionContextPanel({
       {openTab === "context" && (
         <div className="flex-1 overflow-y-auto p-2.5">
           <div className="mb-2.5 grid gap-2">
+            <div
+              className={`rounded-xl border p-3 ${
+                !hasPatient || overviewError
+                  ? "border-amber-200 bg-amber-50"
+                  : overview
+                    ? "border-emerald-200 bg-emerald-50"
+                    : "border-slate-200 bg-white"
+              }`}
+            >
+              <p
+                className={`text-[10px] font-semibold uppercase tracking-wider ${
+                  !hasPatient || overviewError ? "text-amber-700" : overview ? "text-emerald-700" : "text-slate-500"
+                }`}
+              >
+                Chart scope
+              </p>
+              {!hasPatient ? (
+                <>
+                  <h3 className="mt-1 text-xs font-semibold text-[#1c1c1e]">No patient selected</h3>
+                  <p className="mt-1 text-[11px] leading-4 text-slate-600">
+                    Select a patient or workspace before asking chart-grounded questions.
+                  </p>
+                </>
+              ) : overview ? (
+                <>
+                  <h3 className="mt-1 truncate text-xs font-semibold text-[#1c1c1e]">{overview.name}</h3>
+                  <p className="mt-1 text-[11px] leading-4 text-slate-600">
+                    Active chart loaded with {overview.clinical_resource_count.toLocaleString()} clinical facts,{" "}
+                    {overview.unique_loinc_count.toLocaleString()} lab types, and{" "}
+                    {overview.encounter_count.toLocaleString()} encounters.
+                  </p>
+                </>
+              ) : overviewError ? (
+                <>
+                  <h3 className="mt-1 text-xs font-semibold text-[#1c1c1e]">Chart unavailable</h3>
+                  <p className="mt-1 text-[11px] leading-4 text-slate-600">{errorMessage(overviewError)}</p>
+                </>
+              ) : (
+                <>
+                  <h3 className="mt-1 text-xs font-semibold text-[#1c1c1e]">Loading chart</h3>
+                  <p className="mt-1 text-[11px] leading-4 text-slate-500">Resolving the selected workspace.</p>
+                </>
+              )}
+            </div>
             <div className="rounded-xl border border-slate-200 bg-white p-3">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-[#5b76fe]">Agent profile</p>
               <h3 className="mt-1 text-xs font-semibold text-[#1c1c1e]">General chart review</h3>
@@ -1119,11 +1170,12 @@ export function ExplorerAssistant() {
   const [sessionPanelTab, setSessionPanelTab] = useState<SessionPanelTab>("context");
   const [selectedToolLog, setSelectedToolLog] = useState<SelectedToolLog | null>(null);
 
-  const { data: overview } = useQuery({
+  const overviewQuery = useQuery({
     queryKey: ["overview", patientId],
     queryFn: () => api.getOverview(patientId!),
     enabled: !!patientId,
   });
+  const overview = overviewQuery.data;
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -1324,6 +1376,9 @@ export function ExplorerAssistant() {
       <SessionContextPanel
         openTab={sessionPanelTab}
         onTabChange={setSessionPanelTab}
+        overview={overview}
+        overviewError={overviewQuery.error}
+        hasPatient={hasPatient}
         activePackages={chat.contextPackages}
         onTogglePackage={chat.toggleContextPackage}
         messages={chat.messages}

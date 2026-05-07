@@ -1,3 +1,4 @@
+import { Suspense, lazy, type ComponentType } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
@@ -8,47 +9,67 @@ import { Landing } from "./pages/Landing";
 import { PlatformArchitecture } from "./pages/PlatformArchitecture";
 import { PatientRecordPool } from "./pages/PatientRecordPool";
 import { GuidedTour } from "./pages/GuidedTour";
-import { PlatformEntry } from "./pages/PlatformEntry";
-import { ExplorerOverview } from "./pages/Explorer/Overview";
-import { ExplorerTimeline } from "./pages/Explorer/Timeline";
-import { ExplorerCorpus } from "./pages/Explorer/Corpus";
-import { ExplorerSafety } from "./pages/Explorer/Safety";
-import { ExplorerImmunizations } from "./pages/Explorer/Immunizations";
-import { ExplorerConditions } from "./pages/Explorer/Conditions";
-import { ExplorerProcedures } from "./pages/Explorer/Procedures";
-import { ExplorerClearance } from "./pages/Explorer/Clearance";
-import { ExplorerAnesthesia } from "./pages/Explorer/Anesthesia";
-import { ExplorerDistributions } from "./pages/Explorer/Distributions";
-import { ExplorerInteractions } from "./pages/Explorer/Interactions";
-import { ExplorerAssistant } from "./pages/Explorer/Assistant";
-import { ExplorerCareJourney } from "./pages/Explorer/CareJourney";
-import { ExplorerPatientData } from "./pages/Explorer/PatientData";
-import { ExplorerHistory } from "./pages/Explorer/History";
-import { PatientJourney } from "./pages/Journey/PatientJourney";
-import { PatientRecordOverview } from "./pages/Modules/PatientRecordOverview";
-import { PreOpOverview } from "./pages/Modules/PreOpOverview";
-import { ClinicalTrials } from "./pages/Modules/ClinicalTrials";
-import { MedicationAccess } from "./pages/Modules/MedicationAccess";
-import { Marketplace } from "./pages/Modules/Marketplace";
-import { MarketplaceConcept } from "./pages/Modules/MarketplaceConcept";
-import { DataSharing } from "./pages/Modules/DataSharing";
-import { DataCatalog } from "./pages/Modules/DataCatalog";
-import { PublishReadinessPage } from "./pages/Modules/DataAggregator/PublishReadinessPage";
-import { SourceIntakePage } from "./pages/Modules/DataAggregator/SourceIntakePage";
-import { WorkspaceLibraryPage } from "./pages/Modules/DataAggregator/WorkspaceLibraryPage";
-import { HarmonizeView } from "./pages/Modules/HarmonizeView";
-import { ClinicalInsights } from "./pages/Modules/ClinicalInsights";
-import { LabExplainer } from "./pages/Modules/LabExplainer";
-import { TrialFinder } from "./pages/Modules/TrialFinder";
-import { PatientMemoryView } from "./pages/Modules/PatientMemoryView";
-import { PatientContext } from "./pages/Modules/PatientContext";
-import { AggregationMethodology } from "./pages/Modules/AggregationMethodology";
-import { AnalysisOverview } from "./pages/Analysis/Overview";
-import { AnalysisMethodology } from "./pages/Analysis/Methodology";
-import { AnalysisDefinitions } from "./pages/Analysis/Definitions";
-import { AnalysisCoverage } from "./pages/Analysis/Coverage";
-import { AnalysisFlightSchool } from "./pages/Analysis/FlightSchool";
-import { AnalysisFhirPrimer } from "./pages/Analysis/FhirPrimer";
+
+function lazyNamed<TModule extends Record<string, unknown>>(
+  loader: () => Promise<TModule>,
+  exportName: keyof TModule,
+) {
+  return lazy(async () => {
+    const module = await loader();
+    return { default: module[exportName] as ComponentType };
+  });
+}
+
+function PageFallback() {
+  return (
+    <div className="flex min-h-[360px] items-center justify-center p-8">
+      <div className="h-12 w-12 rounded-full border-4 border-[#dfe4ea] border-t-[#5b76fe]" />
+    </div>
+  );
+}
+
+const PlatformEntry = lazyNamed(() => import("./pages/PlatformEntry"), "PlatformEntry");
+const ExplorerOverview = lazyNamed(() => import("./pages/Explorer/Overview"), "ExplorerOverview");
+const ExplorerTimeline = lazyNamed(() => import("./pages/Explorer/Timeline"), "ExplorerTimeline");
+const ExplorerCorpus = lazyNamed(() => import("./pages/Explorer/Corpus"), "ExplorerCorpus");
+const ExplorerSafety = lazyNamed(() => import("./pages/Explorer/Safety"), "ExplorerSafety");
+const ExplorerImmunizations = lazyNamed(() => import("./pages/Explorer/Immunizations"), "ExplorerImmunizations");
+const ExplorerConditions = lazyNamed(() => import("./pages/Explorer/Conditions"), "ExplorerConditions");
+const ExplorerProcedures = lazyNamed(() => import("./pages/Explorer/Procedures"), "ExplorerProcedures");
+const ExplorerClearance = lazyNamed(() => import("./pages/Explorer/Clearance"), "ExplorerClearance");
+const ExplorerAnesthesia = lazyNamed(() => import("./pages/Explorer/Anesthesia"), "ExplorerAnesthesia");
+const ExplorerDistributions = lazyNamed(() => import("./pages/Explorer/Distributions"), "ExplorerDistributions");
+const ExplorerInteractions = lazyNamed(() => import("./pages/Explorer/Interactions"), "ExplorerInteractions");
+const ExplorerAssistant = lazyNamed(() => import("./pages/Explorer/Assistant"), "ExplorerAssistant");
+const ExplorerCareJourney = lazyNamed(() => import("./pages/Explorer/CareJourney"), "ExplorerCareJourney");
+const ExplorerPatientData = lazyNamed(() => import("./pages/Explorer/PatientData"), "ExplorerPatientData");
+const ExplorerHistory = lazyNamed(() => import("./pages/Explorer/History"), "ExplorerHistory");
+const ExplorerLabs = lazyNamed(() => import("./pages/Explorer/Labs"), "ExplorerLabs");
+const PatientJourney = lazyNamed(() => import("./pages/Journey/PatientJourney"), "PatientJourney");
+const PatientRecordOverview = lazyNamed(() => import("./pages/Modules/PatientRecordOverview"), "PatientRecordOverview");
+const PreOpOverview = lazyNamed(() => import("./pages/Modules/PreOpOverview"), "PreOpOverview");
+const ClinicalTrials = lazyNamed(() => import("./pages/Modules/ClinicalTrials"), "ClinicalTrials");
+const MedicationAccess = lazyNamed(() => import("./pages/Modules/MedicationAccess"), "MedicationAccess");
+const Marketplace = lazyNamed(() => import("./pages/Modules/Marketplace"), "Marketplace");
+const MarketplaceConcept = lazyNamed(() => import("./pages/Modules/MarketplaceConcept"), "MarketplaceConcept");
+const DataSharing = lazyNamed(() => import("./pages/Modules/DataSharing"), "DataSharing");
+const DataCatalog = lazyNamed(() => import("./pages/Modules/DataCatalog"), "DataCatalog");
+const PublishReadinessPage = lazyNamed(() => import("./pages/Modules/DataAggregator/PublishReadinessPage"), "PublishReadinessPage");
+const SourceIntakePage = lazyNamed(() => import("./pages/Modules/DataAggregator/SourceIntakePage"), "SourceIntakePage");
+const WorkspaceLibraryPage = lazyNamed(() => import("./pages/Modules/DataAggregator/WorkspaceLibraryPage"), "WorkspaceLibraryPage");
+const HarmonizeView = lazyNamed(() => import("./pages/Modules/HarmonizeView"), "HarmonizeView");
+const ClinicalInsights = lazyNamed(() => import("./pages/Modules/ClinicalInsights"), "ClinicalInsights");
+const LabExplainer = lazyNamed(() => import("./pages/Modules/LabExplainer"), "LabExplainer");
+const TrialFinder = lazyNamed(() => import("./pages/Modules/TrialFinder"), "TrialFinder");
+const PatientMemoryView = lazyNamed(() => import("./pages/Modules/PatientMemoryView"), "PatientMemoryView");
+const PatientContext = lazyNamed(() => import("./pages/Modules/PatientContext"), "PatientContext");
+const AggregationMethodology = lazyNamed(() => import("./pages/Modules/AggregationMethodology"), "AggregationMethodology");
+const AnalysisOverview = lazyNamed(() => import("./pages/Analysis/Overview"), "AnalysisOverview");
+const AnalysisMethodology = lazyNamed(() => import("./pages/Analysis/Methodology"), "AnalysisMethodology");
+const AnalysisDefinitions = lazyNamed(() => import("./pages/Analysis/Definitions"), "AnalysisDefinitions");
+const AnalysisCoverage = lazyNamed(() => import("./pages/Analysis/Coverage"), "AnalysisCoverage");
+const AnalysisFlightSchool = lazyNamed(() => import("./pages/Analysis/FlightSchool"), "AnalysisFlightSchool");
+const AnalysisFhirPrimer = lazyNamed(() => import("./pages/Analysis/FhirPrimer"), "AnalysisFhirPrimer");
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -86,6 +107,7 @@ export default function App() {
     { path: "/marketplace/publish", element: <MarketplaceConcept /> },
     { path: "/explorer", element: <ExplorerOverview /> },
     { path: "/explorer/timeline", element: <ExplorerTimeline /> },
+    { path: "/explorer/labs", element: <ExplorerLabs /> },
     { path: "/explorer/history", element: <ExplorerHistory /> },
     { path: "/explorer/care-journey", element: <ExplorerCareJourney /> },
     { path: "/explorer/corpus", element: <ExplorerCorpus /> },
@@ -136,7 +158,13 @@ export default function App() {
                 <Route
                   key={route.path}
                   path={route.path}
-                  element={<Layout>{route.element}</Layout>}
+                  element={
+                    <Layout>
+                      <Suspense fallback={<PageFallback />}>
+                        {route.element}
+                      </Suspense>
+                    </Layout>
+                  }
                 />
               ))}
             </Routes>

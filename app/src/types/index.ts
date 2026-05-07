@@ -102,6 +102,7 @@ export interface EncounterTypeSummary {
 
 export interface CareTeamSummaryItem {
   name: string;
+  specialty?: string;
   organizations: string[];
   encounter_count: number;
   latest_encounter_dt: string | null;
@@ -110,6 +111,7 @@ export interface CareTeamSummaryItem {
 
 export interface SiteOfServiceSummaryItem {
   name: string;
+  specialty?: string;
   provider_count: number;
   encounter_count: number;
   latest_encounter_dt: string | null;
@@ -171,10 +173,14 @@ export interface EncounterEvent {
   end: string | null;
   provider_org: string;
   practitioner_name: string;
+  specialty: string;
+  source_category: string;
+  provenance_label: string;
   linked_observation_count: number;
   linked_condition_count: number;
   linked_procedure_count: number;
   linked_medication_count: number;
+  linked_clinical_note_count: number;
 }
 
 export interface TimelineResponse {
@@ -248,17 +254,23 @@ export interface EncounterDetail {
   duration_hours: number | null;
   provider_org: string;
   practitioner_name: string;
+  specialty: string;
+  source_category: string;
+  provenance_label: string;
   observations: ObservationDetail[];
   conditions: ConditionDetail[];
   procedures: ProcedureDetail[];
   medications: MedicationDetail[];
   diagnostic_report_count: number;
   imaging_study_count: number;
+  clinical_notes: ClinicalNoteItem[];
 }
 
 export interface LabHistoryPoint {
   effective_dt: string | null;
   value: number;
+  abnormality: "low" | "high" | "normal" | "unknown";
+  alert_severity: "critical" | "warning" | null;
 }
 
 export interface LabValue {
@@ -269,6 +281,12 @@ export interface LabValue {
   effective_dt: string | null;
   trend: "up" | "down" | "stable" | null;
   is_abnormal: boolean | null;
+  abnormality: "low" | "high" | "normal" | "unknown";
+  alert_severity: "critical" | "warning" | null;
+  reference_low: number | null;
+  reference_high: number | null;
+  reference_unit: string;
+  reference_range_label: string;
   history: LabHistoryPoint[];
 }
 
@@ -533,6 +551,37 @@ export interface EncounterMarker {
   diagnoses: string[];
 }
 
+export interface ClinicalNoteItem {
+  note_id: string;
+  source_id: string;
+  source_label: string;
+  resource_type: string;
+  resource_id: string;
+  note_index: number;
+  date: string | null;
+  author: string;
+  organization: string;
+  document_type: string;
+  category: string;
+  encounter_id: string | null;
+  linked_encounter_id: string | null;
+  linked_encounter_type: string;
+  linked_encounter_start: string | null;
+  provider: string;
+  site: string;
+  section_title: string;
+  attachment_content_type: string;
+  preview: string;
+  text: string;
+}
+
+export interface ClinicalNotesResponse {
+  patient_id: string;
+  name: string;
+  total_count: number;
+  notes: ClinicalNoteItem[];
+}
+
 export interface ProcedureMarker {
   procedure_id: string;
   display: string;
@@ -547,6 +596,8 @@ export interface DiagnosticReportItem {
   category: string;
   date: string | null;
   result_count: number;
+  has_presented_form: boolean;
+  note_preview: string;
 }
 
 export interface CareJourneyResponse {
@@ -559,6 +610,7 @@ export interface CareJourneyResponse {
   encounters: EncounterMarker[];
   procedures: ProcedureMarker[];
   diagnostic_reports: DiagnosticReportItem[];
+  clinical_notes: ClinicalNoteItem[];
   drug_classes_present: string[];
 }
 
@@ -942,6 +994,9 @@ export interface HarmonizeObservationSource {
   raw_unit: string | null;
   effective_date: string | null;
   document_reference: string | null;
+  reference_low?: number | null;
+  reference_high?: number | null;
+  reference_unit?: string | null;
 }
 
 export interface HarmonizeLatestObservation {
@@ -1034,7 +1089,57 @@ export interface HarmonizeContributionTotals {
   medications: number;
   allergies: number;
   immunizations: number;
+  encounters: number;
+  procedures: number;
+  diagnostic_reports: number;
+  clinical_notes: number;
   all: number;
+}
+
+export interface HarmonizeClinicalNote {
+  source_id: string;
+  source_label: string;
+  resource_type: string;
+  resource_id: string;
+  note_index: number;
+  encounter_id?: string | null;
+  date: string | null;
+  author?: string | null;
+  organization?: string | null;
+  document_type?: string | null;
+  category?: string | null;
+  time?: string | null;
+  section_title?: string | null;
+  attachment_content_type?: string | null;
+  text: string;
+}
+
+export interface HarmonizeClinicalArtifact {
+  source_id: string;
+  source_label: string;
+  id: string;
+  status: string;
+  display: string;
+  type: string;
+  reason: string;
+  category: string;
+  class_code: string;
+  period_start: string | null;
+  period_end: string | null;
+  performed_start: string | null;
+  performed_end: string | null;
+  effective_date: string | null;
+  encounter_id: string | null;
+  provider: string;
+  site: string;
+  service_provider: string;
+  performer_labels: string[];
+  performer_organization_labels: string[];
+  performer_practitioner_labels: string[];
+  specialty_labels: string[];
+  result_refs: string[];
+  has_presented_form: boolean;
+  note_preview: string;
 }
 
 export interface HarmonizeSourceDiffSourceTotals {
@@ -1074,6 +1179,10 @@ export interface HarmonizeContributionsResponse {
   medications: HarmonizeMergedMedication[];
   allergies: HarmonizeMergedAllergy[];
   immunizations: HarmonizeMergedImmunization[];
+  encounters: HarmonizeClinicalArtifact[];
+  procedures: HarmonizeClinicalArtifact[];
+  diagnostic_reports: HarmonizeClinicalArtifact[];
+  clinical_notes: HarmonizeClinicalNote[];
   totals: HarmonizeContributionTotals;
 }
 
@@ -1146,6 +1255,32 @@ export interface HarmonizeExtractItem {
   elapsed_seconds: number;
 }
 
+export interface HarmonizeExtractJobEvent {
+  event_id: string;
+  event_type:
+    | "job_queued"
+    | "file_queued"
+    | "job_started"
+    | "file_started"
+    | "file_completed"
+    | "job_completed"
+    | "job_failed";
+  created_at: string;
+  stage: string;
+  message: string;
+  source_id: string | null;
+  source_label: string | null;
+  page_start: number | null;
+  page_end: number | null;
+  page_count: number | null;
+  processed_pages: number;
+  total_pages: number | null;
+  processed_files: number;
+  total_files: number;
+  progress_basis: "lifecycle" | "metadata" | "reported" | "estimated";
+  is_estimate: boolean;
+}
+
 export interface HarmonizeExtractResponse {
   collection_id: string;
   extracted: HarmonizeExtractItem[];
@@ -1166,8 +1301,11 @@ export interface HarmonizeExtractJobResponse {
   processed_files: number;
   total_pages: number | null;
   processed_pages: number;
+  estimated_processed_pages?: number;
   current_source_label: string | null;
   estimated_seconds: number | null;
+  progress_mode: "reported" | "estimated" | "lifecycle";
+  events: HarmonizeExtractJobEvent[];
 }
 
 export interface HarmonizeRunFactCounts {
@@ -1223,13 +1361,52 @@ export interface HarmonizeRunReviewItem {
   resolved: boolean;
   decision: string | null;
   decision_notes: string;
+  selected_source_ref: string | null;
   resolved_at: string | null;
+}
+
+export interface HarmonizeReviewEvent {
+  event_id: string;
+  event_type: "review_decision";
+  collection_id: string | null;
+  run_id: string | null;
+  item_id: string;
+  category: string | null;
+  severity: string | null;
+  source_id: string | null;
+  resource_type: string | null;
+  merged_ref: string | null;
+  decision: string;
+  notes: string;
+  selected_source_ref: string | null;
+  resolved: boolean;
+  resolved_at: string | null;
+  created_at: string;
+  actor: string;
+  previous_decision: string | null;
+  previous_resolved: boolean;
+  previous_selected_source_ref: string | null;
+}
+
+export interface HarmonizeReviewDecisionSummary {
+  event_count: number;
+  resolved_item_count: number;
+  open_item_count: number;
+  latest_event_at: string | null;
+  decisions: Record<string, number>;
 }
 
 export interface HarmonizeReviewDecisionPayload {
   item_id: string;
-  decision: "accepted" | "dismissed" | "source_fixed" | "overridden";
+  decision:
+    | "accepted"
+    | "dismissed"
+    | "source_fixed"
+    | "overridden"
+    | "kept_separate"
+    | "deferred";
   notes?: string;
+  selected_source_ref?: string | null;
 }
 
 export interface HarmonizeRunResponse {
@@ -1244,12 +1421,24 @@ export interface HarmonizeRunResponse {
   sources: HarmonizeRunSource[];
   summary: HarmonizeRunSummary;
   review_items: HarmonizeRunReviewItem[];
+  review_events: HarmonizeReviewEvent[];
+  review_decision_summary: HarmonizeReviewDecisionSummary;
   artifact_path: string;
 }
 
 export interface HarmonizeRunStateResponse {
   collection_id: string;
   latest_run: HarmonizeRunResponse | null;
+}
+
+export interface PublishedChartChangeSummary {
+  previous_snapshot_id: string | null;
+  previous_run_id: string | null;
+  fact_delta: number;
+  source_delta: number;
+  review_item_delta: number;
+  candidate_count_delta: HarmonizeRunFactCounts;
+  headline: string;
 }
 
 export interface PublishedChartSnapshot {
@@ -1265,6 +1454,10 @@ export interface PublishedChartSnapshot {
   source_count: number;
   candidate_fact_count: number;
   review_item_count: number;
+  review_decision_summary: HarmonizeReviewDecisionSummary;
+  activated_at: string | null;
+  activated_from_snapshot_id: string | null;
+  change_summary: PublishedChartChangeSummary;
   is_active: boolean;
 }
 
@@ -1274,9 +1467,31 @@ export interface PublishedChartStateResponse {
   snapshots: PublishedChartSnapshot[];
 }
 
+export interface HarmonizeCanonicalSelectionLatest {
+  value?: number | string | null;
+  unit?: string | null;
+  source_label?: string | null;
+  effective_date?: string | null;
+}
+
+export interface HarmonizeCanonicalSelection {
+  applied?: boolean;
+  decision?: string | null;
+  review_item_id?: string | null;
+  resolved_at?: string | null;
+  notes?: string | null;
+  selected_source_ref?: string | null;
+  selected_source_label?: string | null;
+  selected_latest?: HarmonizeCanonicalSelectionLatest | null;
+  previous_latest?: HarmonizeCanonicalSelectionLatest | null;
+  warning?: string | null;
+  retains_all_source_values?: boolean;
+}
+
 export interface HarmonizeProvenanceResponse {
   collection_id: string;
   merged_ref: string;
+  canonical_selection?: HarmonizeCanonicalSelection | null;
   // FHIR Provenance dict — shape stable but free-form on the wire
   provenance: {
     resourceType: string;

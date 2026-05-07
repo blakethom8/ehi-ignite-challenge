@@ -5,16 +5,21 @@ import {
   CalendarDays,
   ChevronRight,
   Clock3,
+  FileText,
   Filter,
+  Info,
   List,
   Pill,
   Scissors,
   Syringe,
+  X,
 } from "lucide-react";
 import { api } from "../../api/client";
+import { ClinicalNoteReader, ClinicalNoteSummary, clinicalNoteActor, clinicalNoteTitle } from "../../components/ClinicalNoteReader";
 import { EmptyState } from "../../components/EmptyState";
 import type {
   CareJourneyResponse,
+  ClinicalNoteItem,
   EncounterEvent,
   ImmunizationItem,
   MedRow,
@@ -24,7 +29,7 @@ import type {
   TimelineResponse,
 } from "../../types";
 
-type HistoryTab = "encounters" | "medications" | "procedures" | "immunizations";
+type HistoryTab = "encounters" | "medications" | "procedures" | "immunizations" | "notes";
 type ViewMode = "timeline" | "table";
 type Tone = "blue" | "teal" | "amber" | "rose";
 
@@ -42,6 +47,7 @@ const TABS: Array<{ id: HistoryTab; label: string; icon: typeof CalendarDays }> 
   { id: "medications", label: "Medications", icon: Pill },
   { id: "procedures", label: "Procedures", icon: Scissors },
   { id: "immunizations", label: "Immunizations", icon: Syringe },
+  { id: "notes", label: "Notes", icon: FileText },
 ];
 
 const TONE_CLASS: Record<Tone, { dot: string; bg: string; text: string }> = {
@@ -87,17 +93,21 @@ function groupByYear(events: HistoryEvent[]): Array<{ year: string; events: Hist
     });
 }
 
+function encounterToHistoryEvent(encounter: EncounterEvent): HistoryEvent {
+  return {
+    id: encounter.encounter_id,
+    date: encounter.start,
+    title: encounter.reason_display || encounter.encounter_type || encounter.class_code || "Encounter",
+    meta: `${encounter.class_code || "Unknown"} encounter`,
+    detail: `${encounter.linked_observation_count} labs/vitals · ${encounter.linked_condition_count} conditions · ${encounter.linked_procedure_count} procedures`,
+    tone: (encounter.class_code === "EMER" ? "rose" : "blue") as Tone,
+  };
+}
+
 function encounterEvents(data: TimelineResponse | undefined): HistoryEvent[] {
   if (!data) return [];
   return data.encounters
-    .map((encounter: EncounterEvent) => ({
-      id: encounter.encounter_id,
-      date: encounter.start,
-      title: encounter.reason_display || encounter.encounter_type || encounter.class_code || "Encounter",
-      meta: `${encounter.class_code || "Unknown"} encounter`,
-      detail: `${encounter.linked_observation_count} labs/vitals · ${encounter.linked_condition_count} conditions · ${encounter.linked_procedure_count} procedures`,
-      tone: (encounter.class_code === "EMER" ? "rose" : "blue") as Tone,
-    }))
+    .map(encounterToHistoryEvent)
     .sort((a, b) => dateValue(b.date) - dateValue(a.date));
 }
 
@@ -159,6 +169,41 @@ function immunizationEvents(data: ImmunizationItem[] | undefined): HistoryEvent[
       tone: "teal" as const,
     }))
     .sort((a, b) => dateValue(b.date) - dateValue(a.date));
+}
+
+function noteEvents(data: ClinicalNoteItem[] | undefined): HistoryEvent[] {
+  if (!data) return [];
+  return data
+    .map((note) => ({
+      id: note.note_id,
+      date: note.date || note.linked_encounter_start,
+      title: note.document_type || note.resource_type || "Clinical note",
+      meta: note.linked_encounter_type || note.source_label || "Clinical note",
+      detail: note.preview || note.text,
+      tone: "blue" as const,
+    }))
+    .sort((a, b) => dateValue(b.date) - dateValue(a.date));
+}
+
+function noteEncounterLabel(note: ClinicalNoteItem): string {
+  return note.linked_encounter_type || (note.linked_encounter_id ? "Linked encounter" : "Not encounter-linked");
+}
+
+function noteEncounterMeta(note: ClinicalNoteItem): string {
+  const parts = [
+    note.linked_encounter_start ? fmtDate(note.linked_encounter_start) : null,
+    note.provider || note.author || null,
+    note.site || note.organization || null,
+  ].filter(Boolean);
+  return parts.join(" · ");
+}
+
+function noteDocumentFilterLabel(note: ClinicalNoteItem): string {
+  return note.resource_type || note.document_type || "Clinical note";
+}
+
+function noteSourceFilterLabel(note: ClinicalNoteItem): string {
+  return note.organization || note.site || note.source_label || "Source not captured";
 }
 
 function TimelineList({ events }: { events: HistoryEvent[] }) {
@@ -269,11 +314,171 @@ function resourceSummary(encounter: EncounterEvent): string {
     encounter.linked_condition_count ? `${encounter.linked_condition_count} Cond` : null,
     encounter.linked_procedure_count ? `${encounter.linked_procedure_count} Proc` : null,
     encounter.linked_medication_count ? `${encounter.linked_medication_count} Med` : null,
+    encounter.linked_clinical_note_count ? `${encounter.linked_clinical_note_count} Notes` : null,
   ].filter(Boolean);
   return parts.length > 0 ? parts.join(" / ") : "No linked resources";
 }
 
-function EncounterHistoryTable({ encounters }: { encounters: EncounterEvent[] }) {
+function encounterTypeLabel(encounter: EncounterEvent): string {
+  return encounter.encounter_type || encounter.reason_display || encounterClassLabel(encounter.class_code) || "Encounter";
+}
+
+function looksLikeSourceName(value: string | null | undefined): boolean {
+  if (!value) return false;
+  return /\.(json|pdf|csv|xml|txt)$/i.test(value) || /^[a-f0-9]{8,}-/i.test(value);
+}
+
+function friendlySourceName(value: string | null | undefined): string {
+  if (!value) return "Source unavailable";
+  return value.replace(/^[a-f0-9]{8,}-/i, "").replace(/_/g, " ");
+}
+
+function providerPrimaryLabel(encounter: EncounterEvent): string {
+  if (encounter.practitioner_name && !looksLikeSourceName(encounter.practitioner_name)) return encounter.practitioner_name;
+  if (encounter.provider_org && !looksLikeSourceName(encounter.provider_org)) return encounter.provider_org;
+  return "Provider not captured";
+}
+
+function providerSecondaryLabel(encounter: EncounterEvent): string {
+  const sourceCandidate = looksLikeSourceName(encounter.provider_org)
+    ? encounter.provider_org
+    : looksLikeSourceName(encounter.practitioner_name)
+      ? encounter.practitioner_name
+      : "";
+  if (sourceCandidate) return `Source: ${friendlySourceName(sourceCandidate)}`;
+  if (encounter.provider_org) return encounter.provider_org;
+  return "Site not captured";
+}
+
+function providerFilterLabel(encounter: EncounterEvent): string {
+  const primary = providerPrimaryLabel(encounter);
+  const secondary = providerSecondaryLabel(encounter).replace(/^Source: /, "");
+  if (!secondary || secondary === "Site not captured" || secondary === primary) return primary;
+  return `${primary} · ${secondary}`;
+}
+
+function EncounterDetailModal({
+  encounter,
+  onClose,
+}: {
+  encounter: EncounterEvent;
+  onClose: () => void;
+}) {
+  const resources = [
+    { label: "Observations", count: encounter.linked_observation_count },
+    { label: "Conditions", count: encounter.linked_condition_count },
+    { label: "Procedures", count: encounter.linked_procedure_count },
+    { label: "Medications", count: encounter.linked_medication_count },
+    { label: "Clinical notes", count: encounter.linked_clinical_note_count },
+  ];
+  const linkedTotal = resources.reduce((sum, item) => sum + item.count, 0);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[#101828]/35 px-4 py-8 backdrop-blur-[2px]">
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="encounter-detail-title"
+        className="w-full max-w-3xl overflow-hidden rounded-2xl border border-[#dfe4ea] bg-white shadow-2xl"
+      >
+        <header className="flex items-start justify-between gap-4 border-b border-[#eef0f5] px-5 py-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#087d75]">Encounter detail</p>
+            <h2 id="encounter-detail-title" className="mt-1 text-lg font-semibold text-[#1c1c1e]">
+              {encounterTypeLabel(encounter)}
+            </h2>
+            <p className="mt-1 text-sm text-[#667085]">{fmtDate(encounter.start)}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#dfe4ea] text-[#667085] hover:border-[#5b76fe] hover:text-[#5b76fe]"
+            aria-label="Close encounter detail"
+          >
+            <X size={16} />
+          </button>
+        </header>
+
+        <div className="space-y-4 p-5">
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="rounded-xl border border-[#e9eaef] bg-[#f9fafb] p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#98a2b3]">Provider / site</p>
+              <p className="mt-2 text-sm font-semibold text-[#1c1c1e]">{providerPrimaryLabel(encounter)}</p>
+              <p className="mt-1 text-xs leading-5 text-[#667085]">{providerSecondaryLabel(encounter)}</p>
+              {(encounter.specialty || encounter.source_category) && (
+                <p className="mt-2 text-xs font-medium text-[#4157d8]">
+                  {[encounter.specialty, encounter.source_category].filter(Boolean).join(" · ")}
+                </p>
+              )}
+            </div>
+            <div className="rounded-xl border border-[#e9eaef] bg-[#f9fafb] p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#98a2b3]">Encounter semantics</p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${encounterClassTone(encounter.class_code)}`}>
+                  {encounterClassLabel(encounter.class_code)}
+                </span>
+                {encounter.source_category && (
+                  <span className="rounded-full bg-[#eef1ff] px-2 py-0.5 text-xs font-semibold text-[#5b76fe]">
+                    {encounter.source_category}
+                  </span>
+                )}
+                <span className="text-xs text-[#667085]">{encounter.class_code || "No class code"}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-[#e9eaef]">
+            <div className="border-b border-[#eef0f5] px-4 py-3">
+              <p className="text-sm font-semibold text-[#1c1c1e]">Linked chart resources</p>
+              <p className="mt-1 text-xs text-[#667085]">
+                These counts show what the encounter can currently explain in the published chart.
+              </p>
+            </div>
+            {linkedTotal === 0 ? (
+              <div className="flex items-start gap-3 p-4 text-sm text-[#667085]">
+                <Info size={16} className="mt-0.5 shrink-0 text-[#f59e0b]" />
+                <p>
+                  No labs, conditions, procedures, medications, or clinical notes are linked to this encounter yet. This is a data-model gap to resolve in the harmonization layer, not a user decision.
+                </p>
+              </div>
+            ) : (
+              <div className="grid gap-2 p-4 sm:grid-cols-5">
+                {resources.map((item) => (
+                  <div key={item.label} className="rounded-lg border border-[#e9eaef] bg-white p-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#98a2b3]">{item.label}</p>
+                    <p className="mt-1 text-xl font-semibold text-[#1c1c1e]">{item.count}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <details className="rounded-xl border border-[#e9eaef] bg-[#f9fafb] p-4">
+            <summary className="cursor-pointer text-sm font-semibold text-[#475467]">Technical provenance</summary>
+            <dl className="mt-3 grid gap-2 text-xs text-[#667085]">
+              <div>
+                <dt className="font-semibold uppercase tracking-[0.12em] text-[#98a2b3]">Encounter ID</dt>
+                <dd className="mt-1 break-all font-mono">{encounter.encounter_id}</dd>
+              </div>
+              <div>
+                <dt className="font-semibold uppercase tracking-[0.12em] text-[#98a2b3]">Source label</dt>
+                <dd className="mt-1">{encounter.provenance_label || friendlySourceName(encounter.provider_org || encounter.practitioner_name)}</dd>
+              </div>
+            </dl>
+          </details>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function EncounterHistoryTable({
+  encounters,
+  onSelectEncounter,
+}: {
+  encounters: EncounterEvent[];
+  onSelectEncounter: (encounter: EncounterEvent) => void;
+}) {
   if (encounters.length === 0) {
     return (
       <div className="rounded-2xl border border-[#e9eaef] bg-white p-8 text-center text-sm text-[#6b7280]">
@@ -297,20 +502,147 @@ function EncounterHistoryTable({ encounters }: { encounters: EncounterEvent[] })
         </thead>
         <tbody>
           {encounters.map((encounter) => (
-            <tr key={encounter.encounter_id} className="border-b border-[#f0f1f5] last:border-0 hover:bg-[#fafafa]">
+            <tr
+              key={encounter.encounter_id}
+              tabIndex={0}
+              onClick={() => onSelectEncounter(encounter)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  onSelectEncounter(encounter);
+                }
+              }}
+              className="cursor-pointer border-b border-[#f0f1f5] last:border-0 hover:bg-[#fafafa] focus:bg-[#f4f6ff] focus:outline-none"
+            >
               <td className="whitespace-nowrap px-4 py-3 font-medium text-[#1c1c1e]">{fmtDate(encounter.start)}</td>
               <td className="px-4 py-3">
                 <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${encounterClassTone(encounter.class_code)}`}>
                   {encounterClassLabel(encounter.class_code)}
                 </span>
               </td>
-              <td className="px-4 py-3 text-[#475467]">{encounter.encounter_type || "Encounter"}</td>
+              <td className="px-4 py-3 text-[#475467]">{encounterTypeLabel(encounter)}</td>
               <td className="px-4 py-3 text-[#475467]">{encounter.reason_display || "-"}</td>
               <td className="px-4 py-3 text-[#475467]">
-                <div className="font-medium text-[#1c1c1e]">{encounter.practitioner_name || "Provider unknown"}</div>
-                <div className="mt-0.5 text-xs text-[#667085]">{encounter.provider_org || "Organization unknown"}</div>
+                <div className="font-medium text-[#1c1c1e]">{providerPrimaryLabel(encounter)}</div>
+                <div className="mt-0.5 text-xs text-[#667085]">{providerSecondaryLabel(encounter)}</div>
+                {(encounter.specialty || encounter.source_category) && (
+                  <div className="mt-1 text-xs text-[#4157d8]">
+                    {[encounter.specialty, encounter.source_category].filter(Boolean).join(" · ")}
+                  </div>
+                )}
               </td>
-              <td className="px-4 py-3 text-xs font-semibold text-[#5b76fe]">{resourceSummary(encounter)}</td>
+              <td className="px-4 py-3">
+                <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#5b76fe]">
+                  <FileText size={13} />
+                  {resourceSummary(encounter)}
+                </span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function NoteReaderModal({
+  note,
+  onClose,
+}: {
+  note: ClinicalNoteItem;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[#101828]/35 px-4 py-8 backdrop-blur-[2px]">
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="clinical-note-reader-title"
+        className="w-full max-w-4xl overflow-hidden rounded-2xl border border-[#dfe4ea] bg-white shadow-2xl"
+      >
+        <header className="flex items-start justify-between gap-4 border-b border-[#eef0f5] px-5 py-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#087d75]">Clinical note reader</p>
+            <h2 id="clinical-note-reader-title" className="mt-1 text-lg font-semibold text-[#1c1c1e]">
+              {clinicalNoteTitle(note)}
+            </h2>
+            <p className="mt-1 text-sm text-[#667085]">{clinicalNoteActor(note)}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#dfe4ea] text-[#667085] hover:border-[#5b76fe] hover:text-[#5b76fe]"
+            aria-label="Close clinical note reader"
+          >
+            <X size={16} />
+          </button>
+        </header>
+        <div className="max-h-[calc(100vh-10rem)] overflow-y-auto p-5">
+          <ClinicalNoteReader note={note} />
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function NoteReviewTable({
+  notes,
+  onSelectNote,
+}: {
+  notes: ClinicalNoteItem[];
+  onSelectNote: (note: ClinicalNoteItem) => void;
+}) {
+  if (notes.length === 0) {
+    return (
+      <div className="rounded-2xl border border-[#e9eaef] bg-white p-8 text-center text-sm text-[#6b7280]">
+        No clinical notes match the current search.
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-hidden rounded-2xl border border-[#e9eaef] bg-white shadow-sm">
+      <table className="w-full min-w-[980px] text-sm">
+        <thead>
+          <tr className="border-b border-[#e9eaef] bg-[#f9fafb] text-left text-xs uppercase tracking-[0.12em] text-[#a5a8b5]">
+            <th className="px-4 py-3 font-semibold">Date</th>
+            <th className="px-4 py-3 font-semibold">Document</th>
+            <th className="px-4 py-3 font-semibold">Encounter link</th>
+            <th className="px-4 py-3 font-semibold">Author / source</th>
+            <th className="px-4 py-3 font-semibold">Preview</th>
+          </tr>
+        </thead>
+        <tbody>
+          {notes.map((note) => (
+            <tr key={note.note_id} className="border-b border-[#f0f1f5] last:border-0 align-top hover:bg-[#fafafa]">
+              <td className="whitespace-nowrap px-4 py-3 font-medium text-[#1c1c1e]">
+                {fmtDate(note.date || note.linked_encounter_start)}
+              </td>
+              <td className="px-4 py-3">
+                <div className="font-medium text-[#1c1c1e]">{clinicalNoteTitle(note)}</div>
+                <div className="mt-0.5 text-xs text-[#667085]">
+                  {note.section_title || note.category || note.resource_type}
+                </div>
+              </td>
+              <td className="px-4 py-3 text-[#475467]">
+                {note.linked_encounter_id ? (
+                  <div>
+                    <div className="font-medium text-[#1c1c1e]">{noteEncounterLabel(note)}</div>
+                    {noteEncounterMeta(note) && (
+                      <div className="mt-0.5 text-xs leading-5 text-[#667085]">{noteEncounterMeta(note)}</div>
+                    )}
+                  </div>
+                ) : (
+                  <span className="text-[#98a2b3]">Not encounter-linked</span>
+                )}
+              </td>
+              <td className="px-4 py-3 text-[#475467]">
+                <div className="font-medium text-[#1c1c1e]">{clinicalNoteActor(note)}</div>
+                <div className="mt-0.5 text-xs text-[#667085]">{note.organization || note.site || note.source_label}</div>
+              </td>
+              <td className="px-4 py-3 text-[#475467]">
+                <ClinicalNoteSummary note={note} onOpen={onSelectNote} />
+              </td>
             </tr>
           ))}
         </tbody>
@@ -324,7 +656,14 @@ export function ExplorerHistory() {
   const patientId = params.get("patient");
   const [tab, setTab] = useState<HistoryTab>("encounters");
   const [view, setView] = useState<ViewMode>("table");
-  const [classFilter, setClassFilter] = useState<string>("all");
+  const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [providerFilter, setProviderFilter] = useState<string>("all");
+  const [noteQuery, setNoteQuery] = useState("");
+  const [noteTypeFilter, setNoteTypeFilter] = useState<string>("all");
+  const [noteSourceFilter, setNoteSourceFilter] = useState<string>("all");
+  const [noteLinkFilter, setNoteLinkFilter] = useState<"all" | "linked" | "unlinked">("all");
+  const [selectedEncounter, setSelectedEncounter] = useState<EncounterEvent | null>(null);
+  const [selectedNote, setSelectedNote] = useState<ClinicalNoteItem | null>(null);
 
   const timelineQ = useQuery({
     queryKey: ["timeline", patientId],
@@ -352,6 +691,11 @@ export function ExplorerHistory() {
     queryFn: () => api.getImmunizations(patientId!),
     enabled: !!patientId && tab === "immunizations",
   });
+  const clinicalNotesQ = useQuery({
+    queryKey: ["clinical-notes", patientId],
+    queryFn: () => api.getClinicalNotes(patientId!),
+    enabled: !!patientId && tab === "notes",
+  });
 
   const eventsByTab = useMemo<Record<HistoryTab, HistoryEvent[]>>(() => {
     const medicationEpisodes = careQ.isSuccess ? medicationEpisodeEvents(careQ.data) : [];
@@ -363,8 +707,9 @@ export function ExplorerHistory() {
           : medicationCatalogEvents(overviewQ.data),
       procedures: procedureEvents(proceduresQ.data?.procedures),
       immunizations: immunizationEvents(immunizationsQ.data?.immunizations),
+      notes: noteEvents(clinicalNotesQ.data?.notes),
     };
-  }, [careQ.data, careQ.isSuccess, immunizationsQ.data, overviewQ.data, proceduresQ.data, timelineQ.data]);
+  }, [careQ.data, careQ.isSuccess, clinicalNotesQ.data, immunizationsQ.data, overviewQ.data, proceduresQ.data, timelineQ.data]);
 
   const tabCounts = useMemo<Record<HistoryTab, number | null>>(
     () => ({
@@ -375,8 +720,9 @@ export function ExplorerHistory() {
           : overviewQ.data?.medications.length ?? null,
       procedures: proceduresQ.data?.total_count ?? null,
       immunizations: immunizationsQ.data?.total_count ?? null,
+      notes: clinicalNotesQ.data?.total_count ?? null,
     }),
-    [careQ.data, careQ.isSuccess, immunizationsQ.data, overviewQ.data, proceduresQ.data, timelineQ.data],
+    [careQ.data, careQ.isSuccess, clinicalNotesQ.data, immunizationsQ.data, overviewQ.data, proceduresQ.data, timelineQ.data],
   );
 
   const medicationHasData = (careQ.isSuccess && medicationEpisodeEvents(careQ.data).length > 0) || !!overviewQ.data;
@@ -387,7 +733,9 @@ export function ExplorerHistory() {
         ? overviewQ.isLoading && !medicationHasData
         : tab === "procedures"
           ? proceduresQ.isLoading
-          : immunizationsQ.isLoading;
+          : tab === "immunizations"
+            ? immunizationsQ.isLoading
+            : clinicalNotesQ.isLoading;
   const isError =
     tab === "encounters"
       ? timelineQ.isError
@@ -395,18 +743,69 @@ export function ExplorerHistory() {
         ? overviewQ.isError && !medicationHasData
         : tab === "procedures"
           ? proceduresQ.isError
-          : immunizationsQ.isError;
-  const patientName = timelineQ.data?.name || careQ.data?.name || overviewQ.data?.name || proceduresQ.data?.name || immunizationsQ.data?.name || "Patient";
-  const currentEvents = eventsByTab[tab];
-  const encounterClassOptions = Array.from(new Set((timelineQ.data?.encounters ?? []).map((encounter) => encounter.class_code || "Unknown")))
+          : tab === "immunizations"
+            ? immunizationsQ.isError
+            : clinicalNotesQ.isError;
+  const patientName = timelineQ.data?.name || careQ.data?.name || overviewQ.data?.name || proceduresQ.data?.name || immunizationsQ.data?.name || clinicalNotesQ.data?.name || "Patient";
+  const encounterTypeOptions = Array.from(new Set((timelineQ.data?.encounters ?? []).map((encounter) => encounterTypeLabel(encounter))))
     .sort((a, b) => a.localeCompare(b));
-  const effectiveClassFilter =
-    classFilter === "all" || encounterClassOptions.includes(classFilter)
-      ? classFilter
+  const encounterProviderOptions = Array.from(new Set((timelineQ.data?.encounters ?? []).map(providerFilterLabel)))
+    .sort((a, b) => a.localeCompare(b));
+  const effectiveTypeFilter =
+    typeFilter === "all" || encounterTypeOptions.includes(typeFilter)
+      ? typeFilter
+      : "all";
+  const effectiveProviderFilter =
+    providerFilter === "all" || encounterProviderOptions.includes(providerFilter)
+      ? providerFilter
       : "all";
   const currentEncounters = (timelineQ.data?.encounters ?? [])
-    .filter((encounter) => effectiveClassFilter === "all" || (encounter.class_code || "Unknown") === effectiveClassFilter)
+    .filter((encounter) => effectiveTypeFilter === "all" || encounterTypeLabel(encounter) === effectiveTypeFilter)
+    .filter((encounter) => effectiveProviderFilter === "all" || providerFilterLabel(encounter) === effectiveProviderFilter)
     .sort((a, b) => dateValue(b.start) - dateValue(a.start));
+  const currentEvents =
+    tab === "encounters"
+      ? currentEncounters.map(encounterToHistoryEvent)
+      : eventsByTab[tab];
+  const noteTypeOptions = Array.from(new Set((clinicalNotesQ.data?.notes ?? []).map(noteDocumentFilterLabel)))
+    .sort((a, b) => a.localeCompare(b));
+  const noteSourceOptions = Array.from(new Set((clinicalNotesQ.data?.notes ?? []).map(noteSourceFilterLabel)))
+    .sort((a, b) => a.localeCompare(b));
+  const effectiveNoteTypeFilter =
+    noteTypeFilter === "all" || noteTypeOptions.includes(noteTypeFilter)
+      ? noteTypeFilter
+      : "all";
+  const effectiveNoteSourceFilter =
+    noteSourceFilter === "all" || noteSourceOptions.includes(noteSourceFilter)
+      ? noteSourceFilter
+      : "all";
+  const hasNoteFilters =
+    noteQuery.trim().length > 0
+    || effectiveNoteTypeFilter !== "all"
+    || effectiveNoteSourceFilter !== "all"
+    || noteLinkFilter !== "all";
+  const filteredNotes = useMemo(() => {
+    const normalized = noteQuery.trim().toLowerCase();
+    const notes = clinicalNotesQ.data?.notes ?? [];
+    return notes.filter((note) => {
+      if (effectiveNoteTypeFilter !== "all" && noteDocumentFilterLabel(note) !== effectiveNoteTypeFilter) return false;
+      if (effectiveNoteSourceFilter !== "all" && noteSourceFilterLabel(note) !== effectiveNoteSourceFilter) return false;
+      if (noteLinkFilter === "linked" && !note.linked_encounter_id) return false;
+      if (noteLinkFilter === "unlinked" && note.linked_encounter_id) return false;
+      if (!normalized) return true;
+      return [
+        note.document_type,
+        note.resource_type,
+        note.author,
+        note.organization,
+        note.site,
+        note.source_label,
+        note.linked_encounter_type,
+        note.preview,
+        note.text,
+      ].join(" ").toLowerCase().includes(normalized);
+    });
+  }, [clinicalNotesQ.data, effectiveNoteSourceFilter, effectiveNoteTypeFilter, noteLinkFilter, noteQuery]);
 
   if (!patientId) {
     return (
@@ -500,36 +899,159 @@ export function ExplorerHistory() {
       </div>
 
       {tab === "encounters" && (
-        <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-[#e9eaef] bg-white px-3 py-2 shadow-sm">
-          <div className="inline-flex items-center gap-1.5 px-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#98a2b3]">
-            <Filter size={13} />
-            Class
+        <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-[#e9eaef] bg-white px-3 py-2 shadow-sm">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex items-center gap-1.5 px-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#98a2b3]">
+              <Filter size={13} />
+              Type
+            </div>
+            {["all", ...encounterTypeOptions].map((typeOption) => (
+              <button
+                key={typeOption}
+                type="button"
+                onClick={() => setTypeFilter(typeOption)}
+                className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  effectiveTypeFilter === typeOption
+                    ? "bg-[#eef1ff] text-[#5b76fe]"
+                    : "bg-[#f9fafb] text-[#667085] hover:bg-[#f2f4f7]"
+                }`}
+              >
+                {typeOption === "all" ? "All" : typeOption}
+              </button>
+            ))}
           </div>
-          {["all", ...encounterClassOptions].map((classCode) => (
-            <button
-              key={classCode}
-              type="button"
-              onClick={() => setClassFilter(classCode)}
-              className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
-                effectiveClassFilter === classCode
-                  ? "bg-[#eef1ff] text-[#5b76fe]"
-                  : "bg-[#f9fafb] text-[#667085] hover:bg-[#f2f4f7]"
-              }`}
+          <label className="ml-auto flex min-w-[240px] items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-[#98a2b3]">
+            Provider / site
+            <select
+              value={effectiveProviderFilter}
+              onChange={(event) => setProviderFilter(event.target.value)}
+              className="min-w-0 flex-1 rounded-lg border border-[#dfe4ea] bg-white px-2 py-1.5 text-xs font-medium normal-case tracking-normal text-[#475467] outline-none focus:border-[#5b76fe]"
             >
-              {classCode === "all" ? "All" : encounterClassLabel(classCode)}
-            </button>
-          ))}
+              <option value="all">All providers and sites</option>
+              {encounterProviderOptions.map((providerOption) => (
+                <option key={providerOption} value={providerOption}>
+                  {providerOption}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
       )}
 
-      {tab === "encounters" && view === "table" ? (
+      {tab === "notes" && (
+        <div className="flex flex-col gap-3 rounded-2xl border border-[#e9eaef] bg-white px-3 py-3 shadow-sm">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+            <p className="text-sm font-semibold text-[#1c1c1e]">Clinical note review</p>
+            <p className="mt-1 text-xs leading-5 text-[#667085]">
+              Narrative artifacts from the active published chart snapshot, grouped back to encounters when the source supplied that link.
+            </p>
+            </div>
+            <label className="relative block w-full lg:w-80">
+              <FileText size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#98a2b3]" />
+              <input
+                value={noteQuery}
+                onChange={(event) => setNoteQuery(event.target.value)}
+                placeholder="Search notes, source, author, encounter"
+                className="h-10 w-full rounded-lg border border-[#d9dee8] bg-white pl-9 pr-3 text-sm outline-none focus:border-[#5b76fe] focus:ring-2 focus:ring-[#5b76fe]/20"
+              />
+            </label>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 border-t border-[#eef0f5] pt-3">
+            <div className="inline-flex items-center gap-1.5 px-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#98a2b3]">
+              <Filter size={13} />
+              Filters
+            </div>
+            <label className="flex min-w-[200px] flex-1 items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-[#98a2b3] sm:flex-none">
+              Type
+              <select
+                value={effectiveNoteTypeFilter}
+                onChange={(event) => setNoteTypeFilter(event.target.value)}
+                className="min-w-0 flex-1 rounded-lg border border-[#dfe4ea] bg-white px-2 py-1.5 text-xs font-medium normal-case tracking-normal text-[#475467] outline-none focus:border-[#5b76fe]"
+              >
+                <option value="all">All note types</option>
+                {noteTypeOptions.map((typeOption) => (
+                  <option key={typeOption} value={typeOption}>
+                    {typeOption}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex min-w-[220px] flex-1 items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-[#98a2b3]">
+              Source
+              <select
+                value={effectiveNoteSourceFilter}
+                onChange={(event) => setNoteSourceFilter(event.target.value)}
+                className="min-w-0 flex-1 rounded-lg border border-[#dfe4ea] bg-white px-2 py-1.5 text-xs font-medium normal-case tracking-normal text-[#475467] outline-none focus:border-[#5b76fe]"
+              >
+                <option value="all">All sources</option>
+                {noteSourceOptions.map((sourceOption) => (
+                  <option key={sourceOption} value={sourceOption}>
+                    {sourceOption}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="flex rounded-lg border border-[#dfe4ea] bg-[#f9fafb] p-1">
+              {[
+                ["all", "All links"],
+                ["linked", "Linked"],
+                ["unlinked", "Unlinked"],
+              ].map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setNoteLinkFilter(value as "all" | "linked" | "unlinked")}
+                  className={`rounded-md px-2.5 py-1 text-xs font-semibold ${
+                    noteLinkFilter === value ? "bg-white text-[#1c1c1e] shadow-sm" : "text-[#667085]"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {hasNoteFilters && (
+              <button
+                type="button"
+                onClick={() => {
+                  setNoteQuery("");
+                  setNoteTypeFilter("all");
+                  setNoteSourceFilter("all");
+                  setNoteLinkFilter("all");
+                }}
+                className="rounded-lg border border-[#dfe4ea] px-2.5 py-1.5 text-xs font-semibold text-[#667085] hover:border-[#5b76fe] hover:text-[#5b76fe]"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {tab === "notes" ? (
         <div className="overflow-x-auto">
-          <EncounterHistoryTable encounters={currentEncounters} />
+          <NoteReviewTable notes={filteredNotes} onSelectNote={setSelectedNote} />
+        </div>
+      ) : tab === "encounters" && view === "table" ? (
+        <div className="overflow-x-auto">
+          <EncounterHistoryTable encounters={currentEncounters} onSelectEncounter={setSelectedEncounter} />
         </div>
       ) : view === "timeline" ? (
         <TimelineList events={currentEvents} />
       ) : (
         <TableView events={currentEvents} />
+      )}
+      {selectedEncounter && (
+        <EncounterDetailModal
+          encounter={selectedEncounter}
+          onClose={() => setSelectedEncounter(null)}
+        />
+      )}
+      {selectedNote && (
+        <NoteReaderModal
+          note={selectedNote}
+          onClose={() => setSelectedNote(null)}
+        />
       )}
     </main>
   );

@@ -562,6 +562,9 @@ function CareNetworkPanel({ overview }: { overview: PatientOverview }) {
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-[#1c1c1e]">{provider.name}</p>
+                  {provider.specialty && (
+                    <p className="mt-0.5 text-xs font-medium text-[#4157d8]">{provider.specialty}</p>
+                  )}
                   <p className="mt-0.5 truncate text-xs text-[#667085]">
                     {provider.organizations.join(", ") || "Organization unknown"}
                   </p>
@@ -590,6 +593,9 @@ function CareNetworkPanel({ overview }: { overview: PatientOverview }) {
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-[#1c1c1e]">{site.name}</p>
+                  {site.specialty && (
+                    <p className="mt-0.5 text-xs font-medium text-[#0f766e]">{site.specialty}</p>
+                  )}
                   <p className="mt-0.5 text-xs text-[#667085]">
                     {site.provider_count} provider{site.provider_count !== 1 ? "s" : ""} documented
                   </p>

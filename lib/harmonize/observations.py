@@ -95,6 +95,39 @@ def _extract_value_and_unit(obs: dict[str, Any]) -> tuple[float | None, str | No
     return v, u
 
 
+def _quantity_value(quantity: dict[str, Any] | None) -> float | None:
+    if not isinstance(quantity, dict):
+        return None
+    value = quantity.get("value")
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _quantity_unit(quantity: dict[str, Any] | None) -> str | None:
+    if not isinstance(quantity, dict):
+        return None
+    unit = quantity.get("unit") or quantity.get("code")
+    return str(unit) if unit else None
+
+
+def _extract_reference_range(obs: dict[str, Any]) -> tuple[float | None, float | None, str | None]:
+    for reference_range in obs.get("referenceRange") or []:
+        if not isinstance(reference_range, dict):
+            continue
+        low = reference_range.get("low")
+        high = reference_range.get("high")
+        low_value = _quantity_value(low)
+        high_value = _quantity_value(high)
+        if low_value is None and high_value is None:
+            continue
+        return low_value, high_value, _quantity_unit(low) or _quantity_unit(high)
+    return None, None, None
+
+
 def _extract_date(obs: dict[str, Any]) -> datetime | None:
     for key in ("effectiveDateTime", "effectiveInstant", "issued"):
         v = obs.get(key)
@@ -192,6 +225,7 @@ def merge_observations(
             edge_activity = "unit-normalize" if unit_converted else activity
 
             ref = _obs_ref(obs, bundle.label, idx)
+            reference_low, reference_high, reference_unit = _extract_reference_range(obs)
             source = ObservationSource(
                 source_label=bundle.label,
                 source_observation_ref=ref,
@@ -201,6 +235,9 @@ def merge_observations(
                 raw_unit=raw_unit,
                 effective_date=_extract_date(obs),
                 document_reference=bundle.document_reference,
+                reference_low=reference_low,
+                reference_high=reference_high,
+                reference_unit=reference_unit,
             )
 
             merged = by_key.get(key)

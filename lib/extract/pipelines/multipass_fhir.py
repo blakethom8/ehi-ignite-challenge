@@ -618,9 +618,10 @@ class MultiPassFHIRPipeline:
         for i in imm_extraction.immunizations:
             entries.append({"resource": self._immunization_to_fhir(i, common_meta_template, layout)})
 
-        # Lab Observations + LOINC code-resolution post-pass
+        # Lab Observations + LOINC + interpretation post-passes
         obs_extraction: LabObservationExtraction = per_pass.get("lab_observations") or LabObservationExtraction()
         loinc_sources = self._apply_loinc_post_pass(obs_extraction)
+        interp_sources = self._apply_interpretation_post_pass(obs_extraction)
         for o in obs_extraction.observations:
             entries.append(
                 {
@@ -630,6 +631,7 @@ class MultiPassFHIRPipeline:
                         layout,
                         doc_context,
                         loinc_resolution_source=loinc_sources.get(id(o)),
+                        interpretation_source=interp_sources.get(id(o)),
                     )
                 }
             )
@@ -866,6 +868,50 @@ class MultiPassFHIRPipeline:
             sources[id(o)] = f"lookup-table-{result.match_type}"
         return sources
 
+    def _apply_interpretation_post_pass(
+        self,
+        obs_extraction: "LabObservationExtraction",
+    ) -> dict[int, str]:
+        """Derive interpretation flag (H / L / N) from value vs reference range.
+
+        For each LabObservationEntry without an extraction-emitted flag but with
+        both a numeric value and at least one reference-range bound, compute
+        interpretation. Returns a dict mapping ``id(entry) → source``:
+
+        - ``"printed"`` — extraction emitted a flag (no change)
+        - ``"computed"`` — post-pass derived flag from numeric comparison
+        - ``"unknown"`` — couldn't compute (no value, or no range)
+
+        FHIR v3-ObservationInterpretation codes used:
+        - ``"H"`` — high (above reference_range_high)
+        - ``"L"`` — low (below reference_range_low)
+        - ``"N"`` — normal (within range)
+
+        Mutates entries in place by populating ``o.flag``.
+        """
+        sources: dict[int, str] = {}
+        for o in obs_extraction.observations:
+            if o.flag is not None:
+                sources[id(o)] = "printed"
+                continue
+            if o.value_quantity is None:
+                sources[id(o)] = "unknown"
+                continue
+            low = o.reference_range_low
+            high = o.reference_range_high
+            if low is None and high is None:
+                sources[id(o)] = "unknown"
+                continue
+            value = o.value_quantity
+            if low is not None and value < low:
+                o.flag = "L"
+            elif high is not None and value > high:
+                o.flag = "H"
+            else:
+                o.flag = "N"
+            sources[id(o)] = "computed"
+        return sources
+
     def _lab_observation_to_fhir(
         self,
         o: LabObservationEntry,
@@ -873,18 +919,27 @@ class MultiPassFHIRPipeline:
         layout,
         doc_context: DocumentContext,
         loinc_resolution_source: str | None = None,
+        interpretation_source: str | None = None,
     ) -> dict[str, Any]:
         bbox_locator = self._bbox_locator_for(o.test_name, o.page, layout)
         codings: list[dict[str, Any]] = []
         if o.loinc_code:
             codings.append({"system": "http://loinc.org", "code": o.loinc_code})
         meta = self._add_bbox_to_meta(common_meta, bbox_locator)
-        if loinc_resolution_source:
+        if loinc_resolution_source or interpretation_source:
             meta = {**meta, "extension": [*meta.get("extension", [])]}
+        if loinc_resolution_source:
             meta["extension"].append(
                 {
                     "url": "https://ehi-atlas.example/fhir/StructureDefinition/loinc-resolution",
                     "valueString": loinc_resolution_source,
+                }
+            )
+        if interpretation_source:
+            meta["extension"].append(
+                {
+                    "url": "https://ehi-atlas.example/fhir/StructureDefinition/interpretation-source",
+                    "valueString": interpretation_source,
                 }
             )
         resource: dict[str, Any] = {

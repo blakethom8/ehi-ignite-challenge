@@ -24,7 +24,11 @@ git pull origin master
 
 api_ready=0
 for _ in {1..90}; do
-  api_ip="$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' deploy_api_1 2>/dev/null || true)"
+  api_container="$("${COMPOSE[@]}" -f "$COMPOSE_FILE" ps -q api 2>/dev/null || true)"
+  api_ip=""
+  if [[ -n "$api_container" ]]; then
+    api_ip="$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$api_container" 2>/dev/null || true)"
+  fi
   if [[ -n "$api_ip" ]] && curl -fsS -H 'Host: ehi.healthcaredataai.com' "http://${api_ip}:8000/api/health" >/dev/null 2>&1; then
     api_ready=1
     break

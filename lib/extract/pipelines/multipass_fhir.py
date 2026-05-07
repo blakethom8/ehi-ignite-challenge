@@ -618,10 +618,21 @@ class MultiPassFHIRPipeline:
         for i in imm_extraction.immunizations:
             entries.append({"resource": self._immunization_to_fhir(i, common_meta_template, layout)})
 
-        # Lab Observations
+        # Lab Observations + LOINC code-resolution post-pass
         obs_extraction: LabObservationExtraction = per_pass.get("lab_observations") or LabObservationExtraction()
+        loinc_sources = self._apply_loinc_post_pass(obs_extraction)
         for o in obs_extraction.observations:
-            entries.append({"resource": self._lab_observation_to_fhir(o, common_meta_template, layout, doc_context)})
+            entries.append(
+                {
+                    "resource": self._lab_observation_to_fhir(
+                        o,
+                        common_meta_template,
+                        layout,
+                        doc_context,
+                        loinc_resolution_source=loinc_sources.get(id(o)),
+                    )
+                }
+            )
 
         bundle: dict[str, Any] = {
             "resourceType": "Bundle",
@@ -820,17 +831,62 @@ class MultiPassFHIRPipeline:
             resource["occurrenceDateTime"] = imm.administration_date
         return resource
 
+    def _apply_loinc_post_pass(
+        self,
+        obs_extraction: "LabObservationExtraction",
+    ) -> dict[int, str]:
+        """Resolve missing LOINC codes via the curated lookup table.
+
+        For each LabObservationEntry without a loinc_code, calls the matcher.
+        On hit, mutates the entry to populate loinc_code. Returns a dict mapping
+        ``id(entry) → resolution_source`` where source is one of:
+
+        - ``"manual"`` — extraction emitted a code already (no change)
+        - ``"lookup-table-exact"`` / ``"lookup-table-alias"`` / ``"lookup-table-fuzzy"``
+            — post-pass resolved via the matcher (match_type appended)
+        - ``"unmatched"`` — post-pass tried but found no candidate
+
+        No external calls. Safe to call repeatedly (idempotent for already-coded
+        entries).
+        """
+        # Lazy import to avoid pulling the table at module load time.
+        from lib.extract.terminology.loinc_matcher import match_loinc
+
+        sources: dict[int, str] = {}
+        for o in obs_extraction.observations:
+            if o.loinc_code:
+                sources[id(o)] = "manual"
+                continue
+            unit_hint = o.unit
+            result = match_loinc(o.test_name, unit_hint)
+            if result is None:
+                sources[id(o)] = "unmatched"
+                continue
+            o.loinc_code = result.code
+            sources[id(o)] = f"lookup-table-{result.match_type}"
+        return sources
+
     def _lab_observation_to_fhir(
         self,
         o: LabObservationEntry,
         common_meta: dict[str, Any],
         layout,
         doc_context: DocumentContext,
+        loinc_resolution_source: str | None = None,
     ) -> dict[str, Any]:
         bbox_locator = self._bbox_locator_for(o.test_name, o.page, layout)
         codings: list[dict[str, Any]] = []
         if o.loinc_code:
             codings.append({"system": "http://loinc.org", "code": o.loinc_code})
+        meta = self._add_bbox_to_meta(common_meta, bbox_locator)
+        if loinc_resolution_source:
+            meta = {**meta, "extension": [*meta.get("extension", [])]}
+            meta["extension"].append(
+                {
+                    "url": "https://ehi-atlas.example/fhir/StructureDefinition/loinc-resolution",
+                    "valueString": loinc_resolution_source,
+                }
+            )
         resource: dict[str, Any] = {
             "resourceType": "Observation",
             "subject": {"reference": f"Patient/{self._patient_id}"},
@@ -847,7 +903,7 @@ class MultiPassFHIRPipeline:
                 }
             ],
             "code": {"text": o.test_name, **({"coding": codings} if codings else {})},
-            "meta": self._add_bbox_to_meta(common_meta, bbox_locator),
+            "meta": meta,
         }
         if o.value_quantity is not None:
             resource["valueQuantity"] = {

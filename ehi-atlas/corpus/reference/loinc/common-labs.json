@@ -1,0 +1,947 @@
+{
+  "version": "0.2.0",
+  "generated_at": "2026-05-07",
+  "scope": "Common labs reference table for the multipass-fhir code-resolution post-pass. Extends the original 22-code showcase to cover the 58 tests in our Function Health comparison PDF + the long tail of common CMP/CBC/lipid/thyroid/A1c/urinalysis tests. Sources: showcase-loinc.json (LOINC 2.77 verified), Function Health parser output (2025-11-19 PDF, real-world cross-verified), NLM Clinical Tables API for gaps.",
+  "sources": [
+    "ehi-atlas/corpus/reference/loinc/showcase-loinc.json",
+    "pdf-review/blake-functionhealth-2025-11-19/function-outputs/...har (Function Health parser)",
+    "https://clinicaltables.nlm.nih.gov/api/loinc_items/v3/search"
+  ],
+  "codes": [
+    {
+      "code": "2345-7",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Glucose",
+        "GLUCOSE",
+        "Blood Glucose",
+        "Serum Glucose",
+        "Random Glucose"
+      ],
+      "verified_against": [
+        "showcase-loinc-2.77",
+        "function-health-2025-11-19"
+      ],
+      "display": "Glucose [Mass/volume] in Serum or Plasma",
+      "unit": "mg/dL",
+      "category": "chemistry",
+      "notes": "Random glucose \u2014 CMP; Rhett759 has prediabetes",
+      "clinical_category": "Metabolic"
+    },
+    {
+      "code": "1558-6",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Fasting Glucose",
+        "FASTING GLUCOSE",
+        "Fasting Plasma Glucose"
+      ],
+      "verified_against": [
+        "showcase-loinc-2.77"
+      ],
+      "display": "Fasting glucose [Mass/volume] in Serum or Plasma",
+      "unit": "mg/dL",
+      "category": "chemistry",
+      "notes": "Fasting glucose \u2014 relevant to prediabetes monitoring",
+      "clinical_category": "Metabolic"
+    },
+    {
+      "code": "3094-0",
+      "system": "http://loinc.org",
+      "aliases": [
+        "BUN",
+        "Urea Nitrogen",
+        "Blood Urea Nitrogen",
+        "Urea Nitrogen (BUN)"
+      ],
+      "verified_against": [
+        "showcase-loinc-2.77",
+        "function-health-2025-11-19"
+      ],
+      "display": "Urea nitrogen [Mass/volume] in Serum or Plasma",
+      "unit": "mg/dL",
+      "category": "chemistry",
+      "notes": "BUN \u2014 part of CMP panel in showcase lab PDF",
+      "clinical_category": "Kidney"
+    },
+    {
+      "code": "2160-0",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Creatinine",
+        "CREATININE",
+        "Serum Creatinine"
+      ],
+      "verified_against": [
+        "showcase-loinc-2.77",
+        "function-health-2025-11-19"
+      ],
+      "display": "Creatinine [Mass/volume] in Serum or Plasma",
+      "unit": "mg/dL",
+      "category": "chemistry",
+      "notes": "Artifact 5 anchor \u2014 PDF creatinine row matched to Synthea Observation via this LOINC code",
+      "clinical_category": "Kidney"
+    },
+    {
+      "code": "33914-3",
+      "system": "http://loinc.org",
+      "aliases": [
+        "eGFR",
+        "EGFR",
+        "Estimated GFR",
+        "Estimated Glomerular Filtration Rate",
+        "Estimated Glomerular Filtration Rate (eGFR)",
+        "GFR",
+        "MDRD eGFR"
+      ],
+      "verified_against": [
+        "showcase-loinc-2.77"
+      ],
+      "display": "Glomerular filtration rate/1.73 sq M.predicted [Volume Rate/Area] in Serum or Plasma by Creatinine-based formula (MDRD)",
+      "unit": "mL/min/{1.73_m2}",
+      "category": "chemistry",
+      "notes": "eGFR \u2014 calculated renal function marker in CMP",
+      "clinical_category": "Kidney"
+    },
+    {
+      "code": "2951-2",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Sodium",
+        "SODIUM",
+        "Na"
+      ],
+      "verified_against": [
+        "showcase-loinc-2.77",
+        "function-health-2025-11-19"
+      ],
+      "display": "Sodium [Moles/volume] in Serum or Plasma",
+      "unit": "mmol/L",
+      "category": "chemistry",
+      "notes": "CMP electrolyte",
+      "clinical_category": "Kidney"
+    },
+    {
+      "code": "2823-3",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Potassium",
+        "POTASSIUM",
+        "K"
+      ],
+      "verified_against": [
+        "showcase-loinc-2.77",
+        "function-health-2025-11-19"
+      ],
+      "display": "Potassium [Moles/volume] in Serum or Plasma",
+      "unit": "mmol/L",
+      "category": "chemistry",
+      "notes": "CMP electrolyte",
+      "clinical_category": "Kidney"
+    },
+    {
+      "code": "2075-0",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Chloride",
+        "CHLORIDE",
+        "Cl"
+      ],
+      "verified_against": [
+        "showcase-loinc-2.77",
+        "function-health-2025-11-19"
+      ],
+      "display": "Chloride [Moles/volume] in Serum or Plasma",
+      "unit": "mmol/L",
+      "category": "chemistry",
+      "notes": "CMP electrolyte",
+      "clinical_category": "Kidney"
+    },
+    {
+      "code": "2028-9",
+      "system": "http://loinc.org",
+      "aliases": [
+        "CO2",
+        "Carbon Dioxide",
+        "Carbon Dioxide (CO2)",
+        "Bicarbonate",
+        "Total CO2"
+      ],
+      "verified_against": [
+        "showcase-loinc-2.77",
+        "function-health-2025-11-19"
+      ],
+      "display": "Carbon dioxide, total [Moles/volume] in Serum or Plasma",
+      "unit": "mmol/L",
+      "category": "chemistry",
+      "notes": "CO2 / bicarb \u2014 CMP acid-base indicator",
+      "clinical_category": "Electrolytes"
+    },
+    {
+      "code": "17861-6",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Calcium",
+        "CALCIUM",
+        "Total Calcium",
+        "Ca"
+      ],
+      "verified_against": [
+        "showcase-loinc-2.77",
+        "function-health-2025-11-19"
+      ],
+      "display": "Calcium [Mass/volume] in Serum or Plasma",
+      "unit": "mg/dL",
+      "category": "chemistry",
+      "notes": "CMP calcium \u2014 also relevant in cancer context",
+      "clinical_category": "Kidney"
+    },
+    {
+      "code": "2885-2",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Total Protein",
+        "Protein",
+        "Protein, Total",
+        "PROTEIN, TOTAL"
+      ],
+      "verified_against": [
+        "showcase-loinc-2.77",
+        "function-health-2025-11-19"
+      ],
+      "display": "Protein [Mass/volume] in Serum or Plasma",
+      "unit": "g/dL",
+      "category": "chemistry",
+      "notes": "Total protein \u2014 CMP nutritional/hepatic marker",
+      "clinical_category": "Liver"
+    },
+    {
+      "code": "1751-7",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Albumin",
+        "ALBUMIN"
+      ],
+      "verified_against": [
+        "showcase-loinc-2.77",
+        "function-health-2025-11-19"
+      ],
+      "display": "Albumin [Mass/volume] in Serum or Plasma",
+      "unit": "g/dL",
+      "category": "chemistry",
+      "notes": "Albumin \u2014 CMP hepatic/nutritional; low in malignancy",
+      "clinical_category": "Liver"
+    },
+    {
+      "code": "2336-6",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Globulin",
+        "GLOBULIN"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Liver",
+      "display": "Globulin [Mass/volume] in Serum"
+    },
+    {
+      "code": "1759-0",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Albumin/Globulin Ratio",
+        "A/G Ratio",
+        "ALBUMIN/GLOBULIN RATIO"
+      ],
+      "verified_against": [
+        "function-health-2025-11-19"
+      ],
+      "display": "Albumin/Globulin Ratio",
+      "unit": null,
+      "clinical_category": "Liver"
+    },
+    {
+      "code": "1975-2",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Bilirubin, Total",
+        "Total Bilirubin",
+        "Bilirubin Total",
+        "BILIRUBIN, TOTAL",
+        "Bilirubin"
+      ],
+      "verified_against": [
+        "showcase-loinc-2.77",
+        "function-health-2025-11-19"
+      ],
+      "display": "Bilirubin.total [Mass/volume] in Serum or Plasma",
+      "unit": "mg/dL",
+      "category": "chemistry",
+      "notes": "Total bilirubin \u2014 CMP liver panel",
+      "clinical_category": "Liver"
+    },
+    {
+      "code": "6768-6",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Alkaline Phosphatase",
+        "ALP",
+        "Alkaline Phosphatase (ALP)",
+        "Alk Phos",
+        "ALKALINE PHOSPHATASE"
+      ],
+      "verified_against": [
+        "showcase-loinc-2.77",
+        "function-health-2025-11-19"
+      ],
+      "display": "Alkaline phosphatase [Enzymatic activity/volume] in Serum or Plasma",
+      "unit": "U/L",
+      "category": "chemistry",
+      "notes": "Alk phos \u2014 hepatic/bone marker, CMP; elevated in metastatic cancer",
+      "clinical_category": "Liver"
+    },
+    {
+      "code": "1920-8",
+      "system": "http://loinc.org",
+      "aliases": [
+        "AST",
+        "Aspartate Transaminase",
+        "Aspartate Aminotransferase",
+        "Aspartate Transaminase (AST)",
+        "SGOT"
+      ],
+      "verified_against": [
+        "showcase-loinc-2.77",
+        "function-health-2025-11-19"
+      ],
+      "display": "Aspartate aminotransferase [Enzymatic activity/volume] in Serum or Plasma",
+      "unit": "U/L",
+      "category": "chemistry",
+      "notes": "AST \u2014 hepatic enzyme, CMP liver panel",
+      "clinical_category": "Liver"
+    },
+    {
+      "code": "1742-6",
+      "system": "http://loinc.org",
+      "aliases": [
+        "ALT",
+        "Alanine Transaminase",
+        "Alanine Aminotransferase",
+        "Alanine Transaminase (ALT)",
+        "SGPT"
+      ],
+      "verified_against": [
+        "showcase-loinc-2.77"
+      ],
+      "display": "Alanine aminotransferase [Enzymatic activity/volume] in Serum or Plasma",
+      "unit": "U/L",
+      "category": "chemistry",
+      "notes": "ALT \u2014 hepatic enzyme, CMP liver panel",
+      "clinical_category": "Liver"
+    },
+    {
+      "code": "3097-3",
+      "system": "http://loinc.org",
+      "aliases": [
+        "BUN/Creatinine Ratio",
+        "BUN/Cr Ratio",
+        "Urea Nitrogen/Creatinine Ratio"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Kidney",
+      "display": "Urea nitrogen/Creatinine [Mass Ratio] in Serum or Plasma"
+    },
+    {
+      "code": "6690-2",
+      "system": "http://loinc.org",
+      "aliases": [
+        "WBC",
+        "White Blood Cell Count",
+        "White Blood Cell (WBC) Count",
+        "WBC Count"
+      ],
+      "verified_against": [
+        "function-health-2025-11-19"
+      ],
+      "display": "White Blood Cell (WBC) Count",
+      "unit": "Thousand/uL",
+      "clinical_category": "Immune Regulation"
+    },
+    {
+      "code": "789-8",
+      "system": "http://loinc.org",
+      "aliases": [
+        "RBC",
+        "Red Blood Cell Count",
+        "Red Blood Cell (RBC) Count",
+        "RBC Count"
+      ],
+      "verified_against": [
+        "function-health-2025-11-19"
+      ],
+      "display": "Red Blood Cell (RBC) Count",
+      "unit": "Million/uL",
+      "clinical_category": "Blood"
+    },
+    {
+      "code": "718-7",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Hemoglobin",
+        "HEMOGLOBIN",
+        "Hgb",
+        "Hb"
+      ],
+      "verified_against": [
+        "showcase-loinc-2.77",
+        "function-health-2025-11-19"
+      ],
+      "display": "Hemoglobin [Mass/volume] in Blood",
+      "unit": "g/dL",
+      "category": "hematology",
+      "notes": "Hemoglobin \u2014 anemia indicator; Rhett759 has anemia as active condition",
+      "clinical_category": "Blood"
+    },
+    {
+      "code": "4544-3",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Hematocrit",
+        "HCT",
+        "Hct"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Blood",
+      "display": "Hematocrit [Volume Fraction] of Blood by Automated count"
+    },
+    {
+      "code": "787-2",
+      "system": "http://loinc.org",
+      "aliases": [
+        "MCV",
+        "Mean Corpuscular Volume",
+        "Mean Corpuscular Volume (MCV)"
+      ],
+      "verified_against": [
+        "function-health-2025-11-19"
+      ],
+      "display": "Mean Corpuscular Volume (MCV)",
+      "unit": "fL",
+      "clinical_category": "Blood"
+    },
+    {
+      "code": "785-6",
+      "system": "http://loinc.org",
+      "aliases": [
+        "MCH",
+        "Mean Corpuscular Hemoglobin",
+        "Mean Corpuscular Hemoglobin (MCH)"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Blood",
+      "display": "MCH [Entitic mass] by Automated count"
+    },
+    {
+      "code": "786-4",
+      "system": "http://loinc.org",
+      "aliases": [
+        "MCHC",
+        "Mean Corpuscular Hemoglobin Concentration"
+      ],
+      "verified_against": [
+        "function-health-2025-11-19"
+      ],
+      "display": "Mean Corpuscular Hemoglobin Concentration (MCHC)",
+      "unit": "g/dL",
+      "clinical_category": "Blood"
+    },
+    {
+      "code": "788-0",
+      "system": "http://loinc.org",
+      "aliases": [
+        "RDW",
+        "Red Cell Distribution Width",
+        "Red Cell Distribution Width (RDW)"
+      ],
+      "verified_against": [
+        "function-health-2025-11-19"
+      ],
+      "display": "Red Cell Distribution Width (RDW)",
+      "unit": "%",
+      "clinical_category": "Blood"
+    },
+    {
+      "code": "777-3",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Platelet Count",
+        "Platelets",
+        "Plt"
+      ],
+      "verified_against": [
+        "function-health-2025-11-19"
+      ],
+      "display": "Platelet Count",
+      "unit": "Thousand/uL",
+      "clinical_category": "Blood"
+    },
+    {
+      "code": "776-5",
+      "system": "http://loinc.org",
+      "aliases": [
+        "MPV",
+        "Mean Platelet Volume",
+        "Mean Platelet Volume (MPV)"
+      ],
+      "verified_against": [
+        "function-health-2025-11-19"
+      ],
+      "display": "Mean Platelet Volume (MPV)",
+      "unit": "fL",
+      "clinical_category": "Blood"
+    },
+    {
+      "code": "751-8",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Absolute Neutrophils",
+        "Neutrophils Absolute",
+        "Neuts Absolute"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Immune Regulation",
+      "display": "Neutrophils [#/volume] in Blood by Automated count"
+    },
+    {
+      "code": "731-0",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Absolute Lymphocytes",
+        "Lymphocytes Absolute",
+        "Lymphs Absolute"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Immune Regulation",
+      "display": "Lymphocytes [#/volume] in Blood by Automated count"
+    },
+    {
+      "code": "742-7",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Absolute Monocytes",
+        "Monocytes Absolute"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Immune Regulation",
+      "display": "Monocytes [#/volume] in Blood by Automated count"
+    },
+    {
+      "code": "711-2",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Absolute Eosinophils",
+        "Eosinophils Absolute",
+        "Eos Absolute"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Immune Regulation",
+      "display": "Eosinophils [#/volume] in Blood by Automated count"
+    },
+    {
+      "code": "704-7",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Absolute Basophils",
+        "Basophils Absolute"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Immune Regulation",
+      "display": "Basophils [#/volume] in Blood by Automated count"
+    },
+    {
+      "code": "770-8",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Neutrophils %",
+        "Neutrophils Percent",
+        "Neuts %",
+        "Neutrophils"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Immune Regulation",
+      "display": "Neutrophils/Leukocytes in Blood by Automated count"
+    },
+    {
+      "code": "736-9",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Lymphocytes %",
+        "Lymphocytes Percent",
+        "Lymphs %",
+        "Lymphocytes"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Immune Regulation",
+      "display": "Lymphocytes/Leukocytes in Blood by Automated count"
+    },
+    {
+      "code": "5905-5",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Monocytes %",
+        "Monocytes Percent",
+        "Monocytes"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Immune Regulation",
+      "display": "Monocytes/Leukocytes in Blood by Automated count"
+    },
+    {
+      "code": "713-8",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Eosinophils %",
+        "Eosinophils Percent",
+        "Eos %",
+        "Eosinophils"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Immune Regulation",
+      "display": "Eosinophils/Leukocytes in Blood by Automated count"
+    },
+    {
+      "code": "706-2",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Basophils %",
+        "Basophils Percent",
+        "Basophils"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Immune Regulation",
+      "display": "Basophils/Leukocytes in Blood by Automated count"
+    },
+    {
+      "code": "30522-7",
+      "system": "http://loinc.org",
+      "aliases": [
+        "hs-CRP",
+        "hs CRP",
+        "High-Sensitivity C-Reactive Protein",
+        "High-Sensitivity C-Reactive Protein (hs-CRP)"
+      ],
+      "verified_against": [
+        "function-health-2025-11-19"
+      ],
+      "display": "High-Sensitivity C-Reactive Protein (hs-CRP)",
+      "unit": "mg/L",
+      "clinical_category": "Heart"
+    },
+    {
+      "code": "20448-7",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Insulin",
+        "INSULIN"
+      ],
+      "verified_against": [
+        "function-health-2025-11-19"
+      ],
+      "display": "Insulin",
+      "unit": "uIU/mL",
+      "clinical_category": "Metabolic"
+    },
+    {
+      "code": "4548-4",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Hemoglobin A1c",
+        "HbA1c",
+        "A1c",
+        "Hemoglobin A1c (HbA1c)",
+        "HEMOGLOBIN A1c"
+      ],
+      "verified_against": [
+        "showcase-loinc-2.77",
+        "function-health-2025-11-19"
+      ],
+      "display": "Hemoglobin A1c/Hemoglobin.total in Blood",
+      "unit": "%",
+      "category": "chemistry",
+      "notes": "HbA1c \u2014 diabetes/prediabetes monitoring for Rhett759",
+      "clinical_category": "Metabolic"
+    },
+    {
+      "code": "1884-6",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Apolipoprotein B",
+        "ApoB",
+        "Apolipoprotein B (ApoB)",
+        "APOLIPOPROTEIN B"
+      ],
+      "verified_against": [
+        "function-health-2025-11-19"
+      ],
+      "display": "Apolipoprotein B (ApoB)",
+      "unit": "mg/dL",
+      "clinical_category": "Heart"
+    },
+    {
+      "code": "5778-6",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Color",
+        "Color - Urine",
+        "Urine Color",
+        "COLOR"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Urine",
+      "display": "Color of Urine"
+    },
+    {
+      "code": "5767-9",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Appearance",
+        "Appearance - Urine",
+        "Urine Appearance",
+        "Clarity"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Urine",
+      "display": "Appearance of Urine"
+    },
+    {
+      "code": "5811-5",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Specific Gravity",
+        "Specific Gravity - Urine",
+        "SP GRAVITY"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Urine",
+      "display": "Specific gravity of Urine by Test strip"
+    },
+    {
+      "code": "5803-2",
+      "system": "http://loinc.org",
+      "aliases": [
+        "pH",
+        "pH - Urine",
+        "Urine pH"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Urine",
+      "display": "pH of Urine by Test strip"
+    },
+    {
+      "code": "5792-7",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Glucose - Urine",
+        "Urine Glucose",
+        "Glucose (Urine)"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Urine",
+      "display": "Glucose [Mass/volume] in Urine by Test strip"
+    },
+    {
+      "code": "5770-3",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Bilirubin - Urine",
+        "Urine Bilirubin",
+        "Bilirubin (Urine)"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Urine",
+      "display": "Bilirubin.total [Presence] in Urine by Test strip"
+    },
+    {
+      "code": "5797-6",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Ketones - Urine",
+        "Ketones",
+        "Urine Ketones"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Urine",
+      "display": "Ketones [Mass/volume] in Urine by Test strip"
+    },
+    {
+      "code": "5794-3",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Occult Blood - Urine",
+        "Blood - Urine",
+        "Hemoglobin - Urine",
+        "Urine Blood",
+        "Occult Blood"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Urine",
+      "display": "Hemoglobin [Presence] in Urine by Test strip"
+    },
+    {
+      "code": "5804-0",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Protein - Urine",
+        "Urine Protein",
+        "Protein (Urine)"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Urine",
+      "display": "Protein [Mass/volume] in Urine by Test strip"
+    },
+    {
+      "code": "5802-4",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Nitrite - Urine",
+        "Nitrite",
+        "Urine Nitrite"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Urine",
+      "display": "Nitrite [Presence] in Urine by Test strip"
+    },
+    {
+      "code": "5799-2",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Leukocyte Esterase - Urine",
+        "Leukocyte Esterase",
+        "LE"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Urine",
+      "display": "Leukocyte esterase [Presence] in Urine by Test strip"
+    },
+    {
+      "code": "5821-4",
+      "system": "http://loinc.org",
+      "aliases": [
+        "WBC - Urine",
+        "White Blood Cell (WBC) - Urine",
+        "WBC (Urine)",
+        "Urine WBC"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Urine",
+      "display": "Leukocytes [#/area] in Urine sediment by Microscopy high power field"
+    },
+    {
+      "code": "13945-1",
+      "system": "http://loinc.org",
+      "aliases": [
+        "RBC - Urine",
+        "Red Blood Cell (RBC) - Urine",
+        "RBC (Urine)",
+        "Urine RBC"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Urine",
+      "display": "Erythrocytes [#/area] in Urine sediment by Microscopy high power field"
+    },
+    {
+      "code": "5787-7",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Squamous Epithelial Cells - Urine",
+        "Squamous Epithelial Cells",
+        "Squamous Epi"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Urine",
+      "display": "Epithelial cells [#/area] in Urine sediment by Microscopy high power field"
+    },
+    {
+      "code": "5769-5",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Bacteria - Urine",
+        "Bacteria",
+        "Urine Bacteria"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Urine",
+      "display": "Bacteria [#/area] in Urine sediment by Microscopy high power field"
+    },
+    {
+      "code": "5808-1",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Hyaline Cast - Urine",
+        "Hyaline Casts",
+        "Hyaline Cast"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Urine",
+      "display": "Erythrocytes [#/volume] in Urine sediment by Microscopy high power field"
+    }
+  ]
+}

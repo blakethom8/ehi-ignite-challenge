@@ -40,3 +40,19 @@ data/sof_*.db-*
 research/*.db
 research/*.db-*
 !research/ehi-ignite.db
+
+# pdf-review — scratch space for PDF parsing review.
+# Per-PDF folders (e.g. pdf-review/cedars-myhealth/) hold the inputs and outputs.
+# Real PDFs, parser outputs, and HAR logs may contain PHI — never commit those.
+# scripts/, README.md, notes.md, and per-PDF notes.md ARE committed (the work product).
+pdf-review/*/inputs/*
+!pdf-review/*/inputs/.gitkeep
+pdf-review/*/function-health-output/*
+!pdf-review/*/function-health-output/.gitkeep
+pdf-review/*/function-outputs/*
+!pdf-review/*/function-outputs/.gitkeep
+pdf-review/*/our-output/*
+!pdf-review/*/our-output/.gitkeep
+pdf-review/*/our-outputs/*
+!pdf-review/*/our-outputs/.gitkeep
+.DS_Store

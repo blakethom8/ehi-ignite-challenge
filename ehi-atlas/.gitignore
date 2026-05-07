@@ -21,12 +21,21 @@ corpus/bronze/
 corpus/silver/
 corpus/gold/
 
-# Reference terminology snapshots — sized too large for git
+# Reference terminology snapshots — large release downloads sized too large for git.
+# Curated subsets (JSON), curation scripts (.py), and READMEs ARE tracked.
 corpus/reference/umls/
-corpus/reference/loinc/
-corpus/reference/snomed/
-corpus/reference/rxnorm/
-# Keep the version-pinning manifest
+corpus/reference/loinc/.cache/
+corpus/reference/loinc/*.csv
+corpus/reference/loinc/*.zip
+corpus/reference/loinc/release-*/
+corpus/reference/snomed/.cache/
+corpus/reference/snomed/*.csv
+corpus/reference/snomed/*.zip
+corpus/reference/snomed/release-*/
+corpus/reference/rxnorm/.cache/
+corpus/reference/rxnorm/*.csv
+corpus/reference/rxnorm/*.zip
+# Keep the version-pinning manifest and curated subsets
 !corpus/reference/VERSIONS.md
 
 # External public source clones are reproducible from their pinned SHAs.

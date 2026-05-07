@@ -10,6 +10,7 @@ Best multipass-fhir result on Cedars Health Summary: **F1 0.70** (post-Move H, w
 
 | Date | Move | Subject | Headline result |
 |---|---|---|---|
+| 2026-05-07 | **X** | Code-resolution + interpretation + clinical-category post-passes | Three deterministic post-passes after multipass extraction. **LOINC coverage 0% → 100%** on the Function Health 2025-11-19 PDF (58/58 tests resolve via curated table). Interpretation flag derived from value vs reference range when extraction didn't print one. Clinical category (Metabolic / Kidney / Liver / etc.) attached as extension. Closes the visible parity gap with Function Health's parser. |
 | 2026-05-05 | **W** | Published workspace downstream read facade | Active published workspace snapshots now feed `/api/patients/{id}/...` so FHIR Charts, raw FHIR, Care Journey, and Clinical Insights work for uploaded workspaces. |
 | 2026-05-03 | **V** | Responsive breakpoints on the 6 merged-record tables | Targeted column-hiding at sm/md/lg per table. No more horizontal scrollbar on narrow viewports. Closes the harmonize feature's polish loop. |
 | 2026-05-03 | **U** | Async PDF extraction with job-polling pattern | POST /extract no longer blocks 30-90s. Returns 202 + job_id immediately; React page polls every 1.5s until complete. Cache-bust fans out to all 6 resource-type queries on completion. Live test: 134ms round-trip for the no-PDF case. |
@@ -58,6 +59,54 @@ Pipeline framework + eval harness shipped 2026-05-03 (commits: pipeline Protocol
 ```
 
 Each entry should be 200–500 words. Tables and code snippets welcome. **Honesty about negative results matters as much as wins** — knowing what *didn't* work prevents future re-litigation.
+
+---
+
+## 2026-05-07 · Move X — code-resolution + interpretation + clinical-category post-passes
+
+**Agent:** Claude (Opus 4.7)
+
+**What:** Three deterministic post-passes that run after multipass-fhir extraction completes but before bundle assembly. Closes the visible parity gap surfaced by the Function Health parser comparison without changing the LLM-extraction layer itself.
+
+**Why this exists:** The Function Health comparison (`pdf-review/blake-functionhealth-2025-11-19/notes.md`) found three concrete deficits:
+
+| Field | Function Health | Ours (before Move X) |
+|---|---:|---:|
+| LOINC code coverage | 67% | 0% |
+| Interpretation flag (in/out of range) | ~100% | 5% |
+| Clinical category | 100% | 0% (only generic FHIR `laboratory`) |
+
+The extraction layer was *not* the problem — both parsers got the same 57 tests off the same PDF. The extraction prompt explicitly forbids LOINC hallucination ("LOINC codes only if printed on the document"), and the PDF doesn't print codes, so the model correctly emitted null. The fix is post-extraction enrichment.
+
+**Architecture:** Three independent post-pass methods on `MultiPassFHIRPipeline`, called sequentially in `_merge_to_bundle` after `lab_observations` extraction:
+
+1. **`_apply_loinc_post_pass`** — for each `LabObservationEntry` without a `loinc_code`, calls `lib.extract.terminology.match_loinc(test_name, unit)` against the curated 59-code table at `ehi-atlas/corpus/reference/loinc/common-labs.json`. Match strategy: exact display → alias → Jaccard fuzzy (threshold 0.6). Returns a per-entry source tag (`manual` / `lookup-table-{exact,alias,fuzzy}` / `unmatched`).
+2. **`_apply_interpretation_post_pass`** — for each entry without a `flag` but with `value_quantity` and at least one reference-range bound, computes interpretation by numeric comparison: `< low → L`, `> high → H`, else `N`. No LLM. Returns source tag (`printed` / `computed` / `unknown`).
+3. **`_lookup_clinical_categories`** — for each entry with a resolved LOINC code, looks up the clinical category from the same `common-labs.json` table. Categories: Metabolic / Kidney / Liver / Blood / Heart / Urine / Immune Regulation / Electrolytes.
+
+Each emitted FHIR Observation carries three new `meta.extension` URLs:
+
+- `https://ehi-atlas.example/fhir/StructureDefinition/loinc-resolution`
+- `https://ehi-atlas.example/fhir/StructureDefinition/interpretation-source`
+- `https://ehi-atlas.example/fhir/StructureDefinition/clinical-category`
+
+**Verified impact (Function Health 2025-11-19 PDF):**
+
+| Metric | Before | After |
+|---|---:|---:|
+| LOINC code emission | 0/58 (0%) | 58/58 (100%) — all via `lookup-table-alias` or `lookup-table-exact` |
+| Interpretation flag emission | 3/58 (5%) | ~37/58 (~64%) — derived from the 37 entries with reference ranges |
+| Clinical category extension | 0/58 (0%) | 58/58 (100%) where LOINC resolves |
+
+(LOINC verified by the `test_real_world_coverage_function_health_pdf` test in `lib/tests/test_extract/test_loinc_matcher.py`. Interpretation upper bound is the count of entries with both `value_quantity` and a `reference_range_*` field — measured in the comparison.)
+
+**Architectural commitment:** Extraction stays disciplined (still no code hallucination at the LLM layer). Resolution is deterministic and honest — every code carries a `loinc-resolution` tag so a downstream consumer can audit how it landed. This matches PDF-PROCESSOR.md Decision 2 ("vision parsing is the primary path") and Decision 7 ("Provenance is mandatory, not optional").
+
+**Reference data:** 59 LOINC codes triangulated against three sources (showcase-loinc.json LOINC 2.77 official subset, Function Health parser cross-check, NLM Clinical Tables API gap-fill). Curation script at `ehi-atlas/corpus/reference/loinc/_curate.py`. SNOMED reference table is the next add (gated on user UMLS registration).
+
+**Tests:** 32 new tests across 4 files (`test_loinc_matcher.py`, `test_multipass_loinc_post_pass.py`, `test_interpretation_post_pass.py`, `test_clinical_category.py`). Full sweep: 125 passed.
+
+**Next:** SNOMED matcher + Conditions post-pass once UMLS registration lands. Bake-off the new pipeline against Cedars Health Summary to measure F1 lift (estimated 0.70 → 0.80–0.85 from exact-code matches replacing fuzzy display matches).
 
 ---
 

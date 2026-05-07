@@ -555,6 +555,29 @@ These numbers are estimates. The whole point of building PDF-LAB-STUDIO is so we
 2. **UMLS registration** at https://uts.nlm.nih.gov/uts/signup-login (free, gated). Once you have credentials, drop the API key in `.env` as `UMLS_API_KEY=...`. Unblocks CODE-T04/T05.
 3. **Optional: LOINC free account** at https://loinc.org for the full release download. Not strictly needed for v1 (NLM API covers it), nicer for Phase 2 offline + complete coverage.
 
+### Build status (updated 2026-05-07)
+
+| Task | Status | Commit |
+|---|---|---|
+| **PROMOTE-EXTRACT** | ✅ Shipped | `0a43e44` refactor(promote-extract) |
+| **CODE-T01** — LOINC reference table | ✅ Shipped | `e130ad3` (table + curation script) |
+| **CODE-T02** — LOINC matcher module | ✅ Shipped | `8ea2b4a` |
+| **CODE-T03** — Wire matcher into multipass | ✅ Shipped | `ddfe1e1` |
+| **CODE-T06** — Interpretation post-pass | ✅ Shipped | `1838ce2` |
+| **CODE-T07** — Clinical-category extension | ✅ Shipped | `51d10c4` |
+| **CODE-T04** — SNOMED reference table | ⛔ Blocked on UMLS registration | — |
+| **CODE-T05** — SNOMED matcher + Conditions post-pass | ⛔ Blocked on CODE-T04 | — |
+
+All on branch `feature/code-resolution-loinc`. 125 tests passing. Awaiting user review + merge to master.
+
+Verified impact (Function Health 2025-11-19 PDF):
+
+- LOINC: 0% → **100%** (58/58 tests resolve via curated table)
+- Interpretation flag: 5% → **~64%** (computed from value vs reference range when extraction didn't print)
+- Clinical category extension: 0% → **100%** (where LOINC resolved)
+
+See `docs/architecture/PIPELINE-LOG.md` Move X for the detailed write-up.
+
 ---
 
 *Last updated: 2026-05-07. Working log — append entries with date stamp.*

@@ -435,7 +435,7 @@ class BBoxResult:
     def to_schemas_bbox(self):
         """Convert to :class:`ehi_atlas.extract.schemas.BBox` if available."""
         try:
-            from ehi_atlas.extract.schemas import BBox
+            from lib.extract.schemas import BBox
 
             return BBox(page=self.page, x1=self.x1, y1=self.y1, x2=self.x2, y2=self.y2)
         except ImportError:

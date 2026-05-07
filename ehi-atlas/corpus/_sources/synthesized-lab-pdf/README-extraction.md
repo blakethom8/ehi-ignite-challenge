@@ -41,7 +41,7 @@ pdfplumber (top-origin coordinates) reports the creatinine row text at:
 
 ## Expected Vision Extraction Output
 
-The vision extraction pipeline (task 4.3, `ehi_atlas/extract/pdf.py`) should return
+The vision extraction pipeline (task 4.3, `lib/extract/pdf.py`) should return
 the following for this PDF. This is the "golden output" shape.
 
 ### Python dict shape (Pydantic-style)

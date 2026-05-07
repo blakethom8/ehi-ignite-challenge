@@ -27,7 +27,7 @@ The main entry point is :func:`extract_from_pdf`. For lab-report PDFs the
 convenience wrapper :func:`extract_lab_pdf` is preferred::
 
     from pathlib import Path
-    from ehi_atlas.extract.pdf import extract_lab_pdf
+    from lib.extract.pdf import extract_lab_pdf
 
     result = extract_lab_pdf(Path("corpus/bronze/lab-pdf/rhett759/data.pdf"))
     print(result.document.results[0].test_name)   # "Creatinine"
@@ -66,8 +66,8 @@ from typing import Any, Protocol, Type, TypeVar
 from anthropic import Anthropic
 from pydantic import BaseModel
 
-from ehi_atlas.extract.cache import CacheKey, ExtractionCache, hash_file
-from ehi_atlas.extract.schemas import ExtractionResult
+from lib.extract.cache import CacheKey, ExtractionCache, hash_file
+from lib.extract.schemas import ExtractionResult
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -912,7 +912,7 @@ def _calibrate_bboxes_via_layout(
         return raw
 
     try:
-        from ehi_atlas.extract.layout import extract_layout, find_text_bbox
+        from lib.extract.layout import extract_layout, find_text_bbox
 
         layout = extract_layout(pdf_path)
     except Exception:

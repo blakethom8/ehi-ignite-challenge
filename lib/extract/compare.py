@@ -27,14 +27,14 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 
-from ehi_atlas.extract.pdf import (
+from lib.extract.pdf import (
     DEFAULT_BACKEND,
     DEFAULT_GOOGLE_MODEL,
     DEFAULT_MODEL,
     extract_lab_pdf,
     get_backend,
 )
-from ehi_atlas.extract.schemas import ExtractionResult
+from lib.extract.schemas import ExtractionResult
 
 # ---------------------------------------------------------------------------
 # Default backend matrix

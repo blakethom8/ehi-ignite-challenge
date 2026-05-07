@@ -25,7 +25,7 @@ lanes were archived under
 
 - **Data:** `../corpus/` — `_sources/` (raw drops), `bronze/` (canonical staging),
   `reference/` (terminology snapshots).
-- **Code:** `../ehi_atlas/extract/` — the live PDF→FHIR extraction framework.
+- **Code:** `../lib/extract/` — the live PDF→FHIR extraction framework.
 
 The original `prototypes/` (Josh-stack ports) and `datamart/` (data store)
 folders were never built out as planned and have been archived.

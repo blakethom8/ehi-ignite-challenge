@@ -31,18 +31,18 @@ import streamlit as st
 
 from components.badges import engine_badge_row
 from components.header import render_header
-from ehi_atlas.extract.cache import CacheKey, ExtractionCache, hash_file
-from ehi_atlas.extract.layout import extract_layout, find_text_bbox
-from ehi_atlas.extract.pdf import (
+from lib.extract.cache import CacheKey, ExtractionCache, hash_file
+from lib.extract.layout import extract_layout, find_text_bbox
+from lib.extract.pdf import (
     DEFAULT_BACKEND,
     DEFAULT_MODEL,
     DEFAULT_PROMPT_VERSION,
     DEFAULT_SCHEMA_VERSION,
     extract_lab_pdf,
 )
-from ehi_atlas.extract.schemas import ExtractionResult
-from ehi_atlas.extract.to_fhir import lab_result_to_observation
-from ehi_atlas.extract.uploads import (
+from lib.extract.schemas import ExtractionResult
+from lib.extract.to_fhir import lab_result_to_observation
+from lib.extract.uploads import (
     UPLOADS_ROOT,
     UploadRecord,
     list_uploads,
@@ -382,7 +382,7 @@ with tab_layout:
         placeholder="e.g. Creatinine",
     )
     if anchor:
-        from ehi_atlas.extract.layout import DocumentLayout
+        from lib.extract.layout import DocumentLayout
 
         full_layout = DocumentLayout.model_validate(layout_dict)
         result = find_text_bbox(full_layout, anchor, page=selected_page)
@@ -513,7 +513,7 @@ with right:
         label="🆚 Compare backends across multiple PDFs →",
     )
 st.caption(
-    "Backend abstraction: `ehi_atlas/extract/pdf.py` (`VisionBackend` Protocol) · "
+    "Backend abstraction: `lib/extract/pdf.py` (`VisionBackend` Protocol) · "
     "Uploads dropbox: `corpus/_sources/uploads/` (gitignored) · "
-    "Compare module: `ehi_atlas/extract/compare.py`"
+    "Compare module: `lib/extract/compare.py`"
 )

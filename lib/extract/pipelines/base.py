@@ -153,7 +153,7 @@ class PipelineRegistry:
 
 
 # Module-level singleton + thin function wrappers so callers can write
-# ``from ehi_atlas.extract.pipelines import register, get, list_pipelines``.
+# ``from lib.extract.pipelines import register, get, list_pipelines``.
 _REGISTRY = PipelineRegistry()
 
 
@@ -162,7 +162,7 @@ def register(pipeline_cls: Type[ExtractionPipeline]) -> Type[ExtractionPipeline]
 
     Usage::
 
-        from ehi_atlas.extract.pipelines import (
+        from lib.extract.pipelines import (
             ExtractionPipeline,
             PipelineMetadata,
             register,

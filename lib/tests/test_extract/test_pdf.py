@@ -21,8 +21,8 @@ from unittest.mock import Mock, patch
 import pytest
 from anthropic.types import Message
 
-from ehi_atlas.extract.cache import CacheKey, ExtractionCache, hash_file
-from ehi_atlas.extract.pdf import (
+from lib.extract.cache import CacheKey, ExtractionCache, hash_file
+from lib.extract.pdf import (
     DEFAULT_BACKEND,
     DEFAULT_MODEL,
     DEFAULT_PROMPT_VERSION,
@@ -30,7 +30,7 @@ from ehi_atlas.extract.pdf import (
     extract_from_pdf,
     extract_lab_pdf,
 )
-from ehi_atlas.extract.schemas import ExtractionResult
+from lib.extract.schemas import ExtractionResult
 
 # After the backend-abstraction refactor the cache key embeds the backend
 # identifier as well, so tests build the same composite that pdf.py uses
@@ -239,7 +239,7 @@ def test_extract_validates_against_schema(tmp_path: Path) -> None:
     assert result.extraction_confidence == pytest.approx(0.97)
 
     # Document is a lab report with one result
-    from ehi_atlas.extract.schemas import ExtractedLabReport, ExtractedLabResult, BBox
+    from lib.extract.schemas import ExtractedLabReport, ExtractedLabResult, BBox
     assert isinstance(result.document, ExtractedLabReport)
     assert result.document.lab_name == "Quest Diagnostics"
     assert len(result.document.results) == 1

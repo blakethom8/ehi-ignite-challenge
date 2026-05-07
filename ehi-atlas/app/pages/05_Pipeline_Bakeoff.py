@@ -25,13 +25,13 @@ import streamlit as st
 
 from components.badges import engine_badge_row
 from components.header import render_header
-from ehi_atlas.extract.bake_off import (
+from lib.extract.bake_off import (
     BakeoffCell,
     bake_off,
     format_markdown,
 )
-from ehi_atlas.extract.pipelines import get, list_pipelines
-from ehi_atlas.extract.uploads import list_uploads
+from lib.extract.pipelines import get, list_pipelines
+from lib.extract.uploads import list_uploads
 
 # ---------------------------------------------------------------------------
 # Page config + header
@@ -79,7 +79,7 @@ st.subheader("1 · Pick pipelines")
 
 available_pipelines = list_pipelines()
 if not available_pipelines:
-    st.warning("No pipelines registered. Implement one in `ehi_atlas/extract/pipelines/`.")
+    st.warning("No pipelines registered. Implement one in `lib/extract/pipelines/`.")
     st.stop()
 
 selected_pipeline_names = st.multiselect(
@@ -381,6 +381,6 @@ st.caption(
     "Architecture decision record: "
     "[`docs/architecture/PDF-PROCESSOR.md`](../../../docs/architecture/PDF-PROCESSOR.md) · "
     "Pipeline contributor guide: "
-    "`ehi_atlas/extract/pipelines/README.md` · "
-    "Bake-off module: `ehi_atlas/extract/bake_off.py`"
+    "`lib/extract/pipelines/README.md` · "
+    "Bake-off module: `lib/extract/bake_off.py`"
 )

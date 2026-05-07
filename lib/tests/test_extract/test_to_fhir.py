@@ -15,8 +15,8 @@ from __future__ import annotations
 
 import pytest
 
-from ehi_atlas.extract.schemas import BBox, ExtractedCondition, ExtractedLabResult
-from ehi_atlas.extract.to_fhir import condition_to_fhir, lab_result_to_observation
+from lib.extract.schemas import BBox, ExtractedCondition, ExtractedLabResult
+from lib.extract.to_fhir import condition_to_fhir, lab_result_to_observation
 
 # ---------------------------------------------------------------------------
 # Constants shared across tests

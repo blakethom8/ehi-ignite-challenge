@@ -4,11 +4,11 @@ The cache is keyed by SHA-256 of (file_content, prompt_version, schema_version,
 model_name). A hit returns the cached JSON directly without an LLM call. A miss
 runs the extractor (caller's responsibility) and the result is stored via put().
 
-Cache storage: ``ehi-atlas/ehi_atlas/extract/.cache/<hash>.json``. Gitignored.
+Cache storage: ``ehi-atlas/lib/extract/.cache/<hash>.json``. Gitignored.
 
 Typical caller flow::
 
-    from ehi_atlas.extract.cache import ExtractionCache, CacheKey, hash_file
+    from lib.extract.cache import ExtractionCache, CacheKey, hash_file
 
     cache = ExtractionCache()
     key = CacheKey(

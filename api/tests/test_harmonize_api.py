@@ -1171,7 +1171,7 @@ class UploadCollectionDiscoveryTests(unittest.TestCase):
             return 3 if path.name == "report.pdf" else None
 
         with (
-            patch("ehi_atlas.extract.pipelines.get", side_effect=fake_get_pipeline),
+            patch("lib.extract.pipelines.get", side_effect=fake_get_pipeline),
             patch("api.core.harmonize_service._pdf_page_count", side_effect=fake_page_count),
         ):
             r = self.client.post("/api/harmonize/upload-pdf-events/extract")

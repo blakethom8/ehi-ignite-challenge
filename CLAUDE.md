@@ -99,6 +99,13 @@ ehi-ignite-challenge/
 │   │   ├── episode_detector.py
 │   │   ├── interaction_checker.py
 │   │   └── loader.py
+│   ├── extract/                           ← PDF → FHIR extraction framework ⭐
+│   │   ├── pipelines/                     ← Protocol + registry (multipass-fhir is production default)
+│   │   ├── pdf.py                         ← VisionBackend Protocol (Anthropic + Google AI Studio)
+│   │   ├── bake_off.py                    ← architecture comparison harness
+│   │   ├── eval.py                        ← ground-truth scoring (findable-only filter + GT dedup)
+│   │   ├── cache.py                       ← deterministic SHA-keyed extraction cache
+│   │   └── ...
 │   └── tests/                             ← library tests
 │
 ├── data/                                  ← Production runtime data only
@@ -149,7 +156,7 @@ ehi-ignite-challenge/
 ├── ehi-atlas/                             ← The dev surface for the Atlas data platform
 │   ├── CLAUDE.md                          ← Atlas-zone conventions ⭐
 │   ├── corpus/                            ← bench: _sources/ bronze/ silver/ gold/
-│   ├── ehi_atlas/                         ← in-development Python package (adapters/extract/harmonize)
+│   ├── ehi_atlas/                         ← in-development Python package (currently empty namespace; full 5-layer scaffold archived May 2026 — see ehi-atlas/CLAUDE.md)
 │   ├── notebooks/                         ← end-to-end pipeline notebooks
 │   ├── prototypes/                        ← josh-* (faithful ports) and atlas-* (Atlas experiments)
 │   ├── notes/                             ← josh-stack-deep-dive multi-session notes

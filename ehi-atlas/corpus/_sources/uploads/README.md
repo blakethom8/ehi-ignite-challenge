@@ -16,7 +16,7 @@ uploads/
 
 ## How uploads land here
 
-- **From the Streamlit PDF Lab** (`app/pages/02b_PDF_Lab.py`): the file uploader calls `ehi_atlas.extract.uploads.store_upload()` with the bytes.
+- **From the Streamlit PDF Lab** (`app/pages/02b_PDF_Lab.py`): the file uploader calls `lib.extract.uploads.store_upload()` with the bytes.
 - **From the notebook** (`notebooks/03_layer2b_vision_extraction.ipynb`): the cell that lets you point at any PDF calls `store_upload_from_path()`.
 
 Both paths are idempotent — uploading the same PDF twice returns the same `UploadRecord` and does not duplicate the bytes on disk.

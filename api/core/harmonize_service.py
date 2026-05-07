@@ -68,17 +68,6 @@ PROFILE_ROOT = Path(
 )
 PROFILE_REGISTRY_PATH = PROFILE_ROOT / "profiles.json"
 
-# Make the extraction pipeline registry (lib in the dev zone) importable
-# from this API process. Without this, background extract jobs fail with
-# "ModuleNotFoundError: No module named 'ehi_atlas'" because the dev zone
-# isn't on sys.path by default.
-import sys as _sys
-
-_EHI_ATLAS_DEV_ROOT = REPO_ROOT / "ehi-atlas"
-if _EHI_ATLAS_DEV_ROOT.exists() and str(_EHI_ATLAS_DEV_ROOT) not in _sys.path:
-    _sys.path.insert(0, str(_EHI_ATLAS_DEV_ROOT))
-
-
 # ---------------------------------------------------------------------------
 # Collection registry
 # ---------------------------------------------------------------------------
@@ -1923,7 +1912,7 @@ def extract_pending_pdfs(collection_id: str, job_id: str | None = None) -> list[
     # extraction stack at module-load time.
     import time
 
-    from ehi_atlas.extract.pipelines import get as get_pipeline
+    from lib.extract.pipelines import get as get_pipeline
 
     PipelineCls = get_pipeline("multipass-fhir")
     pipeline = PipelineCls()

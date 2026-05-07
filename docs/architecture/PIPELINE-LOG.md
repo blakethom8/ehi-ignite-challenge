@@ -119,7 +119,7 @@ from candidate facts into first-class chart surfaces.
 
 React side: the mutation just stashes the returned job_id; a `useQuery` polls with `refetchInterval` returning 1500ms while pending/running and false once terminal. React Query stops polling automatically without manual cleanup. A separate `useEffect` on `status === "complete"` invalidates all six resource-type query keys + sources + source-diff so the merged tables reflect the newly extracted facts in one paint.
 
-One subtle fix: the background thread imports `from ehi_atlas.extract.pipelines import get` at runtime, but `ehi-atlas/` isn't on the API process's `sys.path` by default. Fixed by appending it at module load time. Without this fix the API tests under TestClient passed (because they staged sessions with no PDFs to extract) but the live extraction would have failed with `ModuleNotFoundError`.
+One subtle fix: the background thread imports `from lib.extract.pipelines import get` at runtime, but `ehi-atlas/` isn't on the API process's `sys.path` by default. Fixed by appending it at module load time. Without this fix the API tests under TestClient passed (because they staged sessions with no PDFs to extract) but the live extraction would have failed with `ModuleNotFoundError`.
 
 **Result:** End-to-end live test on a fake upload session containing one FHIR JSON file (no PDFs):
 
@@ -899,7 +899,7 @@ Total wall-clock for all 12 cells: 178s.
 
 **Agent:** Claude Opus 4.7
 
-**What:** Built the [pipeline framework](../../ehi-atlas/ehi_atlas/extract/pipelines/) (Protocol + registry + bake-off harness), shipped two pipelines (`single-pass-vision` baseline + `multipass-fhir`), ran first bake-off against Blake's Cedars Health Summary PDF (25 pages, 189 ground-truth facts in `cedars-sinai.json`).
+**What:** Built the [pipeline framework](../../lib/extract/pipelines/) (Protocol + registry + bake-off harness), shipped two pipelines (`single-pass-vision` baseline + `multipass-fhir`), ran first bake-off against Blake's Cedars Health Summary PDF (25 pages, 189 ground-truth facts in `cedars-sinai.json`).
 
 **Why:** Validate decisions 1–4 of `PDF-PROCESSOR.md`. The eval harness from earlier in the session showed `single-pass-vision` losing **161 of 189 ground-truth facts** to schema gaps (medications, allergies, immunizations, labs all 0/N). Schema-direct multi-pass should close the gap.
 

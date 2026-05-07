@@ -199,16 +199,16 @@ The differentiator framing — **"a PDF parser specific for FHIR formats, design
 
 ### Decision
 
-Move forward with **Option B**: promote `ehi-atlas/ehi_atlas/extract/` → `lib/extract/` to fix the inverted dependency model where `api/core/harmonize_service.py` imports from the "dev zone." This sequences **before** P1 (agentic refactor), because the agentic work will land in this code and we want one move, not two.
+Move forward with **Option B**: promote `lib/extract/` → `lib/extract/` to fix the inverted dependency model where `api/core/harmonize_service.py` imports from the "dev zone." This sequences **before** P1 (agentic refactor), because the agentic work will land in this code and we want one move, not two.
 
 ### Task: PROMOTE-EXTRACT
 
 **Type:** refactor (no functional change). **Scope:**
 
-- `git mv ehi-atlas/ehi_atlas/extract lib/extract`
-- Update import in `api/core/harmonize_service.py` (~line 1814): `from ehi_atlas.extract.pipelines` → `from lib.extract.pipelines`
+- `git mv lib/extract lib/extract`
+- Update import in `api/core/harmonize_service.py` (~line 1814): `from lib.extract.pipelines` → `from lib.extract.pipelines`
 - Update any Streamlit pages in `ehi-atlas/app/` that import from extract
-- Update path references in `docs/architecture/PDF-PROCESSOR.md` (multiple `../../ehi-atlas/ehi_atlas/extract/...` links throughout)
+- Update path references in `docs/architecture/PDF-PROCESSOR.md` (multiple `../../lib/extract/...` links throughout)
 - Update `ehi-atlas/CLAUDE.md` so it no longer claims `extract/` lives in this zone
 - Update root `CLAUDE.md`:
   - line 152: replace `(adapters/extract/harmonize)` with the corrected description
@@ -219,7 +219,7 @@ Move forward with **Option B**: promote `ehi-atlas/ehi_atlas/extract/` → `lib/
 
 **Acceptance:**
 - All tests pass
-- `grep -r "from ehi_atlas.extract" .` returns zero hits outside `archive/`
+- `grep -r "from lib.extract" .` returns zero hits outside `archive/`
 - `grep -r "from lib.extract" .` returns at least the harmonize_service.py site
 - Root CLAUDE.md no longer implies `adapters/` and `harmonize/` are live siblings of extract under `ehi_atlas/`
 
@@ -253,7 +253,7 @@ Three subagents (CLAUDE.md vs tree, cross-zone imports, architecture-doc cross-r
 | 5 | Root `CLAUDE.md` line 68 | `context_builder.py ← TODO` | File exists, ~400 lines, has tests at `api/tests/test_context_builder.py` | CLAUDE-MD-RESYNC |
 | 6 | Root `CLAUDE.md` line ~131 + Reference Docs table | `CONTEXT-PIPELINE.md ← LLM context engineering (TODO)` | File exists, 271 lines | CLAUDE-MD-RESYNC |
 | 7 | `docs/architecture/CONTEXT-ENGINEERING.md` + `DATA-DEFINITIONS.md` | Cite `patient-journey/core/drug_classifier.py`, `fhir_explorer/parser/`, etc. | Pre-May-3-refactor paths. Code now lives at `lib/clinical/` and `lib/fhir_parser/`. | ARCH-DOC-RESYNC |
-| 8 | `api/core/harmonize_service.py:1814` | (no claim — code) | Production imports from dev zone (`ehi_atlas.extract.pipelines`) | covered by PROMOTE-EXTRACT |
+| 8 | `api/core/harmonize_service.py:1814` | (no claim — code) | Production imports from dev zone (`lib.extract.pipelines`) | covered by PROMOTE-EXTRACT |
 
 ### MEDIUM — explanation breaks but won't actively mislead
 

@@ -38,16 +38,16 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from ehi_atlas.extract.cache import hash_file
+from lib.extract.cache import hash_file
 
 # ---------------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------------
 
-# Resolved relative to this module: ehi-atlas/ehi_atlas/extract/uploads.py
-# parents[2] is ehi-atlas/.
-_EHI_ATLAS_ROOT = Path(__file__).resolve().parents[2]
-UPLOADS_ROOT = _EHI_ATLAS_ROOT / "corpus" / "_sources" / "uploads"
+# Resolved relative to this module: lib/extract/uploads.py.
+# parents[2] is the repo root; uploads live in the Atlas dev-zone corpus.
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+UPLOADS_ROOT = _REPO_ROOT / "ehi-atlas" / "corpus" / "_sources" / "uploads"
 MANIFEST_PATH = UPLOADS_ROOT / "manifest.json"
 
 _HASH_PREFIX_LEN = 12

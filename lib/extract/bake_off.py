@@ -32,11 +32,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 
-from ehi_atlas.extract.eval import (
+from lib.extract.eval import (
     EvalReport,
     evaluate_bundle,
 )
-from ehi_atlas.extract.pipelines.base import ExtractionPipeline
+from lib.extract.pipelines.base import ExtractionPipeline
 
 
 # ---------------------------------------------------------------------------

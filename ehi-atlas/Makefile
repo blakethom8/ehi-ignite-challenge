@@ -25,7 +25,7 @@ test-fast:  ## Run tests, skipping integration markers
 	uv run pytest tests/ -v -m "not integration"
 
 clean:  ## Remove caches and ephemeral outputs (preserves _sources/ and bronze/)
-	rm -rf ehi_atlas/extract/.cache .extraction-cache
+	rm -rf ../lib/extract/.cache .extraction-cache
 	rm -rf .pytest_cache .ruff_cache
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 	@echo "✓ cleaned"

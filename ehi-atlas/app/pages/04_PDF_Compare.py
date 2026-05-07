@@ -28,7 +28,7 @@ import streamlit as st
 
 from components.badges import engine_badge_row
 from components.header import render_header
-from ehi_atlas.extract.compare import (
+from lib.extract.compare import (
     DEFAULT_MATRIX,
     ComparisonRun,
     compare_backends,
@@ -36,7 +36,7 @@ from ehi_atlas.extract.compare import (
     latency_by_backend,
     to_markdown_table,
 )
-from ehi_atlas.extract.uploads import list_uploads
+from lib.extract.uploads import list_uploads
 
 # ---------------------------------------------------------------------------
 # Page config + header
@@ -334,5 +334,5 @@ st.divider()
 st.caption(
     "Single-PDF inspection: [PDF Lab](./PDF_Lab) · "
     "Notebook: `notebooks/03_layer2b_vision_extraction.ipynb` · "
-    "Compare module: `ehi_atlas/extract/compare.py`"
+    "Compare module: `lib/extract/compare.py`"
 )

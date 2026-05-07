@@ -11,6 +11,7 @@ Production library code imported by `api/`, `ehi-atlas/`, `scripts/`, and protot
 | `lib.sql_on_fhir` | SQL-on-FHIR v2 engine: ViewDefinition → SQLite, enrichments, derivations | `api/core/sof_materialize.py`, `api/core/sof_tools.py` |
 | `lib.clinical` | Drug classifier, episode detector, interaction checker, patient loader | `api/core/`, `api/routers/` |
 | `lib.harmonize` | Cross-source Observation merge + FHIR Provenance minting (LOINC + name-bridge identity resolution, unit normalization). v1 covers Observations only. | `ehi-atlas/app/pages/06_Harmonize_Labs.py`; `api/` (planned) |
+| `lib.extract` | PDF → FHIR extraction framework — `pipelines/` (Protocol + registry), `bake_off.py`, `eval.py`, `pdf.py` (Anthropic + Google AI Studio backends). Production path: `multipass-fhir`. | `api/core/harmonize_service.py`, `ehi-atlas/app/pages/03_PDF_Lab.py` etc. |
 
 ## Conventions
 

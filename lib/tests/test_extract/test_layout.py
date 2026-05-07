@@ -25,7 +25,7 @@ from pathlib import Path
 
 import pytest
 
-from ehi_atlas.extract.layout import (
+from lib.extract.layout import (
     DocumentLayout,
     PageLayout,
     TextSpan,
@@ -39,13 +39,13 @@ from ehi_atlas.extract.layout import (
 # Fixtures
 # ---------------------------------------------------------------------------
 
-_REPO_ROOT = Path(__file__).parent.parent.parent  # ehi-atlas/
+_REPO_ROOT = Path(__file__).parents[3]  # ehi-ignite-challenge/
 
 
 @pytest.fixture(scope="session")
 def lab_pdf_path() -> Path:
     """Absolute path to the synthesized lab PDF."""
-    p = _REPO_ROOT / "corpus/_sources/synthesized-lab-pdf/raw/lab-report-2025-09-12-quest.pdf"
+    p = _REPO_ROOT / "ehi-atlas/corpus/_sources/synthesized-lab-pdf/raw/lab-report-2025-09-12-quest.pdf"
     assert p.exists(), f"Lab PDF not found at {p}"
     return p
 

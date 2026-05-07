@@ -10,12 +10,12 @@
 
 | Subdir | Purpose |
 |---|---|
-| `ehi_atlas/extract/` | PDF→FHIR extraction framework — `pipelines/` (Protocol + registry), `bake_off.py` (architecture comparison harness), `eval.py` (ground-truth scoring with findable-only filter + GT dedup), `pdf.py` (Anthropic + Google AI Studio backends). See `pipelines/README.md` for the contributor guide. |
-| `app/` | Streamlit console for the Atlas data platform. Pages: Overview, Sources & Bronze, **PDF Lab** (single-PDF live extraction), **PDF Compare** (vision-LLM backend A/B), **Pipeline Bakeoff** (extraction-architecture comparison with eval-harness scoring). |
-| `corpus/` | The data bench. `_sources/` (raw drops), `bronze/` (canonical staging), `reference/` (terminology snapshots — LOINC, RxNorm). See `corpus/README.md`. |
+| `ehi_atlas/` | (Currently empty namespace package — `extract/` was promoted to `lib/extract/` in May 2026; the 5-layer scaffold was archived earlier in May 2026 to `archive/ehi-atlas-5layer/`. New library code goes to `lib/`, not here.) |
+| `app/` | Streamlit console for the Atlas data platform. Pages: Overview, Sources & Bronze, **PDF Lab** (single-PDF live extraction; imports from `lib.extract`), **PDF Compare** (vision-LLM backend A/B), **Pipeline Bakeoff** (extraction-architecture comparison with eval-harness scoring). |
+| `corpus/` | The data bench. `_sources/` (raw drops), `bronze/` (canonical staging), `reference/` (terminology snapshots — LOINC, SNOMED, RxNorm; curated subsets tracked, large releases gitignored). See `corpus/README.md`. |
 | `notes/` | Research notes — primarily the Josh-Mandel-stack data lane. |
 | `scripts/` | Utility scripts (privacy-gate validation). |
-| `tests/` | Tests for `ehi_atlas/extract/`. Library-code tests live at `lib/tests/`; FastAPI tests at `api/tests/`. |
+| `tests/` | Atlas-zone tests (Streamlit pages, etc.). Library-extraction tests live at `lib/tests/test_extract/`; FastAPI tests at `api/tests/`. |
 
 ## What does NOT live here
 

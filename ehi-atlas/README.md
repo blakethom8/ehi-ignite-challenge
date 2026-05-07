@@ -36,12 +36,12 @@ make test
 
 | Subdir | Purpose |
 |---|---|
-| `ehi_atlas/extract/` | PDF→FHIR extraction framework — `pipelines/` (Protocol + registry), `bake_off.py`, `eval.py`, `pdf.py` (Anthropic + Google AI Studio backends) |
+| `lib/extract/` | PDF→FHIR extraction framework — `pipelines/` (Protocol + registry), `bake_off.py`, `eval.py`, `pdf.py` (Anthropic + Google AI Studio backends) |
 | `app/` | Streamlit console — overview, Sources & Bronze, **PDF Lab**, **PDF Compare**, **Pipeline Bakeoff** |
 | `corpus/` | Data bench: `_sources/` (raw drops), `bronze/` (canonical staging), `reference/` (terminology snapshots). See `corpus/README.md`. |
 | `notebooks/` | Welcome + bronze-tier notebook |
 | `notes/` | Research notes (Josh-stack data-lane sessions) |
-| `tests/` | Tests for `ehi_atlas/extract/` |
+| `tests/` | Tests for `lib/extract/` |
 | `scripts/` | Privacy-gate validation script |
 
 ## Architecture & experiment journal

@@ -45,10 +45,10 @@ from typing import Any, Literal, Type
 
 from pydantic import BaseModel, Field
 
-from ehi_atlas.extract.cache import CacheKey, ExtractionCache, hash_file
-from ehi_atlas.extract.layout import extract_layout, find_text_bbox
-from ehi_atlas.extract.pdf import VisionBackend, get_backend
-from ehi_atlas.extract.pipelines.base import (
+from lib.extract.cache import CacheKey, ExtractionCache, hash_file
+from lib.extract.layout import extract_layout, find_text_bbox
+from lib.extract.pdf import VisionBackend, get_backend
+from lib.extract.pipelines.base import (
     ExtractionPipeline,
     PipelineMetadata,
     register,
@@ -539,7 +539,7 @@ class MultiPassFHIRPipeline:
 
         # Apply the same coercions extract_from_pdf uses, in case backends
         # emit string-wrapped sub-objects or extra envelope keys.
-        from ehi_atlas.extract.pdf import (
+        from lib.extract.pdf import (
             _coerce_stringified_subobjects,
             _unwrap_extraction_envelope,
         )

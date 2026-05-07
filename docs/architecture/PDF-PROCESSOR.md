@@ -60,7 +60,7 @@ The PDF processor is one adapter among several at Layer 2. It produces the **sam
 
 ### Why we tried an intermediate format first (and abandoned it)
 
-Original justification (preserved in [extract/schemas.py](../../ehi-atlas/ehi_atlas/extract/schemas.py) docstrings): *"Lets prompt authors iterate on extraction quality without touching FHIR serialization, and gives us deterministic FHIR output."*
+Original justification (preserved in [extract/schemas.py](../../lib/extract/schemas.py) docstrings): *"Lets prompt authors iterate on extraction quality without touching FHIR serialization, and gives us deterministic FHIR output."*
 
 What actually happened, measured by the eval harness:
 
@@ -86,7 +86,7 @@ Validation is at the boundary using US Core profiles (subset of full FHIR R4 —
 
 ### Bbox / Provenance preservation
 
-The current `ExtractedLabResult.bbox` field disappears as a top-level field. Instead, every emitted FHIR resource carries a `meta.extension` entry with the source-locator string (`"page=2;bbox=72,574,540,590"`) — same shape we already use in [to_fhir.py](../../ehi-atlas/ehi_atlas/extract/to_fhir.py). No information loss.
+The current `ExtractedLabResult.bbox` field disappears as a top-level field. Instead, every emitted FHIR resource carries a `meta.extension` entry with the source-locator string (`"page=2;bbox=72,574,540,590"`) — same shape we already use in [to_fhir.py](../../lib/extract/to_fhir.py). No information loss.
 
 ---
 
@@ -237,7 +237,7 @@ Three downstream payoffs:
 
 ## Decision 6 — Eval harness is load-bearing
 
-**Decision:** [`ehi_atlas.extract.eval`](../../ehi-atlas/ehi_atlas/extract/eval.py) is the trusted authority on pipeline quality. Architecture decisions are made by running the eval, not by argument.
+**Decision:** [`lib.extract.eval`](../../lib/extract/eval.py) is the trusted authority on pipeline quality. Architecture decisions are made by running the eval, not by argument.
 
 ### What the eval measures
 
@@ -393,7 +393,7 @@ The lab "FPs" are similar: 41 of 41 are an IgE allergen panel correctly extracte
 
 ### Eval upgrades shipped during the bake-off
 
-These improvements ship in [`eval.py`](../../ehi-atlas/ehi_atlas/extract/eval.py); each is documented in `PIPELINE-LOG.md`:
+These improvements ship in [`eval.py`](../../lib/extract/eval.py); each is documented in `PIPELINE-LOG.md`:
 
 1. **`filter_gt_to_findable_in_pdf()`** (Move D) — filter ground-truth facts to those whose codes/displays appear in the PDF text via pdfplumber. Resolves the "GT covers full chart history but PDF is a snapshot" bias.
 2. **`dedupe_gt_facts()`** (Move H) — collapse GT entries that share the same code. Cedars emits one Condition per encounter; without dedup recall was bounded by encounter-multiplicity.
@@ -431,9 +431,9 @@ These are not blockers; they're decisions we'll revisit as data accumulates.
 | Data model: FHIR R4 + USCDI as silver/gold target | [ATLAS-DATA-MODEL.md](./ATLAS-DATA-MODEL.md) |
 | LLM context engineering (5-layer pipeline) | [CONTEXT-ENGINEERING.md](./CONTEXT-ENGINEERING.md) |
 | Data definitions reference | [DATA-DEFINITIONS.md](./DATA-DEFINITIONS.md) |
-| Eval harness implementation | [ehi-atlas/ehi_atlas/extract/eval.py](../../ehi-atlas/ehi_atlas/extract/eval.py) |
-| Backend abstraction (VisionBackend Protocol) | [ehi-atlas/ehi_atlas/extract/pdf.py](../../ehi-atlas/ehi_atlas/extract/pdf.py) |
-| Pipeline contributor guide (after K.1 lands) | `ehi-atlas/ehi_atlas/extract/pipelines/README.md` |
+| Eval harness implementation | [lib/extract/eval.py](../../lib/extract/eval.py) |
+| Backend abstraction (VisionBackend Protocol) | [lib/extract/pdf.py](../../lib/extract/pdf.py) |
+| Pipeline contributor guide (after K.1 lands) | `lib/extract/pipelines/README.md` |
 | Existing PDF Lab Streamlit page | [ehi-atlas/app/pages/03_PDF_Lab.py](../../ehi-atlas/app/pages/03_PDF_Lab.py) |
 | Existing PDF Compare Streamlit page | [ehi-atlas/app/pages/04_PDF_Compare.py](../../ehi-atlas/app/pages/04_PDF_Compare.py) |
 

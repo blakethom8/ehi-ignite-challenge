@@ -48,7 +48,7 @@ Source path: `corpus/bronze/clinical-portfolios/blake_records/cedars-healthskill
 
 A 17-page Quest lab report, surfaced via Function Health's portal, downloaded
 as a PDF. Run through the multi-pass FHIR extraction pipeline
-(`ehi_atlas/extract/pipelines/multipass_fhir.py`), which produces FHIR
+(`lib/extract/pipelines/multipass_fhir.py`), which produces FHIR
 Observations directly — but with **text labels only, no LOINC codes**, because
 Quest's printed reports don't include LOINC alongside the lab name:
 

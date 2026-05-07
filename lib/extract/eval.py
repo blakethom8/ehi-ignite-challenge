@@ -52,7 +52,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Iterable, Literal
 
-from ehi_atlas.extract.schemas import ExtractionResult
+from lib.extract.schemas import ExtractionResult
 
 
 FactType = Literal["condition", "medication", "allergy", "immunization", "lab"]
@@ -562,7 +562,7 @@ def filter_gt_to_findable_in_pdf(
     "findable" — we can't filter what we can't read.
     """
     try:
-        from ehi_atlas.extract.layout import extract_layout
+        from lib.extract.layout import extract_layout
 
         layout = extract_layout(pdf_path)
     except Exception:

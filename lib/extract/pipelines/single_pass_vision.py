@@ -29,18 +29,18 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from ehi_atlas.extract.pdf import extract_lab_pdf
-from ehi_atlas.extract.pipelines.base import (
+from lib.extract.pdf import extract_lab_pdf
+from lib.extract.pipelines.base import (
     ExtractionPipeline,
     PipelineMetadata,
     register,
 )
-from ehi_atlas.extract.schemas import (
+from lib.extract.schemas import (
     ExtractedClinicalNote,
     ExtractedLabReport,
     ExtractionResult,
 )
-from ehi_atlas.extract.to_fhir import (
+from lib.extract.to_fhir import (
     condition_to_fhir,
     lab_result_to_observation,
 )

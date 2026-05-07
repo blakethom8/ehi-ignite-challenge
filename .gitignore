@@ -35,6 +35,10 @@ data/sof.db.tmp
 data/sof_*.db
 data/sof_*.db-*
 
+# lib/extract — vision extraction cache (deterministic SHA-keyed; regenerable)
+lib/extract/.cache/
+lib/extract/.extraction-cache/
+
 # Pitch / reviewer snapshot — intentionally committed (≤ 20 MB, 200 patients).
 # Every other *.db under research/ should stay out of git.
 research/*.db

@@ -36,7 +36,7 @@ corpus/
 
 ## What the live pipeline reads
 
-The PDF → FHIR pipeline (`ehi_atlas/extract/`, exposed via the Streamlit
+The PDF → FHIR pipeline (`lib/extract/`, exposed via the Streamlit
 console) reads from:
 
 | Path | Used by |

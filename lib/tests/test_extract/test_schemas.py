@@ -16,7 +16,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from ehi_atlas.extract.schemas import (
+from lib.extract.schemas import (
     BBox,
     ExtractedClinicalNote,
     ExtractedCondition,

@@ -1,0 +1,184 @@
+{
+  "version": "0.1.0",
+  "generated_at": "2026-04-29",
+  "scope": "Static subset of LOINC codes used by the showcase patient (Rhett759) and the synthesized artifacts. Full LOINC load deferred to Phase 2 (requires free LOINC account download). See corpus/reference/VERSIONS.md.",
+  "source": "Hand-populated from loinc.org public search; codes verified against LOINC 2.77 published release.",
+  "codes": [
+    {
+      "code": "2160-0",
+      "display": "Creatinine [Mass/volume] in Serum or Plasma",
+      "system": "http://loinc.org",
+      "unit": "mg/dL",
+      "category": "chemistry",
+      "notes": "Artifact 5 anchor — PDF creatinine row matched to Synthea Observation via this LOINC code"
+    },
+    {
+      "code": "3094-0",
+      "display": "Urea nitrogen [Mass/volume] in Serum or Plasma",
+      "system": "http://loinc.org",
+      "unit": "mg/dL",
+      "category": "chemistry",
+      "notes": "BUN — part of CMP panel in showcase lab PDF"
+    },
+    {
+      "code": "33914-3",
+      "display": "Glomerular filtration rate/1.73 sq M.predicted [Volume Rate/Area] in Serum or Plasma by Creatinine-based formula (MDRD)",
+      "system": "http://loinc.org",
+      "unit": "mL/min/{1.73_m2}",
+      "category": "chemistry",
+      "notes": "eGFR — calculated renal function marker in CMP"
+    },
+    {
+      "code": "2951-2",
+      "display": "Sodium [Moles/volume] in Serum or Plasma",
+      "system": "http://loinc.org",
+      "unit": "mmol/L",
+      "category": "chemistry",
+      "notes": "CMP electrolyte"
+    },
+    {
+      "code": "2823-3",
+      "display": "Potassium [Moles/volume] in Serum or Plasma",
+      "system": "http://loinc.org",
+      "unit": "mmol/L",
+      "category": "chemistry",
+      "notes": "CMP electrolyte"
+    },
+    {
+      "code": "2075-0",
+      "display": "Chloride [Moles/volume] in Serum or Plasma",
+      "system": "http://loinc.org",
+      "unit": "mmol/L",
+      "category": "chemistry",
+      "notes": "CMP electrolyte"
+    },
+    {
+      "code": "2028-9",
+      "display": "Carbon dioxide, total [Moles/volume] in Serum or Plasma",
+      "system": "http://loinc.org",
+      "unit": "mmol/L",
+      "category": "chemistry",
+      "notes": "CO2 / bicarb — CMP acid-base indicator"
+    },
+    {
+      "code": "2345-7",
+      "display": "Glucose [Mass/volume] in Serum or Plasma",
+      "system": "http://loinc.org",
+      "unit": "mg/dL",
+      "category": "chemistry",
+      "notes": "Random glucose — CMP; Rhett759 has prediabetes"
+    },
+    {
+      "code": "1558-6",
+      "display": "Fasting glucose [Mass/volume] in Serum or Plasma",
+      "system": "http://loinc.org",
+      "unit": "mg/dL",
+      "category": "chemistry",
+      "notes": "Fasting glucose — relevant to prediabetes monitoring"
+    },
+    {
+      "code": "4548-4",
+      "display": "Hemoglobin A1c/Hemoglobin.total in Blood",
+      "system": "http://loinc.org",
+      "unit": "%",
+      "category": "chemistry",
+      "notes": "HbA1c — diabetes/prediabetes monitoring for Rhett759"
+    },
+    {
+      "code": "17861-6",
+      "display": "Calcium [Mass/volume] in Serum or Plasma",
+      "system": "http://loinc.org",
+      "unit": "mg/dL",
+      "category": "chemistry",
+      "notes": "CMP calcium — also relevant in cancer context"
+    },
+    {
+      "code": "2885-2",
+      "display": "Protein [Mass/volume] in Serum or Plasma",
+      "system": "http://loinc.org",
+      "unit": "g/dL",
+      "category": "chemistry",
+      "notes": "Total protein — CMP nutritional/hepatic marker"
+    },
+    {
+      "code": "1751-7",
+      "display": "Albumin [Mass/volume] in Serum or Plasma",
+      "system": "http://loinc.org",
+      "unit": "g/dL",
+      "category": "chemistry",
+      "notes": "Albumin — CMP hepatic/nutritional; low in malignancy"
+    },
+    {
+      "code": "1742-6",
+      "display": "Alanine aminotransferase [Enzymatic activity/volume] in Serum or Plasma",
+      "system": "http://loinc.org",
+      "unit": "U/L",
+      "category": "chemistry",
+      "notes": "ALT — hepatic enzyme, CMP liver panel"
+    },
+    {
+      "code": "1920-8",
+      "display": "Aspartate aminotransferase [Enzymatic activity/volume] in Serum or Plasma",
+      "system": "http://loinc.org",
+      "unit": "U/L",
+      "category": "chemistry",
+      "notes": "AST — hepatic enzyme, CMP liver panel"
+    },
+    {
+      "code": "6768-6",
+      "display": "Alkaline phosphatase [Enzymatic activity/volume] in Serum or Plasma",
+      "system": "http://loinc.org",
+      "unit": "U/L",
+      "category": "chemistry",
+      "notes": "Alk phos — hepatic/bone marker, CMP; elevated in metastatic cancer"
+    },
+    {
+      "code": "1975-2",
+      "display": "Bilirubin.total [Mass/volume] in Serum or Plasma",
+      "system": "http://loinc.org",
+      "unit": "mg/dL",
+      "category": "chemistry",
+      "notes": "Total bilirubin — CMP liver panel"
+    },
+    {
+      "code": "718-7",
+      "display": "Hemoglobin [Mass/volume] in Blood",
+      "system": "http://loinc.org",
+      "unit": "g/dL",
+      "category": "hematology",
+      "notes": "Hemoglobin — anemia indicator; Rhett759 has anemia as active condition"
+    },
+    {
+      "code": "8480-6",
+      "display": "Systolic blood pressure",
+      "system": "http://loinc.org",
+      "unit": "mm[Hg]",
+      "category": "vital",
+      "notes": "Systolic BP — HTN monitoring (Cerner CCDA patient)"
+    },
+    {
+      "code": "8462-4",
+      "display": "Diastolic blood pressure",
+      "system": "http://loinc.org",
+      "unit": "mm[Hg]",
+      "category": "vital",
+      "notes": "Diastolic BP — HTN monitoring (Cerner CCDA patient)"
+    },
+    {
+      "code": "39156-5",
+      "display": "Body mass index (BMI) [Ratio]",
+      "system": "http://loinc.org",
+      "unit": "kg/m2",
+      "category": "vital",
+      "notes": "BMI — metabolic risk in COPD and cancer pre-op context"
+    },
+    {
+      "code": "11506-3",
+      "display": "Progress note",
+      "system": "http://loinc.org",
+      "unit": null,
+      "category": "document",
+      "notes": "Document type code for the planted clinical note (Artifact 4, DocumentReference); see corpus/_sources/synthesized-clinical-note/"
+    }
+  ]
+}

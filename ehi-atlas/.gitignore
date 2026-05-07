@@ -4,15 +4,19 @@
 corpus/_sources/blake-cedars/
 corpus/_sources/devon-cedars/
 corpus/_sources/cedars-portal-pdfs/
+corpus/_sources/bt-kaiser-portal/
 corpus/_sources/blake-cedars/raw/
 corpus/_sources/devon-cedars/raw/
 corpus/_sources/cedars-portal-pdfs/raw/
+corpus/_sources/bt-kaiser-portal/raw/
 
 # Personal source raw artifacts at top level
 corpus/_sources/blake-cedars/*.json
 corpus/_sources/blake-cedars/*.zip
 corpus/_sources/devon-cedars/*.json
 corpus/_sources/devon-cedars/*.zip
+corpus/_sources/bt-kaiser-portal/*.PDF
+corpus/_sources/bt-kaiser-portal/*.pdf
 
 # --- Bronze/silver/gold tier outputs ---------------------------------
 # These are reproducible from sources; don't commit.
@@ -43,7 +47,7 @@ corpus/_sources/josh-ccdas/raw/
 corpus/_sources/josh-epic-ehi/raw/
 
 # --- Vision extraction cache -----------------------------------------
-ehi_atlas/extract/.cache/
+# Note: extract/ moved to lib/extract/ in May 2026. Cache rule there.
 .extraction-cache/
 
 # --- PDF Lab uploads -------------------------------------------------

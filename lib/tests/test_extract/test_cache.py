@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from ehi_atlas.extract.cache import CacheKey, ExtractionCache, hash_file
+from lib.extract.cache import CacheKey, ExtractionCache, hash_file
 
 
 # ---------------------------------------------------------------------------

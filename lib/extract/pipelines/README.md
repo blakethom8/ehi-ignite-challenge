@@ -14,7 +14,7 @@ For the *why* behind this design (instead of the how), see [`docs/architecture/P
 
 ```python
 from pathlib import Path
-from ehi_atlas.extract.pipelines import (
+from lib.extract.pipelines import (
     ExtractionPipeline,
     PipelineMetadata,
     register,
@@ -118,10 +118,10 @@ Models are stochastic, so "deterministic" means "given a configured backend that
 Cache aggressively to avoid burning quota on repeat eval runs. Recommended location:
 
 ```
-ehi-atlas/ehi_atlas/extract/.cache/pipelines/<pipeline-name>/<pdf-sha256>.json
+ehi-atlas/lib/extract/.cache/pipelines/<pipeline-name>/<pdf-sha256>.json
 ```
 
-(Already gitignored.) Use the existing `ehi_atlas.extract.cache.ExtractionCache` if you want — it's content-hash keyed and survives across sessions.
+(Already gitignored.) Use the existing `lib.extract.cache.ExtractionCache` if you want — it's content-hash keyed and survives across sessions.
 
 But the bake-off harness will sometimes pass `skip_cache=True` to force a live run. Your `extract()` method should accept this via a kwarg or via a constructor flag — see how `SinglePassVisionPipeline` does it once it lands.
 
@@ -133,20 +133,20 @@ You don't need to rebuild any of this:
 
 | Module | What it gives you |
 |---|---|
-| [`ehi_atlas.extract.pdf`](../pdf.py) | `VisionBackend` Protocol, `AnthropicBackend`, `GoogleAIStudioBackend` (with automatic page chunking for long PDFs), `get_backend()` selector, response-coercion helpers (`_coerce_stringified_subobjects`, `_unwrap_extraction_envelope`), bbox calibration via pdfplumber (`_calibrate_bboxes_via_layout`). Use these. |
-| [`ehi_atlas.extract.layout`](../layout.py) | PDF rasterization + per-page text+bbox extraction via pdfplumber. The `extract_layout()` function returns a `DocumentLayout` you can use to look up bboxes for any text on any page. |
-| [`ehi_atlas.extract.cache`](../cache.py) | Content-hash cache, atomic writes, deterministic-replay guarantee. |
-| [`ehi_atlas.extract.uploads`](../uploads.py) | If you need to round-trip arbitrary PDFs through the corpus. |
-| [`ehi_atlas.extract.eval`](../eval.py) | The eval harness — what the bake-off uses to score you. Includes `filter_gt_to_findable_in_pdf()` so recall is measured against facts actually in the PDF, not the patient's full chart history. Worth reading to see what your output gets compared against. |
-| [`ehi_atlas.extract.bake_off`](../bake_off.py) | The bake-off harness. `bake_off(pipelines, pairs, findable_only=True)` runs every (pipeline × pdf) cell, scores against ground truth, returns a list of `BakeoffCell` ready for markdown rendering or Streamlit display. |
+| [`lib.extract.pdf`](../pdf.py) | `VisionBackend` Protocol, `AnthropicBackend`, `GoogleAIStudioBackend` (with automatic page chunking for long PDFs), `get_backend()` selector, response-coercion helpers (`_coerce_stringified_subobjects`, `_unwrap_extraction_envelope`), bbox calibration via pdfplumber (`_calibrate_bboxes_via_layout`). Use these. |
+| [`lib.extract.layout`](../layout.py) | PDF rasterization + per-page text+bbox extraction via pdfplumber. The `extract_layout()` function returns a `DocumentLayout` you can use to look up bboxes for any text on any page. |
+| [`lib.extract.cache`](../cache.py) | Content-hash cache, atomic writes, deterministic-replay guarantee. |
+| [`lib.extract.uploads`](../uploads.py) | If you need to round-trip arbitrary PDFs through the corpus. |
+| [`lib.extract.eval`](../eval.py) | The eval harness — what the bake-off uses to score you. Includes `filter_gt_to_findable_in_pdf()` so recall is measured against facts actually in the PDF, not the patient's full chart history. Worth reading to see what your output gets compared against. |
+| [`lib.extract.bake_off`](../bake_off.py) | The bake-off harness. `bake_off(pipelines, pairs, findable_only=True)` runs every (pipeline × pdf) cell, scores against ground truth, returns a list of `BakeoffCell` ready for markdown rendering or Streamlit display. |
 
 ---
 
 ## How the bake-off harness consumes your pipeline
 
 ```python
-from ehi_atlas.extract.pipelines import get
-from ehi_atlas.extract.eval import evaluate, format_markdown
+from lib.extract.pipelines import get
+from lib.extract.eval import evaluate, format_markdown
 
 pipeline_cls = get("my-pipeline")
 pipeline = pipeline_cls()  # construct with default config
@@ -183,7 +183,7 @@ These are observations from building the baseline — feel free to apply or igno
 
 If you're contributing from outside this repo (Cursor session, Codex run, Aider session, etc.):
 
-1. Implement your pipeline as a single Python module under `ehi_atlas/extract/pipelines/`.
+1. Implement your pipeline as a single Python module under `lib/extract/pipelines/`.
 2. Add an import line in `pipelines/__init__.py` so the registry picks it up.
 3. Run `uv run --quiet pytest tests/extract/ -q` to confirm nothing breaks.
 4. Run the bake-off against at least one PDF + ground-truth pair to confirm your `extract()` returns a valid Bundle.

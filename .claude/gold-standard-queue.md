@@ -291,29 +291,29 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 
 ### REVIEW-T01 · Ground-truth schema + on-disk format
 
-- **Status:** Queued (next session)
+- **Status:** ✅ Completed `f27d9fc` · 2026-05-07 · 543 tests pass
 - **Goal:** Define the schema for `data/pdf-lab/ground-truth/<pdf-sha>-vN.json` and a Python module that reads/writes it.
 
 (Detailed brief written when Step 1 lands.)
 
 ### REVIEW-T02 · `lab review --run <id>` CLI
 
-- **Status:** Queued (next session)
+- **Status:** ✅ Completed `f12618f` · 2026-05-07 · 561 tests pass
 - **Goal:** CLI subcommand that walks each fact in a run's bundle, prompts the user for ✓ / ✗ / edit, persists the result as a versioned ground-truth file.
 
 ### REVIEW-T03 · Versioning + audit trail
 
-- **Status:** Queued (next session)
-- **Goal:** Each ground-truth file carries reviewer name, decision per fact, timestamp; older versions kept for audit.
+- **Status:** ✅ Absorbed by REVIEW-T01 + REVIEW-T02 · 2026-05-07
+- **Note:** The originally-scoped "versioning + audit trail" was redundant once T01 + T02 shipped. T01's `GroundTruthVersion` carries `reviewer`, `created_at`, `version`, `source_run_id`, `notes`. T02's per-fact `decisions` list carries `resource_id`, `resource_type`, `decision`, `reviewed_at`. Older versions are retained immutably under `vN.json`. Nothing further to build.
 
 ### EVAL-T01 · Lab CLI auto-loads ground truth when pdf-sha matches
 
-- **Status:** Queued (next session)
+- **Status:** ✅ Completed `5e5cf17` · 2026-05-07 · 570 tests pass
 - **Goal:** When running a pipeline against a PDF that has a verified ground-truth file, automatically use that as the eval reference (overrides any manually-passed --ground-truth).
 
 ### EVAL-T02 · Vision-wins triage workflow
 
-- **Status:** Queued (next session)
+- **Status:** ✅ Completed `64b9651` · 2026-05-07 · 584 tests pass
 - **Goal:** Production extras (facts in run but not in ground truth) get surfaced via a CLI subcommand. Reviewer either incorporates them into the GT or marks them as hallucinations.
 
 ---

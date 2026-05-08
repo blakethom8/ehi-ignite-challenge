@@ -298,13 +298,14 @@ def test_clinical_note_id_is_stable() -> None:
 
 
 # ---------------------------------------------------------------------------
-# 10. Encounter linkage skips DocumentReference and Composition
+# 10. Encounter linkage now covers DocumentReference and Composition (T08)
 # ---------------------------------------------------------------------------
 
 
-def test_encounter_linkage_skips_clinical_notes() -> None:
+def test_encounter_linkage_links_clinical_notes() -> None:
     """Entries with one Encounter + DocumentReference + Composition →
-    after _assign_encounter_references, neither has an 'encounter' field."""
+    after _assign_encounter_references (T08), both are linked to the encounter.
+    DocumentReference uses context.encounter[], Composition uses encounter."""
     pipeline = _new_pipeline()
     enc = {
         "resourceType": "Encounter",
@@ -329,5 +330,11 @@ def test_encounter_linkage_skips_clinical_notes() -> None:
 
     pipeline._assign_encounter_references(entries)
 
-    assert "encounter" not in doc_ref
-    assert "encounter" not in composition
+    # DocumentReference uses FHIR R4 context.encounter[] (a list)
+    ctx = doc_ref.get("context") or {}
+    enc_refs = ctx.get("encounter") or []
+    assert len(enc_refs) == 1
+    assert enc_refs[0]["reference"] == "Encounter/enc-abc123"
+
+    # Composition uses FHIR R4 encounter (singular)
+    assert composition["encounter"]["reference"] == "Encounter/enc-abc123"

@@ -1027,41 +1027,39 @@ class MultiPassFHIRPipeline:
     # ------------------------------------------------------------------
 
     def _assign_encounter_references(self, entries: list[dict[str, Any]]) -> None:
-        """Mutate entries in place to add ``encounter: {reference: "Encounter/<id>"}``
-        on encounter-scopable resources, using two strategies:
+        """Mutate entries in place to add encounter references on encounter-
+        scopable resources.
 
-        1. Single-encounter shortcut: if exactly one Encounter resource exists in
-           the bundle, link every encounter-scopable resource to it.
-        2. Date-match fallback: if multiple encounters exist, link each resource
-           to the encounter whose period.start (or period date-only) matches
-           the resource's effectiveDateTime / occurrenceDateTime / authored
-           date — at day precision.
+        Strategies (in order of preference per resource):
+        1. Single-encounter shortcut: one Encounter in bundle → link everything.
+        2. Date + author match: for DocumentReference / Composition, match on
+           (date, author display) since notes have explicit authorship.
+        3. Date match: fall back to day-precision date match for resources with
+           a date field.
 
         Resources NOT linked: Patient, Practitioner, Organization, Coverage,
-        DocumentReference (until T08), Composition (until T08). Encounters
-        themselves are obviously not self-linked.
+        Encounter (self).
         """
-        # Collect Encounter resources from entries
         encounters = [
             e["resource"] for e in entries
             if e["resource"].get("resourceType") == "Encounter"
         ]
         if not encounters:
-            return  # nothing to link
+            return
 
-        # Build date → encounter_id map (day precision, ISO-8601)
-        enc_by_date: dict[str, str] = {}
+        # Build day-precision date → list of encounters map (multiple encounters
+        # can share a date)
+        enc_by_date: dict[str, list[dict[str, Any]]] = {}
         for enc in encounters:
             period = enc.get("period") or {}
             start = period.get("start") or ""
             if start:
-                day = start[:10]  # "YYYY-MM-DD" prefix
-                enc_by_date.setdefault(day, enc["id"])
+                day = start[:10]
+                enc_by_date.setdefault(day, []).append(enc)
 
         single_encounter_id = encounters[0]["id"] if len(encounters) == 1 else None
 
-        # Resource types that should carry encounter linkage
-        LINKABLE = {
+        LINKABLE_VIA_ENCOUNTER_FIELD = {
             "Observation",
             "Condition",
             "MedicationRequest",
@@ -1069,8 +1067,8 @@ class MultiPassFHIRPipeline:
             "Immunization",
             "AllergyIntolerance",
             "DiagnosticReport",
+            "Composition",
         }
-        # Date fields per resource type (FHIR R4 conventions)
         DATE_FIELDS = {
             "Observation": "effectiveDateTime",
             "Condition": "onsetDateTime",
@@ -1079,32 +1077,73 @@ class MultiPassFHIRPipeline:
             "Immunization": "occurrenceDateTime",
             "AllergyIntolerance": "recordedDate",
             "DiagnosticReport": "effectiveDateTime",
+            "Composition": "date",
+            "DocumentReference": "date",
         }
+
+        def _match_encounter_for(resource: dict[str, Any]) -> str | None:
+            """Return matched encounter ID or None."""
+            rt = resource.get("resourceType")
+
+            # Strategy 1: single-encounter shortcut
+            if single_encounter_id is not None:
+                return single_encounter_id
+
+            # Strategy 2: date + author match (DocumentReference / Composition only)
+            author_display = None
+            if rt in ("DocumentReference", "Composition"):
+                authors = resource.get("author") or []
+                if authors:
+                    author_display = (authors[0].get("display") or "").strip()
+
+            date_field = DATE_FIELDS.get(rt)
+            date_value = resource.get(date_field) if date_field else None
+            if not date_value:
+                return None
+            day = date_value[:10]
+            candidates = enc_by_date.get(day) or []
+            if not candidates:
+                return None
+            if len(candidates) == 1:
+                return candidates[0]["id"]
+            # Multiple encounters on the same day — author match if available
+            if author_display:
+                for c in candidates:
+                    participants = c.get("participant") or []
+                    for p in participants:
+                        individual = (p.get("individual") or {}).get("display") or ""
+                        if individual.strip() and individual.strip() in author_display:
+                            return c["id"]
+                        if author_display in individual.strip():
+                            return c["id"]
+            # Fallback: first candidate
+            return candidates[0]["id"]
 
         for entry in entries:
             resource = entry["resource"]
             rt = resource.get("resourceType")
-            if rt not in LINKABLE:
-                continue
-            if "encounter" in resource:
-                continue  # already linked (e.g. by an upstream pass)
 
-            # Strategy 1: single-encounter shortcut
-            if single_encounter_id is not None:
-                resource["encounter"] = {"reference": f"Encounter/{single_encounter_id}"}
+            if rt == "DocumentReference":
+                # Skip if already linked
+                ctx = resource.get("context") or {}
+                if ctx.get("encounter"):
+                    continue
+                matched = _match_encounter_for(resource)
+                if matched:
+                    resource.setdefault("context", {})
+                    resource["context"]["encounter"] = [{"reference": f"Encounter/{matched}"}]
                 continue
 
-            # Strategy 2: date-match
-            date_field = DATE_FIELDS.get(rt)
-            if not date_field:
+            if rt in LINKABLE_VIA_ENCOUNTER_FIELD:
+                if "encounter" in resource:
+                    continue
+                matched = _match_encounter_for(resource)
+                if matched:
+                    resource["encounter"] = {"reference": f"Encounter/{matched}"}
                 continue
-            date_value = resource.get(date_field) or ""
-            if not date_value:
-                continue
-            day = date_value[:10]
-            matched_id = enc_by_date.get(day)
-            if matched_id:
-                resource["encounter"] = {"reference": f"Encounter/{matched_id}"}
+
+            # Other resources (Patient, Practitioner, Organization, Coverage,
+            # Encounter itself) are not linked.
 
     def _merge_to_bundle(
         self,

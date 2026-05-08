@@ -165,3 +165,147 @@ def test_existing_encounter_reference_preserved() -> None:
 
     # Original reference must be intact
     assert obs["encounter"]["reference"] == "Encounter/enc-original"
+
+
+# ---------------------------------------------------------------------------
+# 8. DocumentReference — single-encounter shortcut
+# ---------------------------------------------------------------------------
+
+
+def test_documentreference_single_encounter_shortcut() -> None:
+    """1 Encounter + 1 DocumentReference (no date) → DocumentReference.context.encounter linked."""
+    pipeline = _new_pipeline()
+    enc = {"resourceType": "Encounter", "id": "enc-doc-001", "period": {"start": "2026-01-10"}}
+    doc = {"resourceType": "DocumentReference", "status": "current"}
+    entries = _make_entries(enc, doc)
+
+    pipeline._assign_encounter_references(entries)
+
+    ctx = doc.get("context") or {}
+    enc_refs = ctx.get("encounter") or []
+    assert len(enc_refs) == 1
+    assert enc_refs[0]["reference"] == "Encounter/enc-doc-001"
+
+
+# ---------------------------------------------------------------------------
+# 9. Composition — single-encounter shortcut
+# ---------------------------------------------------------------------------
+
+
+def test_composition_single_encounter_shortcut() -> None:
+    """1 Encounter + 1 Composition → Composition.encounter.reference linked."""
+    pipeline = _new_pipeline()
+    enc = {"resourceType": "Encounter", "id": "enc-comp-001", "period": {"start": "2026-02-15"}}
+    comp = {"resourceType": "Composition", "title": "Discharge Summary", "date": "2026-02-15"}
+    entries = _make_entries(enc, comp)
+
+    pipeline._assign_encounter_references(entries)
+
+    assert comp["encounter"]["reference"] == "Encounter/enc-comp-001"
+
+
+# ---------------------------------------------------------------------------
+# 10. DocumentReference — date match with multiple encounters on different days
+# ---------------------------------------------------------------------------
+
+
+def test_documentreference_date_match_with_multiple_encounters() -> None:
+    """2 Encounters on different dates, 1 DocumentReference with date matching one → linked correctly."""
+    pipeline = _new_pipeline()
+    enc_a = {"resourceType": "Encounter", "id": "enc-2026-03", "period": {"start": "2026-03-10"}}
+    enc_b = {"resourceType": "Encounter", "id": "enc-2026-07", "period": {"start": "2026-07-22"}}
+    doc = {"resourceType": "DocumentReference", "status": "current", "date": "2026-07-22"}
+    entries = _make_entries(enc_a, enc_b, doc)
+
+    pipeline._assign_encounter_references(entries)
+
+    ctx = doc.get("context") or {}
+    enc_refs = ctx.get("encounter") or []
+    assert len(enc_refs) == 1
+    assert enc_refs[0]["reference"] == "Encounter/enc-2026-07"
+
+
+# ---------------------------------------------------------------------------
+# 11. DocumentReference — author disambiguates same-day encounters
+# ---------------------------------------------------------------------------
+
+
+def test_documentreference_author_disambiguates_same_day_encounters() -> None:
+    """2 Encounters on the same date with different participant.individual.display;
+    DocumentReference with matching author → resolved to the correct encounter."""
+    pipeline = _new_pipeline()
+    enc_a = {
+        "resourceType": "Encounter",
+        "id": "enc-smith",
+        "period": {"start": "2026-04-05"},
+        "participant": [{"individual": {"display": "Dr. Smith"}}],
+    }
+    enc_b = {
+        "resourceType": "Encounter",
+        "id": "enc-jones",
+        "period": {"start": "2026-04-05"},
+        "participant": [{"individual": {"display": "Dr. Jones"}}],
+    }
+    doc = {
+        "resourceType": "DocumentReference",
+        "status": "current",
+        "date": "2026-04-05",
+        "author": [{"display": "Dr. Jones"}],
+    }
+    entries = _make_entries(enc_a, enc_b, doc)
+
+    pipeline._assign_encounter_references(entries)
+
+    ctx = doc.get("context") or {}
+    enc_refs = ctx.get("encounter") or []
+    assert len(enc_refs) == 1
+    assert enc_refs[0]["reference"] == "Encounter/enc-jones"
+
+
+# ---------------------------------------------------------------------------
+# 12. Composition — existing encounter reference preserved
+# ---------------------------------------------------------------------------
+
+
+def test_composition_existing_encounter_reference_preserved() -> None:
+    """Composition already has encounter field → helper does NOT overwrite it."""
+    pipeline = _new_pipeline()
+    enc = {"resourceType": "Encounter", "id": "enc-new-comp", "period": {"start": "2026-05-01"}}
+    comp = {
+        "resourceType": "Composition",
+        "title": "Progress Note",
+        "date": "2026-05-01",
+        "encounter": {"reference": "Encounter/enc-original-comp"},
+    }
+    entries = _make_entries(enc, comp)
+
+    pipeline._assign_encounter_references(entries)
+
+    assert comp["encounter"]["reference"] == "Encounter/enc-original-comp"
+
+
+# ---------------------------------------------------------------------------
+# 13. DocumentReference — existing context.encounter preserved
+# ---------------------------------------------------------------------------
+
+
+def test_documentreference_existing_context_encounter_preserved() -> None:
+    """DocumentReference already has context.encounter → helper does NOT overwrite it."""
+    pipeline = _new_pipeline()
+    enc = {"resourceType": "Encounter", "id": "enc-new-doc", "period": {"start": "2026-06-10"}}
+    doc = {
+        "resourceType": "DocumentReference",
+        "status": "current",
+        "date": "2026-06-10",
+        "context": {
+            "encounter": [{"reference": "Encounter/enc-original-doc"}],
+        },
+    }
+    entries = _make_entries(enc, doc)
+
+    pipeline._assign_encounter_references(entries)
+
+    ctx = doc.get("context") or {}
+    enc_refs = ctx.get("encounter") or []
+    assert len(enc_refs) == 1
+    assert enc_refs[0]["reference"] == "Encounter/enc-original-doc"

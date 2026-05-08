@@ -1541,8 +1541,24 @@ class MultiPassFHIRPipeline:
         pdf_path: Path,
         *,
         skip_cache: bool = False,
+        recorder: "Any | None" = None,
     ) -> dict[str, Any]:
-        """Run document-context pass + per-resource passes in parallel; merge to Bundle."""
+        """Run document-context pass + per-resource passes in parallel; merge to Bundle.
+
+        Args:
+            pdf_path: Path to the PDF to extract.
+            skip_cache: When True, bypass the extraction cache and re-run all passes.
+            recorder: Optional :class:`lib.extract.lab.RunRecorder` instance. When
+                provided, every pass (Pass 0 and all specialist passes) writes full
+                trace artifacts (prompt, response, usage, extraction) to disk. On
+                completion ``recorder.finish(bundle=...)`` is called automatically.
+                Production callers that omit this argument pay zero cost — the
+                recorder code paths are dead without it.
+        """
+        import time
+        import json as _json
+        from lib.extract.lab.cost import estimate_cost
+
         pdf_bytes = pdf_path.read_bytes()
         pdf_hash = hash_file(pdf_path)
 
@@ -1553,70 +1569,184 @@ class MultiPassFHIRPipeline:
         self._pass_0_pdf_hash: str = pdf_hash
         self._pass_0_skip_cache: bool = skip_cache
 
-        # Pass 0 — document context (schema/prompt resolved via hook methods
-        # so subclasses can swap in richer types without re-implementing the
-        # full extract() method).
-        pass_0_raw = self._invoke_pass_0(
-            pdf_bytes=pdf_bytes,
-            pdf_hash=pdf_hash,
-            skip_cache=skip_cache,
-        )
-        doc_context = self._doc_context_from_pass_0(pass_0_raw)
+        def _build_usage(
+            prompt: str,
+            extraction_dict: dict[str, Any],
+            latency_ms: int,
+            model: str | None,
+        ) -> dict[str, Any]:
+            """Build a usage dict using character-length token estimation.
 
-        # Build context-augmented prompt suffix for the rest of the passes
-        context_suffix = (
-            f"\n\n--- DOCUMENT CONTEXT (provided to ensure consistency across "
-            f"resources) ---\n"
-            f"document_type: {doc_context.document_type}\n"
-            f"patient_name: {doc_context.patient_name}\n"
-            f"patient_dob: {doc_context.patient_dob}\n"
-            f"encounter_date: {doc_context.encounter_date}\n"
-            f"ordering_provider: {doc_context.ordering_provider}\n"
-            f"facility_name: {doc_context.facility_name}\n"
-            f"--- end context ---"
-        )
+            The backends return only the extracted dict, not API usage metadata.
+            We estimate token counts from character lengths (÷4 is a rough
+            approximation for English/clinical text) and flag the entry so
+            downstream consumers know these aren't API-reported counts.
+            """
+            input_tokens = max(1, len(prompt) // 4)
+            output_tokens = max(1, len(_json.dumps(extraction_dict)) // 4)
+            cost_usd = estimate_cost(
+                model=model,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+            )
+            return {
+                "input_tokens": input_tokens,
+                "output_tokens": output_tokens,
+                "latency_ms": latency_ms,
+                "cost_usd": cost_usd,
+                "estimated": True,
+            }
 
-        # Per-resource passes — parallel.  The pass list is resolved via
-        # _specialist_passes() so subclasses can filter or augment without
-        # re-implementing the concurrency machinery.
-        active_passes = self._specialist_passes(doc_context)
-        per_pass_outputs: dict[str, BaseModel] = {}
-        with ThreadPoolExecutor(max_workers=self._max_workers) as pool:
-            futures = {
-                pool.submit(
-                    self._run_pass,
+        try:
+            # Pass 0 — document context (schema/prompt resolved via hook methods
+            # so subclasses can swap in richer types without re-implementing the
+            # full extract() method).
+            pass_0_prompt = self._pass_0_prompt()
+            t0_start = time.perf_counter()
+            pass_0_raw = self._invoke_pass_0(
+                pdf_bytes=pdf_bytes,
+                pdf_hash=pdf_hash,
+                skip_cache=skip_cache,
+            )
+            t0_latency_ms = int((time.perf_counter() - t0_start) * 1000)
+            doc_context = self._doc_context_from_pass_0(pass_0_raw)
+
+            if recorder is not None:
+                pass_0_extraction = pass_0_raw.model_dump()
+                recorder.log_pass(
+                    pass_name="document_context",
+                    prompt=pass_0_prompt,
+                    response=pass_0_extraction,
+                    usage=_build_usage(
+                        prompt=pass_0_prompt,
+                        extraction_dict=pass_0_extraction,
+                        latency_ms=t0_latency_ms,
+                        model=self._model,
+                    ),
+                    extraction=pass_0_extraction,
+                )
+
+            # Build context-augmented prompt suffix for the rest of the passes
+            context_suffix = (
+                f"\n\n--- DOCUMENT CONTEXT (provided to ensure consistency across "
+                f"resources) ---\n"
+                f"document_type: {doc_context.document_type}\n"
+                f"patient_name: {doc_context.patient_name}\n"
+                f"patient_dob: {doc_context.patient_dob}\n"
+                f"encounter_date: {doc_context.encounter_date}\n"
+                f"ordering_provider: {doc_context.ordering_provider}\n"
+                f"facility_name: {doc_context.facility_name}\n"
+                f"--- end context ---"
+            )
+
+            # Per-resource passes — parallel.  The pass list is resolved via
+            # _specialist_passes() so subclasses can filter or augment without
+            # re-implementing the concurrency machinery.
+            active_passes = self._specialist_passes(doc_context)
+            per_pass_outputs: dict[str, BaseModel] = {}
+
+            # When recording, wrap each pass submission to capture (prompt,
+            # result, latency) and call recorder.log_pass() after the future
+            # completes. The timing wraps the _run_pass call inside the thread.
+            def _run_pass_timed(
+                p: ExtractionPass,
+                full_prompt: str,
+            ) -> tuple[BaseModel, int]:
+                """Run one pass and return (validated_output, latency_ms)."""
+                t_start = time.perf_counter()
+                result = self._run_pass(
                     pass_name=p.name,
                     schema=p.schema,
-                    system_prompt=p.system_prompt + context_suffix,
+                    system_prompt=full_prompt,
                     pdf_bytes=pdf_bytes,
                     pdf_hash=pdf_hash,
                     skip_cache=skip_cache,
                     extra_user_text=None,
                     prompt_version=p.prompt_version,
                     schema_version=p.schema_version,
-                ): p
-                for p in active_passes
-            }
-            for future in as_completed(futures):
-                p = futures[future]
-                try:
-                    per_pass_outputs[p.name] = future.result()
-                except Exception as e:
-                    # Per-pass failure is captured but doesn't kill the pipeline.
-                    # Empty output for that pass; pipeline still emits a
-                    # partial Bundle. The bake-off cell will reflect lower
-                    # recall but completes successfully.
-                    per_pass_outputs[p.name] = p.schema()  # empty instance
-                    print(f"[multipass-fhir] pass {p.name!r} failed: {type(e).__name__}: {e}")
+                )
+                latency_ms = int((time.perf_counter() - t_start) * 1000)
+                return result, latency_ms
 
-        # Merger — convert per-pass outputs to FHIR resources, build Bundle
-        layout = self._safe_extract_layout(pdf_path)
-        bundle = self._merge_to_bundle(
-            doc_context=doc_context,
-            per_pass=per_pass_outputs,
-            pdf_path=pdf_path,
-            layout=layout,
-        )
+            with ThreadPoolExecutor(max_workers=self._max_workers) as pool:
+                if recorder is not None:
+                    # Timed path: submit _run_pass_timed so we get latency back
+                    futures_timed = {
+                        pool.submit(
+                            _run_pass_timed,
+                            p,
+                            p.system_prompt + context_suffix,
+                        ): p
+                        for p in active_passes
+                    }
+                    for future in as_completed(futures_timed):
+                        p = futures_timed[future]
+                        full_prompt = p.system_prompt + context_suffix
+                        try:
+                            result, latency_ms = future.result()
+                            per_pass_outputs[p.name] = result
+                            extraction_dict = result.model_dump()
+                            override = self._pass_overrides.get(p.name, {})
+                            pass_model = override.get("model") or self._model
+                            recorder.log_pass(
+                                pass_name=p.name,
+                                prompt=full_prompt,
+                                response=extraction_dict,
+                                usage=_build_usage(
+                                    prompt=full_prompt,
+                                    extraction_dict=extraction_dict,
+                                    latency_ms=latency_ms,
+                                    model=pass_model,
+                                ),
+                                extraction=extraction_dict,
+                            )
+                        except Exception as e:
+                            per_pass_outputs[p.name] = p.schema()  # empty instance
+                            print(f"[multipass-fhir] pass {p.name!r} failed: {type(e).__name__}: {e}")
+                else:
+                    # Untimed path (recorder=None) — original behaviour, zero overhead.
+                    futures = {
+                        pool.submit(
+                            self._run_pass,
+                            pass_name=p.name,
+                            schema=p.schema,
+                            system_prompt=p.system_prompt + context_suffix,
+                            pdf_bytes=pdf_bytes,
+                            pdf_hash=pdf_hash,
+                            skip_cache=skip_cache,
+                            extra_user_text=None,
+                            prompt_version=p.prompt_version,
+                            schema_version=p.schema_version,
+                        ): p
+                        for p in active_passes
+                    }
+                    for future in as_completed(futures):
+                        p = futures[future]
+                        try:
+                            per_pass_outputs[p.name] = future.result()
+                        except Exception as e:
+                            # Per-pass failure is captured but doesn't kill the pipeline.
+                            # Empty output for that pass; pipeline still emits a
+                            # partial Bundle. The bake-off cell will reflect lower
+                            # recall but completes successfully.
+                            per_pass_outputs[p.name] = p.schema()  # empty instance
+                            print(f"[multipass-fhir] pass {p.name!r} failed: {type(e).__name__}: {e}")
+
+            # Merger — convert per-pass outputs to FHIR resources, build Bundle
+            layout = self._safe_extract_layout(pdf_path)
+            bundle = self._merge_to_bundle(
+                doc_context=doc_context,
+                per_pass=per_pass_outputs,
+                pdf_path=pdf_path,
+                layout=layout,
+            )
+        except Exception as exc:
+            if recorder is not None:
+                recorder.finish(bundle={}, status="failed", error=str(exc))
+            raise
+
+        if recorder is not None:
+            recorder.finish(bundle=bundle)
         return bundle
 
     # ------------------------------------------------------------------

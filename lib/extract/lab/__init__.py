@@ -10,6 +10,15 @@ from lib.extract.lab.compare import (
     RunComparison,
     compare_runs,
 )
+from lib.extract.lab.ground_truth import (
+    GroundTruthVersion,
+    GroundTruthMeta,
+    save_ground_truth,
+    load_latest_ground_truth,
+    load_ground_truth_version,
+    list_ground_truth_versions,
+    has_ground_truth,
+)
 from lib.extract.lab.recorder import (
     DEFAULT_LAB_ROOT,
     RunManifest,
@@ -21,10 +30,17 @@ __all__ = [
     "BundleShapeReport",
     "DEFAULT_LAB_ROOT",
     "FactSample",
+    "GroundTruthMeta",
+    "GroundTruthVersion",
     "RunComparison",
     "RunManifest",
     "RunRecorder",
     "TraceEntry",
     "compare_runs",
+    "has_ground_truth",
+    "list_ground_truth_versions",
+    "load_ground_truth_version",
+    "load_latest_ground_truth",
+    "save_ground_truth",
     "score_bundle_shape",
 ]

@@ -208,6 +208,40 @@ class VitalSignExtraction(BaseModel):
     vital_signs: list[VitalSignEntry] = Field(default_factory=list)
 
 
+class EncounterEntry(BaseModel):
+    encounter_id: str | None = Field(
+        None, description="Encounter ID if printed; otherwise the pipeline synthesizes a UUID"
+    )
+    status: Literal[
+        "planned", "arrived", "triaged", "in-progress", "onleave", "finished", "cancelled"
+    ] = "finished"
+    class_code: Literal["AMB", "EMER", "IMP", "ACUTE", "NONAC", "OBSENC", "PRENC", "SS", "VR"] | None = Field(
+        None,
+        description="HL7 v3 ActCode for encounter class. AMB=Ambulatory (office visit), "
+        "IMP=Inpatient, EMER=Emergency, ACUTE=Acute inpatient, OBSENC=Observation, etc."
+    )
+    type_display: str | None = Field(
+        None, description="Encounter type as printed (e.g. 'Office Visit', 'Telehealth', 'Annual Physical')"
+    )
+    period_start: str | None = Field(None, description="ISO 8601; date or datetime")
+    period_end: str | None = Field(None, description="ISO 8601; date or datetime")
+    service_provider_display: str | None = Field(
+        None, description="Name of the organization / facility / clinic that hosted this encounter"
+    )
+    participant_display: str | None = Field(
+        None, description="Primary practitioner (name + role) for this encounter"
+    )
+    reason_text: str | None = Field(
+        None, description="Reason for visit / chief complaint as narrative text"
+    )
+    page: int | None = None
+    source_text: str | None = None
+
+
+class EncounterExtraction(BaseModel):
+    encounters: list[EncounterEntry] = Field(default_factory=list)
+
+
 # ---------------------------------------------------------------------------
 # Pass definitions — declarative table of what runs and how
 # ---------------------------------------------------------------------------
@@ -376,6 +410,34 @@ Rules:
 - If no vital-signs section is present, return an empty list."""
 
 
+_ENCOUNTERS_PROMPT = """You are extracting clinical encounters / visits / appointments
+from a medical document.
+
+Rules:
+- Extract every distinct encounter explicitly recorded — office visits, telehealth
+  visits, hospitalizations, ER visits, procedure visits, follow-ups.
+- Use ISO 8601 dates. If only a date is shown (no time), use that as period_start
+  with no period_end. If date + time are shown, include the time portion.
+- class_code mapping (HL7 v3 ActCode):
+    AMB     = Ambulatory office visit, telehealth, urgent care
+    IMP     = Inpatient hospitalization
+    EMER    = Emergency department visit
+    ACUTE   = Acute inpatient
+    OBSENC  = Observation stay
+    PRENC   = Pre-admission encounter
+    SS      = Short-stay
+    VR      = Virtual / telehealth (use when explicitly virtual)
+- type_display: the narrative type as printed (e.g. "Office Visit", "Annual Physical",
+  "Allergy Follow-up", "Wellness Visit", "Hospital Discharge").
+- service_provider_display: the organization / clinic / hospital that hosted the visit
+  (e.g. "Beverly Hills Allergy", "Cedars-Sinai Health System").
+- participant_display: the primary practitioner (e.g. "Ani Shirvanian, NP",
+  "Steven Krems, MD"). One name per encounter — capture the lead provider.
+- reason_text: chief complaint / reason for visit as a short phrase if printed.
+- Do not synthesize encounters from medication orders or lab orders alone.
+- If no encounter records are present (e.g. lab-only PDF), return empty list."""
+
+
 _PASSES: list[ExtractionPass] = [
     ExtractionPass(
         name="conditions",
@@ -419,6 +481,13 @@ _PASSES: list[ExtractionPass] = [
         prompt_version="v1",
         schema_version="v1",
     ),
+    ExtractionPass(
+        name="encounter",
+        schema=EncounterExtraction,
+        system_prompt=_ENCOUNTERS_PROMPT,
+        prompt_version="v1",
+        schema_version="v1",
+    ),
 ]
 
 
@@ -429,6 +498,20 @@ _PASSES: list[ExtractionPass] = [
 
 _PROMPT_VERSION = "multipass-v0.1.0"
 _SCHEMA_VERSION = "multipass-v0.1.0"
+
+def _stable_encounter_id(e: "EncounterEntry", doc_context: "DocumentContext") -> str:
+    """Stable, deterministic encounter ID from (date + provider + service)."""
+    import hashlib
+
+    parts = [
+        e.period_start or doc_context.encounter_date or "no-date",
+        e.participant_display or "no-provider",
+        e.service_provider_display or "no-org",
+        e.type_display or "no-type",
+    ]
+    seed = "|".join(parts)
+    return f"enc-{hashlib.sha1(seed.encode()).hexdigest()[:12]}"
+
 
 _VITAL_LOINC_MAP: dict[str, tuple[str, str]] = {
     "blood-pressure-systolic": ("8480-6", "Systolic blood pressure"),
@@ -716,6 +799,13 @@ class MultiPassFHIRPipeline:
         for vs in vs_extraction.vital_signs:
             entries.append(
                 {"resource": self._vital_sign_to_fhir(vs, common_meta_template, layout, doc_context)}
+            )
+
+        # Encounters
+        enc_extraction: EncounterExtraction = per_pass.get("encounter") or EncounterExtraction()
+        for e in enc_extraction.encounters:
+            entries.append(
+                {"resource": self._encounter_to_fhir(e, common_meta_template, layout, doc_context)}
             )
 
         bundle: dict[str, Any] = {
@@ -1166,6 +1256,46 @@ class MultiPassFHIRPipeline:
             resource["effectiveDateTime"] = vs.effective_date
         elif doc_context.encounter_date:
             resource["effectiveDateTime"] = doc_context.encounter_date
+        return resource
+
+    def _encounter_to_fhir(
+        self,
+        e: EncounterEntry,
+        common_meta: dict[str, Any],
+        layout: Any,
+        doc_context: DocumentContext,
+    ) -> dict[str, Any]:
+        bbox_locator = self._bbox_locator_for(e.source_text, e.page, layout)
+        encounter_id = e.encounter_id or _stable_encounter_id(e, doc_context)
+        resource: dict[str, Any] = {
+            "resourceType": "Encounter",
+            "id": encounter_id,
+            "subject": {"reference": f"Patient/{self._patient_id}"},
+            "status": e.status,
+            "meta": self._add_bbox_to_meta(common_meta, bbox_locator),
+        }
+        if e.class_code:
+            resource["class"] = {
+                "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+                "code": e.class_code,
+            }
+        if e.type_display:
+            resource["type"] = [{"text": e.type_display}]
+        if e.period_start or e.period_end:
+            period: dict[str, Any] = {}
+            if e.period_start:
+                period["start"] = e.period_start
+            if e.period_end:
+                period["end"] = e.period_end
+            resource["period"] = period
+        if e.participant_display:
+            resource["participant"] = [
+                {"individual": {"display": e.participant_display}}
+            ]
+        if e.service_provider_display:
+            resource["serviceProvider"] = {"display": e.service_provider_display}
+        if e.reason_text:
+            resource["reasonCode"] = [{"text": e.reason_text}]
         return resource
 
 

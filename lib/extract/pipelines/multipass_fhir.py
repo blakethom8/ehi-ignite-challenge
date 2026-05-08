@@ -673,6 +673,10 @@ class ExtractionPass:
     - schema_version: bump when the BaseModel schema for this pass changes.
       Forces re-extract for this pass alone; other passes' caches unaffected.
       Both are per-pass — they do NOT invalidate other passes' caches.
+    - run_count: when >= 2, the dispatcher runs this pass that many times in
+      parallel and intersects the resulting facts. Only facts present in ALL
+      runs survive. Trades recall for precision; intended for gold-standard
+      ground-truth generation. Default 1 = existing behaviour.
     """
 
     name: str
@@ -682,6 +686,7 @@ class ExtractionPass:
     schema_version: str = "v1"
     backend_name: str = "anthropic"
     model: str | None = None
+    run_count: int = 1  # GOLD-T02: >= 2 triggers self-consistency (run N times, intersect)
 
 
 _PASS_0_PROMPT = """You are reading a single medical document. Extract the
@@ -1416,6 +1421,196 @@ _SOCIAL_HISTORY_LOINC_MAP: dict[str, tuple[str, str, str]] = {
 }
 
 
+# ---------------------------------------------------------------------------
+# Self-consistency helpers (GOLD-T02)
+# ---------------------------------------------------------------------------
+# Used when ExtractionPass.run_count >= 2.  The dispatcher calls _run_pass N
+# times with distinct run_index values encoded in the cache key (so each
+# individual run gets its own cache slot), then intersects all N outputs so
+# only facts present in every run survive.
+
+
+def _resource_list_field(pass_name: str) -> str:
+    """Return the name of the list field on the Extraction wrapper for this pass.
+
+    E.g. pass_name="lab_observations" → "observations"
+         pass_name="conditions"       → "conditions"
+    """
+    _FIELD_MAP: dict[str, str] = {
+        "conditions": "conditions",
+        "medications": "medications",
+        "allergies": "allergies",
+        "immunizations": "immunizations",
+        "lab_observations": "observations",
+        "vital_signs": "vital_signs",
+        "encounter": "encounters",
+        "practitioner": "practitioners",
+        "organization": "organizations",
+        "clinical_notes": "clinical_notes",
+        "patient_demographics": "patients",
+        "coverage": "coverages",
+        "social_history": "social_history",
+    }
+    field = _FIELD_MAP.get(pass_name)
+    if field is None:
+        # Fallback: try the pass_name itself; let AttributeError surface naturally
+        return pass_name
+    return field
+
+
+def _normalize_text(text: str | None) -> str:
+    """Lowercase + strip punctuation for fuzzy text matching."""
+    if not text:
+        return ""
+    import re
+    return re.sub(r"[^\w\s]", "", text.lower()).strip()
+
+
+def _match_key(pass_name: str, fact: BaseModel) -> tuple[str, ...]:
+    """Return a tuple key used to decide whether two facts from different
+    runs represent the same real-world datum.
+
+    Match strategy per resource type:
+    - Tabular (lab_observations, vital_signs, immunizations, medications):
+        (normalized_name, str(value))
+    - Narrative-coded (conditions, allergies):
+        (normalized_display, code_or_empty)
+    - Identity (encounter, practitioner, organization, patient_demographics,
+        coverage): primary key per type
+    - Document (clinical_notes): (normalized_title, author, encounter_date)
+    - social_history: (topic, effective_date_or_empty)
+    """
+    if pass_name == "lab_observations":
+        # fact is LabObservationEntry
+        name = _normalize_text(getattr(fact, "test_name", None))
+        val_q = getattr(fact, "value_quantity", None)
+        val_s = getattr(fact, "value_string", None)
+        value = str(val_q) if val_q is not None else _normalize_text(val_s)
+        return (name, value)
+
+    if pass_name == "vital_signs":
+        # fact is VitalSignEntry
+        vtype = str(getattr(fact, "vital_type", ""))
+        val = str(getattr(fact, "value", ""))
+        return (vtype, val)
+
+    if pass_name == "immunizations":
+        # fact is ImmunizationEntry
+        name = _normalize_text(getattr(fact, "vaccine_display", None))
+        date = str(getattr(fact, "administration_date", "") or "")
+        return (name, date)
+
+    if pass_name == "medications":
+        # fact is MedicationEntry
+        name = _normalize_text(getattr(fact, "display", None))
+        dose = _normalize_text(getattr(fact, "dose", None))
+        return (name, dose)
+
+    if pass_name == "conditions":
+        # fact is ConditionEntry
+        display = _normalize_text(getattr(fact, "display", None))
+        code = str(getattr(fact, "icd_10_cm_code", "") or getattr(fact, "snomed_ct_code", "") or "")
+        return (display, code)
+
+    if pass_name == "allergies":
+        # fact is AllergyEntry
+        display = _normalize_text(getattr(fact, "display", None))
+        code = str(getattr(fact, "snomed_ct_code", "") or "")
+        return (display, code)
+
+    if pass_name == "encounter":
+        # fact is EncounterEntry — stable key: encounter_id or (period_start, type_display)
+        enc_id = str(getattr(fact, "encounter_id", "") or "")
+        if enc_id:
+            return ("id", enc_id)
+        period = str(getattr(fact, "period_start", "") or "")
+        type_d = _normalize_text(getattr(fact, "type_display", None))
+        return (period, type_d)
+
+    if pass_name == "practitioner":
+        # fact is PractitionerEntry — NPI is the canonical key; fall back to name
+        npi = str(getattr(fact, "npi", "") or "")
+        if npi:
+            return ("npi", npi)
+        name = _normalize_text(getattr(fact, "display_name", None))
+        return ("name", name)
+
+    if pass_name == "organization":
+        # fact is OrganizationEntry
+        name = _normalize_text(getattr(fact, "name", None))
+        city = _normalize_text(getattr(fact, "city", None))
+        return (name, city)
+
+    if pass_name == "patient_demographics":
+        # fact is PatientEntry — MRN first, then name+DOB
+        mrn = str(getattr(fact, "patient_id", "") or "")
+        if mrn:
+            return ("mrn", mrn)
+        family = _normalize_text(getattr(fact, "family_name", None))
+        dob = str(getattr(fact, "birth_date", "") or "")
+        return (family, dob)
+
+    if pass_name == "coverage":
+        # fact is CoverageEntry
+        member_id = str(getattr(fact, "member_id", "") or "")
+        payor = _normalize_text(getattr(fact, "payor_name", None))
+        return (member_id, payor)
+
+    if pass_name == "clinical_notes":
+        # fact is ClinicalNoteEntry
+        title = _normalize_text(getattr(fact, "title", None))
+        author = _normalize_text(getattr(fact, "author_name", None))
+        date = str(getattr(fact, "encounter_date", "") or "")
+        return (title, author, date)
+
+    if pass_name == "social_history":
+        # fact is SocialHistoryEntry
+        topic = str(getattr(fact, "topic", ""))
+        date = str(getattr(fact, "effective_date", "") or "")
+        return (topic, date)
+
+    # Fallback: use normalized repr of the whole fact
+    return (_normalize_text(str(fact)),)
+
+
+def _intersect_pass_outputs(pass_name: str, outputs: list[BaseModel]) -> BaseModel:
+    """Intersect N pass outputs and return a single output containing only
+    facts that appear in ALL runs.
+
+    When only one output is supplied (run_count=1 fallback), it is returned
+    unchanged.  The returned object is the same Pydantic type as the inputs.
+    """
+    if len(outputs) == 1:
+        return outputs[0]
+
+    list_field = _resource_list_field(pass_name)
+    fact_lists: list[list[BaseModel]] = [
+        list(getattr(o, list_field)) for o in outputs
+    ]
+
+    # Build keyed dicts for each run
+    keyed: list[dict[tuple[str, ...], BaseModel]] = []
+    for lst in fact_lists:
+        d: dict[tuple[str, ...], BaseModel] = {}
+        for fact in lst:
+            k = _match_key(pass_name, fact)
+            # On key collision within one run, keep the first occurrence
+            if k not in d:
+                d[k] = fact
+        keyed.append(d)
+
+    # Intersection: keys that appear in every run
+    common_keys = set(keyed[0].keys())
+    for d in keyed[1:]:
+        common_keys &= set(d.keys())
+
+    # Take facts from the first run for common keys (order: stable dict insertion)
+    intersected_facts = [keyed[0][k] for k in keyed[0] if k in common_keys]
+
+    # Reconstruct the wrapper Pydantic model
+    return type(outputs[0])(**{list_field: intersected_facts})
+
+
 @register
 class MultiPassFHIRPipeline:
     """Schema-direct multi-pass extraction. See module docstring for the *why*."""
@@ -1651,23 +1846,20 @@ class MultiPassFHIRPipeline:
 
             # When recording, wrap each pass submission to capture (prompt,
             # result, latency) and call recorder.log_pass() after the future
-            # completes. The timing wraps the _run_pass call inside the thread.
+            # completes. The timing wraps the _dispatch_pass call inside the
+            # thread. _dispatch_pass handles run_count >= 2 transparently.
             def _run_pass_timed(
                 p: ExtractionPass,
                 full_prompt: str,
             ) -> tuple[BaseModel, int]:
-                """Run one pass and return (validated_output, latency_ms)."""
+                """Run one pass (honouring run_count) and return (output, latency_ms)."""
                 t_start = time.perf_counter()
-                result = self._run_pass(
-                    pass_name=p.name,
-                    schema=p.schema,
-                    system_prompt=full_prompt,
+                result = self._dispatch_pass(
+                    p=p,
+                    full_prompt=full_prompt,
                     pdf_bytes=pdf_bytes,
                     pdf_hash=pdf_hash,
                     skip_cache=skip_cache,
-                    extra_user_text=None,
-                    prompt_version=p.prompt_version,
-                    schema_version=p.schema_version,
                 )
                 latency_ms = int((time.perf_counter() - t_start) * 1000)
                 return result, latency_ms
@@ -1708,19 +1900,16 @@ class MultiPassFHIRPipeline:
                             per_pass_outputs[p.name] = p.schema()  # empty instance
                             print(f"[multipass-fhir] pass {p.name!r} failed: {type(e).__name__}: {e}")
                 else:
-                    # Untimed path (recorder=None) — original behaviour, zero overhead.
+                    # Untimed path (recorder=None) — dispatch via _dispatch_pass
+                    # so run_count >= 2 is honoured on this path too.
                     futures = {
                         pool.submit(
-                            self._run_pass,
-                            pass_name=p.name,
-                            schema=p.schema,
-                            system_prompt=p.system_prompt + context_suffix,
+                            self._dispatch_pass,
+                            p=p,
+                            full_prompt=p.system_prompt + context_suffix,
                             pdf_bytes=pdf_bytes,
                             pdf_hash=pdf_hash,
                             skip_cache=skip_cache,
-                            extra_user_text=None,
-                            prompt_version=p.prompt_version,
-                            schema_version=p.schema_version,
                         ): p
                         for p in active_passes
                     }
@@ -1769,8 +1958,17 @@ class MultiPassFHIRPipeline:
         extra_user_text: str | None,
         prompt_version: str = "v1",
         schema_version: str = "v1",
+        run_index: int = 0,
     ) -> BaseModel:
-        """Execute one pass with caching + validation."""
+        """Execute one pass with caching + validation.
+
+        ``run_index`` is embedded in the cache key when > 0 so that multiple
+        self-consistency runs of the same pass get distinct cache slots.  Each
+        individual run still benefits from cross-PDF caching (the PDF hash is
+        part of the key), but two runs of the same pass on the same PDF are
+        not collapsed into a single cache hit (which would defeat the purpose
+        of self-consistency).
+        """
         # Per-pass override resolution: pipeline ctor accepts a dict of
         # {pass_name: {backend, model, thinking_budget_tokens}} that overrides
         # the defaults. Unspecified passes fall through to the pipeline's
@@ -1792,7 +1990,12 @@ class MultiPassFHIRPipeline:
         cache_model_id = f"multipass-fhir/{pass_name}/{backend.name}/{backend.model}"
         # Per-pass prompt + schema versions: bumping either for one pass only
         # invalidates that pass's cache, not the others.
-        full_prompt_version = f"{_PROMPT_VERSION}/{pass_name}@{prompt_version}#{schema_version}"
+        # run_index suffix (GOLD-T02): when run_index > 0 each self-consistency
+        # run gets its own cache slot so they aren't collapsed.
+        run_suffix = f"&run={run_index}" if run_index > 0 else ""
+        full_prompt_version = (
+            f"{_PROMPT_VERSION}/{pass_name}@{prompt_version}#{schema_version}{run_suffix}"
+        )
         key = CacheKey(
             file_sha256=pdf_hash,
             prompt_version=full_prompt_version,
@@ -1846,6 +2049,61 @@ class MultiPassFHIRPipeline:
                 raise
         # Should never reach here — the loop either returns or raises
         raise RuntimeError(f"_run_pass exhausted retries: {last_error}")
+
+    def _dispatch_pass(
+        self,
+        p: "ExtractionPass",
+        full_prompt: str,
+        pdf_bytes: bytes,
+        pdf_hash: str,
+        skip_cache: bool,
+    ) -> BaseModel:
+        """Dispatch one ExtractionPass, honouring ``run_count``.
+
+        When ``p.run_count == 1`` (the default), this is identical to a
+        direct call to ``_run_pass``.  When ``p.run_count >= 2``, the pass is
+        invoked that many times sequentially (each with a distinct
+        ``run_index`` in the cache key) and the results are intersected via
+        :func:`_intersect_pass_outputs`.
+
+        Runs are executed sequentially inside this method rather than with
+        sub-futures.  The outer :class:`ThreadPoolExecutor` already provides
+        per-*pass* parallelism; adding sub-futures for per-*run* parallelism
+        would require a nested pool, which adds complexity for marginal gain
+        (the gold pipeline's Opus + thinking calls are already the bottleneck).
+        """
+        if p.run_count <= 1:
+            return self._run_pass(
+                pass_name=p.name,
+                schema=p.schema,
+                system_prompt=full_prompt,
+                pdf_bytes=pdf_bytes,
+                pdf_hash=pdf_hash,
+                skip_cache=skip_cache,
+                extra_user_text=None,
+                prompt_version=p.prompt_version,
+                schema_version=p.schema_version,
+                run_index=0,
+            )
+
+        # Multi-run self-consistency path
+        outputs: list[BaseModel] = []
+        for run_idx in range(p.run_count):
+            result = self._run_pass(
+                pass_name=p.name,
+                schema=p.schema,
+                system_prompt=full_prompt,
+                pdf_bytes=pdf_bytes,
+                pdf_hash=pdf_hash,
+                skip_cache=skip_cache,
+                extra_user_text=None,
+                prompt_version=p.prompt_version,
+                schema_version=p.schema_version,
+                run_index=run_idx,
+            )
+            outputs.append(result)
+
+        return _intersect_pass_outputs(p.name, outputs)
 
     def _safe_extract_layout(self, pdf_path: Path):
         """Return DocumentLayout or None if the PDF has no extractable text layer."""
@@ -3468,12 +3726,17 @@ _GOLD_THINKING_BUDGET = 16000  # tokens reserved for extended thinking per pass
 class MultiPassFHIRGoldPipeline(MultiPassFHIRPipeline):
     """multipass-fhir variant: gold-standard architecture for ground-truth
     generation. Same multipass architecture as default, but every pass
-    routes to Claude Opus 4.7 with extended thinking enabled.
+    routes to Claude Opus 4.7 with extended thinking enabled AND runs
+    twice (self-consistency via GOLD-T02).
 
-    Cost ~5-10x default. Latency ~5-10x. Run-once-per-PDF; output is the
-    starting point for human review (Step 2 / REVIEW-* tasks).
+    Cost ~10-20x default. Latency ~10-20x. Run-once-per-PDF; output is
+    the starting point for human review (Step 2 / REVIEW-* tasks).
 
-    GOLD-T02 will add self-consistency (run-twice + intersect).
+    Self-consistency (run_count=2): every specialist pass is invoked twice
+    in parallel; only facts that appear in BOTH runs make it into the gold
+    output. Trades recall for precision — exactly what ground-truth
+    generation needs.
+
     GOLD-T03 will add the reviewer agent (whole-bundle inconsistency check).
     """
 
@@ -3481,12 +3744,13 @@ class MultiPassFHIRGoldPipeline(MultiPassFHIRPipeline):
         name="multipass-fhir-gold",
         description=(
             "Gold-standard variant for ground-truth generation. Opus 4.7 + "
-            "extended thinking on every pass. Run-once-per-PDF; output is "
-            "the starting point for human review."
+            "extended thinking + self-consistency (run × 2, intersect) on "
+            "every pass. Run-once-per-PDF; output is the starting point for "
+            "human review."
         ),
         architecture="gold-standard",
         primary_backends=["anthropic"],
-        estimated_cost_per_pdf_usd=2.5,
+        estimated_cost_per_pdf_usd=5.0,  # 2× the original 2.5 estimate for self-consistency
     )
 
     def __init__(
@@ -3516,3 +3780,16 @@ class MultiPassFHIRGoldPipeline(MultiPassFHIRPipeline):
             max_workers=max_workers,
             pass_overrides=overrides,
         )
+
+    def _specialist_passes(self, doc_context: "DocumentContext") -> list[ExtractionPass]:
+        """Override: return every pass in _PASSES with run_count=2.
+
+        The parent's _specialist_passes() returns _PASSES unchanged (run_count=1).
+        The gold pipeline needs self-consistency, so we replace each pass with
+        a frozen-dataclass copy that has run_count=2.  The dispatcher in
+        extract() calls _dispatch_pass() for each, which handles the N-run
+        + intersect logic.
+        """
+        import dataclasses
+
+        return [dataclasses.replace(p, run_count=2) for p in _PASSES]

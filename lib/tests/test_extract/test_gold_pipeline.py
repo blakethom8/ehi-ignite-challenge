@@ -289,3 +289,89 @@ def test_estimate_cost_opus_known_model() -> None:
     assert abs(cost - expected) < 1e-6, (
         f"Expected cost {expected}, got {cost}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Test 9 — gold pipeline uses run_count=2 for all specialist passes (GOLD-T02)
+# ---------------------------------------------------------------------------
+
+
+def test_gold_pipeline_uses_run_count_two_for_all_passes() -> None:
+    """Every pass returned by _specialist_passes() on the gold pipeline must
+    have run_count=2.  This verifies the GOLD-T02 self-consistency override is
+    applied to all specialist passes.
+    """
+    from lib.extract.pipelines.multipass_fhir import (
+        DocumentContext,
+        MultiPassFHIRGoldPipeline,
+    )
+
+    pipeline = _new_gold_init()
+    ctx = DocumentContext(document_type="other")
+    passes = pipeline._specialist_passes(ctx)
+
+    assert len(passes) > 0, "Gold pipeline must return at least one specialist pass"
+    for p in passes:
+        assert p.run_count == 2, (
+            f"Pass {p.name!r} has run_count={p.run_count}; expected 2 for gold pipeline"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Test 10 — dispatcher invokes _run_pass run_count times for run_count >= 2
+# ---------------------------------------------------------------------------
+
+
+def test_dispatcher_invokes_pass_run_count_times() -> None:
+    """When a pass has run_count=2, _dispatch_pass must call _run_pass exactly
+    twice (once per run_index).  We verify this by mocking _run_pass and
+    checking the call count.
+    """
+    from unittest.mock import patch, MagicMock
+    from lib.extract.pipelines.multipass_fhir import (
+        MultiPassFHIRGoldPipeline,
+        ExtractionPass,
+        LabObservationExtraction,
+        LabObservationEntry,
+    )
+
+    pipeline = _new_gold_init()
+
+    # Build a synthetic pass with run_count=2
+    p = ExtractionPass(
+        name="lab_observations",
+        schema=LabObservationExtraction,
+        system_prompt="test prompt",
+        run_count=2,
+    )
+
+    # Build two different outputs to return on successive calls so the
+    # intersection logic is exercised (both have the same Sodium fact).
+    sodium = LabObservationEntry(test_name="Sodium", value_quantity=140.0)
+    output_a = LabObservationExtraction(observations=[sodium])
+    output_b = LabObservationExtraction(observations=[sodium])
+
+    call_count = 0
+    returned_outputs = [output_a, output_b]
+
+    def mock_run_pass(**kwargs: Any) -> LabObservationExtraction:
+        nonlocal call_count
+        result = returned_outputs[call_count]
+        call_count += 1
+        return result
+
+    with patch.object(pipeline, "_run_pass", side_effect=mock_run_pass):
+        result = pipeline._dispatch_pass(
+            p=p,
+            full_prompt="sys prompt",
+            pdf_bytes=b"fake",
+            pdf_hash="abc123",
+            skip_cache=True,
+        )
+
+    assert call_count == 2, (
+        f"Expected _run_pass to be called 2 times for run_count=2, got {call_count}"
+    )
+    assert isinstance(result, LabObservationExtraction), (
+        f"Expected LabObservationExtraction result, got {type(result).__name__}"
+    )

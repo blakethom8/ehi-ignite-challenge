@@ -408,6 +408,57 @@ class PatientExtraction(BaseModel):
     )
 
 
+class CoverageEntry(BaseModel):
+    coverage_id: str | None = None
+    status: Literal["active", "cancelled", "draft", "entered-in-error"] = "active"
+    plan_type: str | None = Field(None, description="HMO / PPO / EPO / POS / Indemnity / etc.")
+    payor_name: str | None = Field(None, description="Insurance company / payer (e.g. 'Blue Cross', 'Aetna')")
+    plan_name: str | None = Field(None, description="Specific plan name (e.g. 'BLUE CROSS EMP VIVITY HMO CSPN')")
+    member_id: str | None = Field(None, description="Member ID / Subscriber ID")
+    subscriber_id: str | None = None
+    group_id: str | None = None
+    payer_id: str | None = Field(None, description="Payer ID (e.g. NAIC code)")
+    relationship_to_subscriber: Literal["self", "spouse", "child", "common-law-spouse", "other"] | None = None
+    effective_period_start: str | None = None
+    effective_period_end: str | None = None
+    page: int | None = None
+    source_text: str | None = None
+
+
+class CoverageExtraction(BaseModel):
+    coverages: list[CoverageEntry] = Field(default_factory=list)
+
+
+class SocialHistoryEntry(BaseModel):
+    topic: Literal[
+        "tobacco-use",
+        "alcohol-use",
+        "drug-use",
+        "occupation",
+        "phq-9",
+        "phq-2",
+        "depression-screen",
+        "sex-assigned-at-birth",
+        "legal-sex",
+        "gender-identity",
+        "sexual-orientation",
+    ] = Field(..., description="Standardized social-history topic")
+    value_string: str | None = Field(
+        None, description="Categorical / text value (e.g. 'Never', 'Yes', 'Manager')"
+    )
+    value_quantity: float | None = Field(
+        None, description="Numeric value (e.g. PHQ-9 score, drinks/week)"
+    )
+    unit: str | None = Field(None, description="UCUM unit if numeric")
+    effective_date: str | None = None
+    page: int | None = None
+    source_text: str | None = None
+
+
+class SocialHistoryExtraction(BaseModel):
+    social_history: list[SocialHistoryEntry] = Field(default_factory=list)
+
+
 # ---------------------------------------------------------------------------
 # Pass definitions — declarative table of what runs and how
 # ---------------------------------------------------------------------------
@@ -710,6 +761,27 @@ Rules:
 - If no narrative notes are present (e.g. lab-only PDF), return empty list."""
 
 
+_COVERAGE_PROMPT = """You are extracting insurance / coverage / payer information
+from a medical document.
+
+Rules:
+- Extract every distinct insurance plan / coverage record. A patient may have
+  primary + secondary coverage; emit one entry per plan.
+- payor_name: the insurance company (e.g. "Blue Cross Blue Shield", "Aetna",
+  "Humana", "Medicare", "Medicaid"). Strip the specific plan suffix.
+- plan_name: the full plan name as printed (e.g. "BLUE CROSS EMP VIVITY HMO CSPN").
+- plan_type: HMO / PPO / EPO / POS / Indemnity / Medicare / Medicaid / etc.
+- member_id and subscriber_id: capture both if shown. They're often the same
+  but distinguish when the patient is a dependent on someone else's plan.
+- group_id: employer group ID if shown.
+- relationship_to_subscriber: 'self' if the patient IS the subscriber, else
+  spouse / child / common-law-spouse / other.
+- Dates ISO 8601. effective_period_start/end if printed (e.g. "Effective 01/01/2026-Present").
+- Do NOT extract historical-only / cancelled coverages unless explicitly listed
+  with end dates.
+- If no insurance information is present, return empty list."""
+
+
 _PATIENT_DEMOGRAPHICS_PROMPT = """You are extracting patient demographic information
 from a medical document.
 
@@ -822,6 +894,13 @@ _PASSES: list[ExtractionPass] = [
         prompt_version="v1",
         schema_version="v1",
     ),
+    ExtractionPass(
+        name="coverage",
+        schema=CoverageExtraction,
+        system_prompt=_COVERAGE_PROMPT,
+        prompt_version="v1",
+        schema_version="v1",
+    ),
 ]
 
 
@@ -906,6 +985,19 @@ def _stable_patient_id(p: "PatientEntry", doc_context: "DocumentContext") -> str
     ]
     seed = "|".join(seed_parts)
     return f"pat-{hashlib.sha1(seed.encode()).hexdigest()[:12]}"
+
+
+def _stable_coverage_id(c: "CoverageEntry") -> str:
+    """Stable, deterministic coverage ID from (payor|member|plan)."""
+    import hashlib
+
+    parts = [
+        c.payor_name or "no-payor",
+        c.member_id or c.subscriber_id or "no-member",
+        c.plan_name or "no-plan",
+    ]
+    seed = "|".join(parts)
+    return f"cov-{hashlib.sha1(seed.encode()).hexdigest()[:12]}"
 
 
 # OMB code → display lookup tables
@@ -1429,6 +1521,13 @@ class MultiPassFHIRPipeline:
         for p in patient_extraction.patients:
             entries.append(
                 {"resource": self._patient_to_fhir(p, common_meta_template, layout, doc_context)}
+            )
+
+        # Coverage
+        coverage_extraction: CoverageExtraction = per_pass.get("coverage") or CoverageExtraction()
+        for c in coverage_extraction.coverages:
+            entries.append(
+                {"resource": self._coverage_to_fhir(c, common_meta_template, layout, doc_context)}
             )
 
         # Post-pass: wire encounter references onto encounter-scopable resources
@@ -2306,6 +2405,89 @@ class MultiPassFHIRPipeline:
         if p.marital_status:
             resource["maritalStatus"] = {"text": p.marital_status}
 
+        return resource
+
+    def _coverage_to_fhir(
+        self,
+        c: CoverageEntry,
+        common_meta: dict[str, Any],
+        layout: Any,
+        doc_context: DocumentContext,
+    ) -> dict[str, Any]:
+        bbox_locator = self._bbox_locator_for(c.source_text, c.page, layout)
+        coverage_id = c.coverage_id or _stable_coverage_id(c)
+        base_meta = self._add_bbox_to_meta(common_meta, bbox_locator)
+        resource: dict[str, Any] = {
+            "resourceType": "Coverage",
+            "id": coverage_id,
+            "status": c.status,
+            "beneficiary": {"reference": f"Patient/{self._patient_id}"},
+            "meta": base_meta,
+        }
+        # Type (plan type)
+        if c.plan_type:
+            resource["type"] = {
+                "coding": [
+                    {
+                        "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+                        "code": c.plan_type.upper() if c.plan_type.upper() in ("HMO", "PPO", "EPO", "POS") else "OTH",
+                        "display": c.plan_type,
+                    }
+                ],
+                "text": c.plan_type,
+            }
+        # Identifiers (member ID, group ID)
+        identifiers = []
+        if c.member_id:
+            identifiers.append({"type": {"text": "Member ID"}, "value": c.member_id})
+        if c.group_id:
+            identifiers.append({"type": {"text": "Group ID"}, "value": c.group_id})
+        if c.subscriber_id and c.subscriber_id != c.member_id:
+            identifiers.append({"type": {"text": "Subscriber ID"}, "value": c.subscriber_id})
+        if identifiers:
+            resource["identifier"] = identifiers
+        # subscriberId convenience field
+        if c.subscriber_id:
+            resource["subscriberId"] = c.subscriber_id
+        # Payor (display-only reference; org resolution is T14's job)
+        payor_entries = []
+        if c.payor_name:
+            payor_entries.append({"display": c.payor_name})
+        if payor_entries:
+            resource["payor"] = payor_entries
+        # Relationship
+        if c.relationship_to_subscriber:
+            resource["relationship"] = {
+                "coding": [
+                    {
+                        "system": "http://terminology.hl7.org/CodeSystem/subscriber-relationship",
+                        "code": c.relationship_to_subscriber,
+                    }
+                ]
+            }
+        # Period
+        if c.effective_period_start or c.effective_period_end:
+            period: dict[str, Any] = {}
+            if c.effective_period_start:
+                period["start"] = c.effective_period_start
+            if c.effective_period_end:
+                period["end"] = c.effective_period_end
+            resource["period"] = period
+        # class[] for plan name + group
+        classes = []
+        if c.plan_name:
+            classes.append({
+                "type": {"coding": [{"system": "http://terminology.hl7.org/CodeSystem/coverage-class", "code": "plan"}]},
+                "value": c.plan_name,
+                "name": c.plan_name,
+            })
+        if c.group_id:
+            classes.append({
+                "type": {"coding": [{"system": "http://terminology.hl7.org/CodeSystem/coverage-class", "code": "group"}]},
+                "value": c.group_id,
+            })
+        if classes:
+            resource["class"] = classes
         return resource
 
 

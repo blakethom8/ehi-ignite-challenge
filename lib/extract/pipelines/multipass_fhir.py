@@ -36,6 +36,11 @@ What this pipeline ships today
   (pdf_sha, pass_name, prompt_version, schema_version, backend/model).
 """
 
+# Extension URL convention: https://ehi-atlas.example/fhir/StructureDefinition/...
+# All new emissions in this file MUST use this base. The harmonize layer
+# at lib/harmonize/provenance.py uses a different base
+# (atlas.healthcaredataai.com) — those will migrate as part of T15.
+
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -186,19 +191,23 @@ class LabObservationExtraction(BaseModel):
 class ExtractionPass:
     """Declarative description of one extraction pass.
 
-    Each pass has its own prompt, schema, prompt_version, and backend.
-    Adding a new fact type is a new ExtractionPass + a converter function.
+    Each pass has its own prompt, schema, prompt_version, schema_version,
+    and backend. Adding a new fact type is a new ExtractionPass + a
+    converter function.
 
-    Bumping ``prompt_version`` for a single pass invalidates only that
-    pass's cache — other passes' cached output is unaffected. This makes
-    A/B prompt iteration fast and cheap. Track each prompt-version delta
-    in `docs/architecture/PIPELINE-LOG.md`.
+    - prompt_version: bump for prompt-only changes. Cheap re-extract for
+      this pass alone; other passes' caches unaffected. Track deltas in
+      ``docs/architecture/PIPELINE-LOG.md``.
+    - schema_version: bump when the BaseModel schema for this pass changes.
+      Forces re-extract for this pass alone; other passes' caches unaffected.
+      Both are per-pass — they do NOT invalidate other passes' caches.
     """
 
     name: str
     schema: Type[BaseModel]
     system_prompt: str
     prompt_version: str = "v1"
+    schema_version: str = "v1"
     backend_name: str = "anthropic"
     model: str | None = None
 
@@ -467,6 +476,7 @@ class MultiPassFHIRPipeline:
                     skip_cache=skip_cache,
                     extra_user_text=None,
                     prompt_version=p.prompt_version,
+                    schema_version=p.schema_version,
                 ): p
                 for p in _PASSES
             }
@@ -507,6 +517,7 @@ class MultiPassFHIRPipeline:
         skip_cache: bool,
         extra_user_text: str | None,
         prompt_version: str = "v1",
+        schema_version: str = "v1",
     ) -> BaseModel:
         """Execute one pass with caching + validation."""
         # Per-pass override resolution: pipeline ctor accepts a dict of
@@ -517,9 +528,9 @@ class MultiPassFHIRPipeline:
         model = override.get("model") or self._model
         backend = get_backend(name=backend_name, model=model)
         cache_model_id = f"multipass-fhir/{pass_name}/{backend.name}/{backend.model}"
-        # Per-pass prompt version: bumping the prompt for one pass only
+        # Per-pass prompt + schema versions: bumping either for one pass only
         # invalidates that pass's cache, not the others.
-        full_prompt_version = f"{_PROMPT_VERSION}/{pass_name}@{prompt_version}"
+        full_prompt_version = f"{_PROMPT_VERSION}/{pass_name}@{prompt_version}#{schema_version}"
         key = CacheKey(
             file_sha256=pdf_hash,
             prompt_version=full_prompt_version,

@@ -1439,7 +1439,7 @@ class MultiPassFHIRPipeline:
         patient_id: str = "unknown",
         backend_name: str = "anthropic",
         model: str | None = None,
-        pass_overrides: dict[str, dict[str, str]] | None = None,
+        pass_overrides: dict[str, dict[str, Any]] | None = None,
         max_workers: int = 6,
     ) -> None:
         """Construct a MultiPassFHIRPipeline.
@@ -1448,12 +1448,16 @@ class MultiPassFHIRPipeline:
             patient_id: Patient FHIR ID for emitted resources.
             backend_name: Default backend for every pass when no override.
             model: Default model for every pass when no override.
-            pass_overrides: Per-pass backend/model overrides. Format:
-                ``{"pass_name": {"backend": "gemma-google-ai-studio",
-                                 "model": "gemma-4-31b-it"}, ...}``.
-                Used to test "cheap models for tabular passes" hypotheses
-                without subclassing. Pass names match the ``name`` field
-                in :data:`_PASSES`.
+            pass_overrides: Per-pass backend/model/thinking overrides. Format:
+                ``{"pass_name": {"backend": "anthropic",
+                                 "model": "claude-opus-4-7",
+                                 "thinking_budget_tokens": 16000}, ...}``.
+                ``thinking_budget_tokens`` is forwarded to
+                :class:`AnthropicBackend` to enable extended thinking for
+                that pass.  Used to test "cheap models for tabular passes"
+                or "gold-standard Opus + thinking" hypotheses without
+                subclassing. Pass names match the ``name`` field in
+                :data:`_PASSES`.
             max_workers: Concurrency for the per-resource passes. Default 6.
         """
         self._patient_id = patient_id
@@ -1768,12 +1772,23 @@ class MultiPassFHIRPipeline:
     ) -> BaseModel:
         """Execute one pass with caching + validation."""
         # Per-pass override resolution: pipeline ctor accepts a dict of
-        # {pass_name: {backend, model}} that overrides the defaults.
-        # Unspecified passes fall through to the pipeline's default backend.
+        # {pass_name: {backend, model, thinking_budget_tokens}} that overrides
+        # the defaults. Unspecified passes fall through to the pipeline's
+        # default backend.
         override = self._pass_overrides.get(pass_name, {})
         backend_name = override.get("backend") or self._backend_name
         model = override.get("model") or self._model
-        backend = get_backend(name=backend_name, model=model)
+        thinking_budget_tokens_raw = override.get("thinking_budget_tokens")
+        thinking_budget_tokens: int | None = (
+            int(thinking_budget_tokens_raw)
+            if thinking_budget_tokens_raw is not None
+            else None
+        )
+        backend = get_backend(
+            name=backend_name,
+            model=model,
+            thinking_budget_tokens=thinking_budget_tokens,
+        )
         cache_model_id = f"multipass-fhir/{pass_name}/{backend.name}/{backend.model}"
         # Per-pass prompt + schema versions: bumping either for one pass only
         # invalidates that pass's cache, not the others.
@@ -3440,3 +3455,64 @@ class MultiPassFHIRBidiScoutPipeline(MultiPassFHIRScoutPipeline):
                 }
             )
         return bundle
+
+
+# ---------------------------------------------------------------------------
+# Gold-standard pipeline (GOLD-T01)
+# ---------------------------------------------------------------------------
+
+_GOLD_THINKING_BUDGET = 16000  # tokens reserved for extended thinking per pass
+
+
+@register
+class MultiPassFHIRGoldPipeline(MultiPassFHIRPipeline):
+    """multipass-fhir variant: gold-standard architecture for ground-truth
+    generation. Same multipass architecture as default, but every pass
+    routes to Claude Opus 4.7 with extended thinking enabled.
+
+    Cost ~5-10x default. Latency ~5-10x. Run-once-per-PDF; output is the
+    starting point for human review (Step 2 / REVIEW-* tasks).
+
+    GOLD-T02 will add self-consistency (run-twice + intersect).
+    GOLD-T03 will add the reviewer agent (whole-bundle inconsistency check).
+    """
+
+    metadata = PipelineMetadata(
+        name="multipass-fhir-gold",
+        description=(
+            "Gold-standard variant for ground-truth generation. Opus 4.7 + "
+            "extended thinking on every pass. Run-once-per-PDF; output is "
+            "the starting point for human review."
+        ),
+        architecture="gold-standard",
+        primary_backends=["anthropic"],
+        estimated_cost_per_pdf_usd=2.5,
+    )
+
+    def __init__(
+        self,
+        *,
+        patient_id: str = "unknown",
+        max_workers: int = 6,
+    ) -> None:
+        # Build per-pass overrides for every pass in _PASSES plus the
+        # document_context pass (Pass 0).  All passes route to Opus 4.7
+        # with extended thinking.
+        gold_override: dict[str, Any] = {
+            "backend": "anthropic",
+            "model": "claude-opus-4-7",
+            "thinking_budget_tokens": _GOLD_THINKING_BUDGET,
+        }
+        overrides: dict[str, dict[str, Any]] = {
+            p.name: gold_override for p in _PASSES
+        }
+        # Also override the document_context (Pass 0) pass
+        overrides["document_context"] = gold_override
+
+        super().__init__(
+            patient_id=patient_id,
+            backend_name="anthropic",
+            model="claude-opus-4-7",
+            max_workers=max_workers,
+            pass_overrides=overrides,
+        )

@@ -141,6 +141,13 @@ class AnthropicBackend:
     Uses the Anthropic Messages API with the ``emit_extraction`` tool to force
     structured output. The same response shape that worked before the backend
     refactor is preserved exactly.
+
+    When ``thinking_budget_tokens`` is set, extended thinking is enabled on
+    every call by passing ``thinking={"type": "enabled", "budget_tokens": N}``
+    to ``messages.create``.  The response may then include ``type="thinking"``
+    blocks before the tool-use block; those are silently skipped during content
+    iteration.  When ``None`` (the default), no thinking config is passed and
+    all existing behavior is preserved.
     """
 
     name = "anthropic"
@@ -149,9 +156,11 @@ class AnthropicBackend:
         self,
         model: str = DEFAULT_MODEL,
         client: Anthropic | None = None,
+        thinking_budget_tokens: int | None = None,
     ) -> None:
         self.model = model
         self._client = client
+        self._thinking_budget_tokens = thinking_budget_tokens
 
     @property
     def client(self) -> Anthropic:
@@ -168,6 +177,13 @@ class AnthropicBackend:
         max_tokens: int = 16384,
     ) -> dict[str, Any]:
         pdf_b64 = base64.standard_b64encode(pdf_bytes).decode("utf-8")
+
+        extra_params: dict[str, Any] = {}
+        if self._thinking_budget_tokens is not None:
+            extra_params["thinking"] = {
+                "type": "enabled",
+                "budget_tokens": self._thinking_budget_tokens,
+            }
 
         message = self.client.messages.create(
             model=self.model,
@@ -205,10 +221,13 @@ class AnthropicBackend:
                     ],
                 }
             ],
+            **extra_params,
         )
 
         tool_call = None
         for block in message.content:
+            if getattr(block, "type", None) == "thinking":
+                continue  # extended-thinking output; not the response content
             if getattr(block, "type", None) == "tool_use":
                 tool_call = block
                 break
@@ -754,6 +773,7 @@ def get_backend(
     *,
     model: str | None = None,
     client: Any = None,
+    thinking_budget_tokens: int | None = None,
 ) -> VisionBackend:
     """Resolve a :class:`VisionBackend` by name.
 
@@ -762,12 +782,16 @@ def get_backend(
             then to ``DEFAULT_BACKEND``.
         model: Model name override (passed to the backend).
         client: Backend-specific SDK client (e.g. ``Anthropic`` instance).
+        thinking_budget_tokens: When set, enables extended thinking on the
+            Anthropic backend (passed through to :class:`AnthropicBackend`).
+            Ignored for non-Anthropic backends.
     """
     name = name or os.environ.get("EHI_VISION_BACKEND") or DEFAULT_BACKEND
     if name == "anthropic":
         return AnthropicBackend(
             model=model or DEFAULT_MODEL,
             client=client,
+            thinking_budget_tokens=thinking_budget_tokens,
         )
     if name == "gemma-google-ai-studio":
         return GoogleAIStudioBackend(

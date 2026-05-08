@@ -580,4 +580,68 @@ See `docs/architecture/PIPELINE-LOG.md` Move X for the detailed write-up.
 
 ---
 
+## Entry 7 — Extraction expansion: the full pivot (2026-05-07)
+
+### Why we're doing this
+
+The Cedars MyHealth review (`pdf-review/cedars-myhealth/notes.md`) made a real product gap visible. On a 25-page comprehensive Patient Health Summary with rich narrative content (SOAP-style progress notes from a 04/22/2026 allergy visit, full physical exam, A&P paragraphs, patient education narrative), our parser captured **zero narrative content** and **zero non-Observation administrative resources**. We extracted 160 entries — 138 Observations, 8 Immunizations, 7 Conditions (including 4 vision-wins from imaging narrative ✓), 6 MedicationRequests, 1 AllergyIntolerance — but emitted no `Encounter`, no `DocumentReference`, no `Composition`, no `Patient`, no `Practitioner`, no `Organization`, no `Coverage`. We also missed the vital-signs table and the PHQ-9 score.
+
+The user's call: pivot, build all three stages, and add an "organization layer" so the orchestrator (me) can check in on agents doing the work. This is the largest in-session build we've planned.
+
+### Three audit findings that shape the plan
+
+1. **Architecture is ready.** No "magic 5/6" hardcoded anywhere. The `_PASSES` list is the single source of truth and adding to it is local. ThreadPoolExecutor + cache key both scale to 12+ passes. Only `eval.py` has a hardcoded `FactType` Literal that needs extending.
+2. **Downstream is mostly waiting for us.** API + parser layer already has handlers for `Encounter`, `Practitioner`, `Organization`, `DocumentReference`, `Patient`, `Composition`. Several UI surfaces show "Unknown provider" / "Unknown organization" / empty Encounters tab purely because **extraction never emits these resources**, not because downstream can't consume them. The pivot lights up surfaces that already exist.
+3. **FHIR shape is well-precedented.** Synthea bundles in `data/synthea-samples/synthea-r4-individual/fhir/` show the canonical shape for every new resource type. `lib/fhir_parser/extractors.py` already PARSES them (Patient with full US Core extensions, Encounter with periods/participants). We have READ infrastructure; we're building WRITE infrastructure.
+
+### Quick-win surfaces (will light up immediately upon shipping the pass)
+
+| Surface | Currently | After |
+|---|---|---|
+| Care Team panel | "Unknown provider" | Real provider names + specialty |
+| Sites of Service panel | "Unknown organization" | Real facilities + counts |
+| History → Encounters tab | empty | chronological visits with linked counts |
+| Key Labs panel | labs only | + vital signs panels |
+| History → Notes tab | "Clinical note (unknown source)" | typed notes with source attribution |
+
+### Decisions resolved
+
+1. **Extension URL unification:** standardize on `https://ehi-atlas.example/fhir/StructureDefinition/...` (the existing multipass convention). All new resource emissions use it. Existing harmonize URLs at `atlas.healthcaredataai.com` migrate as we touch them — not a separate task.
+2. **Per-pass schema versioning:** add as **T00 (foundation)**. Today bumping global `_SCHEMA_VERSION` invalidates all pass caches — at 16 passes that gets expensive. Adding a `schema_version` field to `ExtractionPass` is a 1-hour refactor with big future-proofing payoff.
+3. **Composition vs DocumentReference for clinical notes:** emit BOTH. `DocumentReference` is the narrative container; `Composition` preserves section structure (Subjective / Exam / A&P / Plan) when the source has clear sections. Cedars MyHealth has clear sections, so both will populate.
+4. **Per-pass model selection** — use existing `pass_overrides`. Default tabular passes (vital_signs, social_history) to Gemma; narrative passes (clinical_notes, conditions) to Claude. Bake-off later refines.
+
+### The 16-task plan
+
+Detail in `.claude/extraction-expansion-queue.md`. Summary:
+
+| Phase | Tasks | Outcome |
+|---|---|---|
+| **0 — Foundation** | T00 (schema versioning + URL unification) | All 15 follow-on tasks build on a clean foundation |
+| **A — Vital signs + eval** | T01 (vital_signs pass), T02 (eval.py FactType expansion) | Key Labs panel populates with vitals |
+| **B — Encounters + care network** | T03 (Encounter), T04 (Practitioner), T05 (Organization), T06 (encounter linkage) | Care Team + Sites of Service + Encounters tab all light up |
+| **C — Narrative & documents** | T07 (clinical_notes → DocumentReference + Composition), T08 (note↔encounter linkage) | The original ask. SOAP narrative preserved. |
+| **D — Patient demographics** | T09 (Patient with US Core), T10 (replace `Patient/unknown` refs) | Identity unified across the bundle |
+| **E — Auxiliary resources** | T11 (Coverage), T12 (Social history Observations) | C-CDA-style coverage complete |
+| **F — Identity resolution** | T13 (Practitioner matcher, NPI), T14 (Organization matcher), T15 (DocumentReference dataclass) | Cross-source merge works for new types |
+
+Total estimate: ~10–14 condensed days. Building all 3 stages this session per user direction.
+
+### Orchestration layer
+
+- **`.claude/extraction-expansion-queue.md`** — 16 builder-sized briefs. Status tracked inline (Queued → In Progress → Completed `<hash>`).
+- **Builder agent**: `phase1-builder` (general-purpose execution agent — same one used for the Phase 1 work). Dispatched with self-contained briefs.
+- **Per-task cycle:** I read the brief, write a self-contained dispatch prompt, dispatch builder, builder returns PASS/FAIL with commit hash. I verify (read commit, run tests, look at diff), mark queue item complete, dispatch next.
+- **Phase boundaries:** after each phase I report status to user. They can intervene before the next phase starts.
+
+### Branch + sequencing
+
+Stacked on `feature/code-resolution-loinc` (LOINC work is the foundation). All 16 commits accumulate on the same branch. User reviews at phase boundaries.
+
+### Build status
+
+Live in `.claude/extraction-expansion-queue.md`. As of 2026-05-07: queue created, T00 dispatching.
+
+---
+
 *Last updated: 2026-05-07. Working log — append entries with date stamp.*

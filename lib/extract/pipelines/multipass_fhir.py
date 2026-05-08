@@ -43,10 +43,13 @@ What this pipeline ships today
 
 from __future__ import annotations
 
+import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal, Type
+
+logger = logging.getLogger(__name__)
 
 from pydantic import BaseModel, Field
 
@@ -734,7 +737,16 @@ Rules:
   paraphrase. Example: "Last Filed Vital Signs" not "the vital signs table".
 - If the document has no resource of a type, use `present=false` and empty pages.
 - sections list is in document order; capture top-level titles only (not
-  every subsection inside a progress note)."""
+  every subsection inside a progress note).
+
+REQUIRED OUTPUT SHAPE — your `presence` field MUST contain entries for
+ALL 13 resource types listed below, even those absent from the document.
+For absent types, set `present: false`, `pages: []`, `section_hint: null`.
+DO NOT omit keys; the dispatcher uses absence to skip specialist passes.
+
+Required keys: conditions, medications, allergies, immunizations,
+lab_observations, vital_signs, encounter, practitioner, organization,
+clinical_notes, patient_demographics, coverage, social_history."""
 
 
 # ---------------------------------------------------------------------------
@@ -779,7 +791,16 @@ EVENTS-FOCUSED RULES:
 - Be CONSERVATIVE on tabular content: false positives waste downstream
   cost. But be MORE PERMISSIVE on encounters and narrative — a partial
   encounter mention is worth flagging.
-- Page hints are 1-indexed."""
+- Page hints are 1-indexed.
+
+REQUIRED OUTPUT SHAPE — your `presence` field MUST contain entries for
+ALL 13 resource types listed below, even those absent from the document.
+For absent types, set `present: false`, `pages: []`, `section_hint: null`.
+DO NOT omit keys; the dispatcher uses absence to skip specialist passes.
+
+Required keys: conditions, medications, allergies, immunizations,
+lab_observations, vital_signs, encounter, practitioner, organization,
+clinical_notes, patient_demographics, coverage, social_history."""
 
 
 _DOCUMENT_MAP_PROMPT_TABLES = """You are scanning a medical document to produce a
@@ -819,7 +840,16 @@ TABLES-FOCUSED RULES:
 - Be MORE PERMISSIVE on tabular content (better to flag a sparse table
   than miss it); be CONSERVATIVE on narrative (false positives there
   waste downstream cost on the clinical_notes pass).
-- Page hints are 1-indexed."""
+- Page hints are 1-indexed.
+
+REQUIRED OUTPUT SHAPE — your `presence` field MUST contain entries for
+ALL 13 resource types listed below, even those absent from the document.
+For absent types, set `present: false`, `pages: []`, `section_hint: null`.
+DO NOT omit keys; the dispatcher uses absence to skip specialist passes.
+
+Required keys: conditions, medications, allergies, immunizations,
+lab_observations, vital_signs, encounter, practitioner, organization,
+clinical_notes, patient_demographics, coverage, social_history."""
 
 
 ScoutFlavor = Literal["events", "tables"]
@@ -3543,21 +3573,15 @@ class MultiPassFHIRScoutPipeline(MultiPassFHIRPipeline):
         with prompt_version suffixed "+scout" so the cache key for the
         augmented prompt is distinct from the default pipeline's cache.
 
-        Defensive fallback — when presence is empty (the LLM didn't fill in the
-        routing manifest, or every key is absent), skipping ALL specialist
-        passes would silently produce a zero-entry bundle. That's a worse
-        failure than running everything. So an empty / no-True presence
-        falls through to the full _PASSES list (no page hints, no skipping).
-        Observed in practice on the cedars-myhealth run with the events-flavor
-        scout prompt — `presence` came back as `{}`.
-        """
-        anything_present = any(
-            (rp is not None and rp.present)
-            for rp in doc_map.presence.values()
-        )
-        if not anything_present:
-            return list(_PASSES)
+        No fallback: when presence is empty or all-absent, returns []. The
+        resulting bundle will have zero entries — that is the INTENTIONAL visible
+        failure mode. Fix the Pass 0 prompt rather than masking failures with a
+        silent fallback to all passes. A WARNING is logged so the failure is
+        loud in stdout / test output.
 
+        Per user directive: "we shouldn't allow a fallback pipeline for when one
+        of our pipelines breaks... we need that visibility while we are testing."
+        """
         augmented: list[ExtractionPass] = []
         for original in _PASSES:
             presence = doc_map.presence.get(original.name)  # type: ignore[arg-type]
@@ -3584,6 +3608,11 @@ class MultiPassFHIRScoutPipeline(MultiPassFHIRPipeline):
                     backend_name=original.backend_name,
                     model=original.model,
                 )
+            )
+        if not augmented:
+            logger.warning(
+                "scout: empty/all-absent presence manifest — dispatching 0 specialists. "
+                "Fix the Pass 0 prompt or the LLM output rather than relying on a fallback."
             )
         return augmented
 

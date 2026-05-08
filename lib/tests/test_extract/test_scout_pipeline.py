@@ -131,15 +131,17 @@ def test_augmented_passes_preserves_pass_metadata() -> None:
     assert aug.prompt_version == f"{original.prompt_version}+scout"
 
 
-def test_augmented_passes_when_all_absent_falls_back_to_all_passes() -> None:
-    """Defensive fallback: when no resource is marked present=True, the
-    scout's manifest is uninformative — falling back to running ALL passes
-    is much better than silently emitting a zero-entry bundle.
+def test_augmented_passes_when_all_absent_returns_empty() -> None:
+    """No fallback: when no resource is marked present=True, the manifest
+    is uninformative and the dispatcher returns an empty pass list. This
+    is the visible-failure-mode the user requested — silent fallback was
+    masking real Pass 0 failures.
 
-    Discovered live on the cedars-myhealth run: the events-flavor scout
-    returned `presence: {}`, the dispatcher would have skipped all
-    specialists, and we'd get bundle.entry == [] with no error. This
-    fallback prevents that silent failure mode."""
+    Discovered live on the cedars-myhealth run: scout was producing
+    identical output to default because Pass 0 returned `presence: {}`,
+    the dispatcher fell back to all _PASSES, and we paid for Pass 0
+    without any cost savings. Strengthening the prompt + removing the
+    fallback is the fix."""
     pipeline = _new_scout_pipeline()
     doc_map = DocumentMap(
         document_type="other",
@@ -150,20 +152,17 @@ def test_augmented_passes_when_all_absent_falls_back_to_all_passes() -> None:
         },
     )
     result = pipeline._augmented_passes(doc_map)
-    # Fall back to the full _PASSES list (no skipping, no page hints)
-    assert len(result) == len(_PASSES)
-    assert {p.name for p in result} == {p.name for p in _PASSES}
+    assert result == []
 
 
-def test_augmented_passes_when_presence_dict_empty_falls_back_to_all_passes() -> None:
-    """Empty presence dict: same defensive fallback as the all-absent case.
-    The LLM didn't fill in the manifest at all — running every pass is the
-    safe behavior."""
+def test_augmented_passes_when_presence_dict_empty_returns_empty() -> None:
+    """No fallback: empty presence dict → empty pass list. The LLM didn't
+    fill in the manifest at all. Dispatcher trusts the manifest as-is so
+    the failure is visible (bundle.entry == [])."""
     pipeline = _new_scout_pipeline()
     doc_map = DocumentMap(document_type="other")
     result = pipeline._augmented_passes(doc_map)
-    assert len(result) == len(_PASSES)
-    assert {p.name for p in result} == {p.name for p in _PASSES}
+    assert result == []
 
 
 def test_augmented_passes_partial_presence_skips_absent_only() -> None:
@@ -214,3 +213,16 @@ def test_pass_0_uses_document_map_for_scout() -> None:
     pipeline = _new_scout_pipeline()
     assert pipeline._pass_0_prompt() is _DOCUMENT_MAP_PROMPT
     assert pipeline._pass_0_schema() is DocumentMap
+
+
+def test_augmented_passes_logs_warning_when_falling_to_empty(caplog) -> None:
+    """When _augmented_passes would return an empty list, it logs a WARN
+    so the visible-failure-mode is loud rather than silent."""
+    import logging
+    pipeline = _new_scout_pipeline()
+    doc_map = DocumentMap(document_type="other")
+    with caplog.at_level(logging.WARNING):
+        result = pipeline._augmented_passes(doc_map)
+    assert result == []
+    assert any("empty" in r.message.lower() or "absent" in r.message.lower()
+               for r in caplog.records)

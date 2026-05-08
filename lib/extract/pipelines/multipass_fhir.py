@@ -315,6 +315,47 @@ class OrganizationExtraction(BaseModel):
     organizations: list[OrganizationEntry] = Field(default_factory=list)
 
 
+class ClinicalNoteSection(BaseModel):
+    title: str = Field(..., description="Section title as printed (e.g. 'Subjective', 'Physical Exam', 'Assessment and Plan', 'Plan')")
+    loinc_code: str | None = Field(
+        None, description="LOINC code for the section if known. Common: 10164-2 History of Present Illness, "
+        "29545-1 Physical Examination, 51848-0 Evaluation note, 18776-5 Plan of treatment, 11329-0 Hx of past illness, "
+        "10157-6 History of family member diseases."
+    )
+    narrative_text: str = Field(..., description="VERBATIM narrative text from this section. Do NOT summarize.")
+
+
+class ClinicalNoteEntry(BaseModel):
+    note_id: str | None = Field(None, description="Note ID if printed; otherwise synthesized")
+    note_type: Literal[
+        "progress-note",
+        "consult-note",
+        "discharge-summary",
+        "procedure-note",
+        "history-and-physical",
+        "patient-education",
+        "telephone-encounter",
+        "other",
+    ] = "progress-note"
+    note_type_loinc: str | None = Field(
+        None, description="LOINC code for note type. Common: 11506-3 Progress note, "
+        "11488-4 Consultation note, 18842-5 Discharge summary, 28570-0 Procedure note, "
+        "34117-2 History and Physical."
+    )
+    title: str | None = Field(None, description="Note title as printed (e.g. 'Allergy & Immunology Progress Note')")
+    author_name: str | None = None
+    author_role: str | None = Field(None, description="Author credential / role (NP / MD / RN / etc.)")
+    encounter_date: str | None = Field(None, description="ISO 8601; date the note was authored")
+    sections: list[ClinicalNoteSection] = Field(default_factory=list, description="Ordered sections of the note")
+    page_start: int | None = None
+    page_end: int | None = None
+    source_text: str | None = None
+
+
+class ClinicalNoteExtraction(BaseModel):
+    clinical_notes: list[ClinicalNoteEntry] = Field(default_factory=list)
+
+
 # ---------------------------------------------------------------------------
 # Pass definitions — declarative table of what runs and how
 # ---------------------------------------------------------------------------
@@ -569,6 +610,54 @@ Rules:
 - If no organizations are mentioned, return empty list."""
 
 
+_CLINICAL_NOTES_PROMPT = """You are extracting long-form narrative clinical notes
+from a medical document.
+
+What counts as a clinical note:
+- Progress notes (SOAP-format or narrative)
+- Consult notes
+- Discharge summaries
+- Procedure notes
+- History & Physical (H&P) entries
+- Patient education paragraphs that read as continuous narrative
+
+Rules:
+- Extract every distinct narrative note. Each note becomes ONE
+  ClinicalNoteEntry; its internal sections (Subjective, Objective,
+  Assessment, Plan, etc.) become entries in the `sections` list.
+- Preserve section structure when present. Common section titles:
+    Subjective, Objective, Physical Exam, Assessment, Plan,
+    Assessment and Plan, History of Present Illness, Reason for Visit,
+    Patient Education, Plan of Treatment, Reason for Follow up,
+    Past Medical History, Review of Systems, Allergies (when narrative).
+- For each section: capture the title verbatim and the FULL narrative
+  text. Do NOT summarize, paraphrase, or shorten. The point of this
+  pass is to preserve narrative fidelity.
+- LOINC codes for note types (use these when confident):
+    11506-3 = Progress note
+    11488-4 = Consultation note
+    18842-5 = Discharge summary
+    28570-0 = Procedure note
+    34117-2 = History and Physical
+- LOINC codes for sections (use these when confident):
+    10164-2 = History of Present Illness (Subjective / HPI)
+    29545-1 = Physical Examination (Objective / Physical Exam)
+    51848-0 = Evaluation note (Assessment)
+    18776-5 = Plan of treatment (Plan)
+    51847-2 = Evaluation + Plan note (combined A&P)
+- Capture author_name + author_role separately (e.g. "Ani Shirvanian"
+  + "NP", or "Steven Krems" + "MD"). Strip the credential from the name.
+- encounter_date: ISO 8601 if visible. Use the note's authored/signed date.
+- page_start / page_end: 1-indexed page numbers spanning the note.
+- Multi-page notes ARE allowed — capture the full continuous narrative
+  even if it spans pages.
+- Do NOT extract structured-table content here (vital signs, labs,
+  medications, immunizations have their own passes).
+- Do NOT extract administrative text (insurance, demographics,
+  document headers/footers).
+- If no narrative notes are present (e.g. lab-only PDF), return empty list."""
+
+
 _PASSES: list[ExtractionPass] = [
     ExtractionPass(
         name="conditions",
@@ -633,6 +722,13 @@ _PASSES: list[ExtractionPass] = [
         prompt_version="v1",
         schema_version="v1",
     ),
+    ExtractionPass(
+        name="clinical_notes",
+        schema=ClinicalNoteExtraction,
+        system_prompt=_CLINICAL_NOTES_PROMPT,
+        prompt_version="v1",
+        schema_version="v1",
+    ),
 ]
 
 
@@ -686,6 +782,20 @@ def _stable_organization_id(o: "OrganizationEntry") -> str:
     state = (o.state or "").lower().strip()
     seed = f"{name}|{city}|{state}"
     return f"org-{hashlib.sha1(seed.encode()).hexdigest()[:12]}"
+
+
+def _stable_clinical_note_id(n: "ClinicalNoteEntry", doc_context: "DocumentContext") -> str:
+    """Stable, deterministic note ID from (title|author|date|page_start).
+    Same inputs across re-extractions always yield the same ID."""
+    import hashlib
+    parts = [
+        n.title or n.note_type,
+        n.author_name or "no-author",
+        n.encounter_date or doc_context.encounter_date or "no-date",
+        str(n.page_start or 0),
+    ]
+    seed = "|".join(parts)
+    return f"note-{hashlib.sha1(seed.encode()).hexdigest()[:12]}"
 
 
 _VITAL_LOINC_MAP: dict[str, tuple[str, str]] = {
@@ -1076,6 +1186,12 @@ class MultiPassFHIRPipeline:
             entries.append(
                 {"resource": self._organization_to_fhir(o, common_meta_template, layout, doc_context)}
             )
+
+        # Clinical Notes — emits paired DocumentReference + Composition per note
+        notes_extraction: ClinicalNoteExtraction = per_pass.get("clinical_notes") or ClinicalNoteExtraction()
+        for n in notes_extraction.clinical_notes:
+            for resource in self._clinical_note_to_fhir_resources(n, common_meta_template, layout, doc_context):
+                entries.append({"resource": resource})
 
         # Post-pass: wire encounter references onto encounter-scopable resources
         self._assign_encounter_references(entries)
@@ -1699,6 +1815,116 @@ class MultiPassFHIRPipeline:
                 addr["postalCode"] = o.postal_code
             resource["address"] = [addr]
         return resource
+
+    def _clinical_note_to_fhir_resources(
+        self,
+        n: ClinicalNoteEntry,
+        common_meta: dict[str, Any],
+        layout: Any,
+        doc_context: DocumentContext,
+    ) -> list[dict[str, Any]]:
+        """Returns a list of TWO FHIR resources: a DocumentReference (narrative
+        container) and a Composition (sectioned structure). Both are linked
+        via shared identifier."""
+        import base64
+
+        bbox_locator = self._bbox_locator_for(n.source_text, n.page_start, layout)
+        note_id = n.note_id or _stable_clinical_note_id(n, doc_context)
+        base_meta = self._add_bbox_to_meta(common_meta, bbox_locator)
+
+        note_date = n.encounter_date or doc_context.encounter_date
+
+        # Build joined narrative for DocumentReference attachment
+        full_text_parts: list[str] = []
+        if n.title:
+            full_text_parts.append(n.title)
+        for section in n.sections:
+            full_text_parts.append(f"\n\n{section.title}\n{section.narrative_text}")
+        full_text = "\n".join(full_text_parts).strip()
+
+        # Type coding for both resources
+        if n.note_type_loinc:
+            type_coding = {
+                "system": "http://loinc.org",
+                "code": n.note_type_loinc,
+                "display": n.note_type.replace("-", " ").title(),
+            }
+        else:
+            # Default mappings if model didn't emit a code
+            DEFAULT_TYPE_LOINC: dict[str, tuple[str, str]] = {
+                "progress-note": ("11506-3", "Progress note"),
+                "consult-note": ("11488-4", "Consultation note"),
+                "discharge-summary": ("18842-5", "Discharge summary"),
+                "procedure-note": ("28570-0", "Procedure note"),
+                "history-and-physical": ("34117-2", "History and Physical"),
+                "patient-education": ("11506-3", "Progress note"),  # closest
+                "telephone-encounter": ("28615-3", "Telephone encounter note"),
+                "other": ("11506-3", "Progress note"),
+            }
+            code, display = DEFAULT_TYPE_LOINC[n.note_type]
+            type_coding = {"system": "http://loinc.org", "code": code, "display": display}
+
+        # 1. DocumentReference — narrative container
+        encoded = base64.b64encode(full_text.encode("utf-8")).decode("ascii") if full_text else ""
+        doc_ref: dict[str, Any] = {
+            "resourceType": "DocumentReference",
+            "id": f"docref-{note_id}",
+            "status": "current",
+            "type": {"coding": [type_coding], "text": n.title or n.note_type},
+            "subject": {"reference": f"Patient/{self._patient_id}"},
+            "content": [
+                {
+                    "attachment": {
+                        "contentType": "text/plain",
+                        "data": encoded,
+                        **({"title": n.title} if n.title else {}),
+                    }
+                }
+            ],
+            "meta": base_meta,
+        }
+        if note_date:
+            doc_ref["date"] = note_date
+        if n.author_name:
+            doc_ref["author"] = [{"display": n.author_name + (f", {n.author_role}" if n.author_role else "")}]
+
+        # 2. Composition — sectioned structure
+        composition: dict[str, Any] = {
+            "resourceType": "Composition",
+            "id": f"comp-{note_id}",
+            "status": "final",
+            "type": {"coding": [type_coding], "text": n.title or n.note_type},
+            "subject": {"reference": f"Patient/{self._patient_id}"},
+            "title": n.title or "Clinical Note",
+            "meta": base_meta,
+        }
+        if note_date:
+            composition["date"] = note_date
+        if n.author_name:
+            composition["author"] = [{"display": n.author_name + (f", {n.author_role}" if n.author_role else "")}]
+        sections_out: list[dict[str, Any]] = []
+        for section in n.sections:
+            section_dict: dict[str, Any] = {
+                "title": section.title,
+                "text": {
+                    "status": "additional",
+                    "div": f'<div xmlns="http://www.w3.org/1999/xhtml">{section.narrative_text}</div>',
+                },
+            }
+            if section.loinc_code:
+                section_dict["code"] = {
+                    "coding": [
+                        {
+                            "system": "http://loinc.org",
+                            "code": section.loinc_code,
+                        }
+                    ]
+                }
+            sections_out.append(section_dict)
+        if sections_out:
+            composition["section"] = sections_out
+
+        return [doc_ref, composition]
 
 
 # ---------------------------------------------------------------------------

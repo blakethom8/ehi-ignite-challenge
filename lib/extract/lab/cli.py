@@ -1,12 +1,11 @@
 """CLI for the PDF Lab. Subcommands:
     run     — run pipeline(s) on a PDF, capture full traces
     compare — diff two completed runs (LAB-T04)
-    show    — print summary of one run (LAB-T06, stub today)
-    list    — list recent runs (LAB-T06, stub today)
-    report  — generate markdown report (LAB-T06, stub today)
+    show    — print a single-run markdown summary (LAB-T06)
+    list    — list recent runs (LAB-T06)
+    report  — generate a paste-able markdown report (LAB-T06)
 
-`run` and `compare` are fully implemented. The other subcommands are
-stubbed with a clear "lands in LAB-Tnn" message.
+All subcommands are fully implemented.
 """
 
 from __future__ import annotations
@@ -31,7 +30,9 @@ def main(argv: list[str] | None = None) -> int:
 
     _add_run_parser(subparsers)
     _add_compare_parser(subparsers)
-    _add_stub_parsers(subparsers)
+    _add_show_parser(subparsers)
+    _add_list_parser(subparsers)
+    _add_report_parser(subparsers)
 
     args = parser.parse_args(argv)
 
@@ -39,8 +40,12 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_run(args)
     if args.cmd == "compare":
         return _cmd_compare(args)
-    if args.cmd in ("show", "list", "report"):
-        return _cmd_stub(args.cmd)
+    if args.cmd == "show":
+        return _cmd_show(args)
+    if args.cmd == "list":
+        return _cmd_list(args)
+    if args.cmd == "report":
+        return _cmd_report(args)
 
     parser.error(f"unknown command: {args.cmd}")
     return 2  # unreachable after parser.error
@@ -159,25 +164,63 @@ def _cmd_compare(args: argparse.Namespace) -> int:
     return 0
 
 
-def _add_stub_parsers(sub: argparse._SubParsersAction) -> None:  # type: ignore[type-arg]
-    """Register placeholder subcommands so the help message lists them."""
-    for cmd, deferred_to in [
-        ("show", "LAB-T06"),
-        ("list", "LAB-T06"),
-        ("report", "LAB-T06"),
-    ]:
-        sp = sub.add_parser(cmd, help=f"(stub — lands in {deferred_to})")
-        sp.set_defaults(deferred_to=deferred_to)
+def _add_show_parser(sub: argparse._SubParsersAction) -> None:  # type: ignore[type-arg]
+    p = sub.add_parser("show", help="Print a single-run markdown summary")
+    p.add_argument("--run", required=True, help="Run id")
+    p.add_argument("--root", type=Path, default=DEFAULT_LAB_ROOT)
 
 
-def _cmd_stub(cmd: str) -> int:
-    deferred = {
-        "show": "LAB-T06",
-        "list": "LAB-T06",
-        "report": "LAB-T06",
-    }[cmd]
-    print(f"`{cmd}` is not yet implemented. It lands in {deferred}.", file=sys.stderr)
-    return 2
+def _cmd_show(args: argparse.Namespace) -> int:
+    from lib.extract.lab.report import render_run_summary
+    try:
+        print(render_run_summary(args.run, root=args.root))
+    except FileNotFoundError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    return 0
+
+
+def _add_list_parser(sub: argparse._SubParsersAction) -> None:  # type: ignore[type-arg]
+    p = sub.add_parser("list", help="List recent runs")
+    p.add_argument("--pipeline", default=None, help="Filter by pipeline name")
+    p.add_argument("--last", type=int, default=20, help="Show only the last N runs (default 20)")
+    p.add_argument("--root", type=Path, default=DEFAULT_LAB_ROOT)
+
+
+def _cmd_list(args: argparse.Namespace) -> int:
+    from lib.extract.lab.report import read_runs_index, render_runs_list
+    runs = read_runs_index(root=args.root)
+    runs = runs[: args.last]
+    print(render_runs_list(runs, pipeline_filter=args.pipeline))
+    return 0
+
+
+def _add_report_parser(sub: argparse._SubParsersAction) -> None:  # type: ignore[type-arg]
+    p = sub.add_parser("report", help="Generate a markdown report for a run or comparison")
+    g = p.add_mutually_exclusive_group(required=True)
+    g.add_argument("--run", help="Run id (single-run summary)")
+    g.add_argument("--compare", nargs=2, metavar=("RUN_A", "RUN_B"), help="Compare two run ids")
+    p.add_argument("--root", type=Path, default=DEFAULT_LAB_ROOT)
+
+
+def _cmd_report(args: argparse.Namespace) -> int:
+    from lib.extract.lab.report import render_run_summary, render_comparison
+    from lib.extract.lab.compare import compare_runs
+    if args.run:
+        try:
+            print(render_run_summary(args.run, root=args.root))
+        except FileNotFoundError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 2
+    else:
+        run_a, run_b = args.compare
+        try:
+            comparison = compare_runs(run_a, run_b, root=args.root)
+        except FileNotFoundError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 2
+        print(render_comparison(comparison))
+    return 0
 
 
 def _cmd_run(args: argparse.Namespace) -> int:

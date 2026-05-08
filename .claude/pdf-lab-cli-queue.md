@@ -51,7 +51,7 @@ Run-id format: `<utc-iso-no-colons>_<pdf-sha-prefix>_<pipeline-name>` — sortab
 
 ## LAB-T01 · `RunRecorder` + on-disk artifact layout
 
-- **Status:** Queued
+- **Status:** ✅ Completed `4dedf3c` · 2026-05-07 · 280 tests pass
 - **Goal:** A library class that captures everything for a single pipeline run: per-pass prompts, raw responses, token usage, latency, cost, parsed extraction, final bundle, ground truth (optional). Persists under `data/pdf-lab/runs/<run-id>/` with the documented layout.
 - **Files you may touch:** `lib/extract/lab/__init__.py` (new), `lib/extract/lab/recorder.py` (new), `lib/tests/test_extract/test_lab_recorder.py` (new). Mirror the directory pattern of `lib/extract/terminology/` (existing precedent for sub-package).
 - **Files you must NOT touch:** any pipeline code; any `api/`; the existing queue files.
@@ -193,7 +193,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 
 ## LAB-T02 · Wire `RunRecorder` into `MultiPassFHIRPipeline.extract()`
 
-- **Status:** Queued
+- **Status:** ✅ Completed `d3f7bac` · 2026-05-07 · 288 tests pass
 - **Depends on:** LAB-T01
 - **Goal:** Thread the recorder through extraction so every pipeline run produces full traces. Optional parameter — default `None` preserves existing behavior; pipelines used outside the lab don't pay any cost.
 
@@ -294,7 +294,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 
 ## LAB-T03 · CLI entry point + `run` subcommand
 
-- **Status:** Queued
+- **Status:** ✅ Completed `3dcc043` · 2026-05-07 · 298 tests pass
 - **Depends on:** LAB-T01 + LAB-T02
 - **Goal:** A CLI module at `lib/extract/lab/__main__.py` invoked via `python -m lib.extract.lab`. First subcommand: `run` (single-pipeline or multi-pipeline against a PDF).
 
@@ -398,7 +398,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 
 ## LAB-T04 · `compare` subcommand — diff two run artifacts
 
-- **Status:** Queued
+- **Status:** ✅ Completed `23266cf` · 2026-05-07 · 309 tests pass
 - **Depends on:** LAB-T01 + LAB-T03
 - **Goal:** Compute structured diff between two completed runs. Surfaces what changed: per-resource counts, per-fact agreement, cost / latency delta, bundle-shape delta.
 
@@ -477,7 +477,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 
 ## LAB-T05 · Bundle-shape assertions module
 
-- **Status:** Queued
+- **Status:** ✅ Completed `be899e1` · 2026-05-07 · 324 tests pass
 - **Depends on:** LAB-T01 (eval.json target)
 - **Goal:** Beyond F1 per resource type, score each Bundle on structural quality. The new resource types (Patient, Encounter, Practitioner, Organization, etc.) need cross-resource sanity checks that F1 doesn't capture.
 
@@ -554,7 +554,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 
 ## LAB-T06 · `show` / `list` / `report` subcommands + markdown report generator
 
-- **Status:** Queued
+- **Status:** ✅ Completed `9e7f665` · 2026-05-07 · 339 tests pass
 - **Depends on:** LAB-T01 + LAB-T03 + LAB-T04 + LAB-T05
 - **Goal:** Three subcommands that read run artifacts and emit human-readable output. The agent-loop's "share findings" step.
 

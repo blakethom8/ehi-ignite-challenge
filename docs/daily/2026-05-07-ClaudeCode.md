@@ -810,4 +810,126 @@ Synthesis + testing platform = next session(s).
 
 ---
 
+## Entry 10 — PDF Lab reframe: agent-first, CLI-driven (2026-05-07)
+
+The user direction shifted scope: "Think of the testing environment from an agent-first perspective. CLI probably makes the most sense. The main focus is on you being able to run those logs, review them, share the insights, and make enhancements."
+
+This is a meaningful simplification. The previous `pdf-lab-studio-queue.md` was Streamlit-heavy — comparison view, vision-wins reviewer, history dashboard, all UI surfaces. With the agent-first reframe, **none of that needs to be built as UI.** It needs to exist as machine-readable data with a CLI on top, plus a markdown-report generator I can use to share findings.
+
+### What changes
+
+**Out:**
+- `PDFLAB-T02` (Streamlit page shell)
+- `PDFLAB-T04` (side-by-side comparison view UI)
+- `PDFLAB-T05` (vision-wins reviewer UI)
+- `PDFLAB-T06` (cost/latency dashboard UI)
+
+**In:**
+- A library + CLI in `lib/extract/lab/` with subcommands: `run`, `compare`, `show`, `list`, `report`
+- Disk layout for run artifacts (prompts, raw responses, usage, parsed extractions, bundle output, eval metrics) keyed by run-id
+- Markdown-report generator I can paste into conversations to share findings
+
+Streamlit becomes optional (can layer on later if a human ever needs to browse runs visually). For Phase 1 it's not on the critical path.
+
+### Run-artifact disk layout
+
+```
+data/pdf-lab/
+├── runs.jsonl                   ← append-only index, one line per run
+└── runs/
+    └── <run-id>/                ← e.g. 2026-05-07T18-30-00_a3b2c1_multipass-fhir
+        ├── manifest.json        ← pipeline, PDF SHA, started/finished, cost, latency
+        ├── source.pdf           ← reference / copy of input PDF
+        ├── ground-truth.json    ← optional sibling FHIR Bundle for F1 scoring
+        ├── bundle.json          ← extracted FHIR Bundle (the production output)
+        ├── eval.json            ← F1 + bundle-shape metrics
+        └── traces/
+            └── <pass-name>/
+                ├── prompt.txt        ← full system prompt
+                ├── response.json     ← raw LLM response
+                ├── usage.json        ← tokens, latency, cost
+                └── extraction.json   ← parsed Pydantic output (XExtraction)
+```
+
+This is the **agent's working dataset.** I can:
+- `cat traces/conditions/prompt.txt` to read what we asked
+- `jq` over `bundle.json` to inspect what was extracted
+- `diff` two run artifacts to see what changed
+- Aggregate `usage.json` files across runs for cost trends
+
+### CLI surface (agent-driven; not human-UI)
+
+```bash
+# Run one pipeline against a PDF, optionally with ground truth
+uv run python -m lib.extract.lab run \
+    --pipeline multipass-fhir \
+    --pdf path/to.pdf \
+    [--ground-truth path/to.json] \
+    [--out data/pdf-lab/runs/<run-id>]
+
+# Run multiple pipelines on the same PDF (parallel)
+uv run python -m lib.extract.lab run \
+    --pipeline multipass-fhir \
+    --pipeline multipass-fhir-scout \
+    --pipeline multipass-fhir-bidi-scout \
+    --pdf path/to.pdf
+
+# Compare two existing runs (or a run vs ground truth)
+uv run python -m lib.extract.lab compare --run-a <id> --run-b <id>
+
+# Show summary of a single run
+uv run python -m lib.extract.lab show --run <id>
+
+# List recent runs
+uv run python -m lib.extract.lab list [--pipeline <name>] [--last <n>]
+
+# Generate a markdown report — the thing I paste into our conversations
+uv run python -m lib.extract.lab report --run <id>      # single-run report
+uv run python -m lib.extract.lab report --compare <id> <id>  # comparison report
+```
+
+Output is markdown by default — readable in terminal, paste-able into chat, easy to embed in `pdf-review/<source>/notes.md` files.
+
+### Build plan — 6 tasks (was 6 in the studio version too, but rescoped)
+
+| ID | Task | Effort |
+|---|---|---|
+| **LAB-T01** | Run-artifact layout + `RunRecorder` class (capture prompts, responses, usage per pass) | ½ day |
+| **LAB-T02** | Pipeline tracing instrumentation — thread `RunRecorder` through `MultiPassFHIRPipeline.extract()` | ½ day |
+| **LAB-T03** | CLI entry point + `run` subcommand (single-pipeline + multi-pipeline) | ½ day |
+| **LAB-T04** | `compare` subcommand — diff two run artifacts (resource counts, per-fact agreement, cost/latency delta, bundle-shape diff) | 1 day |
+| **LAB-T05** | Bundle-shape assertions module — patient uniqueness, encounter linkage rate, narrative fidelity score, etc. (the new resource types need this) | ½ day |
+| **LAB-T06** | Markdown report generator — `show`, `list`, `report` subcommands | ½ day |
+
+**Total: ~3 days condensed.** All 6 land on the same branch.
+
+What's intentionally NOT in scope:
+- Streamlit page (deferred — `pdf-lab-studio-queue.md` superseded by this one)
+- Vision-wins reviewer UI (the data is captured; classification can happen via JSON edits or a future small Streamlit page)
+- Run-history dashboard UI (the JSONL index + CLI list/report is enough)
+- Real-time progress tracking (the CLI blocks on extraction; status emits to stdout)
+
+### What this lets us do (the agent-loop)
+
+```
+User: "Run the bidi-scout pipeline on the cedars-myhealth PDF"
+↓
+Claude: uv run python -m lib.extract.lab run \
+            --pipeline multipass-fhir-bidi-scout \
+            --pdf pdf-review/cedars-myhealth/inputs/...PDF
+↓
+Run completes. Run-id printed. Artifacts on disk.
+↓
+Claude: uv run python -m lib.extract.lab report --run <id>
+↓
+Markdown report comes back. Claude reads it, summarizes for user, flags
+disagreement signals from the bidi reconciliation, suggests next moves.
+↓
+User decides next experiment.
+```
+
+This is the loop the user described. Build it and the architecture-experiment work has a real measurement surface.
+
+---
+
 *Last updated: 2026-05-07. Working log — append entries with date stamp.*

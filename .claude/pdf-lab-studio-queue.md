@@ -1,5 +1,10 @@
 # PDF Lab Studio — Task Queue
 
+> ⚠️ **SUPERSEDED 2026-05-07** by `.claude/pdf-lab-cli-queue.md`. The user directed agent-first / CLI-driven design rather than a Streamlit-heavy UI. This queue is preserved for reference; tasks here are NOT scheduled for build. See `docs/daily/2026-05-07-ClaudeCode.md` Entry 10 for the reframe.
+
+---
+
+
 > Test-environment build for the PDF parser. Six builder-sized tasks that compose into a side-by-side, per-PDF, per-model comparison studio with provenance, ground-truth-driven F1, vision-wins triage, and run history. Source spec: `docs/daily/2026-05-07-ClaudeCode.md` Entry 4. Strategic context: the parent-company pitch ("vendor-neutrality with empirical model selection") needs the bake-off to be cheap and routine, not a one-off command-line ritual.
 
 **Status legend:** `Queued` → `In Progress (dispatched YYYY-MM-DD HH:MM)` → `Completed (hash)` / `⚠ In Progress (failed HH:MM)` / `⛔ Blocked (open question #)`

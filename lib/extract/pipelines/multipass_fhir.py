@@ -356,6 +356,58 @@ class ClinicalNoteExtraction(BaseModel):
     clinical_notes: list[ClinicalNoteEntry] = Field(default_factory=list)
 
 
+class PatientEntry(BaseModel):
+    patient_id: str | None = Field(
+        None, description="Patient ID / MRN if printed (used as the FHIR Patient.id when present)"
+    )
+    family_name: str | None = None
+    given_names: list[str] = Field(default_factory=list)
+    prefix: str | None = None
+    suffix: str | None = None
+    nickname: str | None = Field(None, description="Preferred / used name (e.g. 'Blake' for 'Blake Thomson')")
+    gender: Literal["male", "female", "other", "unknown"] | None = None
+    birth_sex: Literal["M", "F", "UNK", "OTH"] | None = Field(
+        None, description="US Core birthsex: M / F / UNK / OTH"
+    )
+    birth_date: str | None = Field(None, description="ISO 8601 YYYY-MM-DD")
+    deceased_date: str | None = None
+    # OMB race + ethnicity codes (US Core)
+    race_text: str | None = Field(None, description="Race as printed (free text)")
+    race_omb_code: str | None = Field(
+        None,
+        description="OMB race code: 1002-5 American Indian/Alaska Native, 2028-9 Asian, "
+        "2054-5 Black/African American, 2076-8 Native Hawaiian/Pacific Islander, "
+        "2106-3 White, 2131-1 Other"
+    )
+    ethnicity_text: str | None = None
+    ethnicity_omb_code: str | None = Field(
+        None,
+        description="OMB ethnicity code: 2135-2 Hispanic or Latino, 2186-5 Not Hispanic or Latino"
+    )
+    marital_status: str | None = Field(
+        None, description="Marital status as printed (e.g. 'Domestic Partner', 'Married', 'Single')"
+    )
+    language: str | None = Field(None, description="Preferred language as printed (e.g. 'English')")
+    address_line: str | None = None
+    city: str | None = None
+    state: str | None = None
+    postal_code: str | None = None
+    country: str | None = None
+    phone_home: str | None = None
+    phone_mobile: str | None = None
+    phone_work: str | None = None
+    email: str | None = None
+    page: int | None = None
+    source_text: str | None = None
+
+
+class PatientExtraction(BaseModel):
+    patients: list[PatientEntry] = Field(
+        default_factory=list,
+        description="Usually 1; allow list to handle edge cases (e.g. multi-patient summaries)",
+    )
+
+
 # ---------------------------------------------------------------------------
 # Pass definitions — declarative table of what runs and how
 # ---------------------------------------------------------------------------
@@ -658,6 +710,40 @@ Rules:
 - If no narrative notes are present (e.g. lab-only PDF), return empty list."""
 
 
+_PATIENT_DEMOGRAPHICS_PROMPT = """You are extracting patient demographic information
+from a medical document.
+
+Rules:
+- Extract the primary patient's demographics. Most documents describe ONE patient;
+  emit one PatientEntry. If the document covers multiple patients (rare), emit
+  one entry per distinct patient.
+- patient_id: capture MRN / Medical Record Number / Patient ID if printed.
+- gender: lowercase ("male" / "female" / "other" / "unknown").
+- birth_sex: US Core uses single-letter codes. "Legal Sex Male" / "Sex Assigned at
+  Birth Male" → "M". Female → "F". Unknown / not on file → "UNK". Other → "OTH".
+- birth_date: ISO 8601 (YYYY-MM-DD).
+- race_text: capture as printed (e.g. "White", "Black or African American",
+  "Asian", "American Indian or Alaska Native").
+- race_omb_code: map to OMB code if confident:
+    1002-5 = American Indian or Alaska Native
+    2028-9 = Asian
+    2054-5 = Black or African American
+    2076-8 = Native Hawaiian or Other Pacific Islander
+    2106-3 = White
+    2131-1 = Other Race
+- ethnicity_text: capture as printed (e.g. "Not Hispanic or Latino", "Hispanic or Latino").
+- ethnicity_omb_code: map to OMB code if confident:
+    2135-2 = Hispanic or Latino
+    2186-5 = Not Hispanic or Latino
+- marital_status: capture as printed (don't translate Domestic Partner → other terms).
+- language: preferred spoken / written language as printed.
+- Capture multiple phone numbers if labeled (Home / Mobile / Work).
+- Capture address from the primary "Patient Address" block.
+- Do NOT extract demographics of other people mentioned in the document
+  (practitioners, emergency contacts, family). Those are not the patient.
+- If no patient demographics block is present, return empty list."""
+
+
 _PASSES: list[ExtractionPass] = [
     ExtractionPass(
         name="conditions",
@@ -729,6 +815,13 @@ _PASSES: list[ExtractionPass] = [
         prompt_version="v1",
         schema_version="v1",
     ),
+    ExtractionPass(
+        name="patient_demographics",
+        schema=PatientExtraction,
+        system_prompt=_PATIENT_DEMOGRAPHICS_PROMPT,
+        prompt_version="v1",
+        schema_version="v1",
+    ),
 ]
 
 
@@ -796,6 +889,38 @@ def _stable_clinical_note_id(n: "ClinicalNoteEntry", doc_context: "DocumentConte
     ]
     seed = "|".join(parts)
     return f"note-{hashlib.sha1(seed.encode()).hexdigest()[:12]}"
+
+
+def _stable_patient_id(p: "PatientEntry", doc_context: "DocumentContext") -> str:
+    """Stable patient ID derived from MRN if present, else from name + DOB.
+    The FHIR Patient.id thus matches across re-extractions of the same patient."""
+    import hashlib
+    if p.patient_id:
+        # Sanitize MRN for use as FHIR id (alphanumeric + dash)
+        sanitized = "".join(c if c.isalnum() else "-" for c in p.patient_id)
+        return f"pat-mrn-{sanitized}"
+    seed_parts = [
+        p.family_name or "",
+        "|".join(p.given_names),
+        p.birth_date or doc_context.patient_dob or "",
+    ]
+    seed = "|".join(seed_parts)
+    return f"pat-{hashlib.sha1(seed.encode()).hexdigest()[:12]}"
+
+
+# OMB code → display lookup tables
+_OMB_RACE_DISPLAY = {
+    "1002-5": "American Indian or Alaska Native",
+    "2028-9": "Asian",
+    "2054-5": "Black or African American",
+    "2076-8": "Native Hawaiian or Other Pacific Islander",
+    "2106-3": "White",
+    "2131-1": "Other Race",
+}
+_OMB_ETHNICITY_DISPLAY = {
+    "2135-2": "Hispanic or Latino",
+    "2186-5": "Not Hispanic or Latino",
+}
 
 
 _VITAL_LOINC_MAP: dict[str, tuple[str, str]] = {
@@ -1231,6 +1356,13 @@ class MultiPassFHIRPipeline:
         for n in notes_extraction.clinical_notes:
             for resource in self._clinical_note_to_fhir_resources(n, common_meta_template, layout, doc_context):
                 entries.append({"resource": resource})
+
+        # Patient Demographics
+        patient_extraction: PatientExtraction = per_pass.get("patient_demographics") or PatientExtraction()
+        for p in patient_extraction.patients:
+            entries.append(
+                {"resource": self._patient_to_fhir(p, common_meta_template, layout, doc_context)}
+            )
 
         # Post-pass: wire encounter references onto encounter-scopable resources
         self._assign_encounter_references(entries)
@@ -1964,6 +2096,146 @@ class MultiPassFHIRPipeline:
             composition["section"] = sections_out
 
         return [doc_ref, composition]
+
+    def _patient_to_fhir(
+        self,
+        p: PatientEntry,
+        common_meta: dict[str, Any],
+        layout: Any,
+        doc_context: DocumentContext,
+    ) -> dict[str, Any]:
+        bbox_locator = self._bbox_locator_for(p.source_text, p.page, layout)
+        patient_id = _stable_patient_id(p, doc_context)
+        base_meta = self._add_bbox_to_meta(common_meta, bbox_locator)
+        resource: dict[str, Any] = {
+            "resourceType": "Patient",
+            "id": patient_id,
+            "active": True,
+            "meta": base_meta,
+        }
+
+        # US Core extensions
+        extensions: list[dict[str, Any]] = []
+        if p.race_omb_code or p.race_text:
+            race_ext_inner: list[dict[str, Any]] = []
+            if p.race_omb_code:
+                race_ext_inner.append({
+                    "url": "ombCategory",
+                    "valueCoding": {
+                        "system": "urn:oid:2.16.840.1.113883.6.238",
+                        "code": p.race_omb_code,
+                        "display": _OMB_RACE_DISPLAY.get(p.race_omb_code, p.race_text or ""),
+                    },
+                })
+            if p.race_text:
+                race_ext_inner.append({"url": "text", "valueString": p.race_text})
+            extensions.append({
+                "url": "http://hl7.org/fhir/us/core/StructureDefinition/us-core-race",
+                "extension": race_ext_inner,
+            })
+        if p.ethnicity_omb_code or p.ethnicity_text:
+            eth_ext_inner: list[dict[str, Any]] = []
+            if p.ethnicity_omb_code:
+                eth_ext_inner.append({
+                    "url": "ombCategory",
+                    "valueCoding": {
+                        "system": "urn:oid:2.16.840.1.113883.6.238",
+                        "code": p.ethnicity_omb_code,
+                        "display": _OMB_ETHNICITY_DISPLAY.get(p.ethnicity_omb_code, p.ethnicity_text or ""),
+                    },
+                })
+            if p.ethnicity_text:
+                eth_ext_inner.append({"url": "text", "valueString": p.ethnicity_text})
+            extensions.append({
+                "url": "http://hl7.org/fhir/us/core/StructureDefinition/us-core-ethnicity",
+                "extension": eth_ext_inner,
+            })
+        if p.birth_sex:
+            extensions.append({
+                "url": "http://hl7.org/fhir/us/core/StructureDefinition/us-core-birthsex",
+                "valueCode": p.birth_sex,
+            })
+        if extensions:
+            resource["extension"] = extensions
+
+        # Identifier (MRN)
+        if p.patient_id:
+            resource["identifier"] = [
+                {
+                    "type": {
+                        "coding": [
+                            {
+                                "system": "http://terminology.hl7.org/CodeSystem/v2-0203",
+                                "code": "MR",
+                                "display": "Medical Record Number",
+                            }
+                        ]
+                    },
+                    "value": p.patient_id,
+                }
+            ]
+
+        # Name
+        name_part: dict[str, Any] = {}
+        if p.family_name:
+            name_part["family"] = p.family_name
+        if p.given_names:
+            name_part["given"] = list(p.given_names)
+        if p.prefix:
+            name_part["prefix"] = [p.prefix]
+        if p.suffix:
+            name_part["suffix"] = [p.suffix]
+        if name_part:
+            resource["name"] = [name_part]
+            if p.nickname:
+                resource["name"].append({"use": "usual", "given": [p.nickname]})
+
+        if p.gender:
+            resource["gender"] = p.gender
+        if p.birth_date:
+            resource["birthDate"] = p.birth_date
+        if p.deceased_date:
+            resource["deceasedDateTime"] = p.deceased_date
+
+        # Address
+        if p.address_line or p.city or p.state or p.postal_code:
+            addr: dict[str, Any] = {"use": "home"}
+            if p.address_line:
+                addr["line"] = [p.address_line]
+            if p.city:
+                addr["city"] = p.city
+            if p.state:
+                addr["state"] = p.state
+            if p.postal_code:
+                addr["postalCode"] = p.postal_code
+            if p.country:
+                addr["country"] = p.country
+            resource["address"] = [addr]
+
+        # Telecom
+        telecom: list[dict[str, Any]] = []
+        if p.phone_home:
+            telecom.append({"system": "phone", "value": p.phone_home, "use": "home"})
+        if p.phone_mobile:
+            telecom.append({"system": "phone", "value": p.phone_mobile, "use": "mobile"})
+        if p.phone_work:
+            telecom.append({"system": "phone", "value": p.phone_work, "use": "work"})
+        if p.email:
+            telecom.append({"system": "email", "value": p.email})
+        if telecom:
+            resource["telecom"] = telecom
+
+        # Communication / language
+        if p.language:
+            resource["communication"] = [
+                {"language": {"text": p.language}, "preferred": True}
+            ]
+
+        # Marital status
+        if p.marital_status:
+            resource["maritalStatus"] = {"text": p.marital_status}
+
+        return resource
 
 
 # ---------------------------------------------------------------------------

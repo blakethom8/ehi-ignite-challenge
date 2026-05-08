@@ -1270,6 +1270,73 @@ class MultiPassFHIRPipeline:
             # Other resources (Patient, Practitioner, Organization, Coverage,
             # Encounter itself) are not linked.
 
+    def _rewrite_patient_references(self, entries: list[dict[str, Any]]) -> None:
+        """If a Patient resource exists in the bundle, rewrite every other
+        resource's subject/patient reference to point at the real Patient.id.
+
+        Mutates entries in place. Idempotent: re-running on an already-rewritten
+        bundle has no effect.
+
+        No-op if zero or multiple Patient resources are present (multiple is
+        rare and ambiguous; we don't pick).
+        """
+        patients = [
+            e["resource"] for e in entries
+            if e["resource"].get("resourceType") == "Patient"
+        ]
+        if len(patients) != 1:
+            return  # zero or ambiguous
+
+        target_id = patients[0]["id"]
+        target_ref = f"Patient/{target_id}"
+
+        # Resource types that carry a ``subject: Reference(Patient/...)`` field.
+        # Per FHIR R4: Observation, Condition, Procedure, MedicationRequest,
+        # Encounter, DiagnosticReport, AllergyIntolerance, DocumentReference,
+        # Composition (and more).
+        SUBJECT_TYPES = {
+            "Observation",
+            "Condition",
+            "MedicationRequest",
+            "Encounter",
+            "DiagnosticReport",
+            "AllergyIntolerance",
+            "DocumentReference",
+            "Composition",
+            "Procedure",
+        }
+
+        for entry in entries:
+            resource = entry["resource"]
+            rt = resource.get("resourceType")
+
+            if rt == "Patient":
+                continue  # the patient itself
+
+            # subject-field path
+            if rt in SUBJECT_TYPES:
+                subj = resource.get("subject")
+                if isinstance(subj, dict):
+                    ref = subj.get("reference") or ""
+                    if ref.startswith("Patient/") and ref != target_ref:
+                        subj["reference"] = target_ref
+
+            # Immunization uses ``patient`` (not ``subject``) per _immunization_to_fhir
+            if rt == "Immunization":
+                pat = resource.get("patient")
+                if isinstance(pat, dict):
+                    ref = pat.get("reference") or ""
+                    if ref.startswith("Patient/") and ref != target_ref:
+                        pat["reference"] = target_ref
+
+            # Coverage uses ``beneficiary``
+            if rt == "Coverage":
+                ben = resource.get("beneficiary")
+                if isinstance(ben, dict):
+                    ref = ben.get("reference") or ""
+                    if ref.startswith("Patient/") and ref != target_ref:
+                        ben["reference"] = target_ref
+
     def _merge_to_bundle(
         self,
         *,
@@ -1366,6 +1433,10 @@ class MultiPassFHIRPipeline:
 
         # Post-pass: wire encounter references onto encounter-scopable resources
         self._assign_encounter_references(entries)
+
+        # Post-pass: rewrite Patient/unknown (or any stale patient_id) to the
+        # real Patient.id emitted by the patient_demographics pass (T10).
+        self._rewrite_patient_references(entries)
 
         bundle: dict[str, Any] = {
             "resourceType": "Bundle",

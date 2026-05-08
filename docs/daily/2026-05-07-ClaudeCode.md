@@ -644,4 +644,80 @@ Live in `.claude/extraction-expansion-queue.md`. As of 2026-05-07: queue created
 
 ---
 
+## Entry 8 — PDF parser architecture: where we are, the menu, and the testing problem (2026-05-07)
+
+After the 16-task extraction expansion shipped, the natural strategic question is: *what shape of agent system are we actually running, and is it the right one?* Captured here so we don't lose the framing in the next session.
+
+### What `multipass-fhir` actually is
+
+It's **specialized parallel single-shot agents**. Not "agentic." Concretely:
+
+- **Pass 0 (scout/context):** one LLM call. Extracts patient name, DOB, encounter date, lab name, doc type. Sets shared context.
+- **12 specialist passes:** each one is a single LLM call with a focused system prompt and a Pydantic schema (one resource type per pass). All 12 dispatch in parallel via `ThreadPoolExecutor` after Pass 0 completes.
+- **Deterministic merger:** concatenate per-pass outputs into a FHIR Bundle, run post-passes (LOINC resolution, interpretation, clinical-category, encounter linkage, patient-reference rewrite).
+
+No tool use. No iteration. No reasoning loop. Each pass either succeeds or fails as a single call. This is the discipline `PDF-PROCESSOR.md` Decision 2 commits to (vision-primary, no hallucinated codes), and the post-pass layer handles deterministic resolution that would otherwise tempt the model to fabricate codes.
+
+### The architecture menu — five alternatives we could explore
+
+| Approach | What it is | When it wins | When it loses |
+|---|---|---|---|
+| **A. Current — Parallel specialists** | 12 single-shot passes, fan-out from Pass 0, deterministic merge | Tabular extraction; cost-bounded; scales linearly | Long PDFs (whole-PDF context per pass); no validation/retry loop |
+| **B. Multi-agent consensus** | Run K=2-3 agents per pass with varied prompts/models, reconcile disagreements | Narrative passes (conditions from imaging, A&P from notes) where precision matters | K× cost; reconciliation logic non-trivial; tabular passes don't need it |
+| **C. Scout-then-specialist** | Beefed-up Pass 0 produces a *routing manifest* (which sections / pages contain what); downstream passes get page-scoped prompts; some passes get skipped entirely | Long mixed-type PDFs (Cedars MyHealth: vitals on p2, allergens p3-19, notes p22-24). Cuts cost by 40-60% on docs with sparse coverage | Scout errors propagate (mis-route → missed extraction); adds one round-trip |
+| **D. Agentic with tools** | Each pass becomes a multi-turn agent with tools: `lookup_rxnorm()`, `validate_resource()`, `examine_page(n)`, `retry()` | Code resolution (no hallucination); validation retries; cross-resource consistency | 3-5× LLM calls per pass; latency; complexity |
+| **E. Region-scoped agents** | Segment document into regions (section/page/visual block); process each region for all relevant resource types in parallel | Very long docs (100+ pages); natural parallelism within passes | Cross-region links lost; region boundaries fragile |
+
+### Honest read on the menu
+
+- **C (scout-then-specialist) is the biggest near-term win** for our data. Cedars MyHealth ran every pass against all 25 pages even though clinical notes only exist on pages 22-24, vital signs only on page 2, allergens only on pages 3-19. Page-scoped prompts + skip-when-absent would cut cost ~40-60% AND tighten every prompt's signal-to-noise ratio.
+- **B (consensus)** is most valuable for the conditions pass (F1 0.35) and clinical_notes pass (narrative ambiguity matters). Probably overkill for tabular passes where structure handles disambiguation.
+- **D (agentic with tools)** is what `PDF-PROCESSOR.md` foreshadows. The post-pass layer we built (LOINC matcher, interpretation, encounter linkage) is essentially a *deterministic substitute* for tools — same outcome, no LLM round-trips. For things deterministic lookup can't handle (validation retries, "look at page X again"), agentic is the right answer. **Don't pre-build it; measure what the post-pass approach achieves first.**
+- **E (region-scoped)** matters at 100+ pages. Cedars MyHealth at 25 pages still fits comfortably in one vision call. Defer.
+
+### The testing-platform gap (the real problem)
+
+The 16-task build massively widened the *surface* the test bench has to cover. The eval harness today is shaped around "did we extract the right LAB facts." After the build, the question becomes **"did we extract the right document"** — a much bigger surface:
+
+- Did we correctly identify 1 Patient (not 2, not 0)?
+- Did Observations link to the right Encounter?
+- Does extracted narrative correspond verbatim to the actual section?
+- Did Practitioner NPIs get correctly extracted vs hallucinated?
+- Are Coverage.period dates plausible?
+
+These are **structural** questions, not **fact-bucket** questions. The testing platform needs to evolve.
+
+| Testing capability | Why it matters | Status |
+|---|---|---|
+| Unit tests | Code correctness given expected input | ✅ 385 passing |
+| End-to-end on real PDFs | LLM-side actually produces what builders expect | ❌ ad-hoc, not automated |
+| **A/B harness** (two architectures, same PDF) | Only way to compare A / B / C / D / E above | ⏳ scoped in PDF-LAB-STUDIO T03–T04 |
+| **Consensus testing** (K agents, agreement rate) | Required if we adopt B | ❌ not scoped |
+| **Per-pass full-trace logging** (prompt + response + usage) | Replay, debug, prompt iteration | ⏳ scoped in PDFLAB-T01 |
+| **Cost / latency / F1 over time** | Regression detection | ⏳ scoped in PDFLAB-T06 |
+| **Eval for new resource types** | T02 covered vital-sign; Encounter / Patient / Coverage / Social-history / Practitioner / Organization / DocumentReference / Composition all missing | ❌ gap |
+| **Vision-wins reviewer UI** | Eval treats valid extras as precision penalty | ⏳ scoped, not built |
+| **Failure-mode taxonomy** | When wrong, *how* wrong? (hallucinated / missed / mis-coded / misattributed / wrong-encounter) | ❌ not scoped |
+| **Narrative ground-truth** | Eval's exact-code+fuzzy-display match doesn't extend to clinical notes | ❌ not scoped |
+
+**The strategic shift:** ground-truth-as-spectrum, not ground-truth-as-binary.
+- For structured siblings (Synthea, Cedars FHIR JSON): exact-match F1 (current).
+- For narrative: human-graded comparison.
+- For new resource types (Patient, Coverage, Practitioner): bundle-shape assertions (counts, identity uniqueness, cross-resource link rate).
+
+### Three orthogonal investments, in priority order
+
+1. **Build PDF-LAB-STUDIO with 13-pass scope in mind** — extend from "labs and conditions F1" to "full FHIR Bundle shape comparison." Foundation for everything else. Already scoped at `.claude/pdf-lab-studio-queue.md`; scope expansion required.
+2. **Add scout-then-specialist (C) as a parallel pipeline** — keep `multipass-fhir` as the default, register `multipass-fhir-scout` as an alternative. Bake-off (once PDF-LAB-STUDIO ships) decides which wins. Pipeline Protocol already supports this; same pattern as `multipass-fhir-gemma-tabular`.
+3. **Defer agentic (D) until we measure** — post-pass layer may already do 80% of what tools-with-retry would. Cheap deterministic resolution before reaching for agentic complexity is the right discipline.
+
+### What's shipping in this session (continuation)
+
+The user direction is "carry out the build for me." Sequencing:
+- **First:** scout-then-specialist pipeline (priority #2). Smaller, well-scoped, validates the architecture-comparison story without building a full studio first. New queue file `.claude/scout-pipeline-queue.md`.
+- **Second:** PDF-LAB-STUDIO scope expansion. Update the existing queue to cover the 13-pass surface so when we build it, the scope is right.
+- **Deferred:** PDF-LAB-STUDIO actual implementation (separate session). It's a 3-5 day build with no shortcut.
+
+---
+
 *Last updated: 2026-05-07. Working log — append entries with date stamp.*

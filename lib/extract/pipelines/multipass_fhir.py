@@ -242,6 +242,79 @@ class EncounterExtraction(BaseModel):
     encounters: list[EncounterEntry] = Field(default_factory=list)
 
 
+class PractitionerEntry(BaseModel):
+    practitioner_id: str | None = Field(
+        None, description="Practitioner ID if printed; otherwise pipeline synthesizes one"
+    )
+    npi: str | None = Field(
+        None, description="10-digit NPI number if printed (digits only — strip dashes/spaces)"
+    )
+    display_name: str | None = Field(
+        None, description="Full name as displayed (e.g. 'Steven Krems, MD')"
+    )
+    family_name: str | None = None
+    given_names: list[str] = Field(default_factory=list)
+    prefix: str | None = Field(None, description="Title prefix: Dr. / Mr. / Mrs.")
+    suffix: str | None = Field(
+        None, description="Credential suffix: MD, DO, NP, PA, RN, MD PhD, etc."
+    )
+    specialty: str | None = Field(
+        None, description="Clinical specialty if mentioned (e.g. 'Allergy & Immunology')"
+    )
+    role: str | None = Field(
+        None, description="Role in care: 'PCP', 'Attending', 'Supervising Physician', 'Authorizing'"
+    )
+    phone: str | None = None
+    address_line: str | None = None
+    city: str | None = None
+    state: str | None = None
+    postal_code: str | None = None
+    page: int | None = None
+    source_text: str | None = None
+
+
+class PractitionerExtraction(BaseModel):
+    practitioners: list[PractitionerEntry] = Field(default_factory=list)
+
+
+class OrganizationEntry(BaseModel):
+    organization_id: str | None = Field(
+        None, description="Organization ID if printed; otherwise synthesized"
+    )
+    name: str | None = Field(..., description="Organization name as printed")
+    type_code: Literal[
+        "prov",     # Healthcare Provider (general)
+        "dept",     # Department
+        "team",     # Care team
+        "ins",      # Insurance company
+        "pay",      # Payer
+        "edu",      # Educational institution
+        "reli",     # Religious institution
+        "crs",      # Clinical research sponsor
+        "cg",       # Community group
+        "bus",      # Non-healthcare business
+        "other",
+    ] | None = Field(
+        None, description="HL7 organization-type code. 'prov' = generic healthcare provider; "
+        "'dept' for sub-departments; 'pay' / 'ins' for insurance"
+    )
+    type_display: str | None = Field(
+        None, description="Free-text type label (e.g. 'Allergy Clinic', 'Diagnostic Lab')"
+    )
+    phone: str | None = None
+    fax: str | None = None
+    address_line: str | None = None
+    city: str | None = None
+    state: str | None = None
+    postal_code: str | None = None
+    page: int | None = None
+    source_text: str | None = None
+
+
+class OrganizationExtraction(BaseModel):
+    organizations: list[OrganizationEntry] = Field(default_factory=list)
+
+
 # ---------------------------------------------------------------------------
 # Pass definitions — declarative table of what runs and how
 # ---------------------------------------------------------------------------
@@ -438,6 +511,33 @@ Rules:
 - If no encounter records are present (e.g. lab-only PDF), return empty list."""
 
 
+_PRACTITIONERS_PROMPT = """You are extracting practitioners / providers / clinicians
+mentioned in a medical document.
+
+Rules:
+- Extract every distinct practitioner — physicians, nurse practitioners,
+  physician assistants, supervising providers, authorizing providers,
+  pathologists, radiologists.
+- Distinguish first-time mentions from repeated references — emit ONE entry
+  per unique practitioner. If the same name appears multiple times in the
+  document with different roles (e.g. "Ani Shirvanian, NP" appears as
+  Attending in one encounter and as Care Team member elsewhere), emit one
+  entry capturing the highest-fidelity role description.
+- Capture NPI if printed. NPIs are 10-digit numbers, often labeled "NPI:"
+  or appearing under a provider's name.
+- Capture suffix credentials carefully: "MD" / "DO" / "NP" / "PA" / "RN" /
+  "MD, PhD" / etc. These go in `suffix`, not in `display_name`.
+- Capture specialty if mentioned in narrative (e.g. "Board certified in
+  Allergy & Immunology" → specialty="Allergy & Immunology").
+- Capture role if context makes it clear: PCP / Attending / Supervising /
+  Authorizing / Performing / Ordering. Do not guess if not stated.
+- Capture practice address from any "Suite", "Office Phone", or formal
+  address block adjacent to the name.
+- If only a display name is shown without a clear practitioner context
+  (e.g. a name buried in narrative), still emit it — name alone is enough.
+- If no practitioners are present, return empty list."""
+
+
 _PASSES: list[ExtractionPass] = [
     ExtractionPass(
         name="conditions",
@@ -488,6 +588,13 @@ _PASSES: list[ExtractionPass] = [
         prompt_version="v1",
         schema_version="v1",
     ),
+    ExtractionPass(
+        name="practitioner",
+        schema=PractitionerExtraction,
+        system_prompt=_PRACTITIONERS_PROMPT,
+        prompt_version="v1",
+        schema_version="v1",
+    ),
 ]
 
 
@@ -511,6 +618,25 @@ def _stable_encounter_id(e: "EncounterEntry", doc_context: "DocumentContext") ->
     ]
     seed = "|".join(parts)
     return f"enc-{hashlib.sha1(seed.encode()).hexdigest()[:12]}"
+
+
+def _stable_practitioner_id(p: "PractitionerEntry") -> str:
+    """Stable, deterministic ID. Prefers NPI when present (the canonical
+    practitioner identifier in US healthcare); falls back to SHA1 of
+    (display_name|family|given) for un-NPI'd practitioners."""
+    import hashlib
+
+    if p.npi:
+        return f"prac-npi-{p.npi}"
+    seed_parts = [
+        p.display_name or "",
+        p.family_name or "",
+        "|".join(p.given_names),
+        p.prefix or "",
+        p.suffix or "",
+    ]
+    seed = "|".join(seed_parts)
+    return f"prac-{hashlib.sha1(seed.encode()).hexdigest()[:12]}"
 
 
 _VITAL_LOINC_MAP: dict[str, tuple[str, str]] = {
@@ -806,6 +932,13 @@ class MultiPassFHIRPipeline:
         for e in enc_extraction.encounters:
             entries.append(
                 {"resource": self._encounter_to_fhir(e, common_meta_template, layout, doc_context)}
+            )
+
+        # Practitioners
+        prac_extraction: PractitionerExtraction = per_pass.get("practitioner") or PractitionerExtraction()
+        for p in prac_extraction.practitioners:
+            entries.append(
+                {"resource": self._practitioner_to_fhir(p, common_meta_template, layout, doc_context)}
             )
 
         bundle: dict[str, Any] = {
@@ -1296,6 +1429,86 @@ class MultiPassFHIRPipeline:
             resource["serviceProvider"] = {"display": e.service_provider_display}
         if e.reason_text:
             resource["reasonCode"] = [{"text": e.reason_text}]
+        return resource
+
+    def _practitioner_to_fhir(
+        self,
+        p: PractitionerEntry,
+        common_meta: dict[str, Any],
+        layout: Any,
+        doc_context: DocumentContext,
+    ) -> dict[str, Any]:
+        bbox_locator = self._bbox_locator_for(p.source_text, p.page, layout)
+        practitioner_id = p.practitioner_id or _stable_practitioner_id(p)
+        resource: dict[str, Any] = {
+            "resourceType": "Practitioner",
+            "id": practitioner_id,
+            "active": True,
+            "meta": self._add_bbox_to_meta(common_meta, bbox_locator),
+        }
+        # Identifier (NPI)
+        if p.npi:
+            resource["identifier"] = [
+                {
+                    "system": "http://hl7.org/fhir/sid/us-npi",
+                    "value": p.npi,
+                }
+            ]
+        # Name
+        name_part: dict[str, Any] = {}
+        if p.family_name:
+            name_part["family"] = p.family_name
+        if p.given_names:
+            name_part["given"] = list(p.given_names)
+        if p.prefix:
+            name_part["prefix"] = [p.prefix]
+        if p.suffix:
+            name_part["suffix"] = [p.suffix]
+        if p.display_name and not name_part:
+            # Display-only fallback when we can't decompose
+            name_part["text"] = p.display_name
+        if name_part:
+            if p.display_name and "text" not in name_part:
+                name_part["text"] = p.display_name
+            resource["name"] = [name_part]
+        # Telecom
+        if p.phone:
+            resource["telecom"] = [
+                {"system": "phone", "value": p.phone, "use": "work"}
+            ]
+        # Address
+        if p.address_line or p.city or p.state or p.postal_code:
+            addr: dict[str, Any] = {}
+            if p.address_line:
+                addr["line"] = [p.address_line]
+            if p.city:
+                addr["city"] = p.city
+            if p.state:
+                addr["state"] = p.state
+            if p.postal_code:
+                addr["postalCode"] = p.postal_code
+            resource["address"] = [addr]
+        # Specialty + role go in extensions (since FHIR R4 Practitioner doesn't
+        # natively carry specialty — that's PractitionerRole's job; we keep it
+        # here for now and migrate to PractitionerRole in a future task).
+        extensions = []
+        if p.specialty:
+            extensions.append(
+                {
+                    "url": "https://ehi-atlas.example/fhir/StructureDefinition/practitioner-specialty",
+                    "valueString": p.specialty,
+                }
+            )
+        if p.role:
+            extensions.append(
+                {
+                    "url": "https://ehi-atlas.example/fhir/StructureDefinition/practitioner-role",
+                    "valueString": p.role,
+                }
+            )
+        if extensions:
+            resource_extension_list = resource["meta"].get("extension", [])
+            resource["meta"] = {**resource["meta"], "extension": [*resource_extension_list, *extensions]}
         return resource
 
 

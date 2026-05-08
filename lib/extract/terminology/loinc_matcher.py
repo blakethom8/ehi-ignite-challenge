@@ -157,6 +157,15 @@ def match_loinc(
     if not display or not display.strip():
         return None
 
+    # Class-score interpretive entries (e.g., "Egg White (F001) IgE Class",
+    # "Peanut (F013) IgE - Class") have NO standard LOINC codes — they're
+    # ordinal interpretations (0-6) of the underlying quantitative IgE test.
+    # Function Health's parser correctly emits null for these. We mirror that:
+    # never resolve a code for entries ending in "Class" / "- Class".
+    norm_for_class_check = display.lower().strip()
+    if norm_for_class_check.endswith(" class") or norm_for_class_check.endswith("- class"):
+        return None
+
     table = _load_table(table_path)
     norm_input = _normalize(display)
 

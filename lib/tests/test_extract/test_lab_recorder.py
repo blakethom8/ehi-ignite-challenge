@@ -194,7 +194,10 @@ def test_log_pass_extraction_optional(started_recorder: RunRecorder) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_log_pass_updates_running_cost_and_latency(started_recorder: RunRecorder) -> None:
+def test_log_pass_accumulates_running_cost(started_recorder: RunRecorder) -> None:
+    """log_pass() accumulates cost; per-pass latencies go to
+    sum_pass_latency_ms (so we can compute parallelism factor later).
+    The headline `latency_ms` is wall-clock and is set in finish()."""
     started_recorder.log_pass(
         pass_name="pass_one",
         prompt="...",
@@ -208,15 +211,52 @@ def test_log_pass_updates_running_cost_and_latency(started_recorder: RunRecorder
         usage={"input_tokens": 200, "output_tokens": 100, "latency_ms": 2500, "cost_usd": 0.10},
     )
 
+    # Cost accumulates (genuinely sum across passes)
     assert abs(started_recorder.manifest.cost_usd - 0.15) < 1e-9
-    assert started_recorder.manifest.latency_ms == 4000
+    # Per-pass latency sum accumulates separately
+    assert started_recorder.manifest.sum_pass_latency_ms == 4000
+    # Wall-clock latency is NOT set yet (finish() hasn't been called)
+    assert started_recorder.manifest.latency_ms == 0
 
     # Also verify that manifest.json on disk reflects the running totals
     manifest_on_disk = json.loads(
         (started_recorder.root / "manifest.json").read_text()
     )
     assert abs(manifest_on_disk["cost_usd"] - 0.15) < 1e-9
-    assert manifest_on_disk["latency_ms"] == 4000
+    assert manifest_on_disk["sum_pass_latency_ms"] == 4000
+    assert manifest_on_disk["latency_ms"] == 0
+
+
+def test_finish_sets_wall_clock_latency_from_timestamps(
+    started_recorder: RunRecorder,
+) -> None:
+    """latency_ms is computed from started_at → finished_at when finish()
+    runs. Even when per-pass latencies sum to a much larger number (parallel
+    dispatch), the wall-clock time on the manifest reflects actual elapsed."""
+    import time
+
+    # Log two passes whose per-pass latencies sum to 4 seconds
+    started_recorder.log_pass(
+        pass_name="pass_one",
+        prompt="...",
+        response={},
+        usage={"latency_ms": 1500, "cost_usd": 0.05},
+    )
+    started_recorder.log_pass(
+        pass_name="pass_two",
+        prompt="...",
+        response={},
+        usage={"latency_ms": 2500, "cost_usd": 0.10},
+    )
+    # Real elapsed will be a tiny fraction of a second — much less than 4000ms.
+    time.sleep(0.05)
+    started_recorder.finish(bundle={"resourceType": "Bundle", "entry": []})
+
+    # latency_ms now reflects WALL CLOCK (much less than 4000ms)
+    assert started_recorder.manifest.latency_ms < 4000
+    assert started_recorder.manifest.latency_ms >= 0
+    # sum_pass_latency_ms preserves the per-pass total
+    assert started_recorder.manifest.sum_pass_latency_ms == 4000
 
 
 # ---------------------------------------------------------------------------

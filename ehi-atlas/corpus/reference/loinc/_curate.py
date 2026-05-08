@@ -94,6 +94,50 @@ ALIASES: dict[str, list[str]] = {
     "5787-7": ["Squamous Epithelial Cells - Urine", "Squamous Epithelial Cells", "Squamous Epi"],
     "5769-5": ["Bacteria - Urine", "Bacteria", "Urine Bacteria"],
     "5808-1": ["Hyaline Cast - Urine", "Hyaline Casts", "Hyaline Cast"],
+    # IgE allergen panel — total + food + environmental allergens
+    # Extends coverage from cedars-myhealth Allergen Profile w/ Component Reflex
+    # (Quest test code; ~80 individual allergens). The "X IgE Class" interpretive
+    # scores (0-6) intentionally have no LOINC codes — they remain unmatched.
+    "51651-8": ["IGE", "IGE Total Serum", "Total IgE", "IgE Total", "IgE, Total"],
+    # Food allergens (F-series codes from Quest)
+    "6106-9": ["Egg White (F001) IgE", "Egg White IgE"],
+    "6206-7": ["Peanut (F013) IgE", "Peanut IgE"],
+    "6276-0": ["Wheat (F004) IgE", "Wheat IgE"],
+    "6273-7": ["Walnut (F256) IgE", "Walnut IgE"],
+    "6082-2": ["Codfish (F03) IgE", "Codfish IgE", "Cod IgE"],
+    "6174-7": ["Milk, Cow's (F02) IgE", "Cow Milk IgE", "Milk IgE", "Cow's Milk IgE"],
+    "6248-9": ["Soybean (F014) IgE", "Soybean IgE", "Soy IgE"],
+    "6246-3": ["Shrimp (F024) IgE", "Shrimp IgE"],
+    "7691-9": ["Scallop (F338) IgE", "Scallop IgE"],
+    "6242-2": ["Sesame Seed (F010) IgE", "Sesame Seed IgE", "Sesame IgE"],
+    "6136-6": ["Hazelnut/Filbert (F017) IgE", "Hazelnut IgE", "Filbert IgE"],
+    "6718-1": ["Cashew Nut (F202) IgE", "Cashew IgE"],
+    "6019-4": ["Almond (F020) IgE", "Almond IgE"],
+    "6237-2": ["Salmon (F041) IgE", "Salmon IgE"],
+    "6270-3": ["Tuna (F040) IgE", "Tuna IgE"],
+    # Inhalant / environmental allergens (D/M/E/I/T/G/W series)
+    "6095-4": ["D pteronyssinus (D001) IgE", "Dermatophagoides pteronyssinus IgE", "House Dust Mite IgE"],
+    "6096-2": ["D farinae (D002) IgE", "Dermatophagoides farinae IgE"],
+    "6212-5": ["Penicillium notatum (M001) IgE", "Penicillium IgE"],
+    "6075-6": ["C herbarum (M002) IgE", "Cladosporium herbarum IgE", "Cladosporium IgE"],
+    "6025-1": ["Aspergillus fumigatus (M003) IgE", "Aspergillus IgE"],
+    "6098-8": ["Cat Dander (E001) IgE", "Cat Dander IgE", "Cat IgE"],
+    "6099-6": ["Dog Dander (E005) IgE", "Dog Dander IgE", "Dog IgE"],
+    "6078-0": ["Cockroach (I006) IgE", "Cockroach IgE"],
+    "15284-3": ["Alder, Grey (T002) IgE", "Alder IgE", "Grey Alder IgE"],
+    "21428-8": ["Olive Tree (T009) IgE", "Olive Tree IgE", "Olive IgE"],
+    "102651-7": ["Walnut Pollen (T010) IgE", "Walnut Pollen IgE"],
+    "6090-5": ["Cottonwood Tree (T014) IgE", "Cottonwood Tree IgE", "Cottonwood IgE"],
+    "6189-5": ["Oak, White (T007) IgE", "Oak White IgE", "White Oak IgE", "Oak IgE"],
+    "102293-8": ["Elm, American (T008) IgE", "American Elm IgE", "Elm IgE"],
+    "6281-0": ["White Mulberry (T070) IgE", "White Mulberry IgE", "Mulberry IgE"],
+    "6041-8": ["Bermuda Grass (G002) IgE", "Bermuda Grass IgE", "Bermuda IgE"],
+    "6265-3": ["Timothy (G006) IgE", "Timothy Grass IgE", "Timothy IgE"],
+    "6152-3": ["Johnson Grass (G010) IgE", "Johnson Grass IgE"],
+    "6181-2": ["Mouse Urine Proteins IgE", "Mouse Urine Protein IgE", "Mouse Urine IgE"],
+    "6085-5": ["Ragweed, Short/Common (W001) IgE", "Short Ragweed IgE", "Common Ragweed IgE", "Ragweed IgE"],
+    "6183-8": ["Mugwort (W006) IgE", "Mugwort IgE"],
+    "7604-2": ["Pigweed, Rough (W014) IgE", "Rough Pigweed IgE", "Pigweed IgE"],
 }
 
 # Clinical category by LOINC range/specific code — used by CODE-T07.
@@ -119,6 +163,23 @@ CLINICAL_CATEGORY: dict[str, str] = {
     "5804-0": "Urine", "5802-4": "Urine", "5799-2": "Urine",
     "5821-4": "Urine", "13945-1": "Urine", "5787-7": "Urine",
     "5769-5": "Urine", "5808-1": "Urine",
+    # IgE allergen panel
+    "51651-8": "Allergens",
+    # Food allergens
+    "6106-9": "Allergens", "6206-7": "Allergens", "6276-0": "Allergens",
+    "6273-7": "Allergens", "6082-2": "Allergens", "6174-7": "Allergens",
+    "6248-9": "Allergens", "6246-3": "Allergens", "7691-9": "Allergens",
+    "6242-2": "Allergens", "6136-6": "Allergens", "6718-1": "Allergens",
+    "6019-4": "Allergens", "6237-2": "Allergens", "6270-3": "Allergens",
+    # Inhalant / environmental allergens
+    "6095-4": "Allergens", "6096-2": "Allergens", "6212-5": "Allergens",
+    "6075-6": "Allergens", "6025-1": "Allergens", "6098-8": "Allergens",
+    "6099-6": "Allergens", "6078-0": "Allergens", "15284-3": "Allergens",
+    "21428-8": "Allergens", "102651-7": "Allergens", "6090-5": "Allergens",
+    "6189-5": "Allergens", "102293-8": "Allergens", "6281-0": "Allergens",
+    "6041-8": "Allergens", "6265-3": "Allergens", "6152-3": "Allergens",
+    "6181-2": "Allergens", "6085-5": "Allergens", "6183-8": "Allergens",
+    "7604-2": "Allergens",
 }
 
 

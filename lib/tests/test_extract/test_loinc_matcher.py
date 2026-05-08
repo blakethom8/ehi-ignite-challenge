@@ -105,6 +105,38 @@ def test_null_on_nonsense_input() -> None:
     assert match_loinc("foo bar baz") is None
 
 
+def test_ige_allergens_resolve_via_alias() -> None:
+    """The cedars-myhealth Allergen Profile produces names like
+    'Egg White (F001) IgE'. After the LOINC table extension, these should
+    resolve via alias match."""
+    for name, expected in [
+        ("Egg White (F001) IgE", "6106-9"),
+        ("Peanut (F013) IgE", "6206-7"),
+        ("D pteronyssinus (D001) IgE", "6095-4"),
+        ("Cat Dander (E001) IgE", "6098-8"),
+        ("Dog Dander (E005) IgE", "6099-6"),
+    ]:
+        m = match_loinc(name)
+        assert m is not None, f"{name} should match"
+        assert m.code == expected, f"{name} expected {expected}, got {m.code}"
+
+
+def test_class_score_entries_never_resolve() -> None:
+    """IgE Class scores are ordinal interpretations (0-6) of the underlying
+    quantitative IgE test. They have NO standard LOINC code — Function
+    Health emits null for them, and we should too. Without this guard
+    they would fuzzy-match to the IgE quantitative LOINC, which would
+    be wrong (different concept)."""
+    for name in [
+        "Egg White (F001) IgE Class",
+        "Peanut (F013) IgE Class",
+        "Egg White (F001) IgE - Class",
+        "Wheat IgE - class",  # case-insensitive
+        "Eggs IgE Class 0",
+    ]:
+        assert match_loinc(name) is None, f"{name!r} should NOT resolve"
+
+
 def test_loinc_match_dataclass_shape() -> None:
     m = match_loinc("Glucose")
     assert isinstance(m, LoincMatch)

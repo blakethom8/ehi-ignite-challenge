@@ -942,6 +942,526 @@
       ],
       "clinical_category": "Urine",
       "display": "Erythrocytes [#/volume] in Urine sediment by Microscopy high power field"
+    },
+    {
+      "code": "51651-8",
+      "system": "http://loinc.org",
+      "aliases": [
+        "IGE",
+        "IGE Total Serum",
+        "Total IgE",
+        "IgE Total",
+        "IgE, Total"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Allergens",
+      "display": "IgE Ab [Presence] in Serum or Plasma"
+    },
+    {
+      "code": "6106-9",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Egg White (F001) IgE",
+        "Egg White IgE"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Allergens",
+      "display": "Egg white IgE Ab [Units/volume] in Serum"
+    },
+    {
+      "code": "6206-7",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Peanut (F013) IgE",
+        "Peanut IgE"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Allergens",
+      "display": "Peanut IgE Ab [Units/volume] in Serum"
+    },
+    {
+      "code": "6276-0",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Wheat (F004) IgE",
+        "Wheat IgE"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Allergens",
+      "display": "Wheat IgE Ab [Units/volume] in Serum"
+    },
+    {
+      "code": "6273-7",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Walnut (F256) IgE",
+        "Walnut IgE"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Allergens",
+      "display": "Walnut IgE Ab [Units/volume] in Serum"
+    },
+    {
+      "code": "6082-2",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Codfish (F03) IgE",
+        "Codfish IgE",
+        "Cod IgE"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Allergens",
+      "display": "Codfish IgE Ab [Units/volume] in Serum"
+    },
+    {
+      "code": "6174-7",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Milk, Cow's (F02) IgE",
+        "Cow Milk IgE",
+        "Milk IgE",
+        "Cow's Milk IgE"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Allergens",
+      "display": "Milk IgE Ab [Units/volume] in Serum"
+    },
+    {
+      "code": "6248-9",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Soybean (F014) IgE",
+        "Soybean IgE",
+        "Soy IgE"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Allergens",
+      "display": "Soybean IgE Ab [Units/volume] in Serum"
+    },
+    {
+      "code": "6246-3",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Shrimp (F024) IgE",
+        "Shrimp IgE"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Allergens",
+      "display": "Shrimp IgE Ab [Units/volume] in Serum"
+    },
+    {
+      "code": "7691-9",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Scallop (F338) IgE",
+        "Scallop IgE"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Allergens",
+      "display": "Scallop IgE Ab [Units/volume] in Serum"
+    },
+    {
+      "code": "6242-2",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Sesame Seed (F010) IgE",
+        "Sesame Seed IgE",
+        "Sesame IgE"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Allergens",
+      "display": "Sesame Seed IgE Ab [Units/volume] in Serum"
+    },
+    {
+      "code": "6136-6",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Hazelnut/Filbert (F017) IgE",
+        "Hazelnut IgE",
+        "Filbert IgE"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Allergens",
+      "display": "Hazelnut IgE Ab [Units/volume] in Serum"
+    },
+    {
+      "code": "6718-1",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Cashew Nut (F202) IgE",
+        "Cashew IgE"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Allergens",
+      "display": "Cashew nut IgE Ab [Units/volume] in Serum"
+    },
+    {
+      "code": "6019-4",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Almond (F020) IgE",
+        "Almond IgE"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Allergens",
+      "display": "Almond IgE Ab [Units/volume] in Serum"
+    },
+    {
+      "code": "6237-2",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Salmon (F041) IgE",
+        "Salmon IgE"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Allergens",
+      "display": "Salmon IgE Ab [Units/volume] in Serum"
+    },
+    {
+      "code": "6270-3",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Tuna (F040) IgE",
+        "Tuna IgE"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Allergens",
+      "display": "Tuna IgE Ab [Units/volume] in Serum"
+    },
+    {
+      "code": "6095-4",
+      "system": "http://loinc.org",
+      "aliases": [
+        "D pteronyssinus (D001) IgE",
+        "Dermatophagoides pteronyssinus IgE",
+        "House Dust Mite IgE"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Allergens",
+      "display": "American house dust mite IgE Ab [Units/volume] in Serum"
+    },
+    {
+      "code": "6096-2",
+      "system": "http://loinc.org",
+      "aliases": [
+        "D farinae (D002) IgE",
+        "Dermatophagoides farinae IgE"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Allergens",
+      "display": "European house dust mite IgE Ab [Units/volume] in Serum"
+    },
+    {
+      "code": "6212-5",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Penicillium notatum (M001) IgE",
+        "Penicillium IgE"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Allergens",
+      "display": "Penicillium notatum IgE Ab [Units/volume] in Serum"
+    },
+    {
+      "code": "6075-6",
+      "system": "http://loinc.org",
+      "aliases": [
+        "C herbarum (M002) IgE",
+        "Cladosporium herbarum IgE",
+        "Cladosporium IgE"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Allergens",
+      "display": "Cladosporium herbarum IgE Ab [Units/volume] in Serum"
+    },
+    {
+      "code": "6025-1",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Aspergillus fumigatus (M003) IgE",
+        "Aspergillus IgE"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Allergens",
+      "display": "Aspergillus fumigatus IgE Ab [Units/volume] in Serum"
+    },
+    {
+      "code": "6098-8",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Cat Dander (E001) IgE",
+        "Cat Dander IgE",
+        "Cat IgE"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Allergens",
+      "display": "Dog dander IgE Ab [Units/volume] in Serum"
+    },
+    {
+      "code": "6099-6",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Dog Dander (E005) IgE",
+        "Dog Dander IgE",
+        "Dog IgE"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Allergens",
+      "display": "Dog epithelium IgE Ab [Units/volume] in Serum"
+    },
+    {
+      "code": "6078-0",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Cockroach (I006) IgE",
+        "Cockroach IgE"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Allergens",
+      "display": "Cockroach IgE Ab [Units/volume] in Serum"
+    },
+    {
+      "code": "15284-3",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Alder, Grey (T002) IgE",
+        "Alder IgE",
+        "Grey Alder IgE"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Allergens",
+      "display": "Grey Alder IgE Ab [Units/volume] in Serum"
+    },
+    {
+      "code": "21428-8",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Olive Tree (T009) IgE",
+        "Olive Tree IgE",
+        "Olive IgE"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Allergens",
+      "display": "Olive IgE Ab [Units/volume] in Serum"
+    },
+    {
+      "code": "102651-7",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Walnut Pollen (T010) IgE",
+        "Walnut Pollen IgE"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Allergens",
+      "display": "California Walnut Pollen IgE Ab [Presence] in Serum by Radioallergosorbent test (RAST)"
+    },
+    {
+      "code": "6090-5",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Cottonwood Tree (T014) IgE",
+        "Cottonwood Tree IgE",
+        "Cottonwood IgE"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Allergens",
+      "display": "Cottonwood IgE Ab [Units/volume] in Serum"
+    },
+    {
+      "code": "6189-5",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Oak, White (T007) IgE",
+        "Oak White IgE",
+        "White Oak IgE",
+        "Oak IgE"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Allergens",
+      "display": "White Oak IgE Ab [Units/volume] in Serum"
+    },
+    {
+      "code": "102293-8",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Elm, American (T008) IgE",
+        "American Elm IgE",
+        "Elm IgE"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Allergens",
+      "display": "White Elm IgE Ab [Presence] in Serum by Radioallergosorbent test (RAST)"
+    },
+    {
+      "code": "6281-0",
+      "system": "http://loinc.org",
+      "aliases": [
+        "White Mulberry (T070) IgE",
+        "White Mulberry IgE",
+        "Mulberry IgE"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Allergens",
+      "display": "White mulberry IgE Ab [Units/volume] in Serum"
+    },
+    {
+      "code": "6041-8",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Bermuda Grass (G002) IgE",
+        "Bermuda Grass IgE",
+        "Bermuda IgE"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Allergens",
+      "display": "Bermuda grass IgE Ab [Units/volume] in Serum"
+    },
+    {
+      "code": "6265-3",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Timothy (G006) IgE",
+        "Timothy Grass IgE",
+        "Timothy IgE"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Allergens",
+      "display": "Timothy IgE Ab [Units/volume] in Serum"
+    },
+    {
+      "code": "6152-3",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Johnson Grass (G010) IgE",
+        "Johnson Grass IgE"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Allergens",
+      "display": "Johnson grass IgE Ab [Units/volume] in Serum"
+    },
+    {
+      "code": "6181-2",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Mouse Urine Proteins IgE",
+        "Mouse Urine Protein IgE",
+        "Mouse Urine IgE"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Allergens",
+      "display": "Mouse urine proteins IgE Ab [Units/volume] in Serum"
+    },
+    {
+      "code": "6085-5",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Ragweed, Short/Common (W001) IgE",
+        "Short Ragweed IgE",
+        "Common Ragweed IgE",
+        "Ragweed IgE"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Allergens",
+      "display": "Common Ragweed IgE Ab [Units/volume] in Serum"
+    },
+    {
+      "code": "6183-8",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Mugwort (W006) IgE",
+        "Mugwort IgE"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Allergens",
+      "display": "Mugwort IgE Ab [Units/volume] in Serum"
+    },
+    {
+      "code": "7604-2",
+      "system": "http://loinc.org",
+      "aliases": [
+        "Pigweed, Rough (W014) IgE",
+        "Rough Pigweed IgE",
+        "Pigweed IgE"
+      ],
+      "verified_against": [
+        "nlm-clinical-tables-api"
+      ],
+      "clinical_category": "Allergens",
+      "display": "Common pigweed IgE Ab [Units/volume] in Serum"
     }
   ]
 }

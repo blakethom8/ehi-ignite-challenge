@@ -51,7 +51,16 @@ class TraceEntry:
 
 @dataclass
 class RunManifest:
-    """Metadata for a single run. Serialized to manifest.json."""
+    """Metadata for a single run. Serialized to manifest.json.
+
+    Latency notes:
+      - latency_ms reports WALL-CLOCK time from started_at → finished_at.
+        Computed deterministically in finish(); reflects actual elapsed
+        time including parallel pass dispatch.
+      - sum_pass_latency_ms is the sum of per-pass latencies. Always >=
+        latency_ms when passes ran in parallel; ratio (sum / wall) is
+        the parallelism factor.
+    """
     run_id: str
     pipeline_name: str
     pdf_path: str
@@ -60,7 +69,8 @@ class RunManifest:
     started_at: str
     finished_at: str | None = None
     cost_usd: float = 0.0
-    latency_ms: int = 0
+    latency_ms: int = 0  # wall-clock; populated by finish()
+    sum_pass_latency_ms: int = 0  # sum of per-pass; accumulated in log_pass()
     status: Literal["running", "succeeded", "failed"] = "running"
     error: str | None = None
 
@@ -164,8 +174,10 @@ class RunRecorder:
         # 4. Update manifest.cost_usd += usage.get('cost_usd', 0)
         self._manifest.cost_usd += float(usage.get("cost_usd", 0))
 
-        # 5. Update manifest.latency_ms += usage.get('latency_ms', 0)
-        self._manifest.latency_ms += int(usage.get("latency_ms", 0))
+        # 5. Accumulate per-pass latency separately. The headline `latency_ms`
+        # is wall-clock (set in finish()); per-pass sum lives in
+        # sum_pass_latency_ms so callers can compute the parallelism factor.
+        self._manifest.sum_pass_latency_ms += int(usage.get("latency_ms", 0))
 
         # 6. Atomic rewrite of manifest.json
         _atomic_write_json(self._run_dir / "manifest.json", asdict(self._manifest))
@@ -202,10 +214,22 @@ class RunRecorder:
         if bundle_shape is not None:
             _atomic_write_json(self._run_dir / "bundle_shape.json", bundle_shape)
 
-        # Finalize manifest
-        self._manifest.finished_at = datetime.datetime.utcnow().isoformat() + "Z"
+        # Finalize manifest. latency_ms is wall-clock from started_at →
+        # finished_at; sum_pass_latency_ms (already accumulated) stays
+        # on the dataclass as the per-pass total for parallelism analysis.
+        finished_at = datetime.datetime.utcnow()
+        self._manifest.finished_at = finished_at.isoformat() + "Z"
         self._manifest.status = status
         self._manifest.error = error
+        try:
+            started_at = datetime.datetime.fromisoformat(
+                self._manifest.started_at.replace("Z", "")
+            )
+            wall_clock_ms = int((finished_at - started_at).total_seconds() * 1000)
+            self._manifest.latency_ms = max(wall_clock_ms, 0)
+        except (ValueError, AttributeError):
+            # Fallback: keep latency_ms at whatever it was
+            pass
         _atomic_write_json(self._run_dir / "manifest.json", asdict(self._manifest))
 
         # Append a single line to {root}/runs.jsonl

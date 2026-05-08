@@ -55,7 +55,7 @@ from typing import Any, Iterable, Literal
 from lib.extract.schemas import ExtractionResult
 
 
-FactType = Literal["condition", "medication", "allergy", "immunization", "lab"]
+FactType = Literal["condition", "medication", "allergy", "immunization", "lab", "vital-sign"]
 
 
 # ---------------------------------------------------------------------------
@@ -246,10 +246,13 @@ def facts_from_fhir_resources(fhir: dict[str, list[dict]]) -> list[Fact]:
             )
         )
 
-    # --- Lab Observations only ---
+    # --- Lab and Vital-Sign Observations ---
+    # Discriminate by category coding:
+    #   "vital-signs"  → fact_type "vital-sign"
+    #   "laboratory"   → fact_type "lab"
+    #   (no category)  → fact_type "lab" (backwards-compat for older bundles)
     for obs in fhir.get("Observation", []):
-        if not _is_laboratory(obs):
-            continue
+        obs_fact_type: FactType = _observation_fact_type(obs)
         code = obs.get("code") or {}
         sys_short, code_value, all_codes = _pick_code(
             code.get("coding"), preferred=["loinc", "snomed"]
@@ -257,7 +260,7 @@ def facts_from_fhir_resources(fhir: dict[str, list[dict]]) -> list[Fact]:
         display = code.get("text") or _best_display_from_coding(code.get("coding"))
         facts.append(
             Fact(
-                fact_type="lab",
+                fact_type=obs_fact_type,
                 primary_code_system=sys_short,
                 primary_code=code_value,
                 display=_normalize_display(display),
@@ -324,6 +327,26 @@ def _is_laboratory(observation: dict) -> bool:
             if coding.get("code") == "laboratory":
                 return True
     return False
+
+
+def _observation_fact_type(observation: dict) -> FactType:
+    """Determine the FactType for an Observation based on its category coding.
+
+    Discriminator rules (in priority order):
+      - category[].coding[].code == "vital-signs"  → "vital-sign"
+      - category[].coding[].code == "laboratory"   → "lab"
+      - no category (or unrecognised category)      → "lab" (backwards compat)
+    """
+    cats = observation.get("category", [])
+    if isinstance(cats, list):
+        for cat in cats:
+            for coding in (cat or {}).get("coding", []):
+                code = coding.get("code", "")
+                if code == "vital-signs":
+                    return "vital-sign"
+                if code == "laboratory":
+                    return "lab"
+    return "lab"
 
 
 # ---------------------------------------------------------------------------
@@ -525,7 +548,7 @@ class EvalReport:
         return [ft for ft, r in self.by_type.items() if r.is_schema_gap]
 
 
-_FACT_TYPES: list[FactType] = ["condition", "medication", "allergy", "immunization", "lab"]
+_FACT_TYPES: list[FactType] = ["condition", "medication", "allergy", "immunization", "lab", "vital-sign"]
 
 
 # ---------------------------------------------------------------------------

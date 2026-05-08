@@ -44,7 +44,7 @@ What this pipeline ships today
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal, Type
 
@@ -143,6 +143,146 @@ class DocumentMap(DocumentContext):
             "'Allergies', 'Medications', 'Results', 'Progress Notes', 'Insurance']). "
             "Useful for downstream prompt hints."
         ),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Bidirectional-scout reconciliation types and helpers
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class MapReconciliation:
+    """Result of reconciling two DocumentMap instances.
+
+    The reconciled DocumentMap drives downstream dispatch. The disagreement
+    report is metadata for observability — surfaces uncertainty so test-
+    bench UIs can flag it.
+    """
+
+    reconciled: DocumentMap
+    agreement_count: int           # passes where both scouts agreed (both present, OR both absent)
+    disagreement_count: int        # passes where exactly one scout marked present
+    only_in_a: list[str] = field(default_factory=list)   # pass names present in scout A only
+    only_in_b: list[str] = field(default_factory=list)   # pass names present in scout B only
+    page_hint_overlap: dict[str, int] = field(default_factory=dict)  # per-pass: count of pages both scouts agreed on
+
+
+def reconcile_document_maps(
+    map_a: DocumentMap,
+    map_b: DocumentMap,
+    *,
+    strategy: Literal["union", "intersection"] = "union",
+) -> MapReconciliation:
+    """Reconcile two DocumentMap instances into one.
+
+    Strategies:
+      - "union" (default): include a pass if EITHER scout marks present.
+        Page hints are the union of both scouts' pages. Higher recall.
+      - "intersection": include a pass only if BOTH agree present.
+        Page hints are the intersection. Tighter precision.
+
+    Identity fields (patient_name, patient_dob, encounter_date, etc.):
+      - Prefer scout A's value
+      - Fall back to scout B if A's field is None
+      - Disagreement is captured in the report (not silently overwritten)
+
+    Sections list: union of both, in order of first appearance.
+    """
+    # Collect all presence keys from both maps
+    all_keys: list[str] = []
+    seen_keys: set[str] = set()
+    for k in list(map_a.presence.keys()) + list(map_b.presence.keys()):
+        if k not in seen_keys:
+            all_keys.append(k)
+            seen_keys.add(k)
+
+    reconciled_presence: dict[str, ResourcePresence] = {}
+    agreement_count = 0
+    disagreement_count = 0
+    only_in_a: list[str] = []
+    only_in_b: list[str] = []
+    page_hint_overlap: dict[str, int] = {}
+
+    for key in all_keys:
+        rp_a: ResourcePresence | None = map_a.presence.get(key)  # type: ignore[arg-type]
+        rp_b: ResourcePresence | None = map_b.presence.get(key)  # type: ignore[arg-type]
+
+        present_a = rp_a.present if rp_a is not None else False
+        present_b = rp_b.present if rp_b is not None else False
+
+        pages_a: set[int] = set(rp_a.pages) if rp_a is not None else set()
+        pages_b: set[int] = set(rp_b.pages) if rp_b is not None else set()
+
+        # Section hint: prefer non-null; if both differ, prefer A
+        section_hint_a = rp_a.section_hint if rp_a is not None else None
+        section_hint_b = rp_b.section_hint if rp_b is not None else None
+        if section_hint_a is not None:
+            section_hint = section_hint_a
+        else:
+            section_hint = section_hint_b
+
+        # Apply strategy
+        if strategy == "union":
+            include = present_a or present_b
+            pages_merged = sorted(pages_a | pages_b)
+        else:  # intersection
+            include = present_a and present_b
+            pages_merged = sorted(pages_a & pages_b)
+
+        # Agreement / disagreement tracking
+        if present_a == present_b:
+            agreement_count += 1
+        else:
+            disagreement_count += 1
+
+        # only_in_a / only_in_b (scouts that marked present, the other didn't)
+        if present_a and not present_b:
+            only_in_a.append(key)
+        elif present_b and not present_a:
+            only_in_b.append(key)
+
+        # Page overlap count (pages both scouts agreed on)
+        page_hint_overlap[key] = len(pages_a & pages_b)
+
+        # Build reconciled ResourcePresence only if included
+        if include:
+            reconciled_presence[key] = ResourcePresence(  # type: ignore[literal-required]
+                present=True,
+                pages=pages_merged,
+                section_hint=section_hint,
+            )
+
+    # Identity fields: prefer A, fall back to B
+    def _prefer(a_val: str | None, b_val: str | None) -> str | None:
+        return a_val if a_val is not None else b_val
+
+    # Sections list: union in order of first appearance
+    sections_seen: set[str] = set()
+    sections_merged: list[str] = []
+    for s in list(map_a.sections) + list(map_b.sections):
+        if s not in sections_seen:
+            sections_merged.append(s)
+            sections_seen.add(s)
+
+    reconciled = DocumentMap(
+        document_type=map_a.document_type,
+        patient_name=_prefer(map_a.patient_name, map_b.patient_name),
+        patient_dob=_prefer(map_a.patient_dob, map_b.patient_dob),
+        encounter_date=_prefer(map_a.encounter_date, map_b.encounter_date),
+        ordering_provider=_prefer(map_a.ordering_provider, map_b.ordering_provider),
+        facility_name=_prefer(map_a.facility_name, map_b.facility_name),
+        presence=reconciled_presence,  # type: ignore[arg-type]
+        sections=sections_merged,
+    )
+
+    return MapReconciliation(
+        reconciled=reconciled,
+        agreement_count=agreement_count,
+        disagreement_count=disagreement_count,
+        only_in_a=only_in_a,
+        only_in_b=only_in_b,
+        page_hint_overlap=page_hint_overlap,
     )
 
 

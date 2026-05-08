@@ -38,6 +38,8 @@ from .models import (
     ProvenanceEdge,
 )
 from .observations import SourceBundle, merge_observations
+from .organizations import OrganizationKey, is_same_organization, organization_key
+from .practitioners import PractitionerKey, is_same_practitioner, practitioner_key
 from .provenance import mint_provenance, mint_provenance_bundle
 
 __all__ = [
@@ -47,6 +49,10 @@ __all__ = [
     "merge_allergies",
     "merge_immunizations",
     "canonical_drug_name",
+    "organization_key",
+    "is_same_organization",
+    "practitioner_key",
+    "is_same_practitioner",
     "mint_provenance",
     "mint_provenance_bundle",
     "MergedObservation",
@@ -61,4 +67,6 @@ __all__ = [
     "ImmunizationSource",
     "ProvenanceEdge",
     "SourceBundle",
+    "OrganizationKey",
+    "PractitionerKey",
 ]

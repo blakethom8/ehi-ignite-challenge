@@ -916,6 +916,86 @@ class MultiPassFHIRPipeline:
     # Per-pass FHIR converters
     # ------------------------------------------------------------------
 
+    def _assign_encounter_references(self, entries: list[dict[str, Any]]) -> None:
+        """Mutate entries in place to add ``encounter: {reference: "Encounter/<id>"}``
+        on encounter-scopable resources, using two strategies:
+
+        1. Single-encounter shortcut: if exactly one Encounter resource exists in
+           the bundle, link every encounter-scopable resource to it.
+        2. Date-match fallback: if multiple encounters exist, link each resource
+           to the encounter whose period.start (or period date-only) matches
+           the resource's effectiveDateTime / occurrenceDateTime / authored
+           date — at day precision.
+
+        Resources NOT linked: Patient, Practitioner, Organization, Coverage,
+        DocumentReference (until T08), Composition (until T08). Encounters
+        themselves are obviously not self-linked.
+        """
+        # Collect Encounter resources from entries
+        encounters = [
+            e["resource"] for e in entries
+            if e["resource"].get("resourceType") == "Encounter"
+        ]
+        if not encounters:
+            return  # nothing to link
+
+        # Build date → encounter_id map (day precision, ISO-8601)
+        enc_by_date: dict[str, str] = {}
+        for enc in encounters:
+            period = enc.get("period") or {}
+            start = period.get("start") or ""
+            if start:
+                day = start[:10]  # "YYYY-MM-DD" prefix
+                enc_by_date.setdefault(day, enc["id"])
+
+        single_encounter_id = encounters[0]["id"] if len(encounters) == 1 else None
+
+        # Resource types that should carry encounter linkage
+        LINKABLE = {
+            "Observation",
+            "Condition",
+            "MedicationRequest",
+            "Procedure",
+            "Immunization",
+            "AllergyIntolerance",
+            "DiagnosticReport",
+        }
+        # Date fields per resource type (FHIR R4 conventions)
+        DATE_FIELDS = {
+            "Observation": "effectiveDateTime",
+            "Condition": "onsetDateTime",
+            "MedicationRequest": "authoredOn",
+            "Procedure": "performedDateTime",
+            "Immunization": "occurrenceDateTime",
+            "AllergyIntolerance": "recordedDate",
+            "DiagnosticReport": "effectiveDateTime",
+        }
+
+        for entry in entries:
+            resource = entry["resource"]
+            rt = resource.get("resourceType")
+            if rt not in LINKABLE:
+                continue
+            if "encounter" in resource:
+                continue  # already linked (e.g. by an upstream pass)
+
+            # Strategy 1: single-encounter shortcut
+            if single_encounter_id is not None:
+                resource["encounter"] = {"reference": f"Encounter/{single_encounter_id}"}
+                continue
+
+            # Strategy 2: date-match
+            date_field = DATE_FIELDS.get(rt)
+            if not date_field:
+                continue
+            date_value = resource.get(date_field) or ""
+            if not date_value:
+                continue
+            day = date_value[:10]
+            matched_id = enc_by_date.get(day)
+            if matched_id:
+                resource["encounter"] = {"reference": f"Encounter/{matched_id}"}
+
     def _merge_to_bundle(
         self,
         *,
@@ -996,6 +1076,9 @@ class MultiPassFHIRPipeline:
             entries.append(
                 {"resource": self._organization_to_fhir(o, common_meta_template, layout, doc_context)}
             )
+
+        # Post-pass: wire encounter references onto encounter-scopable resources
+        self._assign_encounter_references(entries)
 
         bundle: dict[str, Any] = {
             "resourceType": "Bundle",

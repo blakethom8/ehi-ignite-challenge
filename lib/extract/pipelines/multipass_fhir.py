@@ -538,6 +538,37 @@ Rules:
 - If no practitioners are present, return empty list."""
 
 
+_ORGANIZATIONS_PROMPT = """You are extracting healthcare organizations / facilities /
+labs / hospitals / clinics mentioned in a medical document.
+
+Rules:
+- Extract every distinct healthcare organization. Examples:
+    - Health systems / hospitals: "Cedars-Sinai Health System", "Mayo Clinic"
+    - Clinics: "Beverly Hills Allergy", "Beverly Hills Allergy & Immunology"
+    - Labs: "Quest Diagnostics", "Quest Diagnostics-West Hills", "LabCorp"
+    - Pathology departments: "CEDARS-SINAI MED CTR DEPT OF PATHOLOGY"
+    - Imaging centers
+    - Pharmacies (when named as the dispensing org, not the brand)
+    - Insurance / payers: "BLUE CROSS", "Aetna", "Humana"
+- Emit one entry per unique organization. If the same name appears multiple
+  times in the document with different roles (e.g. "Quest Diagnostics" as
+  a performing org and as a contact org), emit one entry.
+- type_code mapping (HL7 organization-type):
+    prov  = generic healthcare provider (hospital, clinic, lab — most cases)
+    dept  = a department within a larger org ("DEPT OF PATHOLOGY")
+    pay   = payer / insurance company (Blue Cross, Aetna)
+    ins   = insurance product
+    other = anything not clearly fitting above
+  Default to 'prov' when in doubt.
+- type_display: a more specific narrative label (e.g. "Allergy Clinic",
+  "Diagnostic Lab", "Hospital", "Insurance Company").
+- Capture phone, fax, full address when printed.
+- Be careful: don't extract individual practitioners' personal addresses
+  (those go to the Practitioner pass). Only extract addresses tied to the
+  organization itself.
+- If no organizations are mentioned, return empty list."""
+
+
 _PASSES: list[ExtractionPass] = [
     ExtractionPass(
         name="conditions",
@@ -595,6 +626,13 @@ _PASSES: list[ExtractionPass] = [
         prompt_version="v1",
         schema_version="v1",
     ),
+    ExtractionPass(
+        name="organization",
+        schema=OrganizationExtraction,
+        system_prompt=_ORGANIZATIONS_PROMPT,
+        prompt_version="v1",
+        schema_version="v1",
+    ),
 ]
 
 
@@ -637,6 +675,17 @@ def _stable_practitioner_id(p: "PractitionerEntry") -> str:
     ]
     seed = "|".join(seed_parts)
     return f"prac-{hashlib.sha1(seed.encode()).hexdigest()[:12]}"
+
+
+def _stable_organization_id(o: "OrganizationEntry") -> str:
+    """Stable ID derived from normalized name + city + state. Same inputs
+    yield same ID across re-extractions."""
+    import hashlib
+    name = (o.name or "").lower().strip()
+    city = (o.city or "").lower().strip()
+    state = (o.state or "").lower().strip()
+    seed = f"{name}|{city}|{state}"
+    return f"org-{hashlib.sha1(seed.encode()).hexdigest()[:12]}"
 
 
 _VITAL_LOINC_MAP: dict[str, tuple[str, str]] = {
@@ -939,6 +988,13 @@ class MultiPassFHIRPipeline:
         for p in prac_extraction.practitioners:
             entries.append(
                 {"resource": self._practitioner_to_fhir(p, common_meta_template, layout, doc_context)}
+            )
+
+        # Organizations
+        org_extraction: OrganizationExtraction = per_pass.get("organization") or OrganizationExtraction()
+        for o in org_extraction.organizations:
+            entries.append(
+                {"resource": self._organization_to_fhir(o, common_meta_template, layout, doc_context)}
             )
 
         bundle: dict[str, Any] = {
@@ -1509,6 +1565,56 @@ class MultiPassFHIRPipeline:
         if extensions:
             resource_extension_list = resource["meta"].get("extension", [])
             resource["meta"] = {**resource["meta"], "extension": [*resource_extension_list, *extensions]}
+        return resource
+
+    def _organization_to_fhir(
+        self,
+        o: OrganizationEntry,
+        common_meta: dict[str, Any],
+        layout: Any,
+        doc_context: DocumentContext,
+    ) -> dict[str, Any]:
+        bbox_locator = self._bbox_locator_for(o.source_text, o.page, layout)
+        organization_id = o.organization_id or _stable_organization_id(o)
+        resource: dict[str, Any] = {
+            "resourceType": "Organization",
+            "id": organization_id,
+            "active": True,
+            "name": o.name,
+            "meta": self._add_bbox_to_meta(common_meta, bbox_locator),
+        }
+        if o.type_code:
+            type_coding: dict[str, Any] = {
+                "system": "http://terminology.hl7.org/CodeSystem/organization-type",
+                "code": o.type_code,
+            }
+            type_entry: dict[str, Any] = {"coding": [type_coding]}
+            if o.type_display:
+                type_entry["text"] = o.type_display
+            resource["type"] = [type_entry]
+        elif o.type_display:
+            # No code, but we have a free-text type
+            resource["type"] = [{"text": o.type_display}]
+        # Telecom
+        telecom = []
+        if o.phone:
+            telecom.append({"system": "phone", "value": o.phone, "use": "work"})
+        if o.fax:
+            telecom.append({"system": "fax", "value": o.fax, "use": "work"})
+        if telecom:
+            resource["telecom"] = telecom
+        # Address
+        if o.address_line or o.city or o.state or o.postal_code:
+            addr: dict[str, Any] = {}
+            if o.address_line:
+                addr["line"] = [o.address_line]
+            if o.city:
+                addr["city"] = o.city
+            if o.state:
+                addr["state"] = o.state
+            if o.postal_code:
+                addr["postalCode"] = o.postal_code
+            resource["address"] = [addr]
         return resource
 
 

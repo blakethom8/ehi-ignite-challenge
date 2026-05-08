@@ -271,7 +271,45 @@ def test_anthropic_backend_skips_thinking_blocks_in_response() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Test 8 — estimate_cost Opus known model
+# Tests 8a-8c — JSON-from-text fallback (thinking + tool_choice="auto" path)
+# ---------------------------------------------------------------------------
+
+
+def test_extract_json_object_from_text_fenced() -> None:
+    """When thinking is enabled, Anthropic disallows tool_choice="tool" — we
+    use "auto" + a strong prompt nudge. Most of the time the model still
+    calls the tool. When it doesn't, we parse JSON out of the text block.
+    Required for the gold pipeline to work in production."""
+    from lib.extract.pdf import _extract_json_object_from_text
+
+    fenced = '```json\n{"foo": "bar", "n": 42}\n```'
+    result = _extract_json_object_from_text(fenced)
+    assert result == {"foo": "bar", "n": 42}
+
+
+def test_extract_json_object_from_text_largest_object() -> None:
+    """Falls back to finding the largest {...} span in prose."""
+    from lib.extract.pdf import _extract_json_object_from_text
+
+    prose = (
+        "I'll extract the data. Here's the result:\n\n"
+        '{"document_type": "lab-report", "patient_name": "Blake"}\n\n'
+        "Please review."
+    )
+    result = _extract_json_object_from_text(prose)
+    assert result == {"document_type": "lab-report", "patient_name": "Blake"}
+
+
+def test_extract_json_object_from_text_returns_none_on_garbage() -> None:
+    from lib.extract.pdf import _extract_json_object_from_text
+
+    assert _extract_json_object_from_text("") is None
+    assert _extract_json_object_from_text("no json here") is None
+    assert _extract_json_object_from_text("{ broken {") is None
+
+
+# ---------------------------------------------------------------------------
+# Test 9 — estimate_cost Opus known model
 # ---------------------------------------------------------------------------
 
 

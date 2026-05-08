@@ -69,6 +69,56 @@ from pydantic import BaseModel
 from lib.extract.cache import CacheKey, ExtractionCache, hash_file
 from lib.extract.schemas import ExtractionResult
 
+
+def _extract_json_object_from_text(text: str) -> dict | None:
+    """Best-effort: pull a JSON object out of a text response.
+
+    Used as a fallback when extended thinking is enabled and the model
+    returns prose instead of a tool_use block (Anthropic disallows
+    forced tool_choice with thinking, so we use auto + prompt-nudge;
+    occasionally the model emits JSON in text instead of via the tool).
+
+    Strategy:
+      1. Strip ```json ... ``` fences if present.
+      2. Find the largest `{ ... }` substring; try to parse.
+      3. Return None on any failure.
+    """
+    if not text:
+        return None
+    candidate = text.strip()
+    # Strip ```json fences
+    if candidate.startswith("```"):
+        first_newline = candidate.find("\n")
+        if first_newline != -1:
+            candidate = candidate[first_newline + 1 :]
+        if candidate.rstrip().endswith("```"):
+            candidate = candidate.rstrip()[:-3]
+    # Try direct parse
+    try:
+        result = json.loads(candidate)
+        return result if isinstance(result, dict) else None
+    except json.JSONDecodeError:
+        pass
+    # Fallback: find largest {...} balanced span
+    start = candidate.find("{")
+    if start == -1:
+        return None
+    depth = 0
+    for i in range(start, len(candidate)):
+        c = candidate[i]
+        if c == "{":
+            depth += 1
+        elif c == "}":
+            depth -= 1
+            if depth == 0:
+                blob = candidate[start : i + 1]
+                try:
+                    result = json.loads(blob)
+                    return result if isinstance(result, dict) else None
+                except json.JSONDecodeError:
+                    return None
+    return None
+
 T = TypeVar("T", bound=BaseModel)
 
 DEFAULT_BACKEND = "anthropic"
@@ -179,11 +229,31 @@ class AnthropicBackend:
         pdf_b64 = base64.standard_b64encode(pdf_bytes).decode("utf-8")
 
         extra_params: dict[str, Any] = {}
-        if self._thinking_budget_tokens is not None:
+        thinking_enabled = self._thinking_budget_tokens is not None
+        if thinking_enabled:
             extra_params["thinking"] = {
                 "type": "enabled",
                 "budget_tokens": self._thinking_budget_tokens,
             }
+
+        # Anthropic constraint: extended thinking is incompatible with
+        # tool_choice forcing a specific tool. When thinking is enabled we use
+        # tool_choice="auto" + a strong prompt nudge; the model still calls
+        # emit_extraction in practice (validated empirically), and we fall
+        # back to parsing JSON out of the text block if it doesn't.
+        if thinking_enabled:
+            tool_choice = {"type": "auto"}
+            user_text = (
+                "Extract this document into the schema. You MUST respond by "
+                "calling the emit_extraction tool with the structured "
+                "extraction. Do not respond with prose."
+            )
+        else:
+            tool_choice = {"type": "tool", "name": "emit_extraction"}
+            user_text = (
+                "Extract this document into the schema. "
+                "Return only the structured tool call."
+            )
 
         message = self.client.messages.create(
             model=self.model,
@@ -198,7 +268,7 @@ class AnthropicBackend:
                     "input_schema": schema_json,
                 }
             ],
-            tool_choice={"type": "tool", "name": "emit_extraction"},
+            tool_choice=tool_choice,
             messages=[
                 {
                     "role": "user",
@@ -211,13 +281,7 @@ class AnthropicBackend:
                                 "data": pdf_b64,
                             },
                         },
-                        {
-                            "type": "text",
-                            "text": (
-                                "Extract this document into the schema. "
-                                "Return only the structured tool call."
-                            ),
-                        },
+                        {"type": "text", "text": user_text},
                     ],
                 }
             ],
@@ -225,12 +289,31 @@ class AnthropicBackend:
         )
 
         tool_call = None
+        text_blocks: list[str] = []
         for block in message.content:
-            if getattr(block, "type", None) == "thinking":
+            btype = getattr(block, "type", None)
+            if btype == "thinking":
                 continue  # extended-thinking output; not the response content
-            if getattr(block, "type", None) == "tool_use":
+            if btype == "tool_use":
                 tool_call = block
                 break
+            if btype == "text":
+                text_blocks.append(getattr(block, "text", "") or "")
+
+        if tool_call is None and thinking_enabled and text_blocks:
+            # Fallback: when thinking is enabled and the model emitted text
+            # instead of calling the tool, try to parse JSON out of the text.
+            # Look for the largest JSON object in the response (the model
+            # often wraps it in ```json ... ``` blocks).
+            extracted_input = _extract_json_object_from_text("\n\n".join(text_blocks))
+            if extracted_input is not None:
+                # Synthesize a tool_call-like wrapper so downstream parsing works.
+                class _SynthTool:
+                    type = "tool_use"
+                    name = "emit_extraction"
+                    def __init__(self, input_dict: dict) -> None:
+                        self.input = input_dict
+                tool_call = _SynthTool(extracted_input)
 
         if tool_call is None:
             content_types = [getattr(b, "type", None) for b in message.content]
@@ -289,11 +372,26 @@ class AnthropicBackend:
         schema_json = schema.model_json_schema()
 
         extra_params: dict[str, Any] = {}
-        if self._thinking_budget_tokens is not None:
+        thinking_enabled = self._thinking_budget_tokens is not None
+        if thinking_enabled:
             extra_params["thinking"] = {
                 "type": "enabled",
                 "budget_tokens": self._thinking_budget_tokens,
             }
+
+        # Anthropic constraint: extended thinking incompatible with
+        # tool_choice="tool". Use "auto" + a strong prompt nudge when
+        # thinking is on; fall back to JSON-from-text parsing if needed.
+        if thinking_enabled:
+            tool_choice = {"type": "auto"}
+            user_content = (
+                user_prompt
+                + "\n\nYou MUST respond by calling the emit_extraction tool "
+                "with the structured extraction. Do not respond with prose."
+            )
+        else:
+            tool_choice = {"type": "tool", "name": "emit_extraction"}
+            user_content = user_prompt
 
         message = self.client.messages.create(
             model=self.model,
@@ -306,23 +404,39 @@ class AnthropicBackend:
                     "input_schema": schema_json,
                 }
             ],
-            tool_choice={"type": "tool", "name": "emit_extraction"},
+            tool_choice=tool_choice,
             messages=[
                 {
                     "role": "user",
-                    "content": user_prompt,
+                    "content": user_content,
                 }
             ],
             **extra_params,
         )
 
         tool_call = None
+        text_blocks: list[str] = []
         for block in message.content:
-            if getattr(block, "type", None) == "thinking":
+            btype = getattr(block, "type", None)
+            if btype == "thinking":
                 continue
-            if getattr(block, "type", None) == "tool_use":
+            if btype == "tool_use":
                 tool_call = block
                 break
+            if btype == "text":
+                text_blocks.append(getattr(block, "text", "") or "")
+
+        if tool_call is None and thinking_enabled and text_blocks:
+            # Fallback: thinking-enabled responses sometimes return JSON in
+            # the text block instead of calling the tool. Parse it.
+            extracted_input = _extract_json_object_from_text("\n\n".join(text_blocks))
+            if extracted_input is not None:
+                class _SynthTool:
+                    type = "tool_use"
+                    name = "emit_extraction"
+                    def __init__(self, input_dict: dict) -> None:
+                        self.input = input_dict
+                tool_call = _SynthTool(extracted_input)
 
         if tool_call is None:
             content_types = [getattr(b, "type", None) for b in message.content]

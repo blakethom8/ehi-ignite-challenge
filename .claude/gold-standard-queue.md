@@ -13,7 +13,7 @@
 
 ### GOLD-T01 · Register `multipass-fhir-gold` pipeline (Opus 4.7 + extended thinking)
 
-- **Status:** Queued
+- **Status:** ✅ Completed `18f2035` · 2026-05-07 · 508 tests pass
 - **Goal:** New pipeline `multipass-fhir-gold` (architecture: `gold-standard`) using Claude Opus 4.7 with extended thinking enabled per pass. Same overall multipass-fhir architecture, just upgraded model + thinking. v1 — no self-consistency yet (GOLD-T02), no reviewer agent yet (GOLD-T03).
 - **Files you may touch:** `lib/extract/pdf.py` (extend AnthropicBackend with optional thinking param), `lib/extract/pipelines/multipass_fhir.py` (register new subclass), `lib/tests/test_extract/test_gold_pipeline.py` (new).
 - **Files you must NOT touch:** other pipelines (defaults / scout / bidi / gemma), `.claude/gold-standard-queue.md`, anything in `api/` / `app/` / `archive/`.
@@ -128,7 +128,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 
 ### GOLD-T02 · Self-consistency wrapper — run each pass twice, intersect facts
 
-- **Status:** Queued
+- **Status:** ✅ Completed `289c826` · 2026-05-07 · 517 tests pass
 - **Depends on:** GOLD-T01 (gold pipeline must exist)
 - **Goal:** Add a `run_count: int = 1` field to `ExtractionPass`. When `run_count >= 2`, the dispatcher runs the pass that many times (in parallel via the existing ThreadPoolExecutor) and intersects the resulting facts. Bump the gold pipeline's per-pass `run_count` to 2.
 
@@ -187,7 +187,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 
 ### GOLD-T03 · Reviewer agent — whole-bundle inconsistency check
 
-- **Status:** Queued
+- **Status:** ✅ Completed `071a77f` · 2026-05-07 · 525 tests pass
 - **Depends on:** GOLD-T01
 - **Goal:** A meta-pass that runs AFTER the assembled FHIR Bundle is built. Reads the bundle, asks Opus to scrutinize it for inconsistencies (med start before DOB, encounter referenced in notes but not as Encounter resource, conflicting dates, etc.), emits a list of "concerns" onto `bundle.meta.extension`.
 

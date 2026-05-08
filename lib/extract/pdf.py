@@ -70,6 +70,45 @@ from lib.extract.cache import CacheKey, ExtractionCache, hash_file
 from lib.extract.schemas import ExtractionResult
 
 
+def _build_thinking_params(model: str, budget_tokens: int) -> dict[str, Any]:
+    """Return the thinking + output_config kwargs for messages.create.
+
+    Anthropic changed the thinking API between model generations:
+      - Older (Claude Sonnet 4, Haiku 4): `thinking={"type":"enabled","budget_tokens":N}`
+      - Newer (Claude Opus 4.7, future Sonnet 4.7+): `thinking={"type":"adaptive"}`
+        plus `output_config={"effort": "low"|"medium"|"high"}`
+
+    We map our `thinking_budget_tokens: int` hint to effort:
+      - <= 4000   → "low"
+      - <= 12000  → "medium"
+      - > 12000   → "high"
+
+    Detection: any model containing "opus-4-7", "opus-5", or "sonnet-4-7"
+    uses the adaptive API. Conservative fallback to the enabled API for
+    everything else.
+    """
+    model_lower = (model or "").lower()
+    is_adaptive_model = any(
+        token in model_lower
+        for token in ("opus-4-7", "opus-5", "sonnet-4-7", "haiku-4-7", "haiku-5")
+    )
+
+    if is_adaptive_model:
+        if budget_tokens <= 4000:
+            effort = "low"
+        elif budget_tokens <= 12000:
+            effort = "medium"
+        else:
+            effort = "high"
+        return {
+            "thinking": {"type": "adaptive"},
+            "output_config": {"effort": effort},
+        }
+    return {
+        "thinking": {"type": "enabled", "budget_tokens": budget_tokens},
+    }
+
+
 def _extract_json_object_from_text(text: str) -> dict | None:
     """Best-effort: pull a JSON object out of a text response.
 
@@ -231,10 +270,13 @@ class AnthropicBackend:
         extra_params: dict[str, Any] = {}
         thinking_enabled = self._thinking_budget_tokens is not None
         if thinking_enabled:
-            extra_params["thinking"] = {
-                "type": "enabled",
-                "budget_tokens": self._thinking_budget_tokens,
-            }
+            # Newer Claude models (Opus 4.7+) use the adaptive thinking API:
+            # `thinking={"type": "adaptive"}` plus output_config.effort.
+            # Older models (Sonnet 4, Haiku 4) used `{"type":"enabled","budget_tokens":N}`.
+            # Map our budget hint to the right shape per model.
+            extra_params.update(
+                _build_thinking_params(self.model, self._thinking_budget_tokens)
+            )
 
         # Anthropic constraint: extended thinking is incompatible with
         # tool_choice forcing a specific tool. When thinking is enabled we use
@@ -374,10 +416,13 @@ class AnthropicBackend:
         extra_params: dict[str, Any] = {}
         thinking_enabled = self._thinking_budget_tokens is not None
         if thinking_enabled:
-            extra_params["thinking"] = {
-                "type": "enabled",
-                "budget_tokens": self._thinking_budget_tokens,
-            }
+            # Newer Claude models (Opus 4.7+) use the adaptive thinking API:
+            # `thinking={"type": "adaptive"}` plus output_config.effort.
+            # Older models (Sonnet 4, Haiku 4) used `{"type":"enabled","budget_tokens":N}`.
+            # Map our budget hint to the right shape per model.
+            extra_params.update(
+                _build_thinking_params(self.model, self._thinking_budget_tokens)
+            )
 
         # Anthropic constraint: extended thinking incompatible with
         # tool_choice="tool". Use "auto" + a strong prompt nudge when

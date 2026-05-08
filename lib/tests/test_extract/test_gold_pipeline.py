@@ -220,10 +220,15 @@ def test_anthropic_backend_thinking_param_optional() -> None:
         f"Expected 'thinking' kwarg when thinking_budget_tokens=16000, "
         f"got call kwargs: {call_kwargs_b}"
     )
-    assert call_kwargs_b["thinking"] == {
-        "type": "enabled",
-        "budget_tokens": 16000,
-    }, f"Unexpected thinking value: {call_kwargs_b['thinking']!r}"
+    # claude-opus-4-7 uses the adaptive thinking API with output_config.effort,
+    # not the older enabled+budget_tokens shape (per Anthropic API docs).
+    assert call_kwargs_b["thinking"] == {"type": "adaptive"}, (
+        f"Unexpected thinking value for Opus 4.7: {call_kwargs_b['thinking']!r}"
+    )
+    assert call_kwargs_b.get("output_config", {}).get("effort") == "high", (
+        f"Expected output_config.effort='high' for budget_tokens=16000; "
+        f"got {call_kwargs_b.get('output_config')!r}"
+    )
 
 
 # ---------------------------------------------------------------------------

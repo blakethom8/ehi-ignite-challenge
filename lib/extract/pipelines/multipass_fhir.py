@@ -1505,6 +1505,37 @@ class MultiPassFHIRPipeline:
         """
         return _PASSES
 
+    def _invoke_pass_0(
+        self,
+        *,
+        pdf_bytes: bytes,
+        pdf_hash: str,
+        skip_cache: bool,
+        system_prompt: str | None = None,
+        prompt_version: str = "v1",
+    ) -> BaseModel:
+        """Invoke Pass 0 once and return the raw (validated) output.
+
+        Exists so subclasses (e.g. the bidi-scout pipeline) can call Pass 0
+        multiple times with different prompts without re-implementing the full
+        ``extract()`` method.
+
+        When ``system_prompt`` is None the hook method ``_pass_0_prompt()``
+        is used (the default behaviour).  When overriding, pass an explicit
+        ``system_prompt`` and a distinct ``prompt_version`` so the two
+        invocations get distinct cache keys and don't collide.
+        """
+        return self._run_pass(
+            pass_name="document_context",
+            schema=self._pass_0_schema(),
+            system_prompt=system_prompt if system_prompt is not None else self._pass_0_prompt(),
+            pdf_bytes=pdf_bytes,
+            pdf_hash=pdf_hash,
+            skip_cache=skip_cache,
+            extra_user_text=None,
+            prompt_version=prompt_version,
+        )
+
     def extract(
         self,
         pdf_path: Path,
@@ -1515,17 +1546,20 @@ class MultiPassFHIRPipeline:
         pdf_bytes = pdf_path.read_bytes()
         pdf_hash = hash_file(pdf_path)
 
+        # Stash pdf_bytes / pdf_hash / skip_cache on self so _doc_context_from_pass_0
+        # overrides (e.g. MultiPassFHIRBidiScoutPipeline) can call _invoke_pass_0
+        # a second time without needing separate parameters.
+        self._pass_0_pdf_bytes: bytes = pdf_bytes
+        self._pass_0_pdf_hash: str = pdf_hash
+        self._pass_0_skip_cache: bool = skip_cache
+
         # Pass 0 — document context (schema/prompt resolved via hook methods
         # so subclasses can swap in richer types without re-implementing the
         # full extract() method).
-        pass_0_raw = self._run_pass(
-            pass_name="document_context",
-            schema=self._pass_0_schema(),
-            system_prompt=self._pass_0_prompt(),
+        pass_0_raw = self._invoke_pass_0(
             pdf_bytes=pdf_bytes,
             pdf_hash=pdf_hash,
             skip_cache=skip_cache,
-            extra_user_text=None,
         )
         doc_context = self._doc_context_from_pass_0(pass_0_raw)
 
@@ -3134,3 +3168,130 @@ class MultiPassFHIRScoutPipeline(MultiPassFHIRPipeline):
                 )
             )
         return augmented
+
+
+@register
+class MultiPassFHIRBidiScoutPipeline(MultiPassFHIRScoutPipeline):
+    """multipass-fhir variant: TWO scouts + reconciliation.
+
+    Pass 0 runs twice with two distinct prompt flavors:
+      - "events" — encounter / narrative-focused
+      - "tables" — structured-data-focused
+
+    The two DocumentMap outputs are reconciled via reconcile_document_maps()
+    (default strategy: union — broader recall). Specialist passes dispatch
+    against the reconciled DocumentMap. Page hints are the union of both
+    scouts' page lists for each present resource type.
+
+    The MapReconciliation metadata (agreement / disagreement counts,
+    only_in_a / only_in_b lists) is attached to bundle.meta.extension as
+    a JSON-serialized scout-reconciliation extension, surfacing
+    uncertainty for the test bench.
+
+    Cost: 2× Pass 0 (cheap relative to 12+ specialist passes). Specialist
+    dispatch unchanged from MultiPassFHIRScoutPipeline.
+    """
+
+    metadata = PipelineMetadata(
+        name="multipass-fhir-bidi-scout",
+        description=(
+            "Two-scout variant of multipass-fhir-scout. Runs Pass 0 twice "
+            "with events-focused and tables-focused prompts, reconciles, "
+            "and dispatches specialists against the merged manifest. Same "
+            "FHIR Bundle output shape; reconciliation metadata attached "
+            "to bundle meta.extension."
+        ),
+        architecture="bidirectional-scout-then-specialist",
+        primary_backends=["anthropic"],
+        estimated_cost_per_pdf_usd=0.22,  # +0.04 vs scout pipeline
+    )
+
+    # Stashed by _doc_context_from_pass_0 so _merge_to_bundle can read it.
+    _scout_reconciliation: MapReconciliation | None = None
+
+    def _doc_context_from_pass_0(self, pass_0_output: BaseModel) -> DocumentContext:
+        """Override: run two scouts in sequence, reconcile, return the
+        reconciled DocumentMap.
+
+        The first scout invocation is already done by the parent's extract()
+        via _invoke_pass_0() and passed in as ``pass_0_output``.  This
+        method runs the second scout with the complementary flavor, reconciles
+        the pair, and stashes the MapReconciliation on self so _merge_to_bundle
+        can attach it to bundle.meta.extension.
+
+        Note: the "events" flavor was used for the first pass (via
+        _pass_0_prompt override); the "tables" flavor is run here as the
+        second pass with a distinct prompt_version cache key.
+        """
+        assert isinstance(pass_0_output, DocumentMap), (
+            f"expected DocumentMap from Pass 0, got {type(pass_0_output).__name__}"
+        )
+        map_a: DocumentMap = pass_0_output
+
+        # Second scout: tables-focused, with a distinct prompt_version
+        # so cache keys for the two scouts don't collide.
+        map_b_raw = self._invoke_pass_0(
+            pdf_bytes=self._pass_0_pdf_bytes,
+            pdf_hash=self._pass_0_pdf_hash,
+            skip_cache=self._pass_0_skip_cache,
+            system_prompt=get_scout_prompt("tables"),
+            prompt_version="bidi-tables-v1",
+        )
+        assert isinstance(map_b_raw, DocumentMap), (
+            f"expected DocumentMap from second scout, got {type(map_b_raw).__name__}"
+        )
+        map_b: DocumentMap = map_b_raw
+
+        reconciliation = reconcile_document_maps(map_a, map_b, strategy="union")
+        self._scout_reconciliation = reconciliation
+
+        # Stash the reconciled map so _specialist_passes() can dispatch
+        # against it (parent reads self._doc_map).
+        self._doc_map = reconciliation.reconciled
+        return reconciliation.reconciled
+
+    def _pass_0_prompt(self) -> str:
+        """First scout uses the events-focused prompt."""
+        return get_scout_prompt("events")
+
+    def _pass_0_schema(self) -> type[BaseModel]:
+        """Both scouts emit DocumentMap (same schema as the base scout)."""
+        return DocumentMap
+
+    def _merge_to_bundle(
+        self,
+        *,
+        doc_context: DocumentContext,
+        per_pass: dict[str, BaseModel],
+        pdf_path: Path,
+        layout: Any,
+    ) -> dict[str, Any]:
+        """Override: call super(), then attach the reconciliation extension."""
+        bundle = super()._merge_to_bundle(
+            doc_context=doc_context,
+            per_pass=per_pass,
+            pdf_path=pdf_path,
+            layout=layout,
+        )
+        if self._scout_reconciliation is not None:
+            import json
+
+            rec = self._scout_reconciliation
+            bundle["meta"]["extension"].append(
+                {
+                    "url": (
+                        "https://ehi-atlas.example/fhir/StructureDefinition/"
+                        "scout-reconciliation"
+                    ),
+                    "valueString": json.dumps(
+                        {
+                            "agreement_count": rec.agreement_count,
+                            "disagreement_count": rec.disagreement_count,
+                            "only_in_a": rec.only_in_a,
+                            "only_in_b": rec.only_in_b,
+                            "page_hint_overlap": rec.page_hint_overlap,
+                        }
+                    ),
+                }
+            )
+        return bundle

@@ -290,6 +290,28 @@ class ImagingStudyRecord:
     instance_count: int = 0
 
 
+@dataclass
+class DocumentReferenceRecord:
+    """A clinical document reference (notes, attachments, etc.).
+
+    Maps from FHIR R4 DocumentReference. Lossy: not every FHIR field is
+    captured; only the ones we use downstream.
+    """
+
+    document_id: str | None = None
+    status: str | None = None
+    type_display: str | None = None
+    type_code: str | None = None  # LOINC code if present
+    type_system: str | None = None  # e.g. http://loinc.org
+    date: str | None = None  # ISO 8601 authored date
+    author_displays: list[str] = field(default_factory=list)
+    encounter_references: list[str] = field(default_factory=list)  # from context.encounter[].reference
+    content_type: str | None = None  # from content[0].attachment.contentType
+    content_text: str | None = None  # decoded plain-text body if attachment.data is base64 text/plain
+    content_url: str | None = None  # from content[0].attachment.url
+    title: str | None = None  # from content[0].attachment.title
+
+
 # ---------------------------------------------------------------------------
 # Top-level container
 # ---------------------------------------------------------------------------
@@ -314,6 +336,7 @@ class PatientRecord:
     allergies: list[AllergyRecord] = field(default_factory=list)
     claims: list[ClaimRecord] = field(default_factory=list)
     imaging_studies: list[ImagingStudyRecord] = field(default_factory=list)
+    document_references: list[DocumentReferenceRecord] = field(default_factory=list)
 
     # Lower-priority resources kept as raw dicts
     care_plans_raw: list[dict] = field(default_factory=list)

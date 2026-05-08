@@ -21,6 +21,7 @@ from .extractors import (
     extract_claim,
     extract_condition,
     extract_diagnostic_report,
+    extract_document_references,
     extract_eob_insurer,
     extract_eob_payment,
     extract_encounter,
@@ -150,6 +151,9 @@ def parse_bundle(file_path: str | Path) -> PatientRecord:
         except Exception as e:
             record.parse_warnings.append(f"EOB {raw.get('id', '?')}: {e}")
 
+    # DocumentReferences — reads from the full bundle (not the pre-bucketed list)
+    record.document_references = extract_document_references(bundle)
+
     # Lower-priority resources kept raw
     record.care_plans_raw = buckets.get("CarePlan", [])
     record.care_teams_raw = buckets.get("CareTeam", [])
@@ -162,7 +166,7 @@ def parse_bundle(file_path: str | Path) -> PatientRecord:
         "Procedure", "DiagnosticReport", "Immunization", "AllergyIntolerance",
         "ImagingStudy", "Claim", "ExplanationOfBenefit", "CarePlan", "CareTeam",
         "Goal", "Device", "Organization", "Practitioner", "PractitionerRole",
-        "Location", "Coverage", "MedicationAdministration",
+        "Location", "Coverage", "MedicationAdministration", "DocumentReference",
     }
     for rtype in buckets:
         if rtype not in known_types:

@@ -17,6 +17,7 @@ from .models import (
     CodeableConcept,
     ConditionRecord,
     DiagnosticReportRecord,
+    DocumentReferenceRecord,
     EncounterRecord,
     ImagingStudyRecord,
     ImmunizationRecord,
@@ -595,3 +596,57 @@ def extract_imaging_study(resource: dict) -> ImagingStudyRecord:
         study.modality = modality.get("code", "")
 
     return study
+
+
+def extract_document_references(bundle: dict) -> list[DocumentReferenceRecord]:
+    """Read DocumentReference resources from a FHIR Bundle."""
+    records: list[DocumentReferenceRecord] = []
+    entries = bundle.get("entry", []) or []
+    for entry in entries:
+        resource = entry.get("resource") or {}
+        if resource.get("resourceType") != "DocumentReference":
+            continue
+        type_obj = resource.get("type") or {}
+        coding_list = type_obj.get("coding") or []
+        type_coding = coding_list[0] if coding_list else {}
+        # Author displays
+        authors = resource.get("author") or []
+        author_displays = [a.get("display", "") for a in authors if a.get("display")]
+        # Encounter references from context
+        ctx = resource.get("context") or {}
+        enc_list = ctx.get("encounter") or []
+        encounter_refs = [e.get("reference", "") for e in enc_list if e.get("reference")]
+        # Content (attachment) — decode base64 text if contentType is text/plain
+        content_list = resource.get("content") or []
+        content_type = None
+        content_text = None
+        content_url = None
+        title = None
+        if content_list:
+            attachment = content_list[0].get("attachment") or {}
+            content_type = attachment.get("contentType")
+            content_url = attachment.get("url")
+            title = attachment.get("title")
+            data = attachment.get("data")
+            if data and (content_type or "").startswith("text/"):
+                try:
+                    content_text = base64.b64decode(data).decode("utf-8", errors="replace")
+                except Exception:
+                    content_text = None
+        records.append(
+            DocumentReferenceRecord(
+                document_id=resource.get("id"),
+                status=resource.get("status"),
+                type_display=type_obj.get("text") or type_coding.get("display"),
+                type_code=type_coding.get("code"),
+                type_system=type_coding.get("system"),
+                date=resource.get("date"),
+                author_displays=author_displays,
+                encounter_references=encounter_refs,
+                content_type=content_type,
+                content_text=content_text,
+                content_url=content_url,
+                title=title,
+            )
+        )
+    return records

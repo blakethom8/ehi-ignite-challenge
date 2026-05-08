@@ -21,7 +21,7 @@ The single-scout `multipass-fhir-scout` (shipped Move Y) shipped a routing manif
 
 ## BIDI-T01 · Reconciliation logic — `reconcile_document_maps()`
 
-- **Status:** Queued
+- **Status:** ✅ Completed `5e3268b` · 2026-05-07 · 254 tests pass
 - **Goal:** Pure-function helper that takes two `DocumentMap` instances and returns a single reconciled `DocumentMap` plus a structured disagreement report.
 - **Files you may touch:** `lib/extract/pipelines/multipass_fhir.py`, `lib/tests/test_extract/test_bidi_reconcile.py` (new)
 - **Files you must NOT touch:** the existing scout pipeline; any prompts; anything in `api/`, `app/`, `archive/`
@@ -132,7 +132,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 
 ## BIDI-T02 · Two scout-prompt variants
 
-- **Status:** Queued
+- **Status:** ✅ Completed `9ce9c05` · 2026-05-07 · 259 tests pass
 - **Depends on:** none (parallel with BIDI-T01 if you want; both feed into T03)
 - **Goal:** Define two distinct scout prompts as constants and a small helper that maps a "scout flavor" identifier to (prompt, schema_version) pairs.
 - **Files you may touch:** `lib/extract/pipelines/multipass_fhir.py`, `lib/tests/test_extract/test_bidi_prompts.py` (new)
@@ -215,7 +215,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 
 ## BIDI-T03 · MultiPassFHIRBidiScoutPipeline class
 
-- **Status:** Queued
+- **Status:** ✅ Completed `db6dcde` · 2026-05-07 · 266 tests pass
 - **Depends on:** BIDI-T01 + BIDI-T02
 - **Goal:** Register `multipass-fhir-bidi-scout` as a parallel pipeline that runs the two scouts, reconciles, and dispatches specialists against the reconciled DocumentMap.
 

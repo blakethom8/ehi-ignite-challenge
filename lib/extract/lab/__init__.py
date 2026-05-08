@@ -30,6 +30,12 @@ from lib.extract.lab.recorder import (
     RunRecorder,
     TraceEntry,
 )
+from lib.extract.lab.vision_wins import (
+    TriageSession,
+    VisionWinVerdict,
+    load_triage_session,
+    run_triage,
+)
 
 __all__ = [
     "BundleShapeReport",
@@ -43,11 +49,15 @@ __all__ = [
     "RunManifest",
     "RunRecorder",
     "TraceEntry",
+    "TriageSession",
+    "VisionWinVerdict",
     "compare_runs",
     "has_ground_truth",
     "list_ground_truth_versions",
     "load_ground_truth_version",
     "load_latest_ground_truth",
+    "load_triage_session",
+    "run_triage",
     "save_ground_truth",
     "score_against_ground_truth",
     "score_bundle_shape",

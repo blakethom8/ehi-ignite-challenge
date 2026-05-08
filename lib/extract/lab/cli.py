@@ -5,6 +5,7 @@
     list    — list recent runs (LAB-T06)
     report  — generate a paste-able markdown report (LAB-T06)
     review  — interactively review a run and persist as ground truth (REVIEW-T02)
+    triage  — triage vision-wins from a run's eval.json (EVAL-T02)
 
 All subcommands are fully implemented.
 """
@@ -35,6 +36,7 @@ def main(argv: list[str] | None = None) -> int:
     _add_list_parser(subparsers)
     _add_report_parser(subparsers)
     _add_review_parser(subparsers)
+    _add_triage_parser(subparsers)
 
     args = parser.parse_args(argv)
 
@@ -50,6 +52,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_report(args)
     if args.cmd == "review":
         return _cmd_review(args)
+    if args.cmd == "triage":
+        return _cmd_triage(args)
 
     parser.error(f"unknown command: {args.cmd}")
     return 2  # unreachable after parser.error
@@ -270,6 +274,45 @@ def _cmd_review(args: argparse.Namespace) -> int:
         print(f"\n(re-run the same command to resume)", file=sys.stderr)
         return 0
     return 0  # discarded — also exit 0
+
+
+def _add_triage_parser(sub: argparse._SubParsersAction) -> None:  # type: ignore[type-arg]
+    p = sub.add_parser(
+        "triage",
+        help="Triage vision-wins from a run's eval.json",
+        description="""\
+Walks each fact in eval.json's extracted_only list and asks for a verdict:
+  v/valid_extra      → incorporate into a new GT version
+  h/hallucination    → model error, eval penalty stands
+  o/out_of_scope     → real but not in our schema; eval ignores
+  s/skip             → defer
+
+Result: vision_wins_verdicts.json + (optionally) a new GT version.
+""",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p.add_argument("--run", required=True, help="Run id to triage")
+    p.add_argument("--reviewer", required=True, help="Your name / email")
+    p.add_argument("--notes", default="")
+    p.add_argument("--root", type=Path, default=DEFAULT_LAB_ROOT)
+
+
+def _cmd_triage(args: argparse.Namespace) -> int:
+    from lib.extract.lab.vision_wins import load_triage_session, run_triage
+    try:
+        session = load_triage_session(args.run, lab_root=args.root)
+    except FileNotFoundError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    status, version = run_triage(
+        session,
+        reviewer=args.reviewer,
+        notes=args.notes,
+        lab_root=args.root,
+    )
+    if version is not None:
+        print(f"  → New ground-truth version: v{version}", file=sys.stderr)
+    return 0
 
 
 def _cmd_run(args: argparse.Namespace) -> int:

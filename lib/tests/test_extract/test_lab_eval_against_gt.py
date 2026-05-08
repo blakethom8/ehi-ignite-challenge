@@ -356,6 +356,48 @@ def test_cli_run_no_eval_when_no_ground_truth(
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# PERF-T01 extensions: fuzzy-match integration in score_against_ground_truth
+# ---------------------------------------------------------------------------
+
+
+def test_score_handles_display_variant_via_fuzzy() -> None:
+    """GT has 'Glucose' with LOINC 2345-7; extracted has 'Glucose Serum' with LOINC 2345-7.
+    Stage 1 code match finds them identical → F1 == 1.0 for Observation."""
+    gt = _bundle(_observation_entry("Glucose", "2345-7"))
+    extracted = _bundle(_observation_entry("Glucose Serum", "2345-7"))
+
+    result = score_against_ground_truth(extracted, gt)
+
+    obs_score = result.per_resource.get("Observation")
+    assert obs_score is not None, "Observation should be in per_resource"
+    assert obs_score.f1 == 1.0, f"Expected F1=1.0 for LOINC-code match, got {obs_score.f1}"
+    assert obs_score.overlap == 1
+
+
+def test_score_exposes_fuzzy_match_count() -> None:
+    """GroundTruthEvalResult has fuzzy_match_count populated when fuzzy matches occurred."""
+    # Use Composition (no code) with display variants so Stage 2 fires
+    def _composition_entry(title: str) -> dict:
+        return {
+            "resource": {
+                "resourceType": "Composition",
+                "id": f"comp-test",
+                "title": title,
+            }
+        }
+
+    gt = _bundle(_composition_entry("Progress Note"))
+    extracted = _bundle(_composition_entry("Allergy Progress Note"))
+
+    result = score_against_ground_truth(extracted, gt)
+
+    assert hasattr(result, "fuzzy_match_count"), "GroundTruthEvalResult must have fuzzy_match_count"
+    assert isinstance(result.fuzzy_match_count, dict)
+    # Composition should have at least 1 fuzzy match
+    assert result.fuzzy_match_count.get("Composition", 0) >= 1
+
+
 def test_cli_run_manual_ground_truth_overrides_auto_loaded(
     fake_pdf: Path,
     lab_root: Path,

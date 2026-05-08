@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, asdict, field
 
-from lib.extract.lab.compare import _extract_fact_keys
+from lib.extract.lab.compare import _extract_fact_keys, match_fact_lists
 
 
 @dataclass(frozen=True)
@@ -30,6 +30,7 @@ class GroundTruthEvalResult:
     total_truth: int
     total_extracted: int
     total_overlap: int
+    fuzzy_match_count: dict[str, int] = field(default_factory=dict)  # per-resource-type Stage 2 match count
 
 
 def score_against_ground_truth(
@@ -50,6 +51,7 @@ def score_against_ground_truth(
     per_resource: dict[str, ResourceTypeScore] = {}
     truth_only: dict[str, list[dict]] = {}
     extracted_only: dict[str, list[dict]] = {}
+    fuzzy_match_count: dict[str, int] = {}
     total_truth = 0
     total_extracted = 0
     total_overlap = 0
@@ -59,10 +61,10 @@ def score_against_ground_truth(
     for rt in all_types:
         t_keys = truth_facts.get(rt, {})
         e_keys = extr_facts.get(rt, {})
-        common = set(t_keys) & set(e_keys)
+        match_result = match_fact_lists(t_keys, e_keys)
         truth_count = len(t_keys)
         extracted_count = len(e_keys)
-        overlap = len(common)
+        overlap = match_result.overlap
 
         precision = overlap / extracted_count if extracted_count else 0.0
         recall = overlap / truth_count if truth_count else 0.0
@@ -81,18 +83,18 @@ def score_against_ground_truth(
             f1=round(f1, 4),
         )
 
-        only_in_truth = list(set(t_keys) - common)[:fact_sample_cap]
-        only_in_extr = list(set(e_keys) - common)[:fact_sample_cap]
-        if only_in_truth:
+        if match_result.only_in_a[:fact_sample_cap]:
             truth_only[rt] = [
-                {"display": t_keys[k].display, "code": t_keys[k].code}
-                for k in only_in_truth
+                {"display": s.display, "code": s.code}
+                for s in match_result.only_in_a[:fact_sample_cap]
             ]
-        if only_in_extr:
+        if match_result.only_in_b[:fact_sample_cap]:
             extracted_only[rt] = [
-                {"display": e_keys[k].display, "code": e_keys[k].code}
-                for k in only_in_extr
+                {"display": s.display, "code": s.code}
+                for s in match_result.only_in_b[:fact_sample_cap]
             ]
+        if match_result.fuzzy_matches:
+            fuzzy_match_count[rt] = match_result.fuzzy_matches
 
         total_truth += truth_count
         total_extracted += extracted_count
@@ -112,4 +114,5 @@ def score_against_ground_truth(
         total_truth=total_truth,
         total_extracted=total_extracted,
         total_overlap=total_overlap,
+        fuzzy_match_count=fuzzy_match_count,
     )

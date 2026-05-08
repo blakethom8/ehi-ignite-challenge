@@ -6,9 +6,11 @@ See `.claude/pdf-lab-cli-queue.md` for the full build plan.
 
 from lib.extract.lab.bundle_shape import BundleShapeReport, score_bundle_shape
 from lib.extract.lab.compare import (
+    FactMatchResult,
     FactSample,
     RunComparison,
     compare_runs,
+    match_fact_lists,
 )
 from lib.extract.lab.eval_against_gt import (
     GroundTruthEvalResult,
@@ -40,6 +42,7 @@ from lib.extract.lab.vision_wins import (
 __all__ = [
     "BundleShapeReport",
     "DEFAULT_LAB_ROOT",
+    "FactMatchResult",
     "FactSample",
     "GroundTruthEvalResult",
     "GroundTruthMeta",
@@ -53,6 +56,7 @@ __all__ = [
     "VisionWinVerdict",
     "compare_runs",
     "has_ground_truth",
+    "match_fact_lists",
     "list_ground_truth_versions",
     "load_ground_truth_version",
     "load_latest_ground_truth",

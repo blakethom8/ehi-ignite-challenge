@@ -276,3 +276,51 @@ def test_fact_only_lists_capped_at_sample_cap(tmp_path: Path) -> None:
     assert result.resource_counts_a.get("Condition", 0) == 20
     assert result.resource_counts_b.get("Condition", 0) == 0
     assert result.counts_delta.get("Condition", 0) == -20
+
+
+# ---------------------------------------------------------------------------
+# PERF-T01 extensions: fuzzy-match integration in compare_runs
+# ---------------------------------------------------------------------------
+
+
+def _composition_entry(title: str) -> dict:
+    return {
+        "resource": {
+            "resourceType": "Composition",
+            "id": f"comp-{title[:8]}",
+            "title": title,
+        }
+    }
+
+
+def test_compare_runs_uses_fuzzy_match_for_display_variants(tmp_path: Path) -> None:
+    """A has Composition titled 'Progress Note', B has 'Allergy Progress Note'.
+    Fuzzy match should find these as overlap rather than false negatives."""
+    bundle_a = {"entry": [_composition_entry("Progress Note")]}
+    bundle_b = {"entry": [_composition_entry("Allergy Progress Note")]}
+
+    _make_run(tmp_path, "run-a", "pipeline-x", bundle_a)
+    _make_run(tmp_path, "run-b", "pipeline-y", bundle_b)
+
+    result = compare_runs("run-a", "run-b", root=tmp_path)
+
+    # The display variants should match via Stage 2 fuzzy — overlap >= 1
+    assert result.fact_overlap.get("Composition", 0) >= 1
+    # Not counted in either only list
+    assert result.fact_only_in_a.get("Composition") is None or len(result.fact_only_in_a.get("Composition", [])) == 0
+    assert result.fact_only_in_b.get("Composition") is None or len(result.fact_only_in_b.get("Composition", [])) == 0
+
+
+def test_compare_runs_exposes_fuzzy_match_count_field(tmp_path: Path) -> None:
+    """RunComparison has a fuzzy_match_count attribute populated when fuzzy matches occurred."""
+    bundle_a = {"entry": [_composition_entry("Progress Note")]}
+    bundle_b = {"entry": [_composition_entry("Allergy Progress Note")]}
+
+    _make_run(tmp_path, "run-a", "pipeline-x", bundle_a)
+    _make_run(tmp_path, "run-b", "pipeline-y", bundle_b)
+
+    result = compare_runs("run-a", "run-b", root=tmp_path)
+
+    assert hasattr(result, "fuzzy_match_count"), "RunComparison must have fuzzy_match_count"
+    assert isinstance(result.fuzzy_match_count, dict)
+    assert result.fuzzy_match_count.get("Composition", 0) >= 1

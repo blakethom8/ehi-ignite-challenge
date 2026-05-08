@@ -8,6 +8,7 @@ agreement, cost / latency delta, bundle-shape delta (if available).
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
 from typing import Any
@@ -40,6 +41,146 @@ class RunComparison:
     fact_only_in_b: dict[str, list[FactSample]]
     bundle_shape_a: dict                       # populated from bundle_shape.json (LAB-T05); empty if absent
     bundle_shape_b: dict
+    fuzzy_match_count: dict[str, int] = field(default_factory=dict)  # per-resource-type Stage 2 match count
+
+
+# ---------------------------------------------------------------------------
+# Fuzzy-match helpers (PERF-T01)
+# ---------------------------------------------------------------------------
+
+_DISPLAY_STOPWORDS = frozenset({
+    # Common English filler
+    "the", "a", "an", "of", "in", "on", "at", "with", "and", "or", "to", "as", "is", "are",
+    # Medical narrative adjectives that don't change identity
+    "active", "known", "current", "no", "yes", "right", "left",
+})
+
+
+def _normalize_display_tokens(display: str | None) -> frozenset[str]:
+    """Aggressive token-set normalization for display-text fuzzy matching.
+
+    Lowercases, strips punctuation, collapses whitespace, tokenizes on
+    spaces, drops stopwords. Returns a frozenset of remaining tokens.
+
+    Note: drops "no" — risk of losing negation in narrative text. Acceptable
+    for this eval-match use case where we're comparing same-meaning labels
+    (e.g., "No Known Allergies" vs "No known active allergies"); both
+    normalize to {allergies} which is what we want to match.
+    """
+    if not display:
+        return frozenset()
+    text = display.lower()
+    text = re.sub(r"[^a-z0-9 ]+", " ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    tokens = [t for t in text.split() if t not in _DISPLAY_STOPWORDS and len(t) > 1]
+    return frozenset(tokens)
+
+
+def _jaccard(a: frozenset[str], b: frozenset[str]) -> float:
+    """Jaccard similarity between two token sets."""
+    if not a and not b:
+        return 1.0
+    if not a or not b:
+        return 0.0
+    return len(a & b) / len(a | b)
+
+
+@dataclass(frozen=True)
+class FactMatchResult:
+    """Result of matching two fact lists with code-first + fuzzy-fallback."""
+    overlap: int
+    only_in_a: list[FactSample]
+    only_in_b: list[FactSample]
+    fuzzy_matches: int  # how many of the overlap came from Stage 2 fuzzy
+
+
+def match_fact_lists(
+    facts_a: dict[tuple, FactSample],
+    facts_b: dict[tuple, FactSample],
+    *,
+    fuzzy_threshold: float = 0.5,
+) -> FactMatchResult:
+    """Two-stage match: code-first, then fuzzy display-token Jaccard.
+
+    Stage 1: exact code match. Facts with matching (lowercase) code are
+    paired; any tuple-key (display, code) where both sides share the same
+    non-empty code counts as a match regardless of display variance.
+
+    Stage 2: for unmatched facts, try Jaccard token-overlap on
+    aggressively-normalized display. Threshold parameterized; default 0.5.
+    Only code-less facts are eligible for Stage 2 — code-bearing facts that
+    didn't match in Stage 1 have different authoritative identities and must
+    not be fuzzy-matched on display text alone.
+
+    A fact is matched at most once (no double-counting). The function
+    returns counts plus sample lists of unmatched facts on each side
+    (for later display in compare/eval reports).
+    """
+    # Build code → sample lookup
+    by_code_a: dict[str, FactSample] = {}
+    no_code_a: list[FactSample] = []
+    for (disp_norm, code_norm), sample in facts_a.items():
+        if code_norm:
+            by_code_a[code_norm] = sample
+        else:
+            no_code_a.append(sample)
+    by_code_b: dict[str, FactSample] = {}
+    no_code_b: list[FactSample] = []
+    for (disp_norm, code_norm), sample in facts_b.items():
+        if code_norm:
+            by_code_b[code_norm] = sample
+        else:
+            no_code_b.append(sample)
+
+    # Stage 1: code matches
+    common_codes = set(by_code_a) & set(by_code_b)
+    matched_a_ids: set[int] = set()
+    matched_b_ids: set[int] = set()
+    overlap = 0
+    for code in common_codes:
+        matched_a_ids.add(id(by_code_a[code]))
+        matched_b_ids.add(id(by_code_b[code]))
+        overlap += 1
+
+    # Unmatched residue — only code-less facts are eligible for Stage 2.
+    # Code-bearing facts that didn't match in Stage 1 have different authoritative
+    # identities and should NOT be fuzzy-matched on display text alone.
+    residue_a_coded = [
+        s for s in by_code_a.values()
+        if id(s) not in matched_a_ids
+    ]
+    residue_b_coded = [
+        s for s in by_code_b.values()
+        if id(s) not in matched_b_ids
+    ]
+    residue_a = list(no_code_a)
+    residue_b = list(no_code_b)
+
+    # Stage 2: fuzzy match via Jaccard — code-less facts only
+    fuzzy_matches = 0
+    for sa in list(residue_a):
+        tokens_a = _normalize_display_tokens(sa.display)
+        if not tokens_a:
+            continue
+        best_score = 0.0
+        best_b = None
+        for sb in residue_b:
+            score = _jaccard(tokens_a, _normalize_display_tokens(sb.display))
+            if score > best_score:
+                best_score = score
+                best_b = sb
+        if best_b is not None and best_score >= fuzzy_threshold:
+            residue_a.remove(sa)
+            residue_b.remove(best_b)
+            overlap += 1
+            fuzzy_matches += 1
+
+    return FactMatchResult(
+        overlap=overlap,
+        only_in_a=residue_a_coded + residue_a,
+        only_in_b=residue_b_coded + residue_b,
+        fuzzy_matches=fuzzy_matches,
+    )
 
 
 def compare_runs(
@@ -69,7 +210,7 @@ def compare_runs(
     all_types = sorted(set(counts_a) | set(counts_b))
     counts_delta = {t: counts_b.get(t, 0) - counts_a.get(t, 0) for t in all_types}
 
-    overlap, only_a, only_b = _fact_diff(bundle_a, bundle_b, fact_sample_cap)
+    overlap, only_a, only_b, fuzzy_counts = _fact_diff(bundle_a, bundle_b, fact_sample_cap)
 
     bundle_shape_a = _read_optional_json(a_dir / "bundle_shape.json", default={})
     bundle_shape_b = _read_optional_json(b_dir / "bundle_shape.json", default={})
@@ -89,6 +230,7 @@ def compare_runs(
         fact_only_in_b=only_b,
         bundle_shape_a=bundle_shape_a,
         bundle_shape_b=bundle_shape_b,
+        fuzzy_match_count=fuzzy_counts,
     )
 
 
@@ -104,15 +246,20 @@ def _fact_diff(
     bundle_a: dict,
     bundle_b: dict,
     sample_cap: int,
-) -> tuple[dict[str, int], dict[str, list[FactSample]], dict[str, list[FactSample]]]:
-    """Per-resource-type fact agreement.
+) -> tuple[dict[str, int], dict[str, list[FactSample]], dict[str, list[FactSample]], dict[str, int]]:
+    """Per-resource-type fact agreement using two-stage code-first + fuzzy matching.
 
-    A "fact" is keyed by (resourceType, normalized_display, code) where the
-    code is from the most authoritative coding system per resource type
-    (LOINC for Observations, SNOMED/ICD-10 for Conditions, RxNorm for
-    Medications, CVX for Immunizations, etc.).
+    A "fact" is keyed by (normalized_display, code) where the code is from
+    the most authoritative coding system per resource type (LOINC for
+    Observations, SNOMED/ICD-10 for Conditions, RxNorm for Medications,
+    CVX for Immunizations, etc.).
 
-    Returns (overlap_counts, only_in_a_samples, only_in_b_samples).
+    Stage 1: exact code match — facts sharing the same non-empty code match
+    regardless of display variance.
+    Stage 2: Jaccard token-overlap on aggressively-normalized display text
+    for facts unmatched after Stage 1.
+
+    Returns (overlap_counts, only_in_a_samples, only_in_b_samples, fuzzy_counts).
     """
     facts_a = _extract_fact_keys(bundle_a)
     facts_b = _extract_fact_keys(bundle_b)
@@ -120,20 +267,21 @@ def _fact_diff(
     overlap: dict[str, int] = {}
     only_a: dict[str, list[FactSample]] = {}
     only_b: dict[str, list[FactSample]] = {}
+    fuzzy_counts: dict[str, int] = {}
 
     all_types = set(facts_a) | set(facts_b)
     for rt in sorted(all_types):
         keys_a = facts_a.get(rt, {})
         keys_b = facts_b.get(rt, {})
-        common = set(keys_a) & set(keys_b)
-        a_only = set(keys_a) - set(keys_b)
-        b_only = set(keys_b) - set(keys_a)
-        overlap[rt] = len(common)
-        if a_only:
-            only_a[rt] = [keys_a[k] for k in list(a_only)[:sample_cap]]
-        if b_only:
-            only_b[rt] = [keys_b[k] for k in list(b_only)[:sample_cap]]
-    return overlap, only_a, only_b
+        result = match_fact_lists(keys_a, keys_b)
+        overlap[rt] = result.overlap
+        if result.only_in_a:
+            only_a[rt] = result.only_in_a[:sample_cap]
+        if result.only_in_b:
+            only_b[rt] = result.only_in_b[:sample_cap]
+        if result.fuzzy_matches:
+            fuzzy_counts[rt] = result.fuzzy_matches
+    return overlap, only_a, only_b, fuzzy_counts
 
 
 def _extract_fact_keys(bundle: dict) -> dict[str, dict[tuple, FactSample]]:

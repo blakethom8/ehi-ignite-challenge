@@ -932,4 +932,78 @@ This is the loop the user described. Build it and the architecture-experiment wo
 
 ---
 
+## Entry 11 — Ground-truth pipeline (gold standard) + review surface (2026-05-07)
+
+### Mission-critical framing
+
+After the first real PDF run + 3-pipeline comparison, the user surfaced what's now blocking deeper progress: **without a stronger reference, our F1 numbers are misleading and we can't measure pipeline progress honestly.** Today's eval compares against structured siblings (Cedars FHIR JSON for cedars-myhealth) — but those siblings:
+
+- Don't code imaging-narrative findings (toe fracture, sesamoid variants — extracted by our parser, penalized by eval)
+- Don't have specific LOINC codes for IgE allergens (Cedars uses `code.text="class"`)
+- Don't include narrative progress notes at all (the entire Allergy & Immunology Progress Note from pages 22-24)
+
+Every time our parser correctly extracts those, eval penalizes us. The structured sibling is a flawed reference.
+
+User direction: build a **gold-standard pipeline + human-in-the-loop review surface** so we have a high-quality, versioned ground-truth bundle per PDF. This becomes the reference our production pipelines are measured against.
+
+### Three-layer architecture
+
+```
+Layer 1 — Gold-standard extraction pipeline
+  multipass-fhir-gold
+  - Claude Opus 4.7 (not Sonnet)
+  - Extended-thinking mode per pass
+  - Self-consistency: each pass runs 2x, intersect facts
+  - Reviewer agent runs over assembled bundle
+  - Cost ~5-10x production. One-time per PDF.
+
+Layer 2 — Human review surface
+  CLI walks fact-by-fact through gold output
+  ✓ / ✗ / edits each fact, captures provenance
+  Output: data/pdf-lab/ground-truth/<pdf-sha>.json (versioned)
+
+Layer 3 — Eval integration
+  Lab CLI auto-loads ground truth when pdf-sha matches
+  F1 measured against the human-reviewed bundle
+  Vision-wins routed to reviewer for incorporate-or-flag
+```
+
+### Build plan — 8 tasks across 2 steps
+
+**Step 1 — Gold-standard pipeline (this session)**
+
+| ID | Task |
+|---|---|
+| **GOLD-T01** | Register `multipass-fhir-gold` (Opus 4.7 + extended-thinking via AnthropicBackend optional config) |
+| **GOLD-T02** | Self-consistency wrapper — `run_count: int` field on ExtractionPass; runs ≥2 mean each pass executes that many times in parallel, fact-level intersection across runs |
+| **GOLD-T03** | Reviewer agent — meta-pass that reads the assembled Bundle and emits "concerns" onto bundle.meta.extension |
+
+**Step 2 — Review CLI + eval integration (next session)**
+
+| ID | Task |
+|---|---|
+| **REVIEW-T01** | Ground-truth schema + on-disk format (`data/pdf-lab/ground-truth/<pdf-sha>-vN.json`) |
+| **REVIEW-T02** | `lab review --run <id>` CLI — walks each fact, ✓/✗/edit, persists |
+| **REVIEW-T03** | Versioning + audit trail (reviewer, decision, timestamp per fact) |
+| **EVAL-T01** | Lab CLI auto-loads ground-truth when pdf-sha matches |
+| **EVAL-T02** | Vision-wins triage workflow |
+
+### Cost / latency expectations
+
+- Gold pipeline: ~$2-5 per PDF (5-10x production). One-time per PDF.
+- Wall-clock: ~5-15 min.
+- Human review: 30-60 min for first 2-3 PDFs; drops with practice.
+
+### How this connects to deferred work
+
+- **Synthesis layer** (`.claude/synthesis-pass-queue.md`) — gold's reviewer agent does synthesis-style work; may subsume the synthesis queue.
+- **Vision-wins reviewer** (deferred from PDF-LAB-STUDIO) — becomes a use case of the review CLI.
+- **Architecture comparison** (Entry 8) — F1 against verified GT is the real answer.
+
+### Build status
+
+Step 1 dispatching this session via `phase1-builder` from `.claude/gold-standard-queue.md`.
+
+---
+
 *Last updated: 2026-05-07. Working log — append entries with date stamp.*

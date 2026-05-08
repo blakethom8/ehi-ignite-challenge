@@ -4,6 +4,7 @@
     show    — print a single-run markdown summary (LAB-T06)
     list    — list recent runs (LAB-T06)
     report  — generate a paste-able markdown report (LAB-T06)
+    review  — interactively review a run and persist as ground truth (REVIEW-T02)
 
 All subcommands are fully implemented.
 """
@@ -33,6 +34,7 @@ def main(argv: list[str] | None = None) -> int:
     _add_show_parser(subparsers)
     _add_list_parser(subparsers)
     _add_report_parser(subparsers)
+    _add_review_parser(subparsers)
 
     args = parser.parse_args(argv)
 
@@ -46,6 +48,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_list(args)
     if args.cmd == "report":
         return _cmd_report(args)
+    if args.cmd == "review":
+        return _cmd_review(args)
 
     parser.error(f"unknown command: {args.cmd}")
     return 2  # unreachable after parser.error
@@ -221,6 +225,51 @@ def _cmd_report(args: argparse.Namespace) -> int:
             return 2
         print(render_comparison(comparison))
     return 0
+
+
+def _add_review_parser(sub: argparse._SubParsersAction) -> None:  # type: ignore[type-arg]
+    p = sub.add_parser(
+        "review",
+        help="Interactively review a run and persist as ground truth",
+        description="""\
+Walks fact-by-fact through a run's bundle. Per fact:
+  a/accept   keep
+  r/reject   drop
+  e/edit     edit JSON in $EDITOR
+  s/skip     defer (accept on save)
+  q/quit-and-save     save progress, resume later
+  Q/quit-no-save      exit without saving
+
+Result: a versioned ground-truth file at
+data/pdf-lab/ground-truth/<pdf-sha-prefix>/vN.json.
+""",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p.add_argument("--run", required=True, help="Run id to review")
+    p.add_argument("--reviewer", required=True, help="Your name / email / handle (recorded with the GT)")
+    p.add_argument("--notes", default="", help="Optional version notes")
+    p.add_argument("--root", type=Path, default=DEFAULT_LAB_ROOT)
+
+
+def _cmd_review(args: argparse.Namespace) -> int:
+    from lib.extract.lab.review import load_session_for_run, run_review
+    try:
+        session = load_session_for_run(args.run, lab_root=args.root)
+    except FileNotFoundError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    status, version = run_review(
+        session,
+        reviewer=args.reviewer,
+        notes=args.notes,
+        lab_root=args.root,
+    )
+    if status == "completed":
+        return 0
+    if status == "saved-partial":
+        print(f"\n(re-run the same command to resume)", file=sys.stderr)
+        return 0
+    return 0  # discarded — also exit 0
 
 
 def _cmd_run(args: argparse.Namespace) -> int:

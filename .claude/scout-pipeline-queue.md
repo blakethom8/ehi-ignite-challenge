@@ -26,7 +26,7 @@ Validation strategy: register as a parallel pipeline. Bake-off harness compares 
 
 ## SCOUT-T01 · DocumentMap schema + scout pass prompt
 
-- **Status:** Queued
+- **Status:** ✅ Completed `6709017` · 2026-05-07 · 234 tests pass
 - **Goal:** Add a new `DocumentMap` Pydantic schema (extends `DocumentContext`) and a `_DOCUMENT_MAP_PROMPT` constant. Schema captures: existing context fields PLUS per-resource-type presence + page hints + section structure.
 - **Files you may touch:** `lib/extract/pipelines/multipass_fhir.py`, `lib/tests/test_extract/test_document_map.py` (new)
 - **Files you must NOT touch:** anything in `api/`, `app/`, the existing `_PASSES` list (this task is data-shape only), `.claude/scout-pipeline-queue.md`
@@ -167,7 +167,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 
 ## SCOUT-T02 · MultiPassFHIRScoutPipeline class with skip + page-hint dispatcher
 
-- **Status:** Queued
+- **Status:** ✅ Completed `d784b37` · 2026-05-07 · 244 tests pass
 - **Depends on:** SCOUT-T01
 - **Goal:** Register a new pipeline `multipass-fhir-scout` that uses `DocumentMap` to skip absent-resource passes and attach page hints to present passes. Subclass `MultiPassFHIRPipeline` to inherit all the FHIR builders + post-passes.
 

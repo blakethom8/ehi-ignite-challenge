@@ -10,6 +10,7 @@ Best multipass-fhir result on Cedars Health Summary: **F1 0.70** (post-Move H, w
 
 | Date | Move | Subject | Headline result |
 |---|---|---|---|
+| 2026-05-07 | **Y** | Scout-then-specialist pipeline architecture | New parallel pipeline `multipass-fhir-scout` registered behind the `ExtractionPipeline` Protocol. Replaces Pass 0 with a richer document-map pass that returns a routing manifest (per-resource-type presence + page hints + section structure). Specialist passes are dispatched only for present resource types, with prompt-augmented page hints. Same FHIR Bundle output shape — downstream consumers see no difference. Hypothesis: 40-60% cost reduction on sparse docs (lab-only, narrative-only) while holding F1 because page-scoped prompts have higher signal-to-noise. Real measurement deferred until PDF-LAB-STUDIO ships. |
 | 2026-05-07 | **X** | Code-resolution + interpretation + clinical-category post-passes | Three deterministic post-passes after multipass extraction. **LOINC coverage 0% → 100%** on the Function Health 2025-11-19 PDF (58/58 tests resolve via curated table). Interpretation flag derived from value vs reference range when extraction didn't print one. Clinical category (Metabolic / Kidney / Liver / etc.) attached as extension. Closes the visible parity gap with Function Health's parser. |
 | 2026-05-05 | **W** | Published workspace downstream read facade | Active published workspace snapshots now feed `/api/patients/{id}/...` so FHIR Charts, raw FHIR, Care Journey, and Clinical Insights work for uploaded workspaces. |
 | 2026-05-03 | **V** | Responsive breakpoints on the 6 merged-record tables | Targeted column-hiding at sm/md/lg per table. No more horizontal scrollbar on narrow viewports. Closes the harmonize feature's polish loop. |
@@ -59,6 +60,47 @@ Pipeline framework + eval harness shipped 2026-05-03 (commits: pipeline Protocol
 ```
 
 Each entry should be 200–500 words. Tables and code snippets welcome. **Honesty about negative results matters as much as wins** — knowing what *didn't* work prevents future re-litigation.
+
+---
+
+## 2026-05-07 · Move Y — scout-then-specialist pipeline architecture
+
+**Agent:** Claude (Opus 4.7)
+
+**What:** Registered a new pipeline `multipass-fhir-scout` (architecture: scout-then-specialist) as a parallel option behind the `ExtractionPipeline` Protocol. It subclasses `MultiPassFHIRPipeline` and diverges in two ways:
+
+1. **Pass 0 returns a routing manifest, not just doc context.** New `DocumentMap` schema (extends `DocumentContext`) adds a `presence: dict[pass_name, ResourcePresence]` field where each `ResourcePresence` captures `{present: bool, pages: list[int], section_hint: str | None}`. The new `_DOCUMENT_MAP_PROMPT` instructs the model to scan the PDF and produce this manifest conservatively (mark `present=true` only when content is clearly there).
+
+2. **Specialist passes are filtered + page-hinted at dispatch time.** A new `_augmented_passes(doc_map)` helper iterates `_PASSES`, drops any pass whose resource type the manifest marks absent, and attaches page hints + section hints to the surviving passes' system prompts. Cache keys get a `+scout` prompt-version suffix so they don't collide with the default pipeline's cache.
+
+The output FHIR Bundle is the same shape as the default `multipass-fhir`. Downstream consumers — `api/core/harmonize_service.py`, `lib/harmonize/`, the React frontend — see no difference. The bake-off harness will compare cost / latency / F1 once PDF-LAB-STUDIO ships.
+
+**Why:** The Cedars MyHealth review (`pdf-review/cedars-myhealth/notes.md`) made the cost waste visible. Cedars MyHealth is 25 pages with sparse coverage:
+
+- Vital signs only on page 2 (1 page out of 25 = 4% coverage)
+- Allergen panels on pages 3-19 (17 pages = 68%)
+- Clinical notes only on pages 22-24 (3 pages = 12%)
+- Patient demographics on pages 1, 20, 25 (3 pages = 12%)
+- Insurance on page 25 (1 page = 4%)
+
+Today every specialist pass runs against all 25 pages regardless. The clinical_notes pass sees 22 pages of irrelevant content; the vital_signs pass sees 24 pages of irrelevant content. **At 13 specialist passes, we're sending the same PDF to the LLM 13 times for content that's mostly absent.**
+
+The hypothesis: a beefed-up scout pass that produces a routing manifest can (a) skip absent-resource passes entirely (cuts cost ~40-60% on sparse docs) and (b) page-scope prompts for present resources (improves signal-to-noise → expected F1 lift on tabular passes).
+
+**Architectural decision:** new pipeline registered alongside the default — not a replacement. The `ExtractionPipeline` Protocol supports multiple architectures coexisting (`PDF-PROCESSOR.md` Decision 5). Same pattern as `multipass-fhir-gemma-tabular`. The bake-off picks the winner per-PDF or per-source.
+
+**Implementation cleanness:** the parent `MultiPassFHIRPipeline` was refactored to expose four small overridable methods (`_pass_0_prompt`, `_pass_0_schema`, `_doc_context_from_pass_0`, `_specialist_passes`). The scout subclass overrides each. Zero changes to the concurrency machinery, the merger, or the post-passes (LOINC, interpretation, clinical-category, encounter linkage, patient-reference rewrite). All 234 pre-existing tests pass unchanged.
+
+**Cache implications:** the `+scout` prompt-version suffix ensures the scout pipeline doesn't share cache entries with the default. Re-running a PDF through both pipelines cleanly extracts twice, no cache poisoning.
+
+**What's deferred (intentionally):**
+- **End-to-end measurement on real PDFs.** The pipeline is registered and unit-tested but hasn't been run against a real PDF yet. That requires a live LLM call (and ground truth to score against). Belongs in PDF-LAB-STUDIO.
+- **Adaptive thresholding.** When the scout marks `present=true` with low confidence, should we still run the pass? Defer until we have data.
+- **Multi-PDF measurement.** Cedars MyHealth is the canonical sparse doc; Function Health 2025-11-19 is dense. Both should be in the bake-off corpus.
+
+**Tests:** 16 new (6 in `test_document_map.py`, 10 in `test_scout_pipeline.py`). Total: 244 passing in the test_extract scope.
+
+**Next:** PDF-LAB-STUDIO build (separate stream) so we can measure cost/F1 against the default and decide whether to promote `multipass-fhir-scout` to the default for sparse-doc workflows.
 
 ---
 

@@ -720,4 +720,94 @@ The user direction is "carry out the build for me." Sequencing:
 
 ---
 
+## Entry 9 — Bidirectional scouts + synthesis layer + testing-platform escalation (2026-05-07)
+
+After Entry 8 + the scout-pipeline build shipped, three new product/architecture instincts surfaced from review. Captured here.
+
+### Idea 1 — Bidirectional scouts with reconciliation
+
+**Hypothesis:** scanning the same PDF with different framings might surface different content. Reconciling the two scout outputs gives:
+- A union (catch what either finds — broader coverage, more permissive)
+- An intersection (only high-confidence overlap — tighter precision)
+- A disagreement signal (sections one scout flags but the other doesn't — uncertainty surface for human review)
+
+**Implementation note on "top-down vs bottom-up":** vision LLMs process pages in parallel, so literal directional traversal doesn't change attention patterns the way it would for a human reader. The actual signal comes from **prompt framing variation**:
+- Scout A: "What clinical EVENTS does this document describe?" (encounter + narrative-focused)
+- Scout B: "What DATA TABLES and structured fields does this document contain?" (lab/structured-focused)
+
+Different framings probe different content types. Trying the literal direction first as the simpler experiment is fine — the failure mode (no meaningful difference) is itself informative and falsifiable.
+
+**Cost:** 2× Pass 0 (cheap relative to the 12+ specialist passes). The reconciled DocumentMap drives the same dispatch logic as the single-scout pipeline.
+
+**Build scope:** new pipeline `multipass-fhir-bidi-scout` registered alongside `multipass-fhir-scout`. ~3 builder tasks. Building this session.
+
+### Idea 2 — Synthesis layer (Patient Narrative + augmentations)
+
+**The architectural shift this implies:** today the pipeline EXTRACTS facts. The user is intuiting that we should also PRODUCE understanding — not as a replacement, but as an additional layer downstream of the structured Bundle.
+
+Synthesis output candidates:
+- **Patient Narrative** — chronological summary of key events, patterns, themes; emitted as a `Composition` resource (one-section-per-theme) with category distinct from clinical-notes Compositions
+- **Acuity periods** — date ranges of high care intensity (multiple visits, lab abnormalities clustering, medication changes)
+- **Care episodes** — medication courses, condition trajectories, recurring care relationships
+- **Time-series summaries** — per-LOINC trend descriptors ("HbA1c rising 5.2 → 5.7 → 5.9 over 18 months")
+- **Pre-computed Q&A targets** — common questions a downstream agent would ask, answered against the bundle ("what's the diabetes status?", "is renal function declining?")
+
+**Why this matters:** the Clinical Insights chat surface today rebuilds patient understanding from individual FHIR resources every conversation. A synthesis layer pre-computes that understanding once, making downstream agents both faster and more consistent.
+
+**Architectural pattern this introduces:** *consumer passes*. The 13 specialist passes today are PRODUCERS — they take a PDF and emit FHIR resources. A synthesis pass is a CONSUMER — it takes the assembled Bundle and emits derived insights. Different lifecycle (runs once after all producers complete), different cache key (depends on the hash of the merged bundle, not the PDF), different output shape (qualitative narrative + structured indexes).
+
+**Build scope:** scoped in `.claude/synthesis-pass-queue.md` but **deferred** — needs product-side input on:
+- What downstream surfaces consume the narrative? (Clinical Insights chat, patient journey UI, others?)
+- What's the right output schema? FHIR Composition? Custom JSON? Both?
+- How do we evaluate qualitative output? (Probably rubric-based human grading; can't F1 a narrative.)
+
+These are real product questions, not implementation choices. Better to settle them before writing the prompt.
+
+### Idea 3 — Augmenting data for downstream agent usability
+
+The user's instinct: "we have the opportunity to augment data from these to make them more 'usable' for downstream agents." This is exactly right and partially overlaps with synthesis.
+
+Beyond the synthesis layer above, augmentations could include:
+- **Provenance graph indexing** — pre-built lookups: "every fact derived from page X", "every fact contributed by source Y"
+- **Cross-reference resolution** — denormalize Patient/Encounter/Practitioner references so consumers don't have to walk the graph
+- **Episode segmentation** — group medication doses into courses, lab values into trends, conditions into trajectories
+- **Confidence summaries** — bundle-level stats on extraction confidence (LOINC resolution rate, fuzzy matches, missing dates)
+
+These are smaller per-augmentation than synthesis but cumulatively important. They go in the same lifecycle bucket as synthesis (consumer passes).
+
+### Testing platform — the escalation
+
+With 4 pipelines today (`multipass-fhir`, `multipass-fhir-gemma-tabular`, `multipass-fhir-scout`, `single-pass-vision`) and now 5–6 emerging (`multipass-fhir-bidi-scout`, eventually a synthesis-augmented variant), the testing platform we scoped at `.claude/pdf-lab-studio-queue.md` needs a deeper pass before it gets built.
+
+The current scope is shaped around:
+- Bring-your-own-PDF + run pipeline matrix
+- Comparison view with F1 + provenance click-through
+- Vision-wins reviewer for "extras"
+- Cost/latency tracking
+
+What the architecture richness now demands:
+
+| Capability | Why we need it |
+|---|---|
+| **N-way pipeline comparison** (not just A vs B) | We're approaching 6 pipelines. Cross-product F1 matrix. |
+| **Multi-agent disagreement surface** | When bidirectional scouts disagree, that's a feature, not noise. UI must surface and triage. |
+| **Per-pass trace diff** | When pipeline X finds a fact and Y doesn't, click through to see WHY (different prompt? different model? different page hint? hallucinated by one?) |
+| **Narrative quality grading** | Rubric-based human-graded eval for synthesis outputs. F1 doesn't apply. |
+| **Cost-quality Pareto curves** | Plot F1 × cost across pipelines. The honest decision is rarely "highest F1"; it's "best F1 for the cost." |
+| **Failure-mode taxonomy** | When extraction is wrong, classify the failure (hallucinated / missed / mis-coded / mis-attributed-encounter / wrong-patient-link). The set of failure modes IS bigger now with cross-resource linkage in play. |
+| **Bundle-shape assertions** | Beyond F1: patient-uniqueness, encounter-link-rate, narrative-fidelity score, identity-uniqueness for Practitioner/Org. Per-bundle scorecard. |
+| **Reproducibility via cached LLM responses** | When testing changes, we shouldn't re-bill the API. The existing cache layer handles this for production extraction; the test bench needs the same discipline. |
+
+This is a meaningful expansion to the queue file scope. Won't update it this session — better as the first task of the PDF-LAB-STUDIO build session, when we can scope each capability against the actual UI it lives in.
+
+### What's shipping in this session
+
+1. **Bidirectional-scout pipeline** (`multipass-fhir-bidi-scout`) — 3 builder tasks. The architecture experiment.
+2. **Synthesis-pass queue file** scoped but not built. Awaits product input.
+3. **Testing-platform implications** captured here for the PDF-LAB-STUDIO scope expansion.
+
+Synthesis + testing platform = next session(s).
+
+---
+
 *Last updated: 2026-05-07. Working log — append entries with date stamp.*

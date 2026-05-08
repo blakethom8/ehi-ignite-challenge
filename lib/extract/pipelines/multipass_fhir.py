@@ -3269,7 +3269,22 @@ class MultiPassFHIRScoutPipeline(MultiPassFHIRPipeline):
         Returns new ExtractionPass instances (NOT modifying the original _PASSES)
         with prompt_version suffixed "+scout" so the cache key for the
         augmented prompt is distinct from the default pipeline's cache.
+
+        Defensive fallback — when presence is empty (the LLM didn't fill in the
+        routing manifest, or every key is absent), skipping ALL specialist
+        passes would silently produce a zero-entry bundle. That's a worse
+        failure than running everything. So an empty / no-True presence
+        falls through to the full _PASSES list (no page hints, no skipping).
+        Observed in practice on the cedars-myhealth run with the events-flavor
+        scout prompt — `presence` came back as `{}`.
         """
+        anything_present = any(
+            (rp is not None and rp.present)
+            for rp in doc_map.presence.values()
+        )
+        if not anything_present:
+            return list(_PASSES)
+
         augmented: list[ExtractionPass] = []
         for original in _PASSES:
             presence = doc_map.presence.get(original.name)  # type: ignore[arg-type]

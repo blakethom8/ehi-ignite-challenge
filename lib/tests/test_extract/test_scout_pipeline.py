@@ -131,8 +131,15 @@ def test_augmented_passes_preserves_pass_metadata() -> None:
     assert aug.prompt_version == f"{original.prompt_version}+scout"
 
 
-def test_augmented_passes_when_all_absent_returns_empty() -> None:
-    """_augmented_passes returns [] when no resource is marked present=True."""
+def test_augmented_passes_when_all_absent_falls_back_to_all_passes() -> None:
+    """Defensive fallback: when no resource is marked present=True, the
+    scout's manifest is uninformative — falling back to running ALL passes
+    is much better than silently emitting a zero-entry bundle.
+
+    Discovered live on the cedars-myhealth run: the events-flavor scout
+    returned `presence: {}`, the dispatcher would have skipped all
+    specialists, and we'd get bundle.entry == [] with no error. This
+    fallback prevents that silent failure mode."""
     pipeline = _new_scout_pipeline()
     doc_map = DocumentMap(
         document_type="other",
@@ -143,15 +150,39 @@ def test_augmented_passes_when_all_absent_returns_empty() -> None:
         },
     )
     result = pipeline._augmented_passes(doc_map)
-    assert result == []
+    # Fall back to the full _PASSES list (no skipping, no page hints)
+    assert len(result) == len(_PASSES)
+    assert {p.name for p in result} == {p.name for p in _PASSES}
 
 
-def test_augmented_passes_when_presence_dict_empty_returns_empty() -> None:
-    """_augmented_passes returns [] when presence dict has no entries at all."""
+def test_augmented_passes_when_presence_dict_empty_falls_back_to_all_passes() -> None:
+    """Empty presence dict: same defensive fallback as the all-absent case.
+    The LLM didn't fill in the manifest at all — running every pass is the
+    safe behavior."""
     pipeline = _new_scout_pipeline()
     doc_map = DocumentMap(document_type="other")
     result = pipeline._augmented_passes(doc_map)
-    assert result == []
+    assert len(result) == len(_PASSES)
+    assert {p.name for p in result} == {p.name for p in _PASSES}
+
+
+def test_augmented_passes_partial_presence_skips_absent_only() -> None:
+    """When SOME resources are marked present=True (manifest is informative),
+    the dispatcher trusts it and skips the absent ones. Fallback only kicks
+    in when the manifest provides NO useful signal."""
+    pipeline = _new_scout_pipeline()
+    doc_map = DocumentMap(
+        document_type="other",
+        presence={
+            "vital_signs": ResourcePresence(present=True),
+            "medications": ResourcePresence(present=False),
+            "conditions": ResourcePresence(present=False),
+        },
+    )
+    result = pipeline._augmented_passes(doc_map)
+    # Only vital_signs is present — should NOT fall back to all 13
+    assert len(result) == 1
+    assert result[0].name == "vital_signs"
 
 
 def test_augmented_passes_does_not_mutate_original_passes() -> None:

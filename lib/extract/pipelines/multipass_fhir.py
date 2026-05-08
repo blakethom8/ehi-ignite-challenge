@@ -1222,6 +1222,48 @@ class MultiPassFHIRPipeline:
         self._max_workers = max_workers
         self._cache = ExtractionCache()
 
+    # ------------------------------------------------------------------
+    # Pass 0 hook points — override in subclasses to swap schema/prompt
+    # ------------------------------------------------------------------
+
+    def _pass_0_prompt(self) -> str:
+        """Return the system prompt for Pass 0 (document context).
+
+        Subclasses may override to return a richer prompt (e.g.
+        ``_DOCUMENT_MAP_PROMPT`` for the scout pipeline).
+        """
+        return _PASS_0_PROMPT
+
+    def _pass_0_schema(self) -> Type[BaseModel]:
+        """Return the Pydantic schema class for Pass 0.
+
+        Subclasses may override to return a richer schema (e.g.
+        ``DocumentMap`` for the scout pipeline).
+        """
+        return DocumentContext
+
+    def _doc_context_from_pass_0(self, pass_0_output: BaseModel) -> DocumentContext:
+        """Convert Pass 0 output to a :class:`DocumentContext`.
+
+        The base implementation returns the output unchanged — it is
+        already a ``DocumentContext``.  Subclasses that emit a richer
+        type (e.g. ``DocumentMap``) must override this to return the
+        narrowed ``DocumentContext`` view while stashing any extra data
+        they need for dispatch.
+        """
+        return pass_0_output  # type: ignore[return-value]
+
+    def _specialist_passes(self, doc_context: DocumentContext) -> list[ExtractionPass]:
+        """Return the list of per-resource passes to dispatch.
+
+        The base implementation returns ``_PASSES`` unchanged.
+        Subclasses may override to filter or augment the list based on
+        ``doc_context`` (e.g. the scout pipeline uses the manifest from
+        a ``DocumentMap`` to skip absent resource types and augment
+        prompts with page hints).
+        """
+        return _PASSES
+
     def extract(
         self,
         pdf_path: Path,
@@ -1232,16 +1274,19 @@ class MultiPassFHIRPipeline:
         pdf_bytes = pdf_path.read_bytes()
         pdf_hash = hash_file(pdf_path)
 
-        # Pass 0 — document context
-        doc_context = self._run_pass(
+        # Pass 0 — document context (schema/prompt resolved via hook methods
+        # so subclasses can swap in richer types without re-implementing the
+        # full extract() method).
+        pass_0_raw = self._run_pass(
             pass_name="document_context",
-            schema=DocumentContext,
-            system_prompt=_PASS_0_PROMPT,
+            schema=self._pass_0_schema(),
+            system_prompt=self._pass_0_prompt(),
             pdf_bytes=pdf_bytes,
             pdf_hash=pdf_hash,
             skip_cache=skip_cache,
             extra_user_text=None,
         )
+        doc_context = self._doc_context_from_pass_0(pass_0_raw)
 
         # Build context-augmented prompt suffix for the rest of the passes
         context_suffix = (
@@ -1256,7 +1301,10 @@ class MultiPassFHIRPipeline:
             f"--- end context ---"
         )
 
-        # Per-resource passes — parallel
+        # Per-resource passes — parallel.  The pass list is resolved via
+        # _specialist_passes() so subclasses can filter or augment without
+        # re-implementing the concurrency machinery.
+        active_passes = self._specialist_passes(doc_context)
         per_pass_outputs: dict[str, BaseModel] = {}
         with ThreadPoolExecutor(max_workers=self._max_workers) as pool:
             futures = {
@@ -1272,7 +1320,7 @@ class MultiPassFHIRPipeline:
                     prompt_version=p.prompt_version,
                     schema_version=p.schema_version,
                 ): p
-                for p in _PASSES
+                for p in active_passes
             }
             for future in as_completed(futures):
                 p = futures[future]
@@ -2744,3 +2792,104 @@ class MultiPassFHIRGemmaTabularPipeline(MultiPassFHIRPipeline):
                 },
             },
         )
+
+
+@register
+class MultiPassFHIRScoutPipeline(MultiPassFHIRPipeline):
+    """multipass-fhir variant: scout-then-specialist architecture.
+
+    Pass 0 is replaced with a richer "document_map" pass that returns a
+    routing manifest (which resource types are present, on which pages).
+    Specialist passes are dispatched ONLY for resource types the manifest
+    says are present, AND each prompt is augmented with page hints from
+    the manifest.
+
+    Output is the same FHIR Bundle shape as multipass-fhir — downstream
+    consumers see no difference. The bake-off compares cost/latency/F1
+    on real PDFs.
+
+    Hypothesis (per docs/daily/2026-05-07-ClaudeCode.md Entry 8):
+    cuts cost 40-60% on sparse docs (lab-only, narrative-only) while
+    holding F1 because page-scoped prompts have higher signal-to-noise.
+    """
+
+    metadata = PipelineMetadata(
+        name="multipass-fhir-scout",
+        description=(
+            "Scout-then-specialist variant. A document_map pass replaces "
+            "Pass 0 and produces a routing manifest; specialist passes "
+            "are dispatched only for present resource types, with "
+            "page-scoped prompt hints. Same FHIR Bundle output shape."
+        ),
+        architecture="scout-then-specialist",
+        primary_backends=["anthropic"],
+        estimated_cost_per_pdf_usd=0.18,  # ~40% lower estimate; bake-off will measure
+    )
+
+    # The routing manifest from Pass 0 is stashed here during extract() so
+    # _specialist_passes() can read it.  Reset at the start of each run.
+    _doc_map: DocumentMap | None = None
+
+    def _pass_0_prompt(self) -> str:
+        """Use the richer document_map prompt instead of the base pass-0 prompt."""
+        return _DOCUMENT_MAP_PROMPT
+
+    def _pass_0_schema(self) -> Type[BaseModel]:
+        """Use DocumentMap schema for Pass 0 (superset of DocumentContext)."""
+        return DocumentMap
+
+    def _doc_context_from_pass_0(self, pass_0_output: BaseModel) -> DocumentContext:
+        """Stash the full DocumentMap for the dispatch loop; return its
+        DocumentContext view so the parent's context_suffix logic stays intact."""
+        assert isinstance(pass_0_output, DocumentMap)
+        self._doc_map = pass_0_output
+        # DocumentMap IS-A DocumentContext (via inheritance) — return as-is
+        return pass_0_output
+
+    def _specialist_passes(self, doc_context: DocumentContext) -> list[ExtractionPass]:
+        """Filter _PASSES to only the resource types the manifest marks present,
+        and augment each surviving pass's prompt with page hints + section hints.
+
+        Falls back to the full _PASSES list if no manifest is available
+        (e.g. the pipeline is used in a context that bypasses extract()).
+        """
+        if self._doc_map is None:
+            return _PASSES
+        return self._augmented_passes(self._doc_map)
+
+    def _augmented_passes(self, doc_map: DocumentMap) -> list[ExtractionPass]:
+        """Filter _PASSES to ones the document_map says are present, and
+        augment each pass's system_prompt with page hints from the manifest.
+
+        Returns new ExtractionPass instances (NOT modifying the original _PASSES)
+        with prompt_version suffixed "+scout" so the cache key for the
+        augmented prompt is distinct from the default pipeline's cache.
+        """
+        augmented: list[ExtractionPass] = []
+        for original in _PASSES:
+            presence = doc_map.presence.get(original.name)  # type: ignore[arg-type]
+            if presence is None or not presence.present:
+                continue  # skip absent resource types
+            # Augment prompt with page hints + section hint
+            hint_lines: list[str] = []
+            if presence.pages:
+                hint_lines.append(
+                    f"\n\nThis content is on page(s) {sorted(set(presence.pages))}."
+                )
+            if presence.section_hint:
+                hint_lines.append(
+                    f"Look for the section labeled '{presence.section_hint}'."
+                )
+            new_prompt = original.system_prompt + "".join(hint_lines)
+            augmented.append(
+                ExtractionPass(
+                    name=original.name,
+                    schema=original.schema,
+                    system_prompt=new_prompt,
+                    prompt_version=f"{original.prompt_version}+scout",
+                    schema_version=original.schema_version,
+                    backend_name=original.backend_name,
+                    model=original.model,
+                )
+            )
+        return augmented

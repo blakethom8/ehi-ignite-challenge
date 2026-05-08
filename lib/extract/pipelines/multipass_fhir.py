@@ -182,6 +182,32 @@ class LabObservationExtraction(BaseModel):
     observations: list[LabObservationEntry] = Field(default_factory=list)
 
 
+class VitalSignEntry(BaseModel):
+    vital_type: Literal[
+        "blood-pressure-systolic",
+        "blood-pressure-diastolic",
+        "heart-rate",
+        "body-temperature",
+        "respiratory-rate",
+        "oxygen-saturation",
+        "body-weight",
+        "body-height",
+        "bmi",
+    ] = Field(..., description="Standardized vital-sign type")
+    value: float | None = None
+    unit: str | None = Field(None, description="UCUM unit if applicable")
+    reference_range_low: float | None = None
+    reference_range_high: float | None = None
+    flag: Literal["H", "L", "N", "HH", "LL", "A"] | None = None
+    effective_date: str | None = Field(None, description="ISO 8601 if printed")
+    page: int | None = None
+    source_text: str | None = None
+
+
+class VitalSignExtraction(BaseModel):
+    vital_signs: list[VitalSignEntry] = Field(default_factory=list)
+
+
 # ---------------------------------------------------------------------------
 # Pass definitions — declarative table of what runs and how
 # ---------------------------------------------------------------------------
@@ -333,6 +359,23 @@ Rules:
   an empty list."""
 
 
+_VITAL_SIGNS_PROMPT = """You are extracting vital-sign measurements from a
+medical document.
+
+Rules:
+- Extract vital signs from any "Vital Signs" / "Last Filed Vital Signs" /
+  "Last Vital Signs" table or row in the document.
+- For Blood Pressure (e.g. "119/71"), emit TWO entries:
+  one with vital_type="blood-pressure-systolic" value=119,
+  one with vital_type="blood-pressure-diastolic" value=71.
+- Use UCUM units: mm[Hg] for blood pressure, /min for heart rate and
+  respiratory rate, Cel for Celsius, %{Saturation} for O2 sat, kg for
+  weight, cm for height, kg/m2 for BMI.
+- effective_date is the date the vital was taken if shown; ISO 8601.
+- Don't extract vitals merely referenced in narrative without a value.
+- If no vital-signs section is present, return an empty list."""
+
+
 _PASSES: list[ExtractionPass] = [
     ExtractionPass(
         name="conditions",
@@ -369,6 +412,13 @@ _PASSES: list[ExtractionPass] = [
         system_prompt=_LAB_OBSERVATIONS_PROMPT,
         prompt_version="v1",
     ),
+    ExtractionPass(
+        name="vital_signs",
+        schema=VitalSignExtraction,
+        system_prompt=_VITAL_SIGNS_PROMPT,
+        prompt_version="v1",
+        schema_version="v1",
+    ),
 ]
 
 
@@ -379,6 +429,18 @@ _PASSES: list[ExtractionPass] = [
 
 _PROMPT_VERSION = "multipass-v0.1.0"
 _SCHEMA_VERSION = "multipass-v0.1.0"
+
+_VITAL_LOINC_MAP: dict[str, tuple[str, str]] = {
+    "blood-pressure-systolic": ("8480-6", "Systolic blood pressure"),
+    "blood-pressure-diastolic": ("8462-4", "Diastolic blood pressure"),
+    "heart-rate": ("8867-4", "Heart rate"),
+    "body-temperature": ("8310-5", "Body temperature"),
+    "respiratory-rate": ("9279-1", "Respiratory rate"),
+    "oxygen-saturation": ("2708-6", "Oxygen saturation in Arterial blood"),
+    "body-weight": ("29463-7", "Body weight"),
+    "body-height": ("8302-2", "Body height"),
+    "bmi": ("39156-5", "Body mass index (BMI)"),
+}
 
 
 @register
@@ -647,6 +709,13 @@ class MultiPassFHIRPipeline:
                         clinical_category=clinical_categories.get(id(o)),
                     )
                 }
+            )
+
+        # Vital Signs
+        vs_extraction: VitalSignExtraction = per_pass.get("vital_signs") or VitalSignExtraction()
+        for vs in vs_extraction.vital_signs:
+            entries.append(
+                {"resource": self._vital_sign_to_fhir(vs, common_meta_template, layout, doc_context)}
             )
 
         bundle: dict[str, Any] = {
@@ -1034,6 +1103,67 @@ class MultiPassFHIRPipeline:
             ]
         if o.effective_date:
             resource["effectiveDateTime"] = o.effective_date
+        elif doc_context.encounter_date:
+            resource["effectiveDateTime"] = doc_context.encounter_date
+        return resource
+
+    def _vital_sign_to_fhir(
+        self,
+        vs: VitalSignEntry,
+        common_meta: dict[str, Any],
+        layout,
+        doc_context: DocumentContext,
+    ) -> dict[str, Any]:
+        bbox_locator = self._bbox_locator_for(vs.source_text, vs.page, layout)
+        loinc_code, loinc_display = _VITAL_LOINC_MAP[vs.vital_type]
+        resource: dict[str, Any] = {
+            "resourceType": "Observation",
+            "subject": {"reference": f"Patient/{self._patient_id}"},
+            "status": "final",
+            "category": [
+                {
+                    "coding": [
+                        {
+                            "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                            "code": "vital-signs",
+                            "display": "Vital Signs",
+                        }
+                    ]
+                }
+            ],
+            "code": {
+                "text": loinc_display,
+                "coding": [{"system": "http://loinc.org", "code": loinc_code, "display": loinc_display}],
+            },
+            "meta": self._add_bbox_to_meta(common_meta, bbox_locator),
+        }
+        if vs.value is not None:
+            resource["valueQuantity"] = {
+                "value": vs.value,
+                "unit": vs.unit or "",
+                "system": "http://unitsofmeasure.org",
+                "code": vs.unit or "",
+            }
+        if vs.reference_range_low is not None or vs.reference_range_high is not None:
+            rr: dict[str, Any] = {}
+            if vs.reference_range_low is not None:
+                rr["low"] = {"value": vs.reference_range_low, "unit": vs.unit or ""}
+            if vs.reference_range_high is not None:
+                rr["high"] = {"value": vs.reference_range_high, "unit": vs.unit or ""}
+            resource["referenceRange"] = [rr]
+        if vs.flag:
+            resource["interpretation"] = [
+                {
+                    "coding": [
+                        {
+                            "system": "http://terminology.hl7.org/CodeSystem/v3-ObservationInterpretation",
+                            "code": vs.flag,
+                        }
+                    ]
+                }
+            ]
+        if vs.effective_date:
+            resource["effectiveDateTime"] = vs.effective_date
         elif doc_context.encounter_date:
             resource["effectiveDateTime"] = doc_context.encounter_date
         return resource

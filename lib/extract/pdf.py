@@ -261,6 +261,80 @@ class AnthropicBackend:
 
         return raw_input
 
+    def call_with_schema(
+        self,
+        *,
+        system_prompt: str,
+        user_prompt: str,
+        schema: type[T],
+        max_tokens: int = 8192,
+    ) -> T:
+        """Text-only structured call — no PDF bytes required.
+
+        Uses the same ``emit_extraction`` tool-forcing pattern as
+        :meth:`extract` but accepts plain text instead of a PDF document.
+        Added for the reviewer agent (GOLD-T03) which needs to send a
+        text-form FHIR Bundle rather than a vision document.
+
+        Args:
+            system_prompt: System instruction for the model.
+            user_prompt: The user message (plain text).
+            schema: A Pydantic BaseModel subclass; its JSON schema is sent
+                as the tool input schema.
+            max_tokens: Max output tokens.
+
+        Returns:
+            A validated instance of ``schema``.
+        """
+        schema_json = schema.model_json_schema()
+
+        extra_params: dict[str, Any] = {}
+        if self._thinking_budget_tokens is not None:
+            extra_params["thinking"] = {
+                "type": "enabled",
+                "budget_tokens": self._thinking_budget_tokens,
+            }
+
+        message = self.client.messages.create(
+            model=self.model,
+            max_tokens=max_tokens,
+            system=system_prompt,
+            tools=[
+                {
+                    "name": "emit_extraction",
+                    "description": "Emit the validated extraction in the provided schema.",
+                    "input_schema": schema_json,
+                }
+            ],
+            tool_choice={"type": "tool", "name": "emit_extraction"},
+            messages=[
+                {
+                    "role": "user",
+                    "content": user_prompt,
+                }
+            ],
+            **extra_params,
+        )
+
+        tool_call = None
+        for block in message.content:
+            if getattr(block, "type", None) == "thinking":
+                continue
+            if getattr(block, "type", None) == "tool_use":
+                tool_call = block
+                break
+
+        if tool_call is None:
+            content_types = [getattr(b, "type", None) for b in message.content]
+            raise RuntimeError(
+                f"Model did not emit the expected tool call 'emit_extraction'. "
+                f"stop_reason={message.stop_reason!r}, "
+                f"content block types={content_types}."
+            )
+
+        raw_input = tool_call.input  # type: ignore[attr-defined]
+        return schema.model_validate(raw_input)
+
 
 class GoogleAIStudioBackend:
     """Gemma 4 vision-extraction backend via Google AI Studio's hosted API.

@@ -3793,3 +3793,37 @@ class MultiPassFHIRGoldPipeline(MultiPassFHIRPipeline):
         import dataclasses
 
         return [dataclasses.replace(p, run_count=2) for p in _PASSES]
+
+    def _merge_to_bundle(self, **kwargs: Any) -> dict[str, Any]:
+        """Override: run the reviewer agent on the assembled bundle (GOLD-T03).
+
+        Calls super()._merge_to_bundle() to build the standard bundle, then
+        passes it through the reviewer agent (Claude Opus 4.7 with extended
+        thinking) for a whole-bundle inconsistency check. Concerns are attached
+        to bundle.meta.extension under the reviewer-concerns URL.
+
+        Failures in the reviewer agent are caught and logged to stderr — a bad
+        reviewer call must never kill an otherwise-successful gold run.
+        """
+        import json as _json
+        import sys
+        from dataclasses import asdict
+
+        bundle = super()._merge_to_bundle(**kwargs)
+
+        try:
+            from lib.extract.lab.reviewer_agent import review_bundle
+
+            concerns = review_bundle(bundle)
+        except Exception as exc:
+            concerns = []
+            print(f"reviewer agent failed: {exc}", file=sys.stderr)
+
+        if concerns:
+            bundle.setdefault("meta", {}).setdefault("extension", []).append(
+                {
+                    "url": "https://ehi-atlas.example/fhir/StructureDefinition/reviewer-concerns",
+                    "valueString": _json.dumps([asdict(c) for c in concerns]),
+                }
+            )
+        return bundle

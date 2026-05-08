@@ -732,6 +732,107 @@ Rules:
   every subsection inside a progress note)."""
 
 
+# ---------------------------------------------------------------------------
+# Bidirectional-scout flavor prompts (BIDI-T02)
+# ---------------------------------------------------------------------------
+
+_DOCUMENT_MAP_PROMPT_EVENTS = """You are scanning a medical document to produce a
+ROUTING MANIFEST focused on CLINICAL EVENTS — encounters, visits, narrative
+notes, observed conditions, treatments delivered.
+
+This pass is a SUPERSET of the document_context pass. You output:
+
+1. All the DocumentContext fields (document_type, patient_name, patient_dob,
+   encounter_date, ordering_provider, facility_name).
+2. A `presence` dict with one entry per known resource type.
+3. A `sections` list of top-level section titles in document order.
+
+Resource types to assess (same enumeration as the default scout):
+  - conditions          : diagnoses / problem list / assessment
+  - medications         : current meds / med list / prescriptions
+  - allergies           : allergies / sensitivities (including "No known")
+  - immunizations       : vaccines / immunizations table
+  - lab_observations    : lab result rows in detailed-results tables
+  - vital_signs         : BP / HR / temp / weight / height / BMI / RR / O2
+  - encounter           : office visits / encounter records / visit summaries
+  - practitioner        : named providers / care team / authorizing physicians
+  - organization        : hospitals / labs / clinics / payers as institutions
+  - clinical_notes      : narrative SOAP notes / progress notes / consult notes
+  - patient_demographics: name / DOB / address / phone / race / ethnicity / MRN
+  - coverage            : insurance / payer / member ID / group / plan name
+  - social_history      : tobacco / alcohol / PHQ / occupation / sex/gender items
+
+EVENTS-FOCUSED RULES:
+- PRIORITIZE identifying ENCOUNTERS and the events around them (visits,
+  notes, conditions discussed during a visit). When you see a date that
+  could anchor an encounter, prefer marking encounter present.
+- Pay close attention to NARRATIVE content (Subjective / Objective /
+  Assessment / Plan paragraphs, free-text progress notes).
+- For tables of structured data (labs, immunizations), still mark present
+  when you see them, but you don't need to enumerate every page
+  exhaustively — note the page range.
+- Be CONSERVATIVE on tabular content: false positives waste downstream
+  cost. But be MORE PERMISSIVE on encounters and narrative — a partial
+  encounter mention is worth flagging.
+- Page hints are 1-indexed."""
+
+
+_DOCUMENT_MAP_PROMPT_TABLES = """You are scanning a medical document to produce a
+ROUTING MANIFEST focused on STRUCTURED DATA — tables of labs, vital signs,
+immunizations, medications with dose/frequency, allergens with values.
+
+This pass is a SUPERSET of the document_context pass. You output:
+
+1. All the DocumentContext fields (document_type, patient_name, patient_dob,
+   encounter_date, ordering_provider, facility_name).
+2. A `presence` dict with one entry per known resource type.
+3. A `sections` list of top-level section titles in document order.
+
+Resource types to assess (same enumeration as the default scout):
+  - conditions          : diagnoses / problem list / assessment
+  - medications         : current meds / med list / prescriptions
+  - allergies           : allergies / sensitivities (including "No known")
+  - immunizations       : vaccines / immunizations table
+  - lab_observations    : lab result rows in detailed-results tables
+  - vital_signs         : BP / HR / temp / weight / height / BMI / RR / O2
+  - encounter           : office visits / encounter records / visit summaries
+  - practitioner        : named providers / care team / authorizing physicians
+  - organization        : hospitals / labs / clinics / payers as institutions
+  - clinical_notes      : narrative SOAP notes / progress notes / consult notes
+  - patient_demographics: name / DOB / address / phone / race / ethnicity / MRN
+  - coverage            : insurance / payer / member ID / group / plan name
+  - social_history      : tobacco / alcohol / PHQ / occupation / sex/gender items
+
+TABLES-FOCUSED RULES:
+- PRIORITIZE identifying STRUCTURED TABLES with rows of data — labs,
+  vital signs, immunizations, medication tables with dose/frequency,
+  allergen panels, social-history grids.
+- Include EVERY page that contains a structured-data row in pages[].
+  Don't summarize — be exhaustive on tabular content.
+- For narrative content (notes, A&P paragraphs), still mark present
+  when you see it, but exhaustive page enumeration isn't required.
+- Be MORE PERMISSIVE on tabular content (better to flag a sparse table
+  than miss it); be CONSERVATIVE on narrative (false positives there
+  waste downstream cost on the clinical_notes pass).
+- Page hints are 1-indexed."""
+
+
+ScoutFlavor = Literal["events", "tables"]
+
+
+def get_scout_prompt(flavor: ScoutFlavor) -> str:
+    """Return the system prompt for a given scout flavor.
+
+    Used by the bidirectional-scout pipeline (BIDI-T03) to dispatch two
+    Pass-0 invocations with different framings.
+    """
+    if flavor == "events":
+        return _DOCUMENT_MAP_PROMPT_EVENTS
+    if flavor == "tables":
+        return _DOCUMENT_MAP_PROMPT_TABLES
+    raise ValueError(f"unknown scout flavor: {flavor!r}")
+
+
 _CONDITIONS_PROMPT = """You are extracting EVERY clinical condition or
 diagnosis recorded in this medical document. Be exhaustive.
 

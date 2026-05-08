@@ -331,6 +331,29 @@ def _cmd_run(args: argparse.Namespace) -> int:
         shape_path = recorder.root / "bundle_shape.json"
         shape_path.write_text(json.dumps(asdict(shape), indent=2))
 
+        # Auto-load ground truth and score when available
+        from lib.extract.lab.ground_truth import load_latest_ground_truth
+        from lib.extract.lab.eval_against_gt import score_against_ground_truth
+
+        gt: tuple[str, dict] | None = None
+        if args.ground_truth:
+            # Manually-passed --ground-truth wins over auto-loaded
+            gt_bundle = json.loads(args.ground_truth.read_text())
+            gt = ("manual", gt_bundle)
+        else:
+            pdf_sha = recorder.manifest.pdf_sha256
+            auto_gt = load_latest_ground_truth(pdf_sha, lab_root=args.root)
+            if auto_gt is not None:
+                gt = (f"auto:v{auto_gt.version}", auto_gt.bundle)
+
+        if gt is not None:
+            source_label, gt_bundle = gt
+            eval_result = score_against_ground_truth(bundle if isinstance(bundle, dict) else {}, gt_bundle)
+            eval_path = recorder.root / "eval.json"
+            eval_path.write_text(json.dumps(asdict(eval_result), indent=2, default=str))
+            print(f"  ✓ ground-truth source: {source_label}")
+            print(f"  ✓ weighted F1: {eval_result.weighted_f1:.0%}")
+
         manifest = recorder.manifest
         bundle_entries = len(bundle.get("entry", [])) if isinstance(bundle, dict) else 0
         print(f"  run-id: {recorder.run_id}")

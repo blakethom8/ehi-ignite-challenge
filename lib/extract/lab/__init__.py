@@ -10,6 +10,11 @@ from lib.extract.lab.compare import (
     RunComparison,
     compare_runs,
 )
+from lib.extract.lab.eval_against_gt import (
+    GroundTruthEvalResult,
+    ResourceTypeScore,
+    score_against_ground_truth,
+)
 from lib.extract.lab.ground_truth import (
     GroundTruthVersion,
     GroundTruthMeta,
@@ -30,8 +35,10 @@ __all__ = [
     "BundleShapeReport",
     "DEFAULT_LAB_ROOT",
     "FactSample",
+    "GroundTruthEvalResult",
     "GroundTruthMeta",
     "GroundTruthVersion",
+    "ResourceTypeScore",
     "RunComparison",
     "RunManifest",
     "RunRecorder",
@@ -42,5 +49,6 @@ __all__ = [
     "load_ground_truth_version",
     "load_latest_ground_truth",
     "save_ground_truth",
+    "score_against_ground_truth",
     "score_bundle_shape",
 ]

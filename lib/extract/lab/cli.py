@@ -1,20 +1,23 @@
 """CLI for the PDF Lab. Subcommands:
     run     — run pipeline(s) on a PDF, capture full traces
-    compare — diff two completed runs (LAB-T04, stub today)
+    compare — diff two completed runs (LAB-T04)
     show    — print summary of one run (LAB-T06, stub today)
     list    — list recent runs (LAB-T06, stub today)
     report  — generate markdown report (LAB-T06, stub today)
 
-Today this module ships only `run`. The other subcommands are stubbed
-with a clear "lands in LAB-Tnn" message.
+`run` and `compare` are fully implemented. The other subcommands are
+stubbed with a clear "lands in LAB-Tnn" message.
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 import sys
+from dataclasses import asdict
 from pathlib import Path
 
+from lib.extract.lab.bundle_shape import score_bundle_shape
 from lib.extract.lab.recorder import DEFAULT_LAB_ROOT, RunRecorder
 from lib.extract.pipelines import get as get_pipeline, list_pipelines
 
@@ -27,13 +30,16 @@ def main(argv: list[str] | None = None) -> int:
     subparsers = parser.add_subparsers(dest="cmd", required=True)
 
     _add_run_parser(subparsers)
+    _add_compare_parser(subparsers)
     _add_stub_parsers(subparsers)
 
     args = parser.parse_args(argv)
 
     if args.cmd == "run":
         return _cmd_run(args)
-    if args.cmd in ("compare", "show", "list", "report"):
+    if args.cmd == "compare":
+        return _cmd_compare(args)
+    if args.cmd in ("show", "list", "report"):
         return _cmd_stub(args.cmd)
 
     parser.error(f"unknown command: {args.cmd}")
@@ -95,10 +101,67 @@ Examples:
     )
 
 
+def _add_compare_parser(sub: argparse._SubParsersAction) -> None:  # type: ignore[type-arg]
+    p = sub.add_parser(
+        "compare",
+        help="Diff two completed runs",
+        description="""\
+Reads two completed runs from data/pdf-lab/runs/ and prints a
+structured diff: resource counts, fact agreement, cost / latency
+delta, bundle-shape delta.
+
+Examples:
+    python -m lib.extract.lab compare --run-a <id> --run-b <id>
+    python -m lib.extract.lab compare --run-a <id> --run-b <id> --format json
+""",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p.add_argument("--run-a", required=True, help="Baseline run id")
+    p.add_argument("--run-b", required=True, help="Comparison run id")
+    p.add_argument("--root", type=Path, default=DEFAULT_LAB_ROOT, help=f"Lab root (default: {DEFAULT_LAB_ROOT})")
+    p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+
+
+def _cmd_compare(args: argparse.Namespace) -> int:
+    from lib.extract.lab.compare import compare_runs
+    try:
+        comparison = compare_runs(args.run_a, args.run_b, root=args.root)
+    except FileNotFoundError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+
+    if args.format == "json":
+        print(json.dumps(asdict(comparison), indent=2, default=str))
+    else:
+        # Markdown / human-readable summary
+        print("# Run comparison")
+        print(f"  A: {comparison.run_a_id} ({comparison.pipeline_a})")
+        print(f"  B: {comparison.run_b_id} ({comparison.pipeline_b})")
+        print()
+        print("## Cost / latency")
+        print(f"  cost delta:    {comparison.cost_delta_usd:+.4f} USD (B - A)")
+        print(f"  latency delta: {comparison.latency_delta_ms:+d} ms (B - A)")
+        print()
+        print("## Resource counts")
+        all_types = sorted(set(comparison.resource_counts_a) | set(comparison.resource_counts_b))
+        for rt in all_types:
+            a = comparison.resource_counts_a.get(rt, 0)
+            b = comparison.resource_counts_b.get(rt, 0)
+            delta = b - a
+            print(f"  {rt:<25} A={a:<4} B={b:<4} Δ={delta:+d}")
+        print()
+        print("## Fact agreement (only in A / only in B / overlap)")
+        for rt in sorted(comparison.fact_overlap):
+            ov = comparison.fact_overlap[rt]
+            a_only = len(comparison.fact_only_in_a.get(rt, []))
+            b_only = len(comparison.fact_only_in_b.get(rt, []))
+            print(f"  {rt:<25} overlap={ov} only_in_a={a_only} only_in_b={b_only}")
+    return 0
+
+
 def _add_stub_parsers(sub: argparse._SubParsersAction) -> None:  # type: ignore[type-arg]
     """Register placeholder subcommands so the help message lists them."""
     for cmd, deferred_to in [
-        ("compare", "LAB-T04"),
         ("show", "LAB-T06"),
         ("list", "LAB-T06"),
         ("report", "LAB-T06"),
@@ -109,7 +172,6 @@ def _add_stub_parsers(sub: argparse._SubParsersAction) -> None:  # type: ignore[
 
 def _cmd_stub(cmd: str) -> int:
     deferred = {
-        "compare": "LAB-T04",
         "show": "LAB-T06",
         "list": "LAB-T06",
         "report": "LAB-T06",
@@ -172,6 +234,11 @@ def _cmd_run(args: argparse.Namespace) -> int:
             # recorder.finish() is called inside extract() on failure (LAB-T02 contract)
             continue
 
+        # Compute bundle shape and write bundle_shape.json
+        shape = score_bundle_shape(bundle if isinstance(bundle, dict) else {})
+        shape_path = recorder.root / "bundle_shape.json"
+        shape_path.write_text(json.dumps(asdict(shape), indent=2))
+
         manifest = recorder.manifest
         bundle_entries = len(bundle.get("entry", [])) if isinstance(bundle, dict) else 0
         print(f"  run-id: {recorder.run_id}")
@@ -179,6 +246,10 @@ def _cmd_run(args: argparse.Namespace) -> int:
         print(f"  cost: ${manifest.cost_usd:.4f}")
         print(f"  latency: {manifest.latency_ms / 1000:.1f}s")
         print(f"  bundle: {bundle_entries} entries")
+        print(f"  patient_count: {shape.patient_count}")
+        print(f"  encounter_link_rate: {shape.encounter_link_rate:.0%}")
+        print(f"  patient_link_rate: {shape.patient_link_rate:.0%}")
+        print(f"  loinc_resolution_rate: {shape.loinc_resolution_rate:.0%}")
         completed.append((name, recorder.run_id))
 
     print()

@@ -281,14 +281,12 @@ def test_main_help_shows_subcommands(capsys: pytest.CaptureFixture) -> None:
 def test_main_compare_stub_returns_2_with_helpful_message(
     capsys: pytest.CaptureFixture,
 ) -> None:
-    """`compare` subcommand is stubbed; exits 2 with a message naming LAB-T04."""
-    exit_code = main(["compare"])
+    """`compare` subcommand is now implemented (LAB-T04). Calling it without
+    required args exits 2 (argparse error for missing --run-a / --run-b)."""
+    with pytest.raises(SystemExit) as exc_info:
+        main(["compare"])
 
-    assert exit_code == 2, f"Expected exit code 2, got {exit_code}"
-    captured = capsys.readouterr()
-    assert "LAB-T04" in captured.err, (
-        f"stderr should mention LAB-T04. Got: {captured.err!r}"
-    )
+    assert exc_info.value.code == 2
 
 
 # ---------------------------------------------------------------------------

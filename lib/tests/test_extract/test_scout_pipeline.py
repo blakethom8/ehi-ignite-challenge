@@ -76,7 +76,7 @@ def test_augmented_passes_skips_absent_resources() -> None:
 
 
 def test_augmented_passes_attaches_page_hints() -> None:
-    """_augmented_passes appends page numbers to the system_prompt."""
+    """_augmented_passes appends page numbers to the system_prompt with additive framing."""
     pipeline = _new_scout_pipeline()
     doc_map = DocumentMap(
         document_type="other",
@@ -86,7 +86,9 @@ def test_augmented_passes_attaches_page_hints() -> None:
     )
     result = pipeline._augmented_passes(doc_map)
     assert len(result) == 1
-    assert "page(s) [2, 3]" in result[0].system_prompt
+    prompt = result[0].system_prompt
+    assert "likely page(s): [2, 3]" in prompt
+    assert "constraint" in prompt
 
 
 def test_augmented_passes_attaches_section_hint() -> None:
@@ -105,8 +107,9 @@ def test_augmented_passes_attaches_section_hint() -> None:
     result = pipeline._augmented_passes(doc_map)
     assert len(result) == 1
     prompt = result[0].system_prompt
-    assert "page(s) [2]" in prompt
+    assert "likely page(s): [2]" in prompt
     assert "Last Filed Vital Signs" in prompt
+    assert "navigation aid" in prompt
 
 
 def test_augmented_passes_preserves_pass_metadata() -> None:
@@ -226,3 +229,55 @@ def test_augmented_passes_logs_warning_when_falling_to_empty(caplog) -> None:
     assert result == []
     assert any("empty" in r.message.lower() or "absent" in r.message.lower()
                for r in caplog.records)
+
+
+def test_augmented_passes_hints_are_framed_as_additive() -> None:
+    """Both page-hint and section-hint framing must use explicit additive language.
+
+    Pins the 'X, NOT Y' framing so future edits don't silently weaken it.
+    The verbose framing is deliberate: small models treat instructions as
+    constraints unless explicitly told otherwise.
+    """
+    pipeline = _new_scout_pipeline()
+    doc_map = DocumentMap(
+        document_type="other",
+        presence={
+            "vital_signs": ResourcePresence(
+                present=True,
+                pages=[5, 10],
+                section_hint="Vital Signs",
+            ),
+        },
+    )
+    result = pipeline._augmented_passes(doc_map)
+    assert len(result) == 1
+    prompt = result[0].system_prompt
+    # Page hint must explicitly say NOT a constraint
+    assert "NOT a constraint" in prompt
+    # Section hint must use navigation aid framing
+    assert "navigation aid" in prompt
+
+
+def test_augmented_passes_pages_and_section_hints_are_separated() -> None:
+    """When both hints are present they must be separated by a blank line.
+
+    Pins the cosmetic fix: the old code concatenated directly, producing
+    '].Look for' with no whitespace. The new code uses '\\n\\n' between hints.
+    """
+    pipeline = _new_scout_pipeline()
+    doc_map = DocumentMap(
+        document_type="other",
+        presence={
+            "vital_signs": ResourcePresence(
+                present=True,
+                pages=[3],
+                section_hint="Last Filed Vital Signs",
+            ),
+        },
+    )
+    result = pipeline._augmented_passes(doc_map)
+    assert len(result) == 1
+    prompt = result[0].system_prompt
+    # Both hints present → must be separated by a blank line
+    assert "\n\nHINT — likely page(s):" in prompt
+    assert "\n\nHINT — likely section label:" in prompt

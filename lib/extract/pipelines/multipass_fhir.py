@@ -733,8 +733,19 @@ Rules:
   content for that resource type. False positives waste downstream cost.
 - Page hints are 1-indexed. List EVERY page containing relevant content, not
   just the first one (e.g., a multi-page lab table → list all those pages).
-- section_hint should be a short identifying phrase from the document, not a
-  paraphrase. Example: "Last Filed Vital Signs" not "the vital signs table".
+- section_hint MUST be the section HEADING / LABEL as it appears printed
+  in the document — for example: "Provider Directory", "Active
+  Medications", "Care Team", "Lab Results", "Allergies & Intolerances".
+  It is a NAVIGATION marker — a phrase that visually marks where the
+  section starts in the document.
+- section_hint must NEVER be a description of the section's CONTENTS
+  (e.g. NOT "Steven Krems MD plus authorizing providers", NOT "list of
+  active diabetes medications", NOT "patient's lab results from May").
+  Content descriptions mislead downstream extractors into matching only
+  the items you happened to mention.
+- If you cannot identify a clear section heading for a resource type
+  but you ARE confident it appears in the document, set section_hint to
+  null. Do NOT invent a label.
 - If the document has no resource of a type, use `present=false` and empty pages.
 - sections list is in document order; capture top-level titles only (not
   every subsection inside a progress note).
@@ -792,6 +803,19 @@ EVENTS-FOCUSED RULES:
   cost. But be MORE PERMISSIVE on encounters and narrative — a partial
   encounter mention is worth flagging.
 - Page hints are 1-indexed.
+- section_hint MUST be the section HEADING / LABEL as it appears printed
+  in the document — for example: "Provider Directory", "Active
+  Medications", "Care Team", "Lab Results", "Allergies & Intolerances".
+  It is a NAVIGATION marker — a phrase that visually marks where the
+  section starts in the document.
+- section_hint must NEVER be a description of the section's CONTENTS
+  (e.g. NOT "Steven Krems MD plus authorizing providers", NOT "list of
+  active diabetes medications", NOT "patient's lab results from May").
+  Content descriptions mislead downstream extractors into matching only
+  the items you happened to mention.
+- If you cannot identify a clear section heading for a resource type
+  but you ARE confident it appears in the document, set section_hint to
+  null. Do NOT invent a label.
 
 REQUIRED OUTPUT SHAPE — your `presence` field MUST contain entries for
 ALL 13 resource types listed below, even those absent from the document.
@@ -841,6 +865,19 @@ TABLES-FOCUSED RULES:
   than miss it); be CONSERVATIVE on narrative (false positives there
   waste downstream cost on the clinical_notes pass).
 - Page hints are 1-indexed.
+- section_hint MUST be the section HEADING / LABEL as it appears printed
+  in the document — for example: "Provider Directory", "Active
+  Medications", "Care Team", "Lab Results", "Allergies & Intolerances".
+  It is a NAVIGATION marker — a phrase that visually marks where the
+  section starts in the document.
+- section_hint must NEVER be a description of the section's CONTENTS
+  (e.g. NOT "Steven Krems MD plus authorizing providers", NOT "list of
+  active diabetes medications", NOT "patient's lab results from May").
+  Content descriptions mislead downstream extractors into matching only
+  the items you happened to mention.
+- If you cannot identify a clear section heading for a resource type
+  but you ARE confident it appears in the document, set section_hint to
+  null. Do NOT invent a label.
 
 REQUIRED OUTPUT SHAPE — your `presence` field MUST contain entries for
 ALL 13 resource types listed below, even those absent from the document.
@@ -3590,14 +3627,26 @@ class MultiPassFHIRScoutPipeline(MultiPassFHIRPipeline):
             # Augment prompt with page hints + section hint
             hint_lines: list[str] = []
             if presence.pages:
+                pages = sorted(set(presence.pages))
                 hint_lines.append(
-                    f"\n\nThis content is on page(s) {sorted(set(presence.pages))}."
+                    f"HINT — likely page(s): {pages}. The scout flagged these pages "
+                    "as containing this resource type, but treat this as a starting "
+                    "point, NOT a constraint. Extract this resource from ANY page in "
+                    "the document where it appears, including pages not in the hint."
                 )
             if presence.section_hint:
                 hint_lines.append(
-                    f"Look for the section labeled '{presence.section_hint}'."
+                    f"HINT — likely section label: \"{presence.section_hint}\". "
+                    "This is the document's section heading where the scout saw "
+                    "this resource type. It is a navigation aid, not a content "
+                    "filter — do NOT restrict yourself to providers/items named in "
+                    "this hint, and do NOT use the hint text as the resource "
+                    "identity."
                 )
-            new_prompt = original.system_prompt + "".join(hint_lines)
+            if hint_lines:
+                new_prompt = original.system_prompt + "\n\n" + "\n\n".join(hint_lines)
+            else:
+                new_prompt = original.system_prompt
             augmented.append(
                 ExtractionPass(
                     name=original.name,

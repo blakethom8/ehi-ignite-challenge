@@ -816,6 +816,35 @@ Rules:
 - If no patient demographics block is present, return empty list."""
 
 
+_SOCIAL_HISTORY_PROMPT = """You are extracting social-history and screening
+information from a medical document.
+
+Topics to capture:
+- tobacco-use: smoking / smokeless tobacco status. value_string is the
+  status as printed: "Never" / "Former" / "Current" / "Daily" / "Some Days".
+- alcohol-use: alcohol consumption. value_string for the categorical answer
+  ("Yes" / "No"); value_quantity + unit ("/week" or "{drinks}/wk") for
+  drinks-per-week numeric.
+- drug-use: recreational drug use status.
+- occupation: job title / role as printed (value_string="MANAGER", etc.).
+- phq-9: total PHQ-9 depression score. value_quantity is the integer score
+  (0-27). value_string left empty.
+- phq-2: total PHQ-2 score. value_quantity (0-6).
+- depression-screen: result of any other depression screening if not PHQ.
+- sex-assigned-at-birth / legal-sex / gender-identity / sexual-orientation:
+  capture as printed in value_string.
+
+Rules:
+- Emit ONE entry per (topic, date) pair. If the same topic was answered
+  on multiple dates, emit each.
+- effective_date: ISO 8601 if a "Date Recorded" or similar timestamp is
+  printed. Else null.
+- Use UCUM for numeric units when applicable.
+- Don't extract clinical conditions (e.g. "depression" as a Condition is
+  the conditions pass's job — only the SCORE goes here).
+- If no social-history block is present, return empty list."""
+
+
 _PASSES: list[ExtractionPass] = [
     ExtractionPass(
         name="conditions",
@@ -898,6 +927,13 @@ _PASSES: list[ExtractionPass] = [
         name="coverage",
         schema=CoverageExtraction,
         system_prompt=_COVERAGE_PROMPT,
+        prompt_version="v1",
+        schema_version="v1",
+    ),
+    ExtractionPass(
+        name="social_history",
+        schema=SocialHistoryExtraction,
+        system_prompt=_SOCIAL_HISTORY_PROMPT,
         prompt_version="v1",
         schema_version="v1",
     ),
@@ -1025,6 +1061,22 @@ _VITAL_LOINC_MAP: dict[str, tuple[str, str]] = {
     "body-weight": ("29463-7", "Body weight"),
     "body-height": ("8302-2", "Body height"),
     "bmi": ("39156-5", "Body mass index (BMI)"),
+}
+
+
+_SOCIAL_HISTORY_LOINC_MAP: dict[str, tuple[str, str, str]] = {
+    # topic: (loinc_code, display, category — "social-history" or "survey")
+    "tobacco-use": ("72166-2", "Tobacco smoking status", "social-history"),
+    "alcohol-use": ("74076-4", "Alcohol use", "social-history"),
+    "drug-use": ("11343-1", "History of drug use", "social-history"),
+    "occupation": ("11341-5", "History of Occupation", "social-history"),
+    "phq-9": ("44261-6", "Patient Health Questionnaire 9 item (PHQ-9) total score", "survey"),
+    "phq-2": ("55757-9", "Patient Health Questionnaire 2 item (PHQ-2) total score", "survey"),
+    "depression-screen": ("73831-0", "Depression screening", "survey"),
+    "sex-assigned-at-birth": ("76689-9", "Sex assigned at birth", "social-history"),
+    "legal-sex": ("76689-9", "Sex assigned at birth", "social-history"),  # closest LOINC
+    "gender-identity": ("76691-5", "Gender identity", "social-history"),
+    "sexual-orientation": ("76690-7", "Sexual orientation", "social-history"),
 }
 
 
@@ -1528,6 +1580,13 @@ class MultiPassFHIRPipeline:
         for c in coverage_extraction.coverages:
             entries.append(
                 {"resource": self._coverage_to_fhir(c, common_meta_template, layout, doc_context)}
+            )
+
+        # Social History
+        sh_extraction: SocialHistoryExtraction = per_pass.get("social_history") or SocialHistoryExtraction()
+        for s in sh_extraction.social_history:
+            entries.append(
+                {"resource": self._social_history_to_fhir(s, common_meta_template, layout, doc_context)}
             )
 
         # Post-pass: wire encounter references onto encounter-scopable resources
@@ -2488,6 +2547,51 @@ class MultiPassFHIRPipeline:
             })
         if classes:
             resource["class"] = classes
+        return resource
+
+    def _social_history_to_fhir(
+        self,
+        s: SocialHistoryEntry,
+        common_meta: dict[str, Any],
+        layout: Any,
+        doc_context: DocumentContext,
+    ) -> dict[str, Any]:
+        bbox_locator = self._bbox_locator_for(s.source_text, s.page, layout)
+        loinc_code, loinc_display, category = _SOCIAL_HISTORY_LOINC_MAP[s.topic]
+        resource: dict[str, Any] = {
+            "resourceType": "Observation",
+            "subject": {"reference": f"Patient/{self._patient_id}"},
+            "status": "final",
+            "category": [
+                {
+                    "coding": [
+                        {
+                            "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                            "code": category,
+                            "display": "Social History" if category == "social-history" else "Survey",
+                        }
+                    ]
+                }
+            ],
+            "code": {
+                "text": loinc_display,
+                "coding": [{"system": "http://loinc.org", "code": loinc_code, "display": loinc_display}],
+            },
+            "meta": self._add_bbox_to_meta(common_meta, bbox_locator),
+        }
+        if s.value_quantity is not None:
+            resource["valueQuantity"] = {
+                "value": s.value_quantity,
+                "unit": s.unit or "",
+                "system": "http://unitsofmeasure.org",
+                "code": s.unit or "",
+            }
+        elif s.value_string is not None:
+            resource["valueString"] = s.value_string
+        if s.effective_date:
+            resource["effectiveDateTime"] = s.effective_date
+        elif doc_context.encounter_date:
+            resource["effectiveDateTime"] = doc_context.encounter_date
         return resource
 
 

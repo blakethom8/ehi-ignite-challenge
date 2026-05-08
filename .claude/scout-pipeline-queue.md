@@ -305,7 +305,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 
 ## SCOUT-T03 · Document architecture comparison in PIPELINE-LOG.md
 
-- **Status:** Queued
+- **Status:** ✅ Completed `c014e69` · 2026-05-07 · doc-only
 - **Depends on:** SCOUT-T01, SCOUT-T02
 - **Goal:** Append a Move Y entry in `docs/architecture/PIPELINE-LOG.md` documenting the scout-then-specialist architecture, the hypothesis, the implementation, and the open question (cost/F1 measurement requires PDF-LAB-STUDIO).
 

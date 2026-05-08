@@ -91,6 +91,61 @@ class DocumentContext(BaseModel):
     )
 
 
+class ResourcePresence(BaseModel):
+    """Per-resource-type presence + page hints from the scout pass."""
+
+    present: bool = Field(False, description="Document contains content for this resource type")
+    pages: list[int] = Field(
+        default_factory=list,
+        description="1-indexed pages containing this resource type",
+    )
+    section_hint: str | None = Field(
+        None,
+        description=(
+            "Short narrative hint for the specialist pass (e.g. 'Last Filed Vital Signs section', "
+            "'Allergy & Immunology Progress Note', 'Comprehensive Metabolic Panel')"
+        ),
+    )
+
+
+class DocumentMap(DocumentContext):
+    """Beefed-up Pass 0 output. Inherits all DocumentContext fields and adds
+    a routing manifest for downstream specialist passes.
+
+    Each presence key matches a pass name in _PASSES. The scout pipeline
+    (SCOUT-T02) uses this map to (a) skip passes whose resource type is
+    absent and (b) attach page hints to the prompts of present passes.
+    """
+
+    presence: dict[
+        Literal[
+            "conditions",
+            "medications",
+            "allergies",
+            "immunizations",
+            "lab_observations",
+            "vital_signs",
+            "encounter",
+            "practitioner",
+            "organization",
+            "clinical_notes",
+            "patient_demographics",
+            "coverage",
+            "social_history",
+        ],
+        ResourcePresence,
+    ] = Field(default_factory=dict, description="Per-pass presence + page hints")
+
+    sections: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Top-level section titles in document order (e.g. ['Patient Demographics', "
+            "'Allergies', 'Medications', 'Results', 'Progress Notes', 'Insurance']). "
+            "Useful for downstream prompt hints."
+        ),
+    )
+
+
 class ConditionEntry(BaseModel):
     display: str = Field(..., description="Condition as it appears on the page")
     icd_10_cm_code: str | None = None
@@ -495,6 +550,46 @@ is, when it was issued, and which facility/lab/clinic produced it.
 
 Be conservative. If a field isn't clearly visible, return null for that field.
 The document_type field is required — pick the closest match from the enum."""
+
+
+_DOCUMENT_MAP_PROMPT = """You are scanning a medical document to produce a
+ROUTING MANIFEST that tells downstream specialist extractors what's present
+and where to focus.
+
+This pass is a SUPERSET of the document_context pass. You output:
+
+1. All the DocumentContext fields (document_type, patient_name, patient_dob,
+   encounter_date, ordering_provider, facility_name) — same as before.
+2. A `presence` dict with one entry per known resource type (see schema).
+   For each: is it present? on which pages (1-indexed)? what section title or
+   visual landmark identifies it?
+3. A `sections` list of top-level section titles in document order.
+
+Resource types to assess:
+  - conditions          : diagnoses / problem list / assessment
+  - medications         : current meds / med list / prescriptions
+  - allergies           : allergies / sensitivities (including "No known")
+  - immunizations       : vaccines / immunizations table
+  - lab_observations    : lab result rows in detailed-results tables
+  - vital_signs         : BP / HR / temp / weight / height / BMI / RR / O2
+  - encounter           : office visits / encounter records / visit summaries
+  - practitioner        : named providers / care team / authorizing physicians
+  - organization        : hospitals / labs / clinics / payers as institutions
+  - clinical_notes      : narrative SOAP notes / progress notes / consult notes
+  - patient_demographics: name / DOB / address / phone / race / ethnicity / MRN
+  - coverage            : insurance / payer / member ID / group / plan name
+  - social_history      : tobacco / alcohol / PHQ / occupation / sex/gender items
+
+Rules:
+- Be CONSERVATIVE: mark `present=true` only when the document clearly contains
+  content for that resource type. False positives waste downstream cost.
+- Page hints are 1-indexed. List EVERY page containing relevant content, not
+  just the first one (e.g., a multi-page lab table → list all those pages).
+- section_hint should be a short identifying phrase from the document, not a
+  paraphrase. Example: "Last Filed Vital Signs" not "the vital signs table".
+- If the document has no resource of a type, use `present=false` and empty pages.
+- sections list is in document order; capture top-level titles only (not
+  every subsection inside a progress note)."""
 
 
 _CONDITIONS_PROMPT = """You are extracting EVERY clinical condition or

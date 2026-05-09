@@ -1,0 +1,89 @@
+flowchart LR
+    subgraph sources["Single Patient EHI Sources"]
+        FHIR["FHIR R4 Bundle"]
+        CCDA["C-CDA / CDA"]
+        PDF["PDFs / Lab Reports"]
+        PORTAL["Portal Export / ZIP"]
+        CONTEXT["Patient / Caregiver Context"]
+    end
+
+    subgraph intake["Source Intake"]
+        CLASSIFY["Classify source type"]
+        PREP["Prepare / extract artifact"]
+        VALIDATE_SOURCE["Check readiness"]
+    end
+
+    subgraph adapters["Extraction + Adapter Layer"]
+        FHIR_ADAPTER["FHIR adapter"]
+        CCDA_ADAPTER["C-CDA adapter"]
+        PDF_PIPE["PDF-to-FHIR pipeline"]
+        LOCAL_MODEL["Local/specialized model path"]
+    end
+
+    subgraph graph["FHIR-Compatible Clinical Fact Graph"]
+        OBS["Observation"]
+        MED["Medication"]
+        COND["Condition"]
+        ENC["Encounter"]
+        DOC["DocumentReference"]
+        PROV["Provenance"]
+    end
+
+    subgraph trust["Validation + Harmonization"]
+        DEDUPE["Deduplicate facts"]
+        CONFLICT["Detect conflicts"]
+        CITE["Attach source citations"]
+        REVIEW["Human review queue"]
+    end
+
+    subgraph harness["FHIR-Grounded AI Harness"]
+        TOOLS["Constrained record tools"]
+        PACKET["Evidence/context packet"]
+        LLM["Language model reasoning layer"]
+    end
+
+    subgraph outputs["Readable + Actionable Outputs"]
+        SUMMARY["Patient summary"]
+        CHARTS["Trends + charts"]
+        HANDOFF["Clinician handoff"]
+        QA["Cited Q&A"]
+        MISSING["Missing information flags"]
+    end
+
+    FHIR --> CLASSIFY
+    CCDA --> CLASSIFY
+    PDF --> CLASSIFY
+    PORTAL --> CLASSIFY
+    CONTEXT --> CLASSIFY
+
+    CLASSIFY --> PREP --> VALIDATE_SOURCE
+    VALIDATE_SOURCE --> FHIR_ADAPTER
+    VALIDATE_SOURCE --> CCDA_ADAPTER
+    VALIDATE_SOURCE --> PDF_PIPE
+    PDF_PIPE -.bounded tasks.-> LOCAL_MODEL
+
+    FHIR_ADAPTER --> OBS
+    CCDA_ADAPTER --> MED
+    PDF_PIPE --> COND
+    LOCAL_MODEL --> OBS
+    FHIR_ADAPTER --> ENC
+    PDF_PIPE --> DOC
+    CCDA_ADAPTER --> PROV
+
+    OBS --> DEDUPE
+    MED --> DEDUPE
+    COND --> DEDUPE
+    ENC --> DEDUPE
+    DOC --> CITE
+    PROV --> CITE
+
+    DEDUPE --> CONFLICT --> REVIEW
+    CITE --> REVIEW
+    REVIEW --> TOOLS
+    TOOLS --> PACKET --> LLM
+
+    LLM --> SUMMARY
+    LLM --> QA
+    TOOLS --> CHARTS
+    PACKET --> HANDOFF
+    PACKET --> MISSING

@@ -24,10 +24,13 @@ Endpoint surface:
 from __future__ import annotations
 
 from datetime import datetime
+from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import FileResponse
 
 from api.core import harmonization_runs, harmonize_service, published_charts
+from scripts.export_workspace_package import build_package
 from api.models import (
     HarmonizeAllergiesResponse,
     HarmonizeCollection,
@@ -548,6 +551,47 @@ def get_source_diff(collection_id: str) -> HarmonizeSourceDiffResponse:
             )
             for s in payload["sources"]
         ],
+    )
+
+
+@router.get("/{collection_id}/export-workspace")
+def export_workspace_package(
+    collection_id: str,
+    include_originals: bool = False,
+    include_demo_ccda: bool = False,
+) -> FileResponse:
+    """Download a portable patient-owned EHI Atlas workspace package.
+
+    The zip contains source inventory, canonical facts, provenance, source
+    contributions, missing-information signals, agent instructions, context
+    packets, markdown/CSV exports, and a tiny package-inspection CLI.
+    """
+    if harmonize_service.get_collection(collection_id) is None:
+        raise HTTPException(status_code=404, detail=f"Collection not found: {collection_id}")
+
+    out_dir = Path("data/workspace-packages")
+    out_dir.mkdir(parents=True, exist_ok=True)
+    suffix = "-with-ccda" if include_demo_ccda else ""
+    out = out_dir / f"{collection_id}{suffix}.zip"
+    extra_sources: list[Path] = []
+    if include_demo_ccda:
+        ccda = Path("ehi-atlas/corpus/_sources/josh-ccdas/raw/Cerner Samples/problems-and-medications.xml")
+        if ccda.exists():
+            extra_sources.append(ccda)
+    try:
+        build_package(
+            collection_id,
+            out,
+            include_originals=include_originals,
+            extra_sources=extra_sources,
+        )
+    except SystemExit as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    return FileResponse(
+        path=out,
+        media_type="application/zip",
+        filename=out.name,
     )
 
 

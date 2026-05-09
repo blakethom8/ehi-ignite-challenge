@@ -1,0 +1,61 @@
+{
+  "comparison_version": "atlas-agent-comparison.v1",
+  "created_at": "2026-05-09T04:29:45Z",
+  "collection": "synthea-demo",
+  "package": "arms/package/inputs/synthea-demo.zip",
+  "raw_sources": [
+    {
+      "path": "/Users/blake/Repo/ehi-ignite-challenge/data/harmonize-demo/synthea-demo/ehr-snapshot-2018.json",
+      "name": "ehr-snapshot-2018.json",
+      "size_bytes": 149640
+    },
+    {
+      "path": "/Users/blake/Repo/ehi-ignite-challenge/data/harmonize-demo/synthea-demo/ehr-snapshot-2024.json",
+      "name": "ehr-snapshot-2024.json",
+      "size_bytes": 584800
+    }
+  ],
+  "arms": {
+    "raw": "Use only the raw/source files in this arm. Do not inspect the prepared Atlas workspace package.",
+    "package": "Use the EHI Atlas workspace package. Read MANIFEST.json and AGENT-INSTRUCTIONS.md first. Prefer structured evidence, provenance, source contributions, conflicts, and missing-information files.",
+    "package-plus-raw": "Use the EHI Atlas workspace package first, then inspect raw/source files only when needed to verify or investigate gaps. Cite structured evidence whenever possible."
+  },
+  "prompts": [
+    {
+      "id": "patient-summary",
+      "title": "Patient summary",
+      "prompt": "You are helping a patient understand their medical record. Produce a concise, plain-language summary of the five most important things in this record. Include what changed recently, what information appears missing, and what the patient should ask their doctor. Cite sources for important claims when source information is available."
+    },
+    {
+      "id": "clinician-handoff",
+      "title": "Clinician handoff",
+      "prompt": "Create a one-page clinician handoff for a specialist reviewing this patient. Include active medications, allergies, key conditions, recent abnormal labs, missing information, and source citations. Do not invent facts. If evidence is unclear, say so."
+    },
+    {
+      "id": "source-contribution",
+      "title": "Source contribution",
+      "prompt": "Explain what each source contributed to the patient record. Identify facts that appear in more than one source, facts unique to a source, and any conflicts or duplicates that require review."
+    },
+    {
+      "id": "chart-ready-labs",
+      "title": "Chart-ready labs",
+      "prompt": "Create a chart-ready table of kidney, liver, metabolic, and hematology labs over time. Include test name, date, value, unit, reference range, abnormal flag, and source. State which labs are missing or not comparable."
+    },
+    {
+      "id": "agent-audit",
+      "title": "Agent audit",
+      "prompt": "Audit your own answer. List every important claim, the source or evidence you used, and any claim that lacks adequate support."
+    }
+  ],
+  "scoring_dimensions": [
+    "correctness",
+    "completeness",
+    "traceability",
+    "interpretability",
+    "cross_source_reasoning",
+    "missing_info_handling",
+    "chart_readiness",
+    "reusability",
+    "auditability"
+  ]
+}

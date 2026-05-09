@@ -37,6 +37,7 @@ import type {
   HarmonizeClinicalArtifact,
   HarmonizeReviewDecisionPayload,
 } from "../../types";
+import { formatDisplayNumber, formatMeasurement } from "../../utils/format";
 
 type ResourceTab =
   | "labs"
@@ -86,13 +87,13 @@ function reviewValueLabel(value: number | null, unit: string | null, rawValue?: 
   const displayValue = value ?? rawValue;
   const displayUnit = unit ?? rawUnit ?? "";
   if (displayValue == null) return "No numeric value";
-  return `${displayValue}${displayUnit ? ` ${displayUnit}` : ""}`;
+  return formatMeasurement(displayValue, displayUnit);
 }
 
 function canonicalSelectionValueLabel(value: HarmonizeCanonicalSelectionLatest | null | undefined): string {
   if (!value) return "No selected value";
   if (value.value == null) return "No selected value";
-  return `${value.value}${value.unit ? ` ${value.unit}` : ""}`;
+  return formatMeasurement(value.value, value.unit);
 }
 
 function sourceMatchesLatest(
@@ -121,7 +122,7 @@ function conflictSpreadLabel(
   const max = Math.max(...values);
   if (min === max) return null;
   const unit = canonicalUnit ?? sources.find((source) => source.unit || source.raw_unit)?.unit ?? sources.find((source) => source.raw_unit)?.raw_unit ?? "";
-  return `${min}-${max}${unit ? ` ${unit}` : ""}`;
+  return `${formatDisplayNumber(min)}-${formatDisplayNumber(max)}${unit ? ` ${unit}` : ""}`;
 }
 
 function reviewDecisionLabel(decision: string | null): string {
@@ -2025,7 +2026,7 @@ function LabsTab({ collectionId }: { collectionId: string }) {
                         </td>
                         <td className="px-4 py-2 text-right tabular-nums text-[#1c1c1e]">
                           {m.latest?.value != null
-                            ? `${m.latest.value} ${m.latest.unit ?? ""}`
+                            ? formatMeasurement(m.latest.value, m.latest.unit)
                             : "—"}
                         </td>
                         <td className="px-4 py-2">
@@ -2069,7 +2070,7 @@ function LabsTab({ collectionId }: { collectionId: string }) {
                       {s.source_label}
                     </span>
                     <span className="tabular-nums font-medium text-[#1c1c1e]">
-                      {s.value != null ? `${s.value} ${s.unit ?? ""}` : "—"}
+                      {s.value != null ? formatMeasurement(s.value, s.unit) : "—"}
                     </span>
                   </li>
                 ))}
@@ -2958,6 +2959,15 @@ export function HarmonizeView() {
               <span className="rounded-full bg-[#f7f9fc] px-2.5 py-1 text-xs font-semibold text-[#667085]">
                 {activeCollection.source_count} sources
               </span>
+            )}
+            {activeId && !activeCollectionHasNoSources && (
+              <a
+                href={`/api/harmonize/${encodeURIComponent(activeId)}/export-workspace${activeId === "synthea-demo" ? "?include_demo_ccda=true" : ""}`}
+                className="inline-flex items-center gap-2 rounded-lg border border-[#dfe4ea] bg-white px-3 py-2 text-sm font-semibold text-[#555a6a] hover:border-[#5b76fe] hover:text-[#5b76fe]"
+              >
+                <FileText size={14} />
+                Download workspace
+              </a>
             )}
             <Link
               to={`/aggregate/sources${patientId ? `?patient=${encodeURIComponent(patientId)}` : ""}`}

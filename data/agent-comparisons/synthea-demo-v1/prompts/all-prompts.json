@@ -1,0 +1,27 @@
+[
+  {
+    "id": "patient-summary",
+    "title": "Patient summary",
+    "prompt": "You are helping a patient understand their medical record. Produce a concise, plain-language summary of the five most important things in this record. Include what changed recently, what information appears missing, and what the patient should ask their doctor. Cite sources for important claims when source information is available."
+  },
+  {
+    "id": "clinician-handoff",
+    "title": "Clinician handoff",
+    "prompt": "Create a one-page clinician handoff for a specialist reviewing this patient. Include active medications, allergies, key conditions, recent abnormal labs, missing information, and source citations. Do not invent facts. If evidence is unclear, say so."
+  },
+  {
+    "id": "source-contribution",
+    "title": "Source contribution",
+    "prompt": "Explain what each source contributed to the patient record. Identify facts that appear in more than one source, facts unique to a source, and any conflicts or duplicates that require review."
+  },
+  {
+    "id": "chart-ready-labs",
+    "title": "Chart-ready labs",
+    "prompt": "Create a chart-ready table of kidney, liver, metabolic, and hematology labs over time. Include test name, date, value, unit, reference range, abnormal flag, and source. State which labs are missing or not comparable."
+  },
+  {
+    "id": "agent-audit",
+    "title": "Agent audit",
+    "prompt": "Audit your own answer. List every important claim, the source or evidence you used, and any claim that lacks adequate support."
+  }
+]

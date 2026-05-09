@@ -407,6 +407,7 @@ const ANALYSIS_NAV_LINKS: NavItem[] = [
 
 const INTERNAL_NAV_LINKS: NavItem[] = [
   { to: "/analysis", label: "Module Overview", icon: BookMarked, description: "FHIR education and methodology" },
+  { to: "/ai-workspace/trial-finder", label: "AI Workspace", icon: MessageSquareText, description: "Clean agent workspace shell" },
   { to: "/pipeline-lab", label: "Pipeline Lab", icon: DatabaseZap, description: "PDF parser experiment leaderboard" },
   { to: "/analysis/qa-eval-lab", label: "Q&A Eval Lab", icon: MessageSquareText, description: "Clinical question test development" },
   { to: "/analysis/ccda-testing-lab", label: "C-CDA Testing Lab", icon: FileJson2, description: "C-CDA and PDF to FHIR playground" },
@@ -422,6 +423,7 @@ function withPatientQuery(path: string, patientId: string | null): string {
 
 function getEnvironment(pathname: string): AppEnvironment {
   if (pathname.startsWith("/platform")) return "platform";
+  if (pathname.startsWith("/ai-workspace")) return "analysis";
   if (pathname.startsWith("/pipeline-lab")) return "analysis";
   if (pathname.startsWith("/ground-truth-review")) return "analysis";
   if (pathname.startsWith("/catalog")) return "catalog";
@@ -1396,6 +1398,7 @@ export function Layout({ children }: LayoutProps) {
 
   const internalToolLinks: { key: string; label: string; to: string }[] = [
     { key: "dataLab", label: "Module Overview", to: "/analysis" },
+    { key: "aiWorkspace", label: "AI Workspace", to: "/ai-workspace/trial-finder" },
     { key: "pipelineLab", label: "Pipeline Lab", to: "/pipeline-lab" },
     { key: "qaEvalLab", label: "Q&A Eval Lab", to: "/analysis/qa-eval-lab" },
     { key: "ccdaLab", label: "C-CDA Testing Lab", to: "/analysis/ccda-testing-lab" },
@@ -1499,6 +1502,7 @@ export function Layout({ children }: LayoutProps) {
     if (key === "anesthesia") return location.pathname.startsWith("/explorer/anesthesia");
     if (key === "qa") return location.pathname.startsWith("/explorer/assistant");
     if (key === "dataLab") return location.pathname === "/analysis";
+    if (key === "aiWorkspace") return location.pathname.startsWith("/ai-workspace");
     if (key === "pipelineLab") return location.pathname.startsWith("/pipeline-lab");
     if (key === "qaEvalLab") return location.pathname.startsWith("/analysis/qa-eval-lab");
     if (key === "ccdaLab") {

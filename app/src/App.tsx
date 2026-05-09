@@ -75,6 +75,7 @@ const QaEvalLab = lazyNamed(() => import("./pages/Analysis/QaEvalLab"), "QaEvalL
 const PipelineLab = lazyNamed(() => import("./pages/PipelineLab/Leaderboard"), "PipelineLab");
 const GroundTruthReview = lazyNamed(() => import("./pages/GroundTruthReview/ReferenceReview"), "GroundTruthReview");
 const UsingAtlasRoutes = lazyNamed(() => import("./pages/UsingAtlas/routes"), "UsingAtlasRoutes");
+const TrialFinderWorkspace = lazyNamed(() => import("./pages/AIWorkspace/TrialFinderWorkspace"), "TrialFinderWorkspace");
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -152,6 +153,7 @@ export default function App() {
     { path: "/ccda-lab", element: <CcdaPipelineLab /> },
     { path: "/ground-truth-review", element: <GroundTruthReview /> },
     { path: "/ground-truth-review/:runId", element: <GroundTruthReview /> },
+    { path: "/ai-workspace/trial-finder", element: <TrialFinderWorkspace /> },
     { path: "/catalog", element: <DataCatalog /> },
   ];
 

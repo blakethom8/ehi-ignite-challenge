@@ -60,6 +60,7 @@ const WorkspaceLibraryPage = lazyNamed(() => import("./pages/Modules/DataAggrega
 const HarmonizeView = lazyNamed(() => import("./pages/Modules/HarmonizeView"), "HarmonizeView");
 const ClinicalInsights = lazyNamed(() => import("./pages/Modules/ClinicalInsights"), "ClinicalInsights");
 const LabExplainer = lazyNamed(() => import("./pages/Modules/LabExplainer"), "LabExplainer");
+const CcdaPipelineLab = lazyNamed(() => import("./pages/Modules/CcdaPipelineLab"), "CcdaPipelineLab");
 const TrialFinder = lazyNamed(() => import("./pages/Modules/TrialFinder"), "TrialFinder");
 const PatientMemoryView = lazyNamed(() => import("./pages/Modules/PatientMemoryView"), "PatientMemoryView");
 const PatientContext = lazyNamed(() => import("./pages/Modules/PatientContext"), "PatientContext");
@@ -70,6 +71,10 @@ const AnalysisDefinitions = lazyNamed(() => import("./pages/Analysis/Definitions
 const AnalysisCoverage = lazyNamed(() => import("./pages/Analysis/Coverage"), "AnalysisCoverage");
 const AnalysisFlightSchool = lazyNamed(() => import("./pages/Analysis/FlightSchool"), "AnalysisFlightSchool");
 const AnalysisFhirPrimer = lazyNamed(() => import("./pages/Analysis/FhirPrimer"), "AnalysisFhirPrimer");
+const QaEvalLab = lazyNamed(() => import("./pages/Analysis/QaEvalLab"), "QaEvalLab");
+const PipelineLab = lazyNamed(() => import("./pages/PipelineLab/Leaderboard"), "PipelineLab");
+const GroundTruthReview = lazyNamed(() => import("./pages/GroundTruthReview/ReferenceReview"), "GroundTruthReview");
+const UsingAtlasRoutes = lazyNamed(() => import("./pages/UsingAtlas/routes"), "UsingAtlasRoutes");
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -141,6 +146,12 @@ export default function App() {
     { path: "/analysis/definitions", element: <AnalysisDefinitions /> },
     { path: "/analysis/coverage", element: <AnalysisCoverage /> },
     { path: "/analysis/flight-school", element: <AnalysisFlightSchool /> },
+    { path: "/analysis/ccda-testing-lab", element: <CcdaPipelineLab /> },
+    { path: "/analysis/qa-eval-lab", element: <QaEvalLab /> },
+    { path: "/pipeline-lab", element: <PipelineLab /> },
+    { path: "/ccda-lab", element: <CcdaPipelineLab /> },
+    { path: "/ground-truth-review", element: <GroundTruthReview /> },
+    { path: "/ground-truth-review/:runId", element: <GroundTruthReview /> },
     { path: "/catalog", element: <DataCatalog /> },
   ];
 
@@ -154,6 +165,7 @@ export default function App() {
               <Route path="/architecture" element={<PlatformArchitecture />} />
               <Route path="/records-pool" element={<PatientRecordPool />} />
               <Route path="/guided-tour" element={<GuidedTour />} />
+              <Route path="/using-atlas/*" element={<Suspense fallback={<PageFallback />}><UsingAtlasRoutes /></Suspense>} />
               {routes.map((route) => (
                 <Route
                   key={route.path}

@@ -558,7 +558,6 @@ def get_source_diff(collection_id: str) -> HarmonizeSourceDiffResponse:
 def export_workspace_package(
     collection_id: str,
     include_originals: bool = False,
-    include_demo_ccda: bool = False,
 ) -> FileResponse:
     """Download a portable patient-owned EHI Atlas workspace package.
 
@@ -571,19 +570,12 @@ def export_workspace_package(
 
     out_dir = Path("data/workspace-packages")
     out_dir.mkdir(parents=True, exist_ok=True)
-    suffix = "-with-ccda" if include_demo_ccda else ""
-    out = out_dir / f"{collection_id}{suffix}.zip"
-    extra_sources: list[Path] = []
-    if include_demo_ccda:
-        ccda = Path("ehi-atlas/corpus/_sources/josh-ccdas/raw/Cerner Samples/problems-and-medications.xml")
-        if ccda.exists():
-            extra_sources.append(ccda)
+    out = out_dir / f"{collection_id}.zip"
     try:
         build_package(
             collection_id,
             out,
             include_originals=include_originals,
-            extra_sources=extra_sources,
         )
     except SystemExit as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc

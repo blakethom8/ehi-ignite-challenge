@@ -17,6 +17,8 @@ Current production host:
 - Repo path: `/opt/ehi-ignite`
 - Compose file: `deploy/docker-compose.prod.yml`
 - Runtime data: `/opt/ehi-ignite/data`, bind-mounted into the API container at `/app/data`
+- Private converter: Microsoft FHIR Converter sidecar, reachable by the API at `http://fhir-converter:8080`
+- Local dev tunnel: `ssh -L 18080:127.0.0.1:18080 hetzner2`
 
 Deploy with:
 
@@ -32,10 +34,17 @@ profiles and uploaded files are preserved because they live in the bind-mounted
 container to answer `/api/health`, then reloads the outer
 `personal-website_nginx_1` container so host-level nginx re-resolves the
 recreated Docker service names instead of returning stale-upstream `502`s.
+It also waits for the FHIR converter `/health/check` endpoint before accepting
+the deployment.
 
 ---
 
 ## docker-compose.prod.yml
+
+The production compose runs four app-owned services: `api`, `app`,
+`cursor-sidecar`, and `fhir-converter`. The converter is intentionally not
+proxied by nginx. It is exposed only on the Docker network and on Hetzner
+localhost port `18080` for SSH-tunneled development.
 
 ```yaml
 services:
@@ -55,6 +64,14 @@ services:
     build:
       context: .
       dockerfile: deploy/Dockerfile.app
+    restart: unless-stopped
+
+  fhir-converter:
+    image: mcr.microsoft.com/healthcareapis/fhir-converter:1.0.0-preview@sha256:202c898d9807015a2b6269d3a6fe581cfaecc247ac163cd53d3e69e9cfc3659f
+    ports:
+      - "127.0.0.1:18080:8080"
+    expose:
+      - "8080"
     restart: unless-stopped
 
   nginx:
@@ -203,6 +220,13 @@ ssh hetzner2 'cd /opt/ehi-ignite && ./deploy/deploy-prod.sh'
 
 # Check status
 ssh hetzner2 'cd /opt/ehi-ignite && docker-compose -f deploy/docker-compose.prod.yml ps'
+
+# Check private converter health on Hetzner
+ssh hetzner2 'curl -fsS http://127.0.0.1:18080/health/check'
+
+# Use the Hetzner converter from local development
+ssh -L 18080:127.0.0.1:18080 hetzner2
+export FHIR_CONVERTER_URL=http://127.0.0.1:18080
 ```
 
 ---

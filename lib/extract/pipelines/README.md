@@ -133,12 +133,36 @@ You don't need to rebuild any of this:
 
 | Module | What it gives you |
 |---|---|
-| [`lib.extract.pdf`](../pdf.py) | `VisionBackend` Protocol, `AnthropicBackend`, `GoogleAIStudioBackend` (with automatic page chunking for long PDFs), `get_backend()` selector, response-coercion helpers (`_coerce_stringified_subobjects`, `_unwrap_extraction_envelope`), bbox calibration via pdfplumber (`_calibrate_bboxes_via_layout`). Use these. |
+| [`lib.extract.pdf`](../pdf.py) | `VisionBackend` Protocol, `AnthropicBackend`, `GoogleAIStudioBackend` (with automatic page chunking for long PDFs), `OllamaVisionBackend` (`gemma-ollama` for local Gemma/MedGemma), `get_backend()` selector, response-coercion helpers (`_coerce_stringified_subobjects`, `_unwrap_extraction_envelope`), bbox calibration via pdfplumber (`_calibrate_bboxes_via_layout`). Use these. |
 | [`lib.extract.layout`](../layout.py) | PDF rasterization + per-page text+bbox extraction via pdfplumber. The `extract_layout()` function returns a `DocumentLayout` you can use to look up bboxes for any text on any page. |
 | [`lib.extract.cache`](../cache.py) | Content-hash cache, atomic writes, deterministic-replay guarantee. |
 | [`lib.extract.uploads`](../uploads.py) | If you need to round-trip arbitrary PDFs through the corpus. |
 | [`lib.extract.eval`](../eval.py) | The eval harness — what the bake-off uses to score you. Includes `filter_gt_to_findable_in_pdf()` so recall is measured against facts actually in the PDF, not the patient's full chart history. Worth reading to see what your output gets compared against. |
 | [`lib.extract.bake_off`](../bake_off.py) | The bake-off harness. `bake_off(pipelines, pairs, findable_only=True)` runs every (pipeline × pdf) cell, scores against ground truth, returns a list of `BakeoffCell` ready for markdown rendering or Streamlit display. |
+
+## Additive workspace variants currently registered
+
+These are side-by-side lanes for measurement and harmonization experiments; they
+are not replacements for one another.
+
+| Pipeline | Lane | What it tests |
+|---|---|---|
+| `multipass-fhir` | vision-direct | Current schema-direct multipass reference. |
+| `multipass-fhir-scout` | vision-direct + routing | Whether a document-map pass can reduce cost and focus specialist prompts. |
+| `multipass-fhir-ollama-tabular` | local mixed vision | Whether localhost Gemma/MedGemma helps bounded table-shaped passes. |
+| `pdfplumber-lab-text` | deterministic text | How far embedded text + regex lab rows gets with zero LLM cost. |
+| `pdfplumber-text-fhir` | text-first LLM | Whether page-marked raw text plus focused schemas competes with vision. |
+
+Run a stable multi-pipeline smoke suite with:
+
+```bash
+uv run python -m lib.extract.lab suite \
+  --config docs/architecture/pdf-pipeline-suite-smoke.yaml \
+  --dry-run
+```
+
+Remove `--dry-run` to execute the full suite and write artifacts under
+`data/pdf-lab/suites/`.
 
 ---
 

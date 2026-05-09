@@ -37,6 +37,7 @@ def main(argv: list[str] | None = None) -> int:
     _add_report_parser(subparsers)
     _add_review_parser(subparsers)
     _add_triage_parser(subparsers)
+    _add_suite_parser(subparsers)
 
     args = parser.parse_args(argv)
 
@@ -54,6 +55,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_review(args)
     if args.cmd == "triage":
         return _cmd_triage(args)
+    if args.cmd == "suite":
+        return _cmd_suite(args)
 
     parser.error(f"unknown command: {args.cmd}")
     return 2  # unreachable after parser.error
@@ -295,6 +298,51 @@ Result: vision_wins_verdicts.json + (optionally) a new GT version.
     p.add_argument("--reviewer", required=True, help="Your name / email")
     p.add_argument("--notes", default="")
     p.add_argument("--root", type=Path, default=DEFAULT_LAB_ROOT)
+
+
+def _add_suite_parser(sub: argparse._SubParsersAction) -> None:  # type: ignore[type-arg]
+    p = sub.add_parser(
+        "suite",
+        help="Run or inspect a pipeline experiment suite",
+        description="""\
+Runs every pipeline × case cell from a YAML suite manifest and writes a
+suite-level report under data/pdf-lab/suites/<suite-run-id>/.
+
+Example:
+    python -m lib.extract.lab suite --config docs/pipeline-suite.yaml --dry-run
+    python -m lib.extract.lab suite --config docs/pipeline-suite.yaml
+""",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p.add_argument("--config", required=True, type=Path, help="YAML/JSON suite manifest")
+    p.add_argument("--root", type=Path, default=DEFAULT_LAB_ROOT)
+    p.add_argument("--dry-run", action="store_true", help="Validate and print planned cells without running")
+    p.add_argument("--skip-cache", action="store_true", help="Force live extraction where supported")
+
+
+def _cmd_suite(args: argparse.Namespace) -> int:
+    from lib.extract.lab.suite import dry_run_plan, load_suite, render_suite_markdown, run_suite, validate_suite
+
+    suite = load_suite(args.config)
+    errors = validate_suite(suite)
+    if errors:
+        for error in errors:
+            print(f"error: {error}", file=sys.stderr)
+        return 2
+
+    if args.dry_run:
+        plan = dry_run_plan(suite)
+        print(f"Suite `{suite.name}`: {len(plan)} cells")
+        for cell in plan:
+            gt = f" gt={cell['ground_truth']}" if cell["ground_truth"] else ""
+            tags = f" tags={','.join(cell['tags'])}" if cell["tags"] else ""
+            print(f"  {cell['pipeline']} × {cell['case']} pdf={cell['pdf']}{gt}{tags}")
+        return 0
+
+    result = run_suite(suite, root=args.root, skip_cache=args.skip_cache or None)
+    print(render_suite_markdown(result))
+    print(f"Suite artifacts: {result.suite_dir}")
+    return 0
 
 
 def _cmd_triage(args: argparse.Namespace) -> int:

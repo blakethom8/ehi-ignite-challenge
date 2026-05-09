@@ -1,0 +1,139 @@
+{
+  "corrected-lab-report": {
+    "patient": {
+      "name": "Morgan Vale",
+      "synthetic_mrn": "SYN-PDF-001",
+      "dob": "1962-04-18"
+    },
+    "document": {
+      "type": "amended chemistry lab report",
+      "service_date": "2026-02-03",
+      "status": "amended-final"
+    },
+    "should_extract": [
+      {
+        "resourceType": "Observation",
+        "loinc": "2160-0",
+        "display": "Creatinine [Mass/volume] in Serum or Plasma",
+        "effectiveDateTime": "2026-02-03T08:14:00-08:00",
+        "valueQuantity": {
+          "value": 1.8,
+          "unit": "mg/dL",
+          "system": "http://unitsofmeasure.org",
+          "code": "mg/dL"
+        },
+        "interpretation": "H",
+        "note": "Corrected final value; preliminary creatinine 0.8 mg/dL was voided."
+      },
+      {
+        "resourceType": "Observation",
+        "loinc": "62238-1",
+        "display": "eGFR",
+        "effectiveDateTime": "2026-02-03T08:14:00-08:00",
+        "valueQuantity": {
+          "value": 42,
+          "unit": "mL/min/1.73m2"
+        },
+        "interpretation": "L"
+      }
+    ],
+    "should_not_extract": [
+      {
+        "reason": "preliminary value was explicitly voided",
+        "display": "Creatinine",
+        "value": 0.8,
+        "unit": "mg/dL"
+      }
+    ]
+  },
+  "medication-reconciliation": {
+    "patient": {
+      "name": "Morgan Vale",
+      "synthetic_mrn": "SYN-PDF-001",
+      "dob": "1962-04-18"
+    },
+    "document": {
+      "type": "preoperative medication reconciliation",
+      "service_date": "2026-03-10",
+      "status": "final"
+    },
+    "should_extract": [
+      {
+        "resourceType": "MedicationStatement",
+        "medication": "Apixaban 5 mg tablet",
+        "rxnorm": "1364430",
+        "status": "active",
+        "dosage": "Take 1 tablet by mouth twice daily",
+        "perioperative_instruction": "Hold 72 hours before planned procedure; last dose evening of 2026-03-14."
+      },
+      {
+        "resourceType": "MedicationStatement",
+        "medication": "Metformin 500 mg tablet",
+        "rxnorm": "860975",
+        "status": "active",
+        "dosage": "Take 1 tablet by mouth twice daily with meals",
+        "perioperative_instruction": "Hold morning of procedure only."
+      },
+      {
+        "resourceType": "MedicationStatement",
+        "medication": "Ibuprofen 200 mg tablet",
+        "status": "stopped",
+        "dosage": "Previously used as needed",
+        "note": "Stopped on 2026-03-10 because patient is anticoagulated."
+      }
+    ],
+    "should_not_extract": [
+      {
+        "reason": "listed under medication allergies/adverse reactions, not current medications",
+        "medication": "Warfarin"
+      },
+      {
+        "reason": "explicitly stopped, not active",
+        "medication": "Ibuprofen",
+        "status": "active"
+      }
+    ]
+  },
+  "radiology-report-page-noise": {
+    "patient": {
+      "name": "Morgan Vale",
+      "synthetic_mrn": "SYN-PDF-001",
+      "dob": "1962-04-18"
+    },
+    "document": {
+      "type": "CT chest radiology report",
+      "service_date": "2026-01-22",
+      "status": "final"
+    },
+    "should_extract": [
+      {
+        "resourceType": "DiagnosticReport",
+        "status": "final",
+        "code_text": "CT chest without contrast",
+        "effectiveDateTime": "2026-01-22T13:40:00-08:00",
+        "conclusion": "Stable 7 mm right lower lobe pulmonary nodule. No pleural effusion. No mediastinal lymphadenopathy."
+      },
+      {
+        "resourceType": "Observation",
+        "code_text": "Pulmonary nodule size",
+        "bodySite": "right lower lobe",
+        "valueQuantity": {
+          "value": 7,
+          "unit": "mm"
+        },
+        "interpretation": "stable"
+      }
+    ],
+    "should_not_extract": [
+      {
+        "reason": "family history sentence describes the patient's mother, not the patient",
+        "finding": "pulmonary embolism"
+      },
+      {
+        "reason": "standard report disclaimer, not a clinical finding",
+        "finding": "report generated with voice recognition"
+      }
+    ]
+  }
+}
+

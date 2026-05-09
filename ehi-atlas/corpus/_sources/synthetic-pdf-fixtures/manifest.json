@@ -1,0 +1,30 @@
+{
+  "source": "constructed://synthetic-pdf-fixtures",
+  "version": "0.1.0",
+  "consent_posture": "constructed",
+  "purpose": "PDF-to-FHIR adapter and LLM extraction regression fixtures",
+  "fixtures": [
+    {
+      "id": "corrected-lab-report",
+      "pdf": "raw/corrected-lab-report.pdf",
+      "source_text": "sources/corrected-lab-report.txt",
+      "expected_facts_key": "corrected-lab-report",
+      "failure_mode": "amended lab report contains preliminary and corrected values; extractor should emit only the corrected final facts"
+    },
+    {
+      "id": "medication-reconciliation",
+      "pdf": "raw/medication-reconciliation.pdf",
+      "source_text": "sources/medication-reconciliation.txt",
+      "expected_facts_key": "medication-reconciliation",
+      "failure_mode": "active, held, and discontinued medications appear near each other; extractor must preserve status and perioperative instructions"
+    },
+    {
+      "id": "radiology-report-page-noise",
+      "pdf": "raw/radiology-report-page-noise.pdf",
+      "source_text": "sources/radiology-report-page-noise.txt",
+      "expected_facts_key": "radiology-report-page-noise",
+      "failure_mode": "repeated headers, disclaimers, page numbers, and family history should not become patient findings"
+    }
+  ]
+}
+

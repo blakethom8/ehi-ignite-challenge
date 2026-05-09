@@ -172,6 +172,8 @@ Created prompts:
 
 ## 2026-05-08 21:43 heartbeat update
 
+> Superseded 2026-05-09: extra-source C-CDA packaging was removed. C-CDA must now enter through the harmonization source layer with patient identity checks.
+
 Added safe C-CDA source packaging support.
 
 ### New capability
@@ -209,6 +211,8 @@ The exporter classifies `.xml` files as `ccda-xml`, packages them under `sources
 This is C-CDA inclusion, not full C-CDA normalization yet. The next improvement is to add a lightweight C-CDA adapter that extracts medication/problem/allergy section entries into FHIR-compatible facts so the C-CDA contributes to `canonical-facts.json`, not just the source inventory.
 
 ## 2026-05-08 21:58 heartbeat update
+
+> Superseded 2026-05-09: lightweight C-CDA extraction now belongs behind the harmonization C-CDA source adapter, not as package-only normalization.
 
 Added lightweight C-CDA normalization into canonical package facts.
 
@@ -252,7 +256,6 @@ Added endpoint:
 
 ```http
 GET /api/harmonize/{collection_id}/export-workspace
-GET /api/harmonize/{collection_id}/export-workspace?include_demo_ccda=true
 ```
 
 Behavior:
@@ -260,17 +263,11 @@ Behavior:
 - builds the package on demand via `scripts.export_workspace_package.build_package`
 - returns `application/zip`
 - returns 404 for unknown collections
-- can include the safe demo C-CDA source for the Synthea demo
+- C-CDA must already be part of the harmonized collection; the API no longer side-loads demo C-CDA sources
 
 ### UI
 
-Added a **Download workspace** button to the Harmonized Record view header. For the Synthea fixture, the link includes the demo C-CDA source:
-
-```text
-/api/harmonize/synthea-demo/export-workspace?include_demo_ccda=true
-```
-
-For other active collections it downloads the active collection package.
+Added a **Download workspace** button to the Harmonized Record view header. It downloads the active collection package.
 
 ### Tests / verification
 

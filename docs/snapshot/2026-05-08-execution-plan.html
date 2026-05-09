@@ -1,0 +1,541 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Execution plan — CCDA + Bench + Wrappers · 2026-05-08</title>
+<style>
+  :root {
+    --ink: #1d2433;
+    --ink-soft: #4a5168;
+    --muted: #6b7390;
+    --rule: #e7eaf2;
+    --rule-strong: #cbd2e2;
+    --bg: #fafbfd;
+    --paper: #ffffff;
+    --accent: #5b76fe;
+    --accent-soft: #eef1ff;
+    --good: #10864c;
+    --bad: #b3261e;
+    --warn: #b86e00;
+    --foundation: #5b76fe;
+    --multiplier: #10864c;
+    --extension: #b86e00;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  main {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 56px 28px 96px;
+    background: var(--paper);
+    border-left: 1px solid var(--rule);
+    border-right: 1px solid var(--rule);
+    min-height: 100vh;
+  }
+  header.doc {
+    border-bottom: 1px solid var(--rule);
+    padding-bottom: 22px;
+    margin-bottom: 36px;
+  }
+  header.doc .eyebrow {
+    color: var(--muted);
+    font-size: 13px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  header.doc h1 {
+    font-size: 28px;
+    line-height: 1.25;
+    margin: 0 0 10px;
+    letter-spacing: -0.01em;
+  }
+  header.doc .meta {
+    color: var(--muted);
+    font-size: 14px;
+  }
+  h2 {
+    font-size: 22px;
+    line-height: 1.3;
+    margin: 48px 0 14px;
+    letter-spacing: -0.01em;
+  }
+  h2 .num {
+    color: var(--accent);
+    font-weight: 600;
+    margin-right: 10px;
+  }
+  h3 {
+    font-size: 17px;
+    margin: 28px 0 8px;
+    color: var(--ink);
+    font-weight: 600;
+  }
+  p { margin: 0 0 14px; }
+  p.lede {
+    font-size: 17px;
+    color: var(--ink-soft);
+  }
+  strong { color: var(--ink); font-weight: 600; }
+  em { color: var(--ink-soft); }
+  ul, ol { margin: 0 0 16px; padding-left: 22px; }
+  ul li, ol li { margin-bottom: 6px; }
+  code {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.88em;
+    background: #f4f5fa;
+    border: 1px solid var(--rule);
+    padding: 1px 5px;
+    border-radius: 4px;
+    color: #2d3650;
+  }
+  hr { border: none; border-top: 1px solid var(--rule); margin: 36px 0; }
+
+  /* Track cards */
+  .track {
+    border: 1px solid var(--rule);
+    border-left-width: 4px;
+    border-radius: 6px;
+    padding: 18px 22px;
+    margin: 0 0 18px;
+    background: #fdfdff;
+  }
+  .track.foundation { border-left-color: var(--foundation); }
+  .track.multiplier { border-left-color: var(--multiplier); }
+  .track.extension  { border-left-color: var(--extension); }
+
+  .track h3 {
+    margin-top: 0;
+    margin-bottom: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .track .label {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 700;
+  }
+  .track.foundation .label { color: var(--foundation); }
+  .track.multiplier .label { color: var(--multiplier); }
+  .track.extension  .label { color: var(--extension); }
+
+  .track .meta-line {
+    color: var(--muted);
+    font-size: 13px;
+    margin: 0 0 12px;
+  }
+
+  .task-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .task-list li {
+    margin-bottom: 6px;
+    padding-left: 22px;
+    position: relative;
+    font-size: 14.5px;
+  }
+  .task-list li::before {
+    content: "□";
+    color: var(--rule-strong);
+    position: absolute;
+    left: 0;
+    top: 0;
+    font-weight: 700;
+  }
+  .task-list .id {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12px;
+    background: #eef1ff;
+    color: var(--accent);
+    padding: 1px 6px;
+    border-radius: 3px;
+    margin-right: 8px;
+    font-weight: 600;
+  }
+
+  /* Sequence diagram */
+  .seq {
+    display: grid;
+    grid-template-columns: 60px 1fr;
+    gap: 8px 16px;
+    margin: 16px 0 24px;
+    font-size: 14px;
+  }
+  .seq .day {
+    color: var(--muted);
+    font-weight: 600;
+    font-size: 13px;
+    padding-top: 2px;
+  }
+  .seq .work {
+    border-left: 2px solid var(--rule-strong);
+    padding-left: 14px;
+    padding-bottom: 6px;
+  }
+  .seq .work .pill {
+    display: inline-block;
+    padding: 1px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-right: 6px;
+  }
+  .seq .work .pill.A { background: #eef1ff; color: var(--foundation); }
+  .seq .work .pill.B { background: #eef1ff; color: var(--foundation); }
+  .seq .work .pill.C { background: #e8f5ec; color: var(--multiplier); }
+  .seq .work .pill.D { background: #fff4e0; color: var(--extension); }
+  .seq .work .pill.E { background: #fff4e0; color: var(--extension); }
+
+  /* Patterns */
+  .pattern {
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    padding: 16px 20px;
+    margin-bottom: 14px;
+    background: #fdfdff;
+  }
+  .pattern.recommended {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+  .pattern h3 {
+    margin-top: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+  }
+  .pattern .badge {
+    font-size: 11px;
+    background: var(--accent);
+    color: white;
+    padding: 2px 8px;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 700;
+  }
+
+  blockquote {
+    margin: 18px 0;
+    padding: 12px 18px;
+    background: var(--accent-soft);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 4px 4px 0;
+  }
+  blockquote p:last-child { margin-bottom: 0; }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 16px 0 22px;
+    font-size: 14px;
+  }
+  th, td {
+    text-align: left;
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+  }
+  th {
+    border-bottom: 1px solid var(--rule-strong);
+    color: var(--muted);
+    font-weight: 600;
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    background: #f7f8fc;
+  }
+
+  .next-step {
+    margin-top: 36px;
+    padding: 22px 22px 18px;
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    background: var(--accent-soft);
+  }
+  .next-step h3 {
+    margin-top: 0;
+    color: var(--accent);
+  }
+  footer {
+    margin-top: 64px;
+    padding-top: 16px;
+    border-top: 1px solid var(--rule);
+    color: var(--muted);
+    font-size: 13px;
+  }
+  @media (max-width: 640px) {
+    main { padding: 36px 18px 64px; }
+    header.doc h1 { font-size: 24px; }
+    h2 { font-size: 19px; }
+  }
+</style>
+</head>
+<body>
+<main>
+
+<header class="doc">
+  <div class="eyebrow">Execution plan · CCDA + Bench + Wrappers</div>
+  <h1>Five tracks, one timeline, two orchestration patterns</h1>
+  <div class="meta">2026-05-08 · ~5 days to Phase 1 deadline · solo + agent fleet</div>
+</header>
+
+<p class="lede">
+  Three workstreams now sit on the table: CCDA pipeline, the bench environment, and the external
+  PDF-parser wrappers (MinerU/LlamaParse/Gemma). They connect — the bench gives the others meaning.
+  Below: dependency-mapped tasks, day-by-day sequencing, and a recommendation on whether to do this
+  in one session or split across Claude Code + Codex.
+</p>
+
+<h2><span class="num">§1</span>The five tracks</h2>
+
+<p>
+  Color coding: <strong style="color: var(--foundation);">blue = foundation</strong> (other tracks
+  depend on this), <strong style="color: var(--multiplier);">green = multiplier</strong> (makes
+  the foundations more valuable), <strong style="color: var(--extension);">orange = extension</strong>
+  (defer if time-pressured).
+</p>
+
+<div class="track foundation">
+  <h3>Track A · CCDA pipeline <span class="label">FOUNDATION · ~1 day</span></h3>
+  <div class="meta-line">
+    Un-archive the existing CCDA adapter, install Microsoft FHIR-Converter, register as a pipeline,
+    wire Josh's 747 sample CCDAs as a corpus. Smallest decisive win — the work is mostly already done.
+  </div>
+  <ul class="task-list">
+    <li><span class="id">A1</span>Un-archive <code>ehi_atlas/adapters/ccda.py</code> + tests; refactor against current <code>lib/</code> import patterns</li>
+    <li><span class="id">A2</span>Install Microsoft FHIR-Converter (<code>npm install -g @microsoft/fhir-converter</code>), verify <code>_probe_fhir_converter()</code> works</li>
+    <li><span class="id">A3</span>Add a new <code>CCDAPipeline</code> to <code>lib/extract/pipelines/</code> registry — same Protocol shape as the PDF pipelines, but stage 1 = subprocess call, stage 0 = no vision</li>
+    <li><span class="id">A4</span>Wire Josh's CCDAs (<code>ehi-atlas/corpus/_sources/josh-ccdas/raw/</code>, 747 docs) as a test corpus loader</li>
+    <li><span class="id">A5</span>Add <code>--ccda</code> option to the lab CLI (<code>python -m lib.extract.lab run --pipeline ccda --ccda &lt;path&gt;</code>)</li>
+    <li><span class="id">A6</span>Smoke test: convert one Cerner CCDA, score against an LLM-extracted version of the same content (matched-content GT)</li>
+  </ul>
+</div>
+
+<div class="track foundation">
+  <h3>Track B · Synthea round-trip GT <span class="label">FOUNDATION · ~1-2 days</span></h3>
+  <div class="meta-line">
+    Render Synthea bundles to PDF, run our pipeline, score against the original bundle. The only
+    fully-trustworthy GT we can generate at scale (no LLM in the loop).
+  </div>
+  <ul class="task-list">
+    <li><span class="id">B1</span>Pick the renderer: Synthea has a built-in CCDA exporter; pair with <code>weasyprint</code> or Chrome-headless to PDF; alternative: render via clinical-document HTML template + PDF print</li>
+    <li><span class="id">B2</span>Round-trip one bundle: <code>bundle.json → CCDA → PDF → our extractor → bundle'.json</code></li>
+    <li><span class="id">B3</span>Score <code>bundle'</code> vs <code>bundle</code> using the existing <code>score_against_ground_truth()</code> — F1 is meaningful here because GT is absolute</li>
+    <li><span class="id">B4</span>Sanity: pick 3 patients with different complexity (1 chronic disease, 1 multi-condition, 1 polypharmacy) and round-trip each</li>
+    <li><span class="id">B5</span>Scale: 100 bundles overnight; aggregate F1 distribution as the headline metric</li>
+  </ul>
+</div>
+
+<div class="track multiplier">
+  <h3>Track C · Bench upgrades <span class="label">MULTIPLIER · ~2 days</span></h3>
+  <div class="meta-line">
+    The bench is already there but rough. Make it genuinely comparative — typed Protocol,
+    diagnostic outputs, leaderboard view. Without this, none of the other tracks compose into a
+    presentable story.
+  </div>
+  <ul class="task-list">
+    <li><span class="id">C1</span><code>ExtractionPipeline</code> Protocol cleanup — formalize input (PDF or CCDA), output (FHIR Bundle), required metadata (cost, latency, version)</li>
+    <li><span class="id">C2</span>Diagnostic outputs — per-resource-type F1, failure-mode taxonomy (hallucinations, misses, code mismatches), surfaced in <code>eval.json</code></li>
+    <li><span class="id">C3</span>Comparative leaderboard view in <code>app/</code> (Streamlit page) — runs across pipelines × PDFs as a heat-map</li>
+    <li><span class="id">C4</span>Reproducibility hashing — pin <code>(pdf_sha, pipeline_version, gt_version) → result_hash</code> so re-runs verify byte-equality</li>
+    <li><span class="id">C5</span>Document the bench as an extensible interface — "here's how you plug in a new pipeline"</li>
+  </ul>
+</div>
+
+<div class="track extension">
+  <h3>Track D · External parser wrappers <span class="label">EXTENSION · ~2 days</span></h3>
+  <div class="meta-line">
+    Wrap MinerU + LlamaParse as <code>ExtractionPipeline</code>s. Each is two-stage:
+    parser → markdown, then markdown → FHIR via Sonnet. Real comparison data.
+  </div>
+  <ul class="task-list">
+    <li><span class="id">D1</span><code>MinerUPipeline</code> — local <code>pip install marker-pdf-converter</code>, stage 1 returns markdown, stage 2 = <code>call_with_schema</code> per resource</li>
+    <li><span class="id">D2</span><code>LlamaParsePipeline</code> — REST to <code>api.cloud.llamaindex.ai/api/parsing/upload</code>, same stage-2 shape</li>
+    <li><span class="id">D3</span>(Optional) <code>ComprehendMedicalPipeline</code> — AWS NER for entity extraction; tests the "best-of-breed clinical-NLP backend" hypothesis</li>
+    <li><span class="id">D4</span>Bake-off: run all pipelines on cedars-myhealth + 10 Synthea round-trips; produce comparison report</li>
+  </ul>
+</div>
+
+<div class="track extension">
+  <h3>Track E · Local Gemma backend <span class="label">EXTENSION · ~1 day</span></h3>
+  <div class="meta-line">
+    <code>OllamaBackend</code> in <code>lib/extract/pdf.py</code>, swap into the existing
+    <code>multipass-fhir-gemma-tabular</code> pipeline. Tests Move F's hypothesis: was the lab-recall
+    regression a chunking artifact, not a Gemma deficit?
+  </div>
+  <ul class="task-list">
+    <li><span class="id">E1</span>Install Ollama, pull <code>gemma4:31b</code> (~20 GB at 4-bit)</li>
+    <li><span class="id">E2</span>Write <code>OllamaBackend</code> implementing <code>VisionBackend</code> Protocol; reuse rasterizer</li>
+    <li><span class="id">E3</span>Wire as a <code>get_backend()</code> branch; swap into <code>multipass-fhir-gemma-tabular</code></li>
+    <li><span class="id">E4</span>Re-run cedars-myhealth; compare lab F1 vs Move F's 0.38 baseline. Falsify or confirm.</li>
+  </ul>
+</div>
+
+<hr>
+
+<h2><span class="num">§2</span>Dependency map</h2>
+
+<table>
+  <thead>
+    <tr><th>Track</th><th>Blocks</th><th>Blocked by</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>A · CCDA pipeline</td><td>none — independent</td><td>none</td></tr>
+    <tr><td>B · Synthea round-trip</td><td>provides headline metric for C and D</td><td>none</td></tr>
+    <tr><td>C · Bench upgrades</td><td>D (comparative views need it)</td><td>nothing strictly, but better after A and B</td></tr>
+    <tr><td>D · External wrappers</td><td>none</td><td>C ideally (Protocol cleanup)</td></tr>
+    <tr><td>E · Local Gemma</td><td>none — independent</td><td>none</td></tr>
+  </tbody>
+</table>
+
+<p>
+  Tracks A, B, and E are <strong>independent of each other</strong> — they could run in parallel
+  if we had the orchestration. C is foundational for D. D is parallel-internally (MinerU and
+  LlamaParse don't conflict).
+</p>
+
+<hr>
+
+<h2><span class="num">§3</span>Recommended sequencing — 5 days to deadline</h2>
+
+<div class="seq">
+  <div class="day">Day 1<br>today</div>
+  <div class="work"><span class="pill A">A</span><strong>CCDA pipeline.</strong> ~3-4 sub-agent tasks, each ~30-60 min. Decisive win — by EOD we have a CCDA→FHIR pipeline registered, Josh's 747 docs as test corpus, and matched-content comparison working.</div>
+
+  <div class="day">Day 2</div>
+  <div class="work"><span class="pill B">B</span><strong>Synthea round-trip GT.</strong> Pick the renderer, get one bundle round-tripping cleanly, scale to 10 patients. By EOD we have the first GT we can publish a number against without caveats.</div>
+
+  <div class="day">Day 3</div>
+  <div class="work"><span class="pill C">C</span><strong>Bench upgrades.</strong> Protocol cleanup + diagnostic outputs + Streamlit leaderboard. Makes the bench presentable for the Phase 1 submission.</div>
+
+  <div class="day">Day 4</div>
+  <div class="work"><span class="pill D">D</span><strong>External wrappers — parallel session.</strong> MinerU + LlamaParse simultaneously in a Codex session (subscription-economics test). This session: polish, write up results, screenshots.</div>
+
+  <div class="day">Day 5<br>05-13</div>
+  <div class="work"><span class="pill D">D</span> + <strong>submission.</strong> Bake-off run, comparison report, final write-up. Track E (local Gemma) deferred to Phase 2 unless we have spare cycles.</div>
+</div>
+
+<hr>
+
+<h2><span class="num">§4</span>Orchestration — how to actually run this</h2>
+
+<div class="pattern recommended">
+  <h3>Pattern A — Hybrid: this session orchestrates A+B+C, Codex session runs D
+    <span class="badge">Recommended</span>
+  </h3>
+  <p>
+    <strong>This session:</strong> I dispatch sub-agents per task in Tracks A, B, C using the
+    existing builder pattern (<code>phase1-builder</code> agents from the
+    <code>.claude/</code> infrastructure already in this repo). I create a queue file at
+    <code>.claude/integration-queue.md</code> (mirroring <code>gold-standard-queue.md</code>),
+    work it sequentially, you check in periodically. Each task is self-contained, ~30-90 min of
+    sub-agent execution time.
+  </p>
+  <p>
+    <strong>Codex session (your machine):</strong> open a Codex CLI session, point it at the
+    bench, ask it to wire MinerU and LlamaParse as parallel work. This is independent of the
+    work happening in this session (Track D doesn't conflict with A+B+C if Track C lands first).
+  </p>
+  <p>
+    <strong>Why this is the best pattern:</strong>
+  </p>
+  <ul>
+    <li><strong>It actually answers §2 of the platform doc</strong> — does subscription-economics work for batch eval? Codex on Track D directly tests it.</li>
+    <li><strong>True parallelism without merge risk</strong> — Track D touches new files (<code>lib/extract/pipelines/external/*</code>) that nothing else touches. Track A+B+C touches infrastructure that needs coherent ownership.</li>
+    <li><strong>Builds the multi-agent operational story</strong> — by the time we submit, we've shown that two independent agent sessions can ship coordinated infrastructure. That's a story for the pitch.</li>
+    <li><strong>Phase 1 deadline pressure</strong> — sequential is too slow at 5 days. This is the only pattern that ships everything.</li>
+  </ul>
+</div>
+
+<div class="pattern">
+  <h3>Pattern B — Single session, sequential</h3>
+  <p>
+    I dispatch sub-agents in one session, sequentially. Easiest to reason about, no coordination
+    overhead, you just check in on progress. Downside: ~6-8 days of wall-clock if everything is
+    serial — won't fit before Phase 1 deadline.
+  </p>
+</div>
+
+<div class="pattern">
+  <h3>Pattern C — Multiple Claude Code sessions</h3>
+  <p>
+    Open 2-3 Claude Code sessions, each owns a track. True parallelism, all in one model
+    family. Downside: subscription rate-limit pressure (we'd be doing a lot of work concurrently),
+    and we'd miss the chance to dogfood Codex specifically.
+  </p>
+</div>
+
+<hr>
+
+<h2><span class="num">§5</span>Cost &amp; budget</h2>
+
+<table>
+  <thead>
+    <tr><th>Track</th><th>API spend (est)</th><th>Why</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>A · CCDA</td><td class="num">~$2</td><td>Mostly subprocess + sub-agent token spend; no LLM extraction</td></tr>
+    <tr><td>B · Synthea round-trip</td><td class="num">~$5</td><td>10 PDF extractions @ ~$0.40 each; scale-to-100 deferred or use Sonnet</td></tr>
+    <tr><td>C · Bench upgrades</td><td class="num">~$3</td><td>Builder agent spend, no extractions</td></tr>
+    <tr><td>D · External wrappers</td><td class="num">~$8</td><td>Stage 2 (markdown→FHIR) on Sonnet; LlamaParse free tier covers stage 1</td></tr>
+    <tr><td>E · Gemma (deferred)</td><td class="num">$0</td><td>Local Gemma is $0/PDF</td></tr>
+    <tr><td><strong>Total</strong></td><td class="num"><strong>~$18</strong></td><td>Within the $50 budget; ~$32 buffer for re-runs and bench validation</td></tr>
+  </tbody>
+</table>
+
+<hr>
+
+<h2><span class="num">§6</span>Risks I'd flag</h2>
+
+<ul>
+  <li><strong>Microsoft FHIR-Converter install friction</strong> — Node 18+ requirement, npm global install. If the npm path fails, fallback is <code>npx</code> which the existing adapter already supports.</li>
+  <li><strong>Synthea CCDA renderer quality</strong> — Synthea outputs CCDA, but the visual rendering layer (CCDA → PDF) may produce too-clean documents. We may need to add visual noise (pseudo-faxes) to make round-trip tests more representative.</li>
+  <li><strong>Codex session rate limits</strong> — if Codex hits limits during Track D, we either fall back to API (eats budget) or move D into this session (loses the multi-agent story but ships).</li>
+  <li><strong>Phase 1 scope creep</strong> — the temptation will be to wire Track E (Gemma) once we see the others working. Discipline says no — local Gemma is a Phase 2 cost-reduction story, not a Phase 1 capability story.</li>
+</ul>
+
+<div class="next-step">
+  <h3>What to do right now</h3>
+  <p>
+    If you're aligned on <strong>Pattern A</strong>:
+  </p>
+  <ol>
+    <li>I'll create <code>.claude/integration-queue.md</code> with Tracks A, B, C broken into sub-agent-sized tasks</li>
+    <li>I'll dispatch <code>A1</code> immediately (un-archive the CCDA adapter — fast first decisive win)</li>
+    <li>You open a Codex CLI session in a separate terminal and point it at this plan, scoped to Track D specifically. I'll write a self-contained brief Codex can pick up.</li>
+    <li>We reconvene at end-of-day with results from both sessions</li>
+  </ol>
+  <p>
+    Or if you'd rather keep it simpler — Pattern B, sequential in this session — that's fine too;
+    we'd have to drop Track D or push it to post-Phase-1. Your call.
+  </p>
+</div>
+
+<footer>
+  Generated 2026-05-08 · branch <code>feature/code-resolution-loinc</code> ·
+  follow-up to platform-research-discussion · 5 days to Phase 1 deadline
+</footer>
+
+</main>
+</body>
+</html>

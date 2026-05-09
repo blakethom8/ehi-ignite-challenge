@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, BookOpenText, Database, FlaskConical, Route, ShieldCheck } from "lucide-react";
+import { ArrowRight, BookOpenText, Database, FileCode2, FlaskConical, Route, ShieldCheck } from "lucide-react";
+import { Link } from "react-router-dom";
 import { api } from "../../api/client";
 
 function StatTile({ label, value, note }: { label: string; value: string; note: string }) {
@@ -186,6 +187,16 @@ export function AnalysisOverview() {
       </section>
 
       <section className="mt-7 grid gap-4 md:grid-cols-3">
+        <Link to="/analysis/ccda-testing-lab" className="rounded-2xl border border-[#cdeee9] bg-white p-4 transition hover:border-[#0f766e] hover:shadow-sm">
+          <p className="flex items-center gap-2 text-sm font-semibold text-[#0f172a]">
+            <FileCode2 size={16} className="text-[#0f766e]" />
+            C-CDA Testing Lab
+          </p>
+          <p className="mt-2 text-sm leading-6 text-[#35524d]">
+            Upload a C-CDA XML or PDF, choose the Microsoft converter or another pipeline, and inspect the emitted FHIR Bundle.
+          </p>
+        </Link>
+
         <article className="rounded-2xl border border-[#dbece7] bg-white p-4">
           <p className="flex items-center gap-2 text-sm font-semibold text-[#0f172a]">
             <Database size={16} className="text-[#0f766e]" />

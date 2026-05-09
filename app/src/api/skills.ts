@@ -8,15 +8,24 @@
 
 import axios from "axios";
 import type {
+  CanvasNode,
+  CanvasResponse,
   Citation,
   PatientMemoryResponse,
   RunListItem,
+  RunInspectorResponse,
+  RunMessage,
+  RunMessageRequest,
+  RunMessagesResponse,
   RunStartResponse,
   RunStateResponse,
   SaveRequest,
   SkillDetail,
   SkillSummary,
   TranscriptResponse,
+  TrialPursuit,
+  TrialPursuitListResponse,
+  TrialPursuitUpsertRequest,
   WorkspaceResponse,
 } from "../types/skills";
 
@@ -97,6 +106,81 @@ export const skillsApi = {
       )
       .then((r) => r.data),
 
+  getCanvas: (
+    skillName: string,
+    runId: string,
+    patientId: string
+  ): Promise<CanvasResponse> =>
+    http
+      .get<CanvasResponse>(
+        `/${encodeURIComponent(skillName)}/runs/${encodeURIComponent(
+          runId
+        )}/canvas`,
+        { params: { patient_id: patientId } }
+      )
+      .then((r) => r.data),
+
+  setCanvasNodeSelection: (
+    skillName: string,
+    runId: string,
+    patientId: string,
+    nodeId: string,
+    selected: boolean
+  ): Promise<CanvasNode> =>
+    http
+      .post<CanvasNode>(
+        `/${encodeURIComponent(skillName)}/runs/${encodeURIComponent(
+          runId
+        )}/canvas/nodes/${encodeURIComponent(nodeId)}/selection`,
+        { selected, actor: "clinician" },
+        { params: { patient_id: patientId } }
+      )
+      .then((r) => r.data),
+
+  getMessages: (
+    skillName: string,
+    runId: string,
+    patientId: string
+  ): Promise<RunMessagesResponse> =>
+    http
+      .get<RunMessagesResponse>(
+        `/${encodeURIComponent(skillName)}/runs/${encodeURIComponent(
+          runId
+        )}/messages`,
+        { params: { patient_id: patientId } }
+      )
+      .then((r) => r.data),
+
+  getInspector: (
+    skillName: string,
+    runId: string,
+    patientId: string
+  ): Promise<RunInspectorResponse> =>
+    http
+      .get<RunInspectorResponse>(
+        `/${encodeURIComponent(skillName)}/runs/${encodeURIComponent(
+          runId
+        )}/inspector`,
+        { params: { patient_id: patientId } }
+      )
+      .then((r) => r.data),
+
+  addMessage: (
+    skillName: string,
+    runId: string,
+    patientId: string,
+    payload: RunMessageRequest
+  ): Promise<RunMessage> =>
+    http
+      .post<RunMessage>(
+        `/${encodeURIComponent(skillName)}/runs/${encodeURIComponent(
+          runId
+        )}/messages`,
+        payload,
+        { params: { patient_id: patientId } }
+      )
+      .then((r) => r.data),
+
   getOutput: (
     skillName: string,
     runId: string,
@@ -158,6 +242,59 @@ export const skillsApi = {
     http
       .get<PatientMemoryResponse>(
         `/patients/${encodeURIComponent(patientId)}/memory`
+      )
+      .then((r) => r.data),
+
+  listTrialPursuits: (patientId: string): Promise<TrialPursuitListResponse> =>
+    http
+      .get<TrialPursuitListResponse>(
+        `/patients/${encodeURIComponent(patientId)}/trial-pursuits`
+      )
+      .then((r) => r.data),
+
+  upsertTrialPursuit: (
+    patientId: string,
+    payload: TrialPursuitUpsertRequest
+  ): Promise<TrialPursuit> =>
+    http
+      .post<TrialPursuit>(
+        `/patients/${encodeURIComponent(patientId)}/trial-pursuits`,
+        payload
+      )
+      .then((r) => r.data),
+
+  updateTrialPursuit: (
+    patientId: string,
+    pursuitId: string,
+    payload: {
+      status?: string;
+      next_step?: string;
+      notes?: string;
+      tags?: string[];
+      event_note?: string;
+      actor?: string;
+    }
+  ): Promise<TrialPursuit> =>
+    http
+      .patch<TrialPursuit>(
+        `/patients/${encodeURIComponent(patientId)}/trial-pursuits/${encodeURIComponent(
+          pursuitId
+        )}`,
+        payload
+      )
+      .then((r) => r.data),
+
+  addTrialPursuitTask: (
+    patientId: string,
+    pursuitId: string,
+    payload: { title: string; due_at?: string | null; actor?: string }
+  ): Promise<TrialPursuit> =>
+    http
+      .post<TrialPursuit>(
+        `/patients/${encodeURIComponent(patientId)}/trial-pursuits/${encodeURIComponent(
+          pursuitId
+        )}/tasks`,
+        payload
       )
       .then((r) => r.data),
 };

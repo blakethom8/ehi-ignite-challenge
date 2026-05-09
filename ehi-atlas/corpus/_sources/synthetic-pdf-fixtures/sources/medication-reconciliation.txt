@@ -1,0 +1,38 @@
+EHI ATLAS SYNTHETIC SURGERY CENTER
+PREOPERATIVE MEDICATION RECONCILIATION
+
+Patient: Morgan Vale
+DOB: 1962-04-18
+MRN: SYN-PDF-001
+Encounter date: 2026-03-10
+Planned procedure: Elective laparoscopic cholecystectomy on 2026-03-18
+Clinician: Elena Brooks, PharmD
+
+ACTIVE MEDICATIONS
+1. Apixaban 5 mg tablet
+   Sig: Take 1 tablet by mouth twice daily.
+   Status: ACTIVE.
+   Perioperative instruction: HOLD 72 hours before planned procedure.
+   Last planned dose: evening of 2026-03-14.
+
+2. Metformin 500 mg tablet
+   Sig: Take 1 tablet by mouth twice daily with meals.
+   Status: ACTIVE.
+   Perioperative instruction: HOLD morning of procedure only.
+
+3. Lisinopril 10 mg tablet
+   Sig: Take 1 tablet by mouth every morning.
+   Status: ACTIVE.
+   Perioperative instruction: Take as usual unless anesthesia instructs otherwise.
+
+STOPPED MEDICATIONS
+Ibuprofen 200 mg tablet was used as needed for knee pain.
+Status: STOPPED on 2026-03-10 because patient is anticoagulated.
+Do not restart before surgery.
+
+MEDICATION ALLERGIES / ADVERSE REACTIONS
+Warfarin - severe rash reported in 2019.
+This is an adverse reaction history and is not a current medication.
+
+Patient verbalized understanding of hold instructions.
+

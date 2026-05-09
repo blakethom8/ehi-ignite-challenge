@@ -14,13 +14,34 @@ fi
 
 git pull origin master
 
+"${COMPOSE[@]}" -f "$COMPOSE_FILE" pull fhir-converter || true
 "${COMPOSE[@]}" -f "$COMPOSE_FILE" build
 
 # Hetzner currently runs docker-compose v1.29, which can fail during in-place
 # recreate with KeyError: ContainerConfig. Removing only service containers is
 # safe because patient/workspace data lives in the bind-mounted ../data volume.
-"${COMPOSE[@]}" -f "$COMPOSE_FILE" rm -fsv api app cursor-sidecar
+"${COMPOSE[@]}" -f "$COMPOSE_FILE" rm -fsv api app cursor-sidecar fhir-converter
 "${COMPOSE[@]}" -f "$COMPOSE_FILE" up -d --no-build
+
+converter_ready=0
+for _ in {1..90}; do
+  converter_container="$("${COMPOSE[@]}" -f "$COMPOSE_FILE" ps -q fhir-converter 2>/dev/null || true)"
+  converter_ip=""
+  if [[ -n "$converter_container" ]]; then
+    converter_ip="$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$converter_container" 2>/dev/null || true)"
+  fi
+  if [[ -n "$converter_ip" ]] && curl -fsS "http://${converter_ip}:8080/health/check" >/dev/null 2>&1; then
+    converter_ready=1
+    break
+  fi
+  sleep 1
+done
+
+if [[ "$converter_ready" != "1" ]]; then
+  echo "FHIR converter did not become healthy after deploy." >&2
+  "${COMPOSE[@]}" -f "$COMPOSE_FILE" logs --tail=120 fhir-converter >&2 || true
+  exit 1
+fi
 
 api_ready=0
 for _ in {1..90}; do

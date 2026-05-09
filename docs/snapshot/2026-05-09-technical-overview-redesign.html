@@ -1,0 +1,653 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Technical Overview — section redesign · 2026-05-09</title>
+<style>
+  :root {
+    --ink: #1d2433;
+    --ink-soft: #4a5168;
+    --muted: #6b7390;
+    --rule: #e7eaf2;
+    --rule-strong: #cbd2e2;
+    --bg: #fafbfd;
+    --paper: #ffffff;
+    --accent: #5b76fe;
+    --accent-soft: #eef1ff;
+    --good: #10864c;
+    --warn: #b86e00;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  main {
+    max-width: 820px;
+    margin: 0 auto;
+    padding: 56px 28px 96px;
+    background: var(--paper);
+    border-left: 1px solid var(--rule);
+    border-right: 1px solid var(--rule);
+    min-height: 100vh;
+  }
+  header.doc {
+    border-bottom: 1px solid var(--rule);
+    padding-bottom: 22px;
+    margin-bottom: 36px;
+  }
+  header.doc .eyebrow {
+    color: var(--muted);
+    font-size: 13px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  header.doc h1 {
+    font-size: 28px;
+    line-height: 1.25;
+    margin: 0 0 10px;
+    letter-spacing: -0.01em;
+  }
+  header.doc .meta {
+    color: var(--muted);
+    font-size: 14px;
+  }
+  h2 {
+    font-size: 22px;
+    line-height: 1.3;
+    margin: 48px 0 14px;
+    letter-spacing: -0.01em;
+  }
+  h2 .num {
+    color: var(--accent);
+    font-weight: 600;
+    margin-right: 10px;
+  }
+  h3 {
+    font-size: 17px;
+    margin: 28px 0 8px;
+    color: var(--ink);
+    font-weight: 600;
+  }
+  h4 {
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+    margin: 20px 0 6px;
+    font-weight: 700;
+  }
+  p { margin: 0 0 14px; }
+  p.lede {
+    font-size: 17px;
+    color: var(--ink-soft);
+  }
+  strong { color: var(--ink); font-weight: 600; }
+  em { color: var(--ink-soft); }
+  ul, ol { margin: 0 0 16px; padding-left: 22px; }
+  ul li, ol li { margin-bottom: 6px; }
+  code {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.88em;
+    background: #f4f5fa;
+    border: 1px solid var(--rule);
+    padding: 1px 5px;
+    border-radius: 4px;
+    color: #2d3650;
+  }
+  hr { border: none; border-top: 1px solid var(--rule); margin: 36px 0; }
+
+  blockquote {
+    margin: 18px 0;
+    padding: 12px 18px;
+    background: var(--accent-soft);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 4px 4px 0;
+  }
+  blockquote p:last-child { margin-bottom: 0; }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 16px 0 22px;
+    font-size: 14px;
+  }
+  th, td {
+    text-align: left;
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+  }
+  th {
+    border-bottom: 1px solid var(--rule-strong);
+    color: var(--muted);
+    font-weight: 600;
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    background: #f7f8fc;
+  }
+
+  /* Audience cards */
+  .audience-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+    margin: 18px 0 24px;
+  }
+  .audience {
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    padding: 14px 16px;
+    background: #fdfdff;
+  }
+  .audience h4 {
+    margin: 0 0 4px;
+    color: var(--accent);
+  }
+  .audience .who {
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .audience p {
+    font-size: 13.5px;
+    margin: 0;
+  }
+
+  /* IA tree */
+  .ia-tree {
+    margin: 18px 0 22px;
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 18px 22px;
+    background: #fdfdff;
+  }
+  .ia-tree .section-row {
+    padding: 10px 0;
+    border-bottom: 1px dashed var(--rule);
+  }
+  .ia-tree .section-row:last-child { border-bottom: none; }
+  .ia-tree .section-row .head {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 4px;
+  }
+  .ia-tree .num-tag {
+    background: var(--accent);
+    color: white;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 3px;
+    font-family: ui-monospace, Menlo, monospace;
+  }
+  .ia-tree .title {
+    font-weight: 600;
+    color: var(--ink);
+    font-size: 15.5px;
+  }
+  .ia-tree .audience-tag {
+    font-size: 11px;
+    color: var(--muted);
+    margin-left: auto;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .ia-tree .gist {
+    font-size: 13.5px;
+    color: var(--ink-soft);
+    margin: 0 0 4px;
+  }
+  .ia-tree .contents {
+    font-size: 13px;
+    color: var(--muted);
+    font-family: ui-monospace, Menlo, monospace;
+  }
+
+  /* Naming options */
+  .naming-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 8px;
+    margin: 16px 0;
+  }
+  .name-card {
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: 10px 12px;
+    text-align: center;
+    background: white;
+    font-size: 13.5px;
+  }
+  .name-card.recommended {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+  .name-card .label {
+    font-weight: 700;
+    margin-bottom: 4px;
+    color: var(--ink);
+  }
+  .name-card .vibe { font-size: 11.5px; color: var(--muted); }
+
+  .question {
+    margin-top: 36px;
+    padding: 22px 22px 18px;
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    background: var(--accent-soft);
+  }
+  .question h3 {
+    margin-top: 0;
+    color: var(--accent);
+  }
+  footer {
+    margin-top: 64px;
+    padding-top: 16px;
+    border-top: 1px solid var(--rule);
+    color: var(--muted);
+    font-size: 13px;
+  }
+  @media (max-width: 640px) {
+    main { padding: 36px 18px 64px; }
+    header.doc h1 { font-size: 24px; }
+    h2 { font-size: 19px; }
+  }
+</style>
+</head>
+<body>
+<main>
+
+<header class="doc">
+  <div class="eyebrow">Website redesign · Technical Overview section</div>
+  <h1>From "Data Labs" to a Technical Overview that earns trust</h1>
+  <div class="meta">2026-05-09 · proposed IA + naming + content sketch · before any code</div>
+</header>
+
+<p class="lede">
+  The current <code>/analysis/*</code> section is six developer-facing pages organized by what
+  data shows. The new section should be organized by what visitors want to know, with the same
+  rigor as the Phase 1 submission narrative but in a browseable, web-native form. Below: who it's
+  for, the IA I'd build, naming options, and what the page-level content sketch looks like.
+</p>
+
+<h2><span class="num">§1</span>Current state — what's there now</h2>
+
+<p>
+  Six pages live at <code>/analysis/*</code>:
+</p>
+
+<ul>
+  <li><code>/analysis</code> (Overview) — stat tiles, learning objectives, pipeline steps, question-to-resource map</li>
+  <li><code>/analysis/fhir-primer</code> — explainer on FHIR R4 resource types</li>
+  <li><code>/analysis/methodology</code> — pipeline stages and trust gates</li>
+  <li><code>/analysis/definitions</code> — field-by-field reference</li>
+  <li><code>/analysis/coverage</code> — corpus-level coverage stats</li>
+  <li><code>/analysis/flight-school</code> — onboarding/orientation content</li>
+</ul>
+
+<p>
+  The pages exist and have content, but the section as a whole reads as <em>a methodology
+  reference for someone already inside the project.</em> A first-time visitor — judge,
+  health-IT vendor, clinician — doesn't know whether to start with FHIR Primer, Methodology,
+  or Overview. There's no visible argument structure: "here's what we built, here's why,
+  here's how to evaluate it."
+</p>
+
+<p>
+  Three structural problems:
+</p>
+
+<ol>
+  <li><strong>Organized by data, not by question.</strong> "Coverage" and "Definitions" answer reference questions. Visitors come with strategic questions: "is this real?", "how does it work?", "what makes it trustworthy?", "how does it compare to X?"</li>
+  <li><strong>The PDF lab — the most differentiated technical work — isn't surfaced.</strong> The whole bake-off, the gold-standard methodology, the live F1 numbers, the local-Gemma experiment — none of it appears in this section.</li>
+  <li><strong>The submission's strongest arguments aren't reflected.</strong> The "we sit alongside TEFCA" framing, the four trust guardrails, the provenance wedge, the harmonization story — the website doesn't echo these.</li>
+</ol>
+
+<hr>
+
+<h2><span class="num">§2</span>Who is this section actually for?</h2>
+
+<p>
+  Four real audiences, in rough order of "would they actually click into this section?":
+</p>
+
+<div class="audience-grid">
+  <div class="audience">
+    <h4>Phase 1 / 2 judges</h4>
+    <div class="who">EHIgnite reviewers, ONC-affiliated</div>
+    <p>Want to verify the submission is real. Will check whether the website corroborates the PDF — or contradicts it. Care about evidence, methodology, honesty about limitations.</p>
+  </div>
+  <div class="audience">
+    <h4>Health-IT-literate visitors</h4>
+    <div class="who">Devs, vendors, FHIR-fluent</div>
+    <p>Want to evaluate whether you understand the ecosystem (CCDA, US Core, TEFCA). Will look for specifics: which FHIR profile, which converter, which standards.</p>
+  </div>
+  <div class="audience">
+    <h4>Clinical evaluators</h4>
+    <div class="who">Physicians, informaticists</div>
+    <p>Want to understand how trust is built. Care about deterministic-first logic, citations, missing-information disclosure, and whether the AI can be safely used in care.</p>
+  </div>
+  <div class="audience">
+    <h4>Future collaborators</h4>
+    <div class="who">Phase 2 partners, researchers</div>
+    <p>Want to know if the platform is something they could build on or contribute to. Care about modularity, extensibility, the wedge.</p>
+  </div>
+</div>
+
+<p>
+  Patients/caregivers are <em>not</em> the audience for this section. They have other surfaces
+  (the explorer, the assistant, the patient-journey app). The Technical Overview is for people
+  who want to understand the engine.
+</p>
+
+<hr>
+
+<h2><span class="num">§3</span>What questions should each page answer?</h2>
+
+<p>
+  This is the core re-orientation. Instead of "Coverage / Definitions / Methodology" (data-shape
+  organization), pages are titled by the visitor question they answer. The user clicks the
+  question they have, lands on the answer.
+</p>
+
+<p>
+  Six questions, six pages, ordered to read like an argument:
+</p>
+
+<div class="ia-tree">
+  <div class="section-row">
+    <div class="head">
+      <span class="num-tag">01</span>
+      <span class="title">How EHI Atlas works in 3 minutes</span>
+      <span class="audience-tag">All audiences</span>
+    </div>
+    <p class="gist">
+      The fastest path from "I just landed here" to "I get it." Single page, one diagram, four pillars: ingest → adapt → harmonize → reason. Short paragraphs, not card sprawl. Ends with three "want more?" links into the deeper pages.
+    </p>
+    <p class="contents">
+      Currently: <code>/analysis</code> Overview · Move to: <code>/how-it-works</code>
+    </p>
+  </div>
+
+  <div class="section-row">
+    <div class="head">
+      <span class="num-tag">02</span>
+      <span class="title">How does data flow through the system?</span>
+      <span class="audience-tag">Devs · Judges</span>
+    </div>
+    <p class="gist">
+      The pipeline page. Walks each layer end-to-end: <strong>Ingest</strong> (sources, classification, prep states) · <strong>Adapt</strong> (FHIR parser, CCDA via Microsoft FHIR-Converter, PDF→FHIR pipelines) · <strong>Harmonize</strong> (dedup, conflict detection, provenance edges) · <strong>Reason</strong> (evidence packets, agent tools, LLM guardrails). Each layer linked to live screens where you can see it running.
+    </p>
+    <p class="contents">
+      Replaces: most of <code>/analysis/methodology</code> · Move to: <code>/how-it-works/pipeline</code>
+    </p>
+  </div>
+
+  <div class="section-row">
+    <div class="head">
+      <span class="num-tag">03</span>
+      <span class="title">How do we extract clinical data from PDFs?</span>
+      <span class="audience-tag">Devs · Judges</span>
+    </div>
+    <p class="gist">
+      The PDF Lab. Currently invisible on the website despite being the most differentiated technical work. Shows: <strong>five extraction architectures</strong> (default, scout, bidi-scout, gold, gemma-tabular) · the <strong>bake-off methodology</strong> · live F1 numbers from the cedars-myhealth eval · the <strong>gold-standard generation</strong> approach (Opus 4.7 + thinking + self-consistency intersect + reviewer agent). Honest about limitations of LLM-judged GT. This is the strongest single page in the section.
+    </p>
+    <p class="contents">
+      New page · Move to: <code>/how-it-works/pdf-extraction</code>
+    </p>
+  </div>
+
+  <div class="section-row">
+    <div class="head">
+      <span class="num-tag">04</span>
+      <span class="title">How do we merge records from different sources?</span>
+      <span class="audience-tag">Health-IT · Clinical</span>
+    </div>
+    <p class="gist">
+      The harmonization wedge. Why deduplication is hard when records come from FHIR + CCDA + PDF + portal. The provenance graph. Cross-source evidence. Conflict detection and resolution. This is the page where the <strong>complementarity-with-TEFCA</strong> framing lives — TEFCA moves records, we organize what arrives.
+    </p>
+    <p class="contents">
+      New page · Move to: <code>/how-it-works/harmonization</code>
+    </p>
+  </div>
+
+  <div class="section-row">
+    <div class="head">
+      <span class="num-tag">05</span>
+      <span class="title">How do we make AI trustworthy in clinical use?</span>
+      <span class="audience-tag">Clinical · Judges</span>
+    </div>
+    <p class="gist">
+      The four guardrails (deterministic-first, evidence minimization, missing-info disclosure, source-backed) made concrete. The intent → retrieve → reason → return loop. The two example assistant patterns from the submission (surgery clearance, "what changed since last visit"). Why we don't dump bundles into the LLM. Bonus: where local Gemma fits for private inference.
+    </p>
+    <p class="contents">
+      Replaces fragments of: <code>/analysis/methodology</code>, <code>/analysis/overview</code> · Move to: <code>/how-it-works/trustworthy-ai</code>
+    </p>
+  </div>
+
+  <div class="section-row">
+    <div class="head">
+      <span class="num-tag">06</span>
+      <span class="title">Standards, interop, and where we sit in the ecosystem</span>
+      <span class="audience-tag">Health-IT · Judges</span>
+    </div>
+    <p class="gist">
+      FHIR R4 + US Core. C-CDA via Microsoft FHIR-Converter (Josh Mandel's 747-doc corpus as the test bed). SMART App Launch readiness. Where Atlas fits relative to TEFCA / QHINs / Apple Health. HIPAA-aware deployment posture (AES-256, TLS 1.3, RBAC, audit logging). What we ARE and what we explicitly are NOT.
+    </p>
+    <p class="contents">
+      New page (folds in fragments of <code>/analysis/fhir-primer</code>) · Move to: <code>/how-it-works/standards</code>
+    </p>
+  </div>
+</div>
+
+<h3>What happens to Coverage, Definitions, FHIR Primer, Flight School?</h3>
+
+<p>
+  Demote. They're <em>reference material</em>, not narrative pages. They should live as a single
+  Reference subsection (or appendix), one click away from the main flow. Visitors who want
+  field-level detail click in; everyone else flows through the six argument pages.
+</p>
+
+<ul>
+  <li><strong>FHIR Primer</strong> — folded into "Standards" page (page 6) as a "FHIR in 60 seconds" inline section, with a "full primer" link to the existing page kept as appendix</li>
+  <li><strong>Definitions</strong> — kept as <code>/reference/definitions</code>, linked from each pipeline-layer page where relevant</li>
+  <li><strong>Coverage</strong> — kept as <code>/reference/coverage</code>, linked from the harmonization page (page 4) where it backs up "what's actually populated in our corpus"</li>
+  <li><strong>Flight School</strong> — kept as a separate onboarding flow at <code>/learn</code>, not part of Technical Overview proper</li>
+</ul>
+
+<hr>
+
+<h2><span class="num">§4</span>Section naming — pick the frame</h2>
+
+<p>
+  "Data Labs" feels operational/internal. "Analysis" is the same problem with academic vibes.
+  The new name should signal <em>this is where you understand the engine.</em>
+</p>
+
+<div class="naming-grid">
+  <div class="name-card recommended">
+    <div class="label">How It Works</div>
+    <div class="vibe">Inviting · clear · convention</div>
+  </div>
+  <div class="name-card">
+    <div class="label">Inside Atlas</div>
+    <div class="vibe">Curious · branded</div>
+  </div>
+  <div class="name-card">
+    <div class="label">Methodology</div>
+    <div class="vibe">Credible · clinical</div>
+  </div>
+  <div class="name-card">
+    <div class="label">Technical Overview</div>
+    <div class="vibe">Accurate · bland</div>
+  </div>
+  <div class="name-card">
+    <div class="label">The Stack</div>
+    <div class="vibe">Tech-y · narrow audience</div>
+  </div>
+  <div class="name-card">
+    <div class="label">Architecture</div>
+    <div class="vibe">Engineering-first</div>
+  </div>
+</div>
+
+<p>
+  My pick: <strong>"How It Works"</strong> as the menu name, with the URL <code>/how-it-works</code>.
+  The page titles inside ("How does data flow...", "How do we extract...", etc.) all start with
+  "how" — which makes the section internally coherent and signals from the menu what kind of
+  content this is. "Methodology" is a fine alternative if you want a more clinical voice; less
+  inviting but more credible. Avoid "Technical Overview" / "The Stack" — both narrow the
+  audience.
+</p>
+
+<hr>
+
+<h2><span class="num">§5</span>Visual / page-shape principles</h2>
+
+<p>
+  Three rules for each new page so they stay coherent and don't drift back into card-sprawl:
+</p>
+
+<ol>
+  <li>
+    <strong>Lead with the question, not a hero card.</strong> The page title <em>is</em> the
+    question. The first paragraph answers it in 2-3 sentences. Everything below is supporting
+    evidence.
+  </li>
+  <li>
+    <strong>Show, don't list.</strong> Each page should embed at least one live thing — a screenshot
+    from the app, a code-shaped tool example, a real F1 number, a snippet of an actual evidence
+    packet. Generic feature-list cards are the failure mode.
+  </li>
+  <li>
+    <strong>Honesty about limits.</strong> Each page has a "What this doesn't yet do" or
+    "Phase 2 next steps" section near the bottom. This is the single biggest credibility lever.
+    Judges and health-IT vendors trust submissions that name their limits more than ones that
+    don't.
+  </li>
+</ol>
+
+<hr>
+
+<h2><span class="num">§6</span>Implementation approach — three sizes</h2>
+
+<table>
+  <thead>
+    <tr><th>Scope</th><th>What lands</th><th>Effort</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Light</strong></td>
+      <td>Rename the section to "How It Works" in the menu and overview. Reorder the existing 6 pages by argument flow. Add the missing PDF Extraction page. No major content rewrite.</td>
+      <td class="num">~4 hrs</td>
+    </tr>
+    <tr>
+      <td><strong>Medium</strong></td>
+      <td>Light scope plus: rewrite Overview as a 3-minute landing. Build the new Pipeline page and Harmonization page. Demote Coverage/Definitions/FHIR Primer to Reference. Refresh Methodology to match the four-guardrail framing from the submission.</td>
+      <td class="num">~1-2 days</td>
+    </tr>
+    <tr>
+      <td><strong>Heavy</strong></td>
+      <td>Medium scope plus: build the live PDF Lab embed (real F1 numbers from cedars-myhealth runs). Add a Standards page with the TEFCA-complementarity framing. Rebuild navigation as a sidebar with the six "how" questions. Add "what this doesn't do" sections to every page. Connect screenshots from the submission's screenshot directory.</td>
+      <td class="num">~3-4 days</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>
+  My read: <strong>Medium scope</strong> is the right level. It's the smallest scope where the
+  section actually changes meaning rather than just shifting labels. Heavy is appealing but
+  Phase 1 deadline is in 4 days — the submission itself is the priority artifact. We can iterate
+  to Heavy after submission.
+</p>
+
+<hr>
+
+<h2><span class="num">§7</span>What I'd build first</h2>
+
+<p>
+  If you're aligned on Medium scope and "How It Works" naming, the order I'd dispatch sub-agents:
+</p>
+
+<ol>
+  <li>
+    <strong>Page 1 — Overview rewrite as 3-minute landing</strong>. Replaces the current
+    <code>/analysis</code> overview. New shape: question-led title, one canonical pipeline
+    diagram, four-pillar summary, three "want more?" links. ~2-3 hrs.
+  </li>
+  <li>
+    <strong>Page 3 — PDF Extraction Lab</strong> (entirely new). The most differentiated single
+    page, currently absent from the website. Ships the bake-off framing, the gold-standard
+    methodology, real F1 numbers. ~3-4 hrs.
+  </li>
+  <li>
+    <strong>Page 4 — Harmonization</strong> (entirely new). The wedge story; complementarity with
+    TEFCA. ~2-3 hrs.
+  </li>
+  <li>
+    <strong>Page 5 — Trustworthy AI rewrite</strong>. Reuses the four guardrails from the
+    submission, the surgery example, the "what changed since" example. ~2-3 hrs.
+  </li>
+  <li>
+    <strong>Page 2 — Pipeline (deep dive)</strong> and <strong>Page 6 — Standards</strong>. ~3-4 hrs.
+  </li>
+  <li>
+    <strong>Demotion + reference cleanup</strong>. Move Coverage, Definitions, FHIR Primer to
+    <code>/reference/*</code>. Rebuild nav sidebar. ~1-2 hrs.
+  </li>
+</ol>
+
+<p>
+  Total: ~15-20 hours of focused work, dispatchable across multiple sub-agent runs. Each page
+  is independent enough to land separately.
+</p>
+
+<div class="question">
+  <h3>Where I'd want your input before building</h3>
+  <ol>
+    <li>
+      <strong>Is "How It Works" the right name</strong>, or do you prefer "Methodology" or
+      something else? This drives the URL and the menu label.
+    </li>
+    <li>
+      <strong>Six pages or fewer?</strong> I propose six because each answers a distinct visitor
+      question. But if you want a tighter section (4 pages), I'd merge Standards into Pipeline
+      and merge Trustworthy AI into Harmonization. Less depth, faster scan.
+    </li>
+    <li>
+      <strong>Should the Phase 2 / TEFCA framing be aggressive or muted?</strong> The submission
+      doc was sober about it. The website can be more direct: "TEFCA moves records, Atlas
+      organizes them." Your call on positioning intensity.
+    </li>
+    <li>
+      <strong>Live demo embeds — yes/no?</strong> The PDF Lab page is strongest if it shows real
+      F1 numbers and the actual bake-off table from the lab CLI. But that means wiring the
+      website to the lab data files. Skippable; the page can be just narrative + a static
+      results table.
+    </li>
+  </ol>
+  <p>
+    Once aligned, I dispatch builders per the §7 order and we ship.
+  </p>
+</div>
+
+<footer>
+  Generated 2026-05-09 · branch <code>codex/patient-workspace-harmonization</code> ·
+  current section: <code>app/src/pages/Analysis/*</code> ·
+  proposed: <code>app/src/pages/HowItWorks/*</code>
+</footer>
+
+</main>
+</body>
+</html>

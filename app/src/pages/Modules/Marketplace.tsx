@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import {
   ArrowRight,
   BookMarked,
@@ -19,6 +20,8 @@ import {
   Upload,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { skillsApi } from "../../api/skills";
+import type { SkillSummary } from "../../types/skills";
 
 function withPatient(path: string, patientId: string | null): string {
   return patientId ? `${path}?patient=${patientId}` : path;
@@ -61,12 +64,12 @@ const marketplaceModules: MarketplaceModule[] = [
     status: "Preview",
     category: "Research",
     audience: "External opportunity",
-    route: "/trials",
+    route: "/skills/trial-finder",
     inputs: ["Problems", "Labs", "Age", "Meds"],
     outputs: ["Eligibility signals", "Exclusions", "Share packet"],
-    body: "Screens record facts against candidate eligibility criteria and highlights what needs verification.",
+    body: "Runs the trial-matching skill in a live workspace with citations, transcript, escalations, and save destinations.",
     boundary: "External search; patient consent required before sharing packet.",
-    action: "Find trials",
+    action: "Open workspace",
     tone: "rose",
     recommended: true,
   },
@@ -195,6 +198,108 @@ function saveModuleIds(storageKey: string, ids: Set<string>): void {
 function StatusBadge({ status }: { status: MarketStatus }) {
   const classes = status === "Preview" ? "bg-[#eef1ff] text-[#5b76fe]" : "bg-[#f5f6f8] text-[#667085]";
   return <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${classes}`}>{status}</span>;
+}
+
+function routeForSkill(skill: SkillSummary, patientId: string | null): string {
+  const path = skill.name === "trial-matching" ? "/skills/trial-finder" : `/skills/${skill.name}`;
+  return withPatient(path, patientId);
+}
+
+function skillStatus(skill: SkillSummary): string {
+  if (skill.is_live_eligible) return "Eval declared";
+  return "Concept";
+}
+
+function MarketplaceSkillRegistry({
+  skills,
+  isLoading,
+  isError,
+  patientId,
+}: {
+  skills: SkillSummary[] | undefined;
+  isLoading: boolean;
+  isError: boolean;
+  patientId: string | null;
+}) {
+  const realSkills = skills ?? [];
+
+  return (
+    <section className="rounded-2xl bg-white p-5 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-[#5b76fe]">Installed skill manifests</p>
+          <h2 className="mt-1 text-xl font-semibold text-[#1c1c1e]">Real agent workspaces available now</h2>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-[#667085]">
+            These cards come from the backend `SKILL.md` registry. Concept modules below stay as product scaffolds until
+            they have a manifest, workspace template, and output schema.
+          </p>
+        </div>
+        <span className="w-fit rounded-full bg-[#eef1ff] px-3 py-1.5 text-xs font-semibold text-[#5b76fe]">
+          {isLoading ? "Loading skills" : `${realSkills.length} installed`}
+        </span>
+      </div>
+
+      {isError ? (
+        <div className="mt-4 rounded-xl border border-[#fee2e2] bg-[#fff7f7] px-4 py-3 text-sm text-[#991b1b]">
+          Skill registry unavailable. Concept modules are still shown below.
+        </div>
+      ) : null}
+
+      <div className="mt-5 overflow-x-auto rounded-xl border border-[#e9eaef]">
+        <table className="w-full min-w-[920px] border-collapse text-[12px]">
+          <thead>
+            <tr className="bg-[#fafafa] text-left text-[10px] font-semibold uppercase tracking-wider text-[#8d92a3]">
+              <th className="border-b border-[#eef0f5] px-3 py-2">Skill</th>
+              <th className="border-b border-[#eef0f5] px-3 py-2">Shape</th>
+              <th className="border-b border-[#eef0f5] px-3 py-2">Audience</th>
+              <th className="border-b border-[#eef0f5] px-3 py-2">Tools</th>
+              <th className="border-b border-[#eef0f5] px-3 py-2">Context</th>
+              <th className="border-b border-[#eef0f5] px-3 py-2">Status</th>
+              <th className="border-b border-[#eef0f5] px-3 py-2" />
+            </tr>
+          </thead>
+          <tbody>
+            {isLoading ? (
+              <tr>
+                <td colSpan={7} className="px-3 py-5 text-sm text-[#667085]">
+                  Reading installed skills.
+                </td>
+              </tr>
+            ) : realSkills.length ? (
+              realSkills.map((skill) => (
+                <tr key={skill.name} className="hover:bg-[#fafbff]">
+                  <td className="border-b border-[#f2f4f8] px-3 py-2">
+                    <Link to={routeForSkill(skill, patientId)} className="font-semibold text-[#1c1c1e] no-underline hover:text-[#5b76fe]">
+                      {skill.name}
+                    </Link>
+                    <p className="mt-1 max-w-xl text-[11px] leading-4 text-[#667085]">{skill.description}</p>
+                  </td>
+                  <td className="border-b border-[#f2f4f8] px-3 py-2 text-[#555a6a]">{skill.shape}</td>
+                  <td className="border-b border-[#f2f4f8] px-3 py-2 text-[#555a6a]">{skill.audience}</td>
+                  <td className="border-b border-[#f2f4f8] px-3 py-2 text-[#555a6a]">{skill.required_tools.join(", ")}</td>
+                  <td className="border-b border-[#f2f4f8] px-3 py-2 text-[#555a6a]">
+                    {skill.context_packages.length ? skill.context_packages.join(", ") : "None declared"}
+                  </td>
+                  <td className="border-b border-[#f2f4f8] px-3 py-2 text-[#5b76fe]">{skillStatus(skill)}</td>
+                  <td className="border-b border-[#f2f4f8] px-3 py-2 text-right">
+                    <Link to={routeForSkill(skill, patientId)} className="font-semibold text-[#5b76fe] no-underline">
+                      Open workspace
+                    </Link>
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={7} className="px-3 py-5 text-sm text-[#667085]">
+                  No installed skills were returned by the registry.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
 }
 
 function MarketplaceCard({
@@ -663,6 +768,11 @@ export function Marketplace() {
   const [favoriteIds, setFavoriteIds] = useState(() => loadModuleIds(FAVORITES_STORAGE_KEY, defaultFavoriteIds));
   const [pinnedIds, setPinnedIds] = useState(() => loadModuleIds(PINNED_STORAGE_KEY, defaultPinnedIds));
   const [viewMode, setViewMode] = useState<MarketplaceViewMode>("table");
+  const skillsQuery = useQuery({
+    queryKey: ["skills-registry"],
+    queryFn: skillsApi.listSkills,
+    refetchOnWindowFocus: false,
+  });
 
   const filteredModules = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -769,6 +879,13 @@ export function Marketplace() {
           </div>
         </div>
       </section>
+
+      <MarketplaceSkillRegistry
+        skills={skillsQuery.data}
+        isLoading={skillsQuery.isLoading}
+        isError={skillsQuery.isError}
+        patientId={patientId}
+      />
 
       <section className="rounded-[24px] border border-[#dfe4ff] bg-[#f7f8ff] p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">

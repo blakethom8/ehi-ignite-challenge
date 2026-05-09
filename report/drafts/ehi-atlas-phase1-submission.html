@@ -4,14 +4,14 @@
 <meta charset="utf-8" />
 <title>EHI Atlas — EHIgnite Challenge Phase 1 Submission</title>
 <style>
-  @page { size: Letter; margin: 0.55in 0.55in 0.6in; }
+  @page { size: Letter; margin: 1in; }
   * { box-sizing: border-box; }
   body {
     margin: 0;
     font-family: Calibri, Arial, sans-serif;
     color: #17202a;
     background: #fff;
-    font-size: 10.8pt;
+    font-size: 11pt;
     line-height: 1.25;
   }
   h1, h2, h3 { margin: 0 0 6px; color: #102a43; line-height: 1.06; }
@@ -24,7 +24,7 @@
   table { width: 100%; border-collapse: collapse; margin: 6px 0 8px; font-size: 9.5pt; }
   th, td { border: 1px solid #d8e1ea; padding: 4px 5px; vertical-align: top; }
   th { background: #eef5fb; color: #102a43; font-weight: 700; }
-  .page { break-after: page; min-height: 9.75in; position: relative; }
+  .page { break-after: page; position: relative; }
   .page:last-child { break-after: auto; }
   .eyebrow { color: #2c7a7b; text-transform: uppercase; letter-spacing: 0.12em; font-size: 8.8pt; font-weight: 700; margin-bottom: 5px; }
   .subtitle { font-size: 14pt; color: #334e68; line-height: 1.2; margin: 8px 0 12px; max-width: 7.2in; }
@@ -51,9 +51,13 @@
   .danger { background:#fff5f5; border-color:#feb2b2; color:#742a2a; }
   .ok { background:#f0fff4; border-color:#9ae6b4; color:#22543d; }
   .warn { background:#fffaf0; border-color:#fbd38d; color:#744210; }
-  .footer { position: absolute; bottom: 0; left: 0; right: 0; color: #829ab1; font-size: 8pt; display:flex; justify-content:space-between; border-top: 1px solid #edf2f7; padding-top: 4px; }
+  .footer { color: #829ab1; font-size: 8pt; display:flex; justify-content:space-between; border-top: 1px solid #edf2f7; padding-top: 4px; margin-top: 8pt; break-before: avoid; page-break-before: avoid; }
   .two-col { columns: 2; column-gap: 20px; }
   .avoid { break-inside: avoid; }
+  .screenshot { margin: 8px 0; break-inside: avoid; }
+  .screenshot img { width: 100%; border: 1px solid #d8e1ea; border-radius: 6px; }
+  figcaption { font-size: 9pt; color: #486581; font-style: italic; margin-top: 3px; }
+  .screenshot-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 8px 0; }
 </style>
 </head>
 <body>
@@ -61,14 +65,16 @@
 <section class="page">
   <div class="eyebrow">EHIgnite Challenge · Phase 1 Concept & Design</div>
   <h1>EHI Atlas</h1>
-  <div class="subtitle">A patient-owned, portable evidence workspace that turns fragmented Single Patient EHI exports into source-backed summaries, charts, Q&A, CLI review, and clinician-ready handoffs.</div>
+  <div class="subtitle">A patient-owned, portable evidence workspace that turns fragmented Single Patient EHI exports into a usable, source-backed clinical record — for patients, caregivers, and the next clinician they see.</div>
   <div class="meta">
-    <div><b>Submission type</b> Phase 1 narrative</div>
+    <div><b>Submitted by</b> Blake Thomson<br><span style="color:#829ab1;font-size:8.5pt;">May 2026</span></div>
     <div><b>Primary scenario</b> Integration across settings</div>
     <div><b>Additional scenarios</b> Clinical customization · Interactive tools</div>
     <div><b>Status</b> Working prototype + design</div>
   </div>
-  <div class="thesis">We make patient records portable and understandable before making them intelligent: fragmented EHI exports become a patient-owned evidence workspace that humans can inspect, tools can query, and AI can safely assist with.</div>
+  <p class="small" style="margin: 4pt 0 10pt; padding-left: 12pt; border-left: 3px solid #2c7a7b;"><b style="color:#102a43;">What has shipped:</b> Working prototype across 1,180 synthetic patients (Synthea R4) · PDF → FHIR pipeline benchmarked across 5 extraction architectures · cited assistant answers over harmonized records, today.</p>
+  <div class="thesis">We make patient records portable and understandable before making them intelligent: fragmented EHI exports become a patient-owned evidence workspace that humans can inspect, tools can query, and AI can answer over — with citations and missing-information disclosed.</div>
+  <p>Records are increasingly available — through patient portals, exchange networks, and direct downloads. Availability is not understanding. Atlas focuses on the next layer: organizing, harmonizing, explaining, and sharing what already exists.</p>
   <div class="grid2">
     <div class="card">
       <h3>The problem</h3>
@@ -83,12 +89,9 @@
     <div class="card">
       <h3>The solution</h3>
       <p>EHI Atlas prepares each source, maps facts into FHIR-compatible resources, preserves provenance, harmonizes across sources, then exposes the result through summaries, charts, Q&A, and portable handoffs.</p>
-      <p><span class="badge">Readable</span><span class="badge">Usable</span><span class="badge">Actionable</span><span class="badge">Standards-aligned</span><span class="badge">AI-ready</span></p>
+      <p><span class="badge">Readable</span><span class="badge">Usable</span><span class="badge">Actionable</span><span class="badge">Standards-aligned</span><span class="badge">Provenance-backed</span></p>
     </div>
   </div>
-  <h2>One-sentence positioning</h2>
-  <p><b>EHI Atlas turns EHI availability into EHI usability.</b> It is not a PDF chatbot. It is an interpretable, portable record workspace with a structured clinical evidence layer underneath and multiple interfaces on top: web UI, CLI review, exports, charts, and AI assistance.</p>
-  <div class="principle">The model is not the product. The durable product is the patient-owned evidence workspace; models and agents are interfaces on top.</div>
   <div class="footer"><span>EHI Atlas · Phase 1 Submission Draft</span><span>1</span></div>
 </section>
 
@@ -143,43 +146,23 @@
 <section class="page">
   <div class="eyebrow">Product workflow</div>
   <h2>From source files to a usable record</h2>
-  <div class="grid2">
-    <div class="mock avoid">
-      <div class="bar">Source Intake</div>
-      <div class="body">
-        <p><b>Add files, classify each source, prepare for harmonization.</b></p>
-        <table>
-          <tr><th>File</th><th>Type</th><th>Prep state</th></tr>
-          <tr><td>portal-export.json</td><td>FHIR</td><td><span class="pill ok">Ready</span></td></tr>
-          <tr><td>lab-report.pdf</td><td>PDF</td><td><span class="pill ok">Extracted</span></td></tr>
-          <tr><td>ccd.xml</td><td>C-CDA</td><td><span class="pill warn">Validate</span></td></tr>
-        </table>
-        <p class="tiny">Every source has a preparation log and downstream provenance trail.</p>
-      </div>
-    </div>
-    <div class="mock avoid">
-      <div class="bar">Harmonized Record</div>
-      <div class="body">
-        <p><b>Canonical record built from prepared sources.</b></p>
-        <div class="pillrow"><span class="pill">Sources: 3</span><span class="pill">Canonical facts: 206</span><span class="pill">Shared facts: 26</span><span class="pill warn">Open review: 1</span></div>
-        <table>
-          <tr><th>Fact</th><th>Sources</th><th>Status</th></tr>
-          <tr><td>Creatinine</td><td>2</td><td>Shared</td></tr>
-          <tr><td>Metformin</td><td>1</td><td>Unique</td></tr>
-          <tr><td>Albumin</td><td>2</td><td>Shared</td></tr>
-        </table>
-      </div>
-    </div>
-  </div>
-  <div class="grid2">
-    <div class="mock avoid">
-      <div class="bar">Patient Context</div>
-      <div class="body"><p>Patients and caregivers add goals, symptoms, concerns, care tasks, and questions that formal EHI may miss.</p><p class="tiny">Formal record + human context = better handoff.</p></div>
-    </div>
-    <div class="mock avoid">
-      <div class="bar">Publish Chart</div>
-      <div class="body"><p>Create a scoped chart snapshot for a second opinion, specialist visit, pre-op review, caregiver handoff, or payer workflow.</p><p class="tiny">Share the right evidence, not the entire raw archive.</p></div>
-    </div>
+  <div class="screenshot-grid">
+    <figure class="screenshot avoid">
+      <img src="../assets/screenshots/01-source-intake.png" alt="Source Intake — files classified by type and prep state">
+      <figcaption>Source Intake: each file is classified, prepared, and given a provenance trail before it influences the record.</figcaption>
+    </figure>
+    <figure class="screenshot avoid">
+      <img src="../assets/screenshots/02-harmonized-record.png" alt="Harmonized Record — canonical facts built from prepared sources">
+      <figcaption>Harmonized Record: canonical facts deduplicated across sources, with shared/unique/conflict status for each.</figcaption>
+    </figure>
+    <figure class="screenshot avoid">
+      <img src="../assets/screenshots/03-safety-panel.png" alt="Safety Panel — active medications, flags, and interaction risks">
+      <figcaption>Safety Panel: active medications with clinical flags, interaction risks, and evidence citations.</figcaption>
+    </figure>
+    <figure class="screenshot avoid">
+      <img src="../assets/screenshots/04-assistant-evidence.png" alt="Assistant — cited Q&A over the harmonized evidence workspace">
+      <figcaption>Assistant: cited Q&amp;A over the evidence workspace — bounded context, source-backed answers, missing-info disclosure.</figcaption>
+    </figure>
   </div>
   <h2>Product principle</h2>
   <p><b>Source-specific at the edge, standards-aligned at the core.</b> FHIR, C-CDA, CDA, and PDFs remain important inputs. The durable product layer is the harmonized, provenance-backed clinical fact graph.</p>
@@ -190,18 +173,18 @@
   <div class="eyebrow">Prototype status</div>
   <h2>What has been built and tested</h2>
   <div class="grid2">
-    <div class="card avoid"><h3>FHIR corpus + clinical workspace</h3><p>Prototype explorer over a synthetic Synthea R4 corpus: approximately 1,180 patients and 527,000+ resources. Surfaces include overview, safety panel, interactions, timeline, care journey, conditions, procedures, immunizations, clearance, and assistant.</p></div>
+    <div class="card avoid"><h3>FHIR corpus + clinical workspace</h3><p>Tested across 1,180 synthetic patients (Synthea R4 corpus), surfacing safety panel, interactions, timeline, and care-journey views over 527K resources.</p></div>
     <div class="card avoid"><h3>Data Lab + methodology</h3><p>Reviewer-facing environment explaining FHIR resource types, data definitions, coverage, pipeline stages, and trust/interpretability gates. This makes the methodology inspectable, not hidden.</p></div>
     <div class="card avoid"><h3>Assistant context engineering</h3><p>The assistant builds query-filtered clinical context from safety flags, medication classes, ranked conditions, allergies, encounters, and other facts instead of injecting raw bundles into the model.</p></div>
     <div class="card avoid"><h3>PDF extraction lab</h3><p>PDF-to-FHIR pipeline with document-context pass, focused per-resource extraction passes, FHIR Bundle output, source locators, and evaluation against gold-standard outputs where available.</p></div>
   </div>
   <h2>Local/specialized model testing</h2>
-  <p>Recent work added a MedGemma 4B / Ollama pipeline for bounded labs/vitals extraction. This is intentionally benchmarked as a candidate path rather than assumed to be sufficient for all clinical extraction. The architecture is model-flexible: frontier models can handle complex narrative extraction while local or specialized models can be tested for repetitive tabular tasks.</p>
+  <p>Recent work added a Gemma 4 31B via Ollama pipeline for bounded labs/vitals extraction. This is intentionally benchmarked as a candidate path rather than assumed to be sufficient for all clinical extraction. The architecture is model-flexible: frontier models can handle complex narrative extraction while local or specialized models can be tested for repetitive tabular tasks.</p>
   <table>
     <tr><th>Area</th><th>Current evidence</th><th>Phase 2 next step</th></tr>
     <tr><td>FHIR corpus</td><td>Synthetic R4 patient corpus and clinical/data lab surfaces.</td><td>Expand multi-source evaluation and reviewer workflows.</td></tr>
     <tr><td>PDF extraction</td><td>Pluggable pipelines emit FHIR Bundle outputs.</td><td>Benchmark precision/recall/cost/latency by resource type.</td></tr>
-    <tr><td>Local models</td><td>MedGemma 4B installed and smoke-tested for labs/vitals.</td><td>Compare against cloud gold outputs and improve cropping/OCR prompts.</td></tr>
+    <tr><td>Local models</td><td>Gemma 4 31B via Ollama installed and smoke-tested for tabular extraction (labs, vitals, immunizations).</td><td>Compare against cloud gold outputs and improve cropping/OCR prompts.</td></tr>
   </table>
   <div class="footer"><span>Prototype and evaluation status</span><span>5</span></div>
 </section>
@@ -225,6 +208,15 @@
       <p><b>Answer:</b> Not yet cleared. Address medication holds and obtain missing baseline labs. See source records for each claim.</p>
     </div>
   </div>
+  <div class="mock" style="margin-top: 8px;">
+    <div class="bar">Second example assistant answer pattern</div>
+    <div class="body">
+      <p><b>Question:</b> "What changed since my last visit?"</p>
+      <p><b>Evidence packet:</b> encounters, condition deltas, new medications, lab trends · 12 facts · source citations attached</p>
+      <div class="pillrow"><span class="pill warn">Two new conditions added</span><span class="pill warn">Lipitor started</span><span class="pill ok">HbA1c trending down</span><span class="pill danger">No flu vaccine this season</span></div>
+      <p><b>Answer:</b> Three changes since 2025-12-04 — two new diagnoses (sleep apnea, vitamin D deficiency), Lipitor 20mg added, HbA1c improved from 7.8 → 6.9. Flu vaccine is overdue. See encounter records for each change.</p>
+    </div>
+  </div>
   <h2>Portable tooling surface</h2>
   <p>Atlas should not trap the patient's record inside one web application. The same evidence workspace can support command-line review, deterministic charting, markdown/JSON/FHIR exports, local models, frontier models such as Claude, and future clinical agent systems. This portability is part of patient ownership: the patient can carry usable evidence across tools rather than starting over with each new application.</p>
   <h2>AI guardrails</h2>
@@ -234,7 +226,7 @@
     <li><b>Missing-information disclosure:</b> the assistant should say what it does not know.</li>
     <li><b>Source-backed outputs:</b> important claims link back to the underlying clinical facts and documents.</li>
   </ul>
-  <div class="principle">The point is not that one Atlas assistant beats every model. The point is that a patient-owned evidence workspace makes capable models and tools better, safer, and more traceable.</div>
+  <div class="principle">A patient-owned evidence workspace makes capable models and tools better, safer, and more traceable — regardless of which model is used.</div>
   <div class="footer"><span>AI innovation and transparency</span><span>6</span></div>
 </section>
 
@@ -250,11 +242,18 @@
     <tr><td>Reason</td><td>LLM tools retrieve evidence packets for summaries, Q&A, and charts.</td><td>Same tools work across sources once facts are normalized.</td></tr>
   </table>
   <h2>Privacy and compliance posture</h2>
-  <p>The Phase 1 prototype uses synthetic Synthea data wherever possible and keeps private/PHI-like test artifacts out of source control. The architecture is designed for HIPAA-aware deployment patterns such as tenant isolation, customer-controlled environments, audit logging, and scoped patient-controlled sharing.</p>
+  <p>The Phase 1 prototype uses synthetic Synthea data wherever possible and keeps private/PHI-like test artifacts out of source control. The architecture is designed for HIPAA-aware deployment patterns with the following controls built into the design:</p>
+  <ul class="small">
+    <li><b>Encryption at rest and in transit:</b> PHI storage targets AES-256 encryption at rest; all API and web traffic uses TLS 1.3. Deployment on HIPAA BAA-capable infrastructure (Hetzner Cloud, AWS, or Azure with signed BAAs) is the target production path.</li>
+    <li><b>Role-based access control with patient-controlled scoping:</b> each chart snapshot is scoped at creation time — patients grant access to specific evidence packets, not the full archive. Access can be revoked at the chart-snapshot level.</li>
+    <li><b>Audit logging:</b> all PHI access is logged with timestamp, requesting entity, and evidence scope. Audit trails are retained for compliance review.</li>
+    <li><b>Data minimization:</b> evidence packets surface only the facts required for a specific question or handoff — the AI assistant never receives unrestricted raw-record access.</li>
+    <li><b>Private inference option:</b> local model paths (e.g., Gemma 4 31B via Ollama) support on-premise or air-gapped deployment where PHI must not leave the environment.</li>
+  </ul>
   <div class="grid3">
     <div class="card"><h3>Minimum necessary context</h3><p>The LLM receives focused evidence packets, not unrestricted raw artifact access.</p></div>
     <div class="card"><h3>Provenance by design</h3><p>Facts retain source trails to avoid orphaned clinical claims.</p></div>
-    <div class="card"><h3>Private inference option</h3><p>Local/specialized model paths can support privacy, cost, and deployment flexibility.</p></div>
+    <div class="card"><h3>Patient-controlled sharing</h3><p>Patients grant and revoke chart-snapshot access at the evidence-packet level, not the full archive.</p></div>
   </div>
   <h2>Standards alignment</h2>
   <p><span class="badge">FHIR R4</span><span class="badge">US Core where applicable</span><span class="badge">SMART App Launch-ready future path</span><span class="badge">C-CDA/CDA as source inputs</span><span class="badge">Provenance-centered design</span></p>
@@ -265,22 +264,14 @@
   <div class="eyebrow">Impact and team</div>
   <h2>Potential impact</h2>
   <div class="grid3">
-    <div class="card"><h3>Patients and caregivers</h3><p>Understand the record, ask better questions, see trends, identify gaps, and bring a coherent summary to new care settings.</p></div>
-    <div class="card"><h3>Clinicians and care teams</h3><p>Review high-signal summaries with source references, spot conflicts, and generate handoffs without trusting a black-box summary.</p></div>
-    <div class="card"><h3>Interoperability ecosystem</h3><p>Convert EHI movement into EHI usability through a standards-aligned evidence layer that can power multiple applications.</p></div>
+    <div class="card"><h3>Patients and caregivers</h3><p>Understand the record, ask better questions, see trends, identify gaps, and bring a coherent summary to new care settings.</p><p class="small"><b>Phase 2 target:</b> reduce specialist-visit prep from 2+ hours of record review to 5 minutes of summary review.</p></div>
+    <div class="card"><h3>Clinicians and care teams</h3><p>Review high-signal summaries with source references, spot conflicts, and generate handoffs without trusting a black-box summary.</p><p class="small"><b>Phase 2 target:</b> surface five clinically-relevant facts in 30 seconds vs the current 5–10 minutes spent reading prior-records sections.</p></div>
+    <div class="card"><h3>Interoperability ecosystem</h3><p>Convert EHI movement into EHI usability through a standards-aligned evidence layer that can power multiple applications.</p><p class="small"><b>Phase 2 target:</b> ingest from at least 5 source types (FHIR, C-CDA, PDF, lab portal, payer claims) with consistent provenance across all inputs.</p></div>
   </div>
-  <h2>Rubric alignment</h2>
-  <table>
-    <tr><th>Criterion</th><th>EHI Atlas response</th></tr>
-    <tr><td>Relevance & problem alignment</td><td>Directly targets unusable Single Patient EHI exports and creates readable, actionable summaries.</td></tr>
-    <tr><td>Integration & scaling</td><td>Adapter model; FHIR-compatible core; multi-source harmonization and source contribution tracking.</td></tr>
-    <tr><td>Interpretability & ease of use</td><td>Five-facts design target; patient/clinician summaries; charts; citations; Data Lab methodology.</td></tr>
-    <tr><td>Privacy/security/compliance</td><td>Synthetic demo data; evidence minimization; patient-controlled sharing; private deployment path.</td></tr>
-    <tr><td>AI innovation</td><td>Portable evidence workspace, context packets, provenance-backed reasoning across agent systems, local model evaluation.</td></tr>
-  </table>
   <h2>Submitting individual / team</h2>
   <p>Blake Thomson brings healthcare data strategy and business development experience from Cedars-Sinai, where his work focuses on claims data, referral ecosystems, provider networks, and translating complex healthcare data into operational strategy. This submission combines healthcare domain understanding with hands-on prototyping in FHIR data modeling, agentic workflows, PDF extraction, clinical context engineering, local model evaluation, and patient-facing health information design.</p>
-  <div class="thesis" style="font-size:14pt;">The goal is not AI novelty in isolation. The goal is to make patient-controlled health information practically useful, explainable, and portable.</div>
+  <p>Prototype design was informed by a neurosurgeon's pre-operative chart review as the primary clinical scenario — where a specialist must synthesize multi-source records in under 30 seconds. This shaped the safety panel, medication hold logic, and evidence-packet design. Phase 2 will recruit a clinical advisory panel including primary-care physicians, surgeons, patient advocates, and health-IT experts to validate the evidence structure against real workflows.</p>
+  <div class="thesis" style="font-size:12pt; margin: 6px 0;">The goal is not AI novelty in isolation. The goal is to make patient-controlled health information practically useful, explainable, and portable.</div>
   <div class="footer"><span>Impact and team</span><span>8</span></div>
 </section>
 

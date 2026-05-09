@@ -14,6 +14,7 @@ Covered scenarios:
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 from unittest.mock import Mock, patch
@@ -27,8 +28,10 @@ from lib.extract.pdf import (
     DEFAULT_MODEL,
     DEFAULT_PROMPT_VERSION,
     DEFAULT_SCHEMA_VERSION,
+    OllamaVisionBackend,
     extract_from_pdf,
     extract_lab_pdf,
+    get_backend,
 )
 from lib.extract.schemas import ExtractionResult
 
@@ -95,6 +98,20 @@ def _make_pdf(tmp_path: Path, content: bytes = b"%PDF-1.4 fake") -> Path:
     p = tmp_path / "data.pdf"
     p.write_bytes(content)
     return p
+
+
+class _FakeHTTPResponse:
+    def __init__(self, body: dict[str, Any]) -> None:
+        self._body = body
+
+    def __enter__(self) -> "_FakeHTTPResponse":
+        return self
+
+    def __exit__(self, *args: object) -> None:
+        return None
+
+    def read(self) -> bytes:
+        return json.dumps(self._body).encode("utf-8")
 
 
 # ---------------------------------------------------------------------------
@@ -170,6 +187,43 @@ def test_extract_calls_api_on_miss_and_caches(tmp_path: Path) -> None:
     # Result is valid
     assert isinstance(result, ExtractionResult)
     assert result.document.document_type == "lab-report"
+
+
+def test_get_backend_resolves_ollama_backend() -> None:
+    backend = get_backend(name="gemma-ollama", model="gemma4:e4b")
+
+    assert isinstance(backend, OllamaVisionBackend)
+    assert backend.name == "gemma-ollama"
+    assert backend.model == "gemma4:e4b"
+
+
+def test_ollama_backend_sends_schema_format(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, Any] = {}
+
+    def fake_urlopen(req: Any, timeout: int) -> _FakeHTTPResponse:
+        captured["timeout"] = timeout
+        captured["url"] = req.full_url
+        captured["payload"] = json.loads(req.data.decode("utf-8"))
+        return _FakeHTTPResponse({"response": '{"observations": []}'})
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+    backend = OllamaVisionBackend(model="gemma4:e4b", host="http://localhost:11434")
+
+    result = backend._extract_single_request(
+        page_images=[b"fake-png"],
+        system_prompt="Extract labs.",
+        schema_json={"type": "object", "properties": {"observations": {"type": "array"}}},
+        max_tokens=128,
+        chunk_label="chunk 1/1 (pages 1-1)",
+    )
+
+    assert result == {"observations": []}
+    assert captured["url"] == "http://localhost:11434/api/generate"
+    assert captured["payload"]["model"] == "gemma4:e4b"
+    assert captured["payload"]["stream"] is False
+    assert captured["payload"]["format"]["type"] == "object"
+    assert captured["payload"]["images"]
+    assert captured["payload"]["options"]["temperature"] == 0.0
 
 
 # ---------------------------------------------------------------------------

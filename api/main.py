@@ -31,6 +31,9 @@ from api.routers import aggregation
 from api.routers import harmonize
 from api.routers import canonical
 from api.routers import cursor_internal_tools
+from api.routers import ground_truth_review
+from api.routers import pipeline_lab
+from api.routers import ccda_lab
 from api.routers import skills as skills_router
 
 _ENVIRONMENT = os.getenv("ENVIRONMENT", "development").strip().lower()
@@ -92,7 +95,7 @@ app.add_middleware(
         ],
     ),
     allow_credentials=False,
-    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Accept", "Authorization", "Content-Type"],
 )
 
@@ -108,6 +111,9 @@ app.include_router(aggregation.router, prefix="/api")
 app.include_router(harmonize.router, prefix="/api")
 app.include_router(canonical.router, prefix="/api")
 app.include_router(cursor_internal_tools.router, prefix="/api")
+app.include_router(ground_truth_review.router, prefix="/api")
+app.include_router(pipeline_lab.router, prefix="/api")
+app.include_router(ccda_lab.router, prefix="/api")
 app.include_router(skills_router.router, prefix="/api")
 
 

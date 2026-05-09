@@ -1,0 +1,578 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Harmonize Data Model — EHI Atlas</title>
+  <style>
+    :root {
+      --text: #0f172a;
+      --text-2: #334155;
+      --muted: #64748b;
+      --muted-2: #94a3b8;
+      --border: #d9dee7;
+      --border-light: #e6eaf2;
+      --surface: #ffffff;
+      --surface-2: #f7f9fc;
+      --surface-3: #eef2f8;
+      --blue: #2f5fcb;
+      --blue-light: #dbe6ff;
+      --blue-bg: #eef3ff;
+      --teal: #0f766e;
+      --teal-bg: #ccfbf1;
+      --green: #166534;
+      --green-bg: #dcfce7;
+      --amber: #92400e;
+      --amber-bg: #fef3c7;
+      --red: #b91c1c;
+      --red-bg: #fee2e2;
+      --purple: #7c3aed;
+      --purple-bg: #ede9fe;
+      --pink: #be185d;
+      --pink-bg: #fce7f3;
+      --orange: #c2410c;
+      --orange-bg: #ffedd5;
+      --slate: #334155;
+      --font: "Inter", "Noto Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --mono: "SFMono-Regular", "JetBrains Mono", "Roboto Mono", "Cascadia Code", monospace;
+      --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
+      --shadow: 0 6px 20px rgba(15, 23, 42, 0.06);
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body { color: var(--text); background: #eef2f7; font-family: var(--font); line-height: 1.55; -webkit-font-smoothing: antialiased; }
+    .page { width: min(1180px, calc(100% - 40px)); margin: 0 auto; padding: 28px 0 96px; }
+
+    /* Header bar */
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between; gap: 20px;
+      background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+      padding: 14px 20px; margin-bottom: 24px; box-shadow: var(--shadow-sm);
+    }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .mark { width: 30px; height: 30px; border-radius: 6px; background: var(--slate); color: white; display: grid; place-items: center; font-size: 11px; font-weight: 700; font-family: var(--mono); }
+    .brand strong { display: block; font-size: 14px; }
+    .brand span { display: block; color: var(--muted); font-size: 12px; }
+    .meta { font-size: 12px; color: var(--muted); display: flex; gap: 14px; flex-wrap: wrap; }
+    .meta b { color: var(--text); font-weight: 600; }
+
+    /* Hero */
+    .hero {
+      background: linear-gradient(135deg, #2f5fcb 0%, #1e3a8a 100%);
+      color: white; border-radius: 16px; padding: 36px 32px;
+      margin-bottom: 28px; box-shadow: var(--shadow);
+    }
+    .hero .eyebrow { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.8; }
+    .hero h1 { font-size: 28px; margin: 8px 0 12px; font-weight: 700; letter-spacing: -0.01em; }
+    .hero p { font-size: 15px; line-height: 1.6; opacity: 0.92; max-width: 760px; margin: 0; }
+
+    /* Section heading */
+    section { margin: 28px 0; }
+    section > h2 {
+      font-size: 20px; font-weight: 700; letter-spacing: -0.01em;
+      margin: 0 0 6px; color: var(--text);
+    }
+    section > .lede { color: var(--muted); font-size: 14px; margin: 0 0 18px; max-width: 780px; }
+    .section-num {
+      display: inline-block; font-family: var(--mono); font-size: 11px; font-weight: 600;
+      color: var(--blue); background: var(--blue-bg);
+      border-radius: 4px; padding: 2px 6px; margin-right: 10px;
+    }
+
+    /* Card */
+    .card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+      padding: 22px; box-shadow: var(--shadow-sm);
+    }
+    .card.tight { padding: 16px 18px; }
+
+    /* Code chip */
+    code, .chip {
+      font-family: var(--mono); font-size: 12px; padding: 1px 6px;
+      background: var(--surface-3); border-radius: 4px; color: var(--text-2);
+    }
+    .chip { white-space: nowrap; }
+
+    /* Resource type cards (5 across) */
+    .res-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+    @media (max-width: 1024px) { .res-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 600px)  { .res-grid { grid-template-columns: 1fr; } }
+    .res-card {
+      border-radius: 12px; border: 1px solid var(--border); background: var(--surface);
+      padding: 14px 14px 16px; box-shadow: var(--shadow-sm);
+      display: flex; flex-direction: column;
+    }
+    .res-card .icon {
+      width: 32px; height: 32px; border-radius: 8px; display: grid; place-items: center;
+      font-weight: 700; font-size: 14px; margin-bottom: 10px;
+    }
+    .res-card h3 { font-size: 14px; margin: 0 0 4px; font-weight: 700; }
+    .res-card .codeline { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-bottom: 12px; }
+    .res-card ol {
+      font-size: 12px; padding-left: 18px; margin: 0 0 12px; color: var(--text-2);
+    }
+    .res-card ol li { margin-bottom: 3px; }
+    .res-card .live {
+      margin-top: auto; font-size: 11px; color: var(--muted); border-top: 1px solid var(--border-light); padding-top: 10px;
+    }
+    .res-card .live b { color: var(--text); font-weight: 600; }
+
+    /* Resource color accents */
+    .res-obs   .icon { background: var(--blue-bg);   color: var(--blue); }
+    .res-obs   { border-left: 3px solid var(--blue); }
+    .res-cond  .icon { background: var(--teal-bg);   color: var(--teal); }
+    .res-cond  { border-left: 3px solid var(--teal); }
+    .res-med   .icon { background: var(--purple-bg); color: var(--purple); }
+    .res-med   { border-left: 3px solid var(--purple); }
+    .res-all   .icon { background: var(--amber-bg);  color: var(--amber); }
+    .res-all   { border-left: 3px solid var(--amber); }
+    .res-imm   .icon { background: var(--pink-bg);   color: var(--pink); }
+    .res-imm   { border-left: 3px solid var(--pink); }
+
+    /* Anatomy diagram */
+    .anatomy {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 18px;
+    }
+    @media (max-width: 880px) { .anatomy { grid-template-columns: 1fr; } }
+    .anatomy .card h3 { font-size: 14px; margin: 0 0 12px; font-weight: 700; }
+    .anatomy .field { display: grid; grid-template-columns: 140px 1fr; gap: 10px; padding: 6px 0; border-bottom: 1px dashed var(--border-light); font-size: 13px; }
+    .anatomy .field:last-child { border-bottom: 0; }
+    .anatomy .field .name { font-family: var(--mono); font-size: 12px; color: var(--blue); }
+    .anatomy .field .desc { color: var(--text-2); }
+    .nested { background: var(--surface-2); border-radius: 8px; padding: 8px 10px; margin-top: 4px; font-size: 12px; }
+
+    /* Pipeline diagram */
+    .pipeline { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 22px 18px; box-shadow: var(--shadow-sm); }
+    .lanes { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr; gap: 10px; align-items: stretch; }
+    @media (max-width: 980px) { .lanes { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 600px) { .lanes { grid-template-columns: 1fr; } }
+    .stage {
+      display: flex; flex-direction: column; gap: 8px; padding: 14px 12px;
+      background: var(--surface-2); border-radius: 10px; min-height: 130px;
+    }
+    .stage h4 { font-size: 12px; font-weight: 700; margin: 0; color: var(--blue); text-transform: uppercase; letter-spacing: 0.04em; }
+    .stage p { font-size: 12px; color: var(--text-2); margin: 0; line-height: 1.5; }
+    .stage code { font-size: 11px; }
+    .arrows { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; padding: 6px 12% 0; color: var(--blue); font-family: var(--mono); font-size: 18px; }
+    @media (max-width: 980px) { .arrows { display: none; } }
+
+    /* Provenance demo (HDL example) */
+    .prov-demo { display: grid; grid-template-columns: 1fr 1.2fr; gap: 18px; align-items: center; }
+    @media (max-width: 880px) { .prov-demo { grid-template-columns: 1fr; } }
+    .merged-record {
+      background: linear-gradient(180deg, #ffffff, #f7faff);
+      border: 2px solid var(--blue); border-radius: 12px; padding: 18px; box-shadow: var(--shadow);
+    }
+    .merged-record .label { font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--blue); letter-spacing: 0.06em; }
+    .merged-record h4 { font-size: 16px; margin: 4px 0 10px; }
+    .merged-record .field-row { display: grid; grid-template-columns: 110px 1fr; padding: 4px 0; font-size: 12px; gap: 10px; }
+    .merged-record .field-row .k { color: var(--muted); font-family: var(--mono); }
+    .merged-record .traj {
+      margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-light);
+    }
+    .merged-record .traj-row { display: grid; grid-template-columns: 100px 1fr 80px 60px; gap: 8px; font-size: 12px; padding: 4px 0; align-items: center; }
+    .merged-record .traj-row .src { color: var(--muted); font-size: 11px; }
+    .merged-record .traj-row .val { font-weight: 700; text-align: right; font-family: var(--mono); }
+    .merged-record .traj-row .unit { color: var(--muted); font-size: 11px; }
+    .delta { font-size: 12px; color: var(--red); margin-top: 6px; font-weight: 600; }
+    .delta .arrow { font-family: var(--mono); }
+
+    .prov-tree { font-family: var(--mono); font-size: 12px; line-height: 1.7; }
+    .prov-tree .h { color: var(--blue); }
+    .prov-tree .key { color: var(--muted); }
+    .prov-tree .val { color: var(--text-2); }
+    .prov-tree .ent { background: var(--blue-bg); border-left: 3px solid var(--blue); padding: 6px 10px; margin: 4px 0 4px 12px; border-radius: 4px; }
+
+    /* Bidirectional walk */
+    .walks { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    @media (max-width: 880px) { .walks { grid-template-columns: 1fr; } }
+    .walk-card .badge {
+      font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+      padding: 3px 8px; border-radius: 4px; display: inline-block; margin-bottom: 8px;
+    }
+    .walk-forward .badge { background: var(--blue-bg); color: var(--blue); }
+    .walk-reverse .badge { background: var(--orange-bg); color: var(--orange); }
+    .walk-card h3 { font-size: 15px; margin: 4px 0 6px; }
+    .walk-card .desc { color: var(--text-2); font-size: 13px; margin: 0 0 12px; }
+    .walk-card .endpoint {
+      font-family: var(--mono); font-size: 11px; color: var(--text-2);
+      background: var(--surface-2); padding: 8px 10px; border-radius: 6px; margin-bottom: 10px;
+    }
+    .walk-card .out { font-size: 12px; color: var(--text-2); }
+    .walk-card .out b { color: var(--text); }
+
+    /* Live numbers */
+    .nums { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .nums th { text-align: left; font-weight: 600; padding: 10px 12px; background: var(--surface-2); color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; border-bottom: 1px solid var(--border); }
+    .nums th.num, .nums td.num { text-align: right; font-family: var(--mono); }
+    .nums td { padding: 10px 12px; border-bottom: 1px solid var(--border-light); }
+    .nums tr.total { font-weight: 600; }
+    .nums tr.total td { border-top: 2px solid var(--border); border-bottom: 0; }
+    .nums .strong { color: var(--blue); font-weight: 700; }
+
+    /* Vision wins callout */
+    .vision-wins {
+      background: linear-gradient(135deg, #fef9c3 0%, #fde68a 100%);
+      border: 1px solid #facc15; border-left: 4px solid #ca8a04;
+      border-radius: 10px; padding: 18px 20px; margin-top: 16px;
+    }
+    .vision-wins h3 { font-size: 14px; margin: 0 0 6px; color: #713f12; }
+    .vision-wins p { font-size: 13px; color: #78350f; margin: 0 0 10px; line-height: 1.6; }
+    .vision-wins ul { margin: 0; padding-left: 22px; font-size: 13px; color: #92400e; }
+    .vision-wins ul li { margin-bottom: 3px; }
+
+    /* Footer */
+    .foot { text-align: center; color: var(--muted); font-size: 12px; margin-top: 32px; padding-top: 18px; border-top: 1px solid var(--border-light); }
+    .foot a { color: var(--blue); text-decoration: none; }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <div class="topbar">
+    <div class="brand">
+      <div class="mark">EA</div>
+      <div>
+        <strong>Harmonize Data Model</strong>
+        <span>Visual catch-up — what gets merged, how, into what</span>
+      </div>
+    </div>
+    <div class="meta">
+      <span><b>Date</b> &nbsp;2026-05-04</span>
+      <span><b>Repo</b> &nbsp;<code>master @ 5e9246a</code></span>
+      <span><b>Status</b> &nbsp;153 tests green</span>
+    </div>
+  </div>
+
+  <div class="hero">
+    <div class="eyebrow">Atlas Wedge · Cross-source Merge with FHIR Provenance</div>
+    <h1>One canonical record. Every fact knows where it came from.</h1>
+    <p>
+      The harmonize layer takes per-source FHIR resources from heterogeneous
+      ingestion paths (native FHIR pulls + vision-extracted PDFs), identity-resolves them,
+      and emits one merged record per canonical fact — each with a Provenance edge
+      pointing back at every source observation that contributed. Below: the data
+      model, the merge identity priorities, and how data actually flows from disk
+      through the matcher to the React app.
+    </p>
+  </div>
+
+  <!-- ─────────────────────────── 1. Anatomy of a merged record ─────────────────────────── -->
+  <section>
+    <h2><span class="section-num">§ 1</span>Anatomy of a merged record</h2>
+    <p class="lede">Every merged record is one canonical clinical fact (a lab, a condition, a med, an allergy, an immunization event). The shape is consistent across resource types; only the identity-priority list differs.</p>
+    <div class="anatomy">
+
+      <div class="card">
+        <h3>Top-level dataclass · <code>MergedObservation</code></h3>
+        <div class="field"><span class="name">canonical_name</span><span class="desc">Human-readable lab name (from the LOINC bridge, or the source's display text)</span></div>
+        <div class="field"><span class="name">loinc_code</span><span class="desc">LOINC code if known (else <code>None</code> for unbridged)</span></div>
+        <div class="field"><span class="name">canonical_unit</span><span class="desc">Target unit values are normalized to (e.g. <code>"mg/dL"</code>)</span></div>
+        <div class="field"><span class="name">sources</span><span class="desc">List of <code>ObservationSource</code> — every source measurement, oldest first</span></div>
+        <div class="field"><span class="name">provenance</span><span class="desc">List of <code>ProvenanceEdge</code> — one per source contribution</span></div>
+        <div class="field"><span class="name">.latest</span><span class="desc">Property: most recent source measurement</span></div>
+        <div class="field"><span class="name">.has_conflict</span><span class="desc">Property: same-day cross-source disagreement &gt; 10 %</span></div>
+      </div>
+
+      <div class="card">
+        <h3>Per-source dataclass · <code>ObservationSource</code></h3>
+        <div class="field"><span class="name">source_label</span><span class="desc"><code>"Cedars-Sinai (FHIR)"</code> / <code>"Function Health · 2024-07-29"</code> / etc.</span></div>
+        <div class="field"><span class="name">source_observation_ref</span><span class="desc">FHIR ref back to the original Observation</span></div>
+        <div class="field"><span class="name">value</span><span class="desc">Numeric value, normalized to <code>canonical_unit</code></span></div>
+        <div class="field"><span class="name">unit</span><span class="desc">Applied unit after normalization</span></div>
+        <div class="field"><span class="name">raw_value, raw_unit</span><span class="desc">Original source values, preserved verbatim</span></div>
+        <div class="field"><span class="name">effective_date</span><span class="desc">When the measurement was made</span></div>
+        <div class="field"><span class="name">document_reference</span><span class="desc">Pointer to the source document (PDF or FHIR pull)</span></div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ─────────────────────────── 2. Five resource types ─────────────────────────── -->
+  <section>
+    <h2><span class="section-num">§ 2</span>Five resource types · USCDI v3 clinical-summary core</h2>
+    <p class="lede">All five matchers share the architecture above. Identity priority differs per type because the canonical code system differs (LOINC for labs, SNOMED for conditions, RxNorm for meds, CVX for vaccines, mixed for allergies).</p>
+    <div class="res-grid">
+
+      <div class="res-card res-obs">
+        <div class="icon">⚖</div>
+        <h3>Observations</h3>
+        <div class="codeline">MergedObservation</div>
+        <ol>
+          <li>LOINC code match</li>
+          <li>name → LOINC bridge</li>
+          <li>name passthrough</li>
+        </ol>
+        <div class="live"><b>blake-real:</b> 350 canonical · <b>65 cross-source</b></div>
+      </div>
+
+      <div class="res-card res-cond">
+        <div class="icon">⚕</div>
+        <h3>Conditions</h3>
+        <div class="codeline">MergedCondition</div>
+        <ol>
+          <li>SNOMED code match</li>
+          <li>ICD-10 code match</li>
+          <li>ICD-9 code match</li>
+          <li>name match (+ bridge for text-only sources)</li>
+        </ol>
+        <div class="live"><b>blake-real:</b> 19 canonical · <b>3 cross-source</b></div>
+      </div>
+
+      <div class="res-card res-med">
+        <div class="icon">℞</div>
+        <h3>Medications</h3>
+        <div class="codeline">MergedMedication</div>
+        <ol>
+          <li>RxNorm code overlap (any-of)</li>
+          <li>generic name canonical (strips brand parens, dose tail)</li>
+          <li>drug-name bridge for text-only sources</li>
+        </ol>
+        <div class="live"><b>blake-real:</b> 7 canonical · <b>6 cross-source</b></div>
+      </div>
+
+      <div class="res-card res-all">
+        <div class="icon">⚠</div>
+        <h3>Allergies</h3>
+        <div class="codeline">MergedAllergy</div>
+        <ol>
+          <li>SNOMED code match</li>
+          <li>RxNorm (drug allergies)</li>
+          <li>name match + bridge</li>
+        </ol>
+        <div class="live"><b>blake-real:</b> 1 canonical · <b>1 cross-source</b><br /><i>+ criticality rollup (high &gt; low)</i></div>
+      </div>
+
+      <div class="res-card res-imm">
+        <div class="icon">💉</div>
+        <h3>Immunizations</h3>
+        <div class="codeline">MergedImmunization</div>
+        <ol>
+          <li>(CVX, occurrence_date) — events, not chronic state</li>
+          <li>(canonical_name, date) for text-only</li>
+          <li>same-day name bridge</li>
+        </ol>
+        <div class="live"><b>blake-real:</b> 10 canonical · <b>8 cross-source</b></div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ─────────────────────────── 3. Pipeline diagram ─────────────────────────── -->
+  <section>
+    <h2><span class="section-num">§ 3</span>Forward pipeline · sources → merged record</h2>
+    <p class="lede">What happens when the React page loads or after the user clicks <i>Extract</i>. Five lanes, one direction.</p>
+    <div class="pipeline">
+      <div class="lanes">
+
+        <div class="stage">
+          <h4>① On disk</h4>
+          <p>FHIR pulls + extracted-PDF JSON files in:</p>
+          <p><code>data/synthea-samples/</code><br />
+          <code>data/harmonize-demo/</code><br />
+          <code>data/aggregation-uploads/&lt;session&gt;/</code><br />
+          <code>ehi-atlas/corpus/.../blake_records/</code></p>
+        </div>
+
+        <div class="stage">
+          <h4>② Collection registry</h4>
+          <p><code>api/core/harmonize_service.py</code></p>
+          <p>Static (synthea-demo, blake-real conditional) + dynamic discovery (upload-&lt;session&gt;).</p>
+          <p>Returns <code>CollectionDefinition</code> with N <code>SourceDefinition</code>s.</p>
+        </div>
+
+        <div class="stage">
+          <h4>③ Loader</h4>
+          <p><code>_load_resources_by_type()</code></p>
+          <p>Reads each source's JSON file, returns <code>{ResourceType: [resource, …]}</code>. Mtime-cached via <code>lru_cache</code>.</p>
+        </div>
+
+        <div class="stage">
+          <h4>④ Matcher</h4>
+          <p><code>lib/harmonize/&lt;type&gt;.py</code></p>
+          <p>For each input resource: extract codes + name + date, resolve identity by priority, normalize units (Obs only), append to <code>MergedX.sources</code>.</p>
+        </div>
+
+        <div class="stage">
+          <h4>⑤ Provenance</h4>
+          <p><code>lib/harmonize/provenance.py</code></p>
+          <p>One <code>ProvenanceEdge</code> per source contribution; FHIR Provenance resource minted on demand for the per-fact lineage panel.</p>
+        </div>
+
+      </div>
+      <div class="arrows">
+        <span style="text-align:center">▶</span>
+        <span style="text-align:center">▶</span>
+        <span style="text-align:center">▶</span>
+        <span style="text-align:center">▶</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─────────────────────────── 4. Worked example: HDL Cholesterol ─────────────────────────── -->
+  <section>
+    <h2><span class="section-num">§ 4</span>One concrete merged record · HDL Cholesterol</h2>
+    <p class="lede">The canonical demo of the wedge — same patient, two sources, 16 months apart, the trajectory only visible after harmonization.</p>
+    <div class="prov-demo">
+
+      <div class="merged-record">
+        <div class="label">MergedObservation</div>
+        <h4>HDL Cholesterol [Mass/volume] in Serum or Plasma</h4>
+        <div class="field-row"><span class="k">loinc_code</span><span><code>2085-9</code></span></div>
+        <div class="field-row"><span class="k">canonical_unit</span><span><code>mg/dL</code></span></div>
+        <div class="field-row"><span class="k">sources</span><span>2 (Cedars-Sinai FHIR + Function Health PDF)</span></div>
+        <div class="field-row"><span class="k">provenance</span><span>2 edges (loinc-match, name-bridge)</span></div>
+
+        <div class="traj">
+          <div class="traj-row"><span>2024-07-29</span><span class="src">Function Health</span><span class="val">81</span><span class="unit">mg/dL</span></div>
+          <div class="traj-row"><span>2025-11-07</span><span class="src">Cedars-Sinai (FHIR)</span><span class="val">67</span><span class="unit">mg/dL</span></div>
+          <div class="delta"><span class="arrow">▼</span> dropped 14 mg/dL over 16 months</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color: var(--blue); margin-bottom:10px;">Provenance resource (FHIR)</div>
+        <div class="prov-tree">
+          <div><span class="h">Provenance</span> {</div>
+          <div>&nbsp;&nbsp;<span class="key">target</span>: [{ ref: <span class="val">"Observation/merged-loinc-2085-9"</span> }],</div>
+          <div>&nbsp;&nbsp;<span class="key">activity</span>: <span class="val">{ code: "loinc-match" }</span>,</div>
+          <div>&nbsp;&nbsp;<span class="key">entity</span>: [</div>
+
+          <div class="ent">
+            <div>{ <span class="key">role</span>: "source",</div>
+            <div>&nbsp;&nbsp;<span class="key">what</span>: { ref: <span class="val">"Observation/cedars-sinai-67"</span> },</div>
+            <div>&nbsp;&nbsp;<span class="key">extension</span>: [</div>
+            <div>&nbsp;&nbsp;&nbsp;&nbsp;source-label: <span class="val">"Cedars-Sinai (FHIR)"</span>,</div>
+            <div>&nbsp;&nbsp;&nbsp;&nbsp;harmonize-activity: <span class="val">"loinc-match"</span>] }</div>
+          </div>
+
+          <div class="ent">
+            <div>{ <span class="key">role</span>: "source",</div>
+            <div>&nbsp;&nbsp;<span class="key">what</span>: { ref: <span class="val">"Observation/function-health-0"</span> },</div>
+            <div>&nbsp;&nbsp;<span class="key">extension</span>: [</div>
+            <div>&nbsp;&nbsp;&nbsp;&nbsp;source-label: <span class="val">"Function Health"</span>,</div>
+            <div>&nbsp;&nbsp;&nbsp;&nbsp;harmonize-activity: <span class="val">"name-bridge"</span>] }</div>
+          </div>
+
+          <div>&nbsp;&nbsp;]</div>
+          <div>}</div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ─────────────────────────── 5. Bidirectional Provenance walks ─────────────────────────── -->
+  <section>
+    <h2><span class="section-num">§ 5</span>Two directions of the Provenance graph</h2>
+    <p class="lede">The same edges power two different clinician questions. Forward: per-fact lineage. Reverse: per-source contribution.</p>
+
+    <div class="walks">
+
+      <div class="card walk-card walk-forward">
+        <div class="badge">Forward · per-fact lineage</div>
+        <h3>"Where did this fact come from?"</h3>
+        <p class="desc">User clicks a row in the Labs / Conditions / Medications / Allergies / Immunizations table. The Provenance panel populates with the source edges for that one fact.</p>
+        <div class="endpoint">GET /api/harmonize/{collection}/provenance/{merged_ref}</div>
+        <div class="out">
+          Response: a single FHIR Provenance resource, one <b>entity</b> per
+          contributing source, with <code>source-label</code> +
+          <code>harmonize-activity</code> Atlas extensions on each.
+        </div>
+      </div>
+
+      <div class="card walk-card walk-reverse">
+        <div class="badge">Reverse · per-source contribution</div>
+        <h3>"What did this PDF contribute?"</h3>
+        <p class="desc">User clicks a row in the Sources panel. An inline panel expands showing every merged fact this source touched, partitioned by resource type.</p>
+        <div class="endpoint">GET /api/harmonize/{collection}/contributions/{document_reference}</div>
+        <div class="out">
+          Response: counts + lists across all 5 resource types. <b>Cedars FHIR
+          contributes 207 facts</b> on blake-real (174 obs + 15 cond + 7 med +
+          1 all + 10 imm); <b>Cedars PDF contributes 160</b>.
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ─────────────────────────── 6. Source diff ─────────────────────────── -->
+  <section>
+    <h2><span class="section-num">§ 6</span>Unique vs shared · source-diff partitioning</h2>
+    <p class="lede">A second walk over the same edges. For each source, partition every merged record into <i>unique</i> (only this source contributed) vs <i>shared</i> (this source + at least one other).</p>
+
+    <div class="card tight">
+      <table class="nums">
+        <thead>
+          <tr>
+            <th>Source</th>
+            <th>Kind</th>
+            <th class="num">Unique</th>
+            <th class="num">Shared</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Cedars-Sinai (FHIR)</td><td>fhir-pull</td><td class="num strong">156</td><td class="num">51</td></tr>
+          <tr><td>Cedars-Sinai (PDF)</td><td>extracted-pdf</td><td class="num strong">103</td><td class="num">57</td></tr>
+          <tr><td>Function Health · 2024-07-26</td><td>extracted-pdf</td><td class="num strong">24</td><td class="num">0</td></tr>
+          <tr><td>Function Health · 2024-07-29</td><td>extracted-pdf</td><td class="num strong">21</td><td class="num">65</td></tr>
+          <tr><td>Function Health · 2025-11-29</td><td>extracted-pdf</td><td class="num strong">0</td><td class="num">58</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="vision-wins">
+      <h3>★ The 4 unique conditions on the Cedars PDF source = the vision wins from Move H</h3>
+      <p>
+        These were originally identified by manual triage of "false positives" in the F1
+        eval — clinical findings the structured FHIR pull never coded but the PDF
+        narrative captured. The harmonize graph now surfaces them automatically as
+        the <b>set difference</b> between the PDF source and every other source.
+      </p>
+      <ul>
+        <li>Bilateral inferior turbinate hypertrophy</li>
+        <li>Bipartite tibial sesamoid on the left</li>
+        <li>Chronic appearing fracture at the base of the right 2nd toe proximal phalanx</li>
+        <li>Marginal osteophyte at the lateral left 1st MTP joint</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ─────────────────────────── 7. Live numbers ─────────────────────────── -->
+  <section>
+    <h2><span class="section-num">§ 7</span>blake-real · all five tables</h2>
+    <p class="lede">Raw → merged → cross-source counts across the five USCDI resource types.</p>
+    <div class="card tight">
+      <table class="nums">
+        <thead>
+          <tr>
+            <th>&nbsp;</th>
+            <th class="num">Sources</th>
+            <th class="num">Obs</th>
+            <th class="num">Cond</th>
+            <th class="num">Med</th>
+            <th class="num">All</th>
+            <th class="num">Imm</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Cedars-Sinai (FHIR) raw</td><td class="num">1</td><td class="num">234</td><td class="num">28</td><td class="num">7</td><td class="num">1</td><td class="num">10</td></tr>
+          <tr><td>Cedars-Sinai (PDF) raw</td><td class="num">1</td><td class="num">138</td><td class="num">7</td><td class="num">6</td><td class="num">1</td><td class="num">8</td></tr>
+          <tr><td>Function Health × 3 raw</td><td class="num">3</td><td class="num">169</td><td class="num">0</td><td class="num">0</td><td class="num">0</td><td class="num">0</td></tr>
+          <tr class="total"><td><b>Total raw</b></td><td class="num">5</td><td class="num">541</td><td class="num">35</td><td class="num">13</td><td class="num">2</td><td class="num">18</td></tr>
+          <tr><td>Merged (canonical)</td><td class="num">—</td><td class="num">350</td><td class="num">19</td><td class="num">7</td><td class="num">1</td><td class="num">10</td></tr>
+          <tr><td><b class="strong">Cross-source merges</b></td><td class="num">—</td><td class="num strong">65</td><td class="num strong">3</td><td class="num strong">6</td><td class="num strong">1</td><td class="num strong">8</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="foot">
+    Companion docs: <a href="../architecture/PIPELINE-LOG.md">PIPELINE-LOG.md</a> ·
+    <a href="../architecture/HARMONIZATION-WORKED-EXAMPLE.md">HARMONIZATION-WORKED-EXAMPLE.md</a> ·
+    <a href="2026-05-04-harmonize-catchup.md">harmonize catch-up report</a>
+  </div>
+
+</div>
+</body>
+</html>

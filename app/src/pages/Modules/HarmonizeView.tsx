@@ -66,6 +66,7 @@ function safeUploadSessionId(value: string): string {
 function kindBadge(kind: string): { label: string; color: string } {
   if (kind === "fhir-pull") return { label: "FHIR pull", color: "bg-emerald-100 text-emerald-800" };
   if (kind === "extracted-pdf") return { label: "PDF extraction", color: "bg-amber-100 text-amber-800" };
+  if (kind === "ccda-xml") return { label: "C-CDA", color: "bg-sky-100 text-sky-800" };
   return { label: kind, color: "bg-slate-100 text-slate-700" };
 }
 
@@ -73,6 +74,7 @@ function sourceStatusClass(status: string): string {
   if (status === "structured" || status === "extracted") return "bg-emerald-100 text-emerald-800";
   if (status === "pending_extraction") return "bg-amber-100 text-amber-800";
   if (status === "empty_extraction" || status === "unparsed_structured") return "bg-amber-100 text-amber-800";
+  if (status === "identity_mismatch") return "bg-red-50 text-red-700";
   return "bg-red-50 text-red-700";
 }
 
@@ -325,7 +327,7 @@ function SourcesPanel({
   const structured = data.sources.filter((s) => s.status === "structured").length;
   const extracted = data.sources.filter((s) => s.status === "extracted").length;
   const pending = data.sources.filter((s) => s.status === "pending_extraction").length;
-  const failures = data.sources.filter((s) => s.status === "missing").length;
+  const failures = data.sources.filter((s) => s.status === "missing" || s.status === "identity_mismatch").length;
   const sourceContributions = diffQuery.data?.sources.reduce(
     (sum, source) => sum + source.totals.unique.all + source.totals.shared.all,
     0,
@@ -2962,7 +2964,7 @@ export function HarmonizeView() {
             )}
             {activeId && !activeCollectionHasNoSources && (
               <a
-                href={`/api/harmonize/${encodeURIComponent(activeId)}/export-workspace${activeId === "synthea-demo" ? "?include_demo_ccda=true" : ""}`}
+                href={`/api/harmonize/${encodeURIComponent(activeId)}/export-workspace`}
                 className="inline-flex items-center gap-2 rounded-lg border border-[#dfe4ea] bg-white px-3 py-2 text-sm font-semibold text-[#555a6a] hover:border-[#5b76fe] hover:text-[#5b76fe]"
               >
                 <FileText size={14} />

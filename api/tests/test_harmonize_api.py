@@ -16,6 +16,8 @@ import os
 import shutil
 import tempfile
 import unittest
+import zipfile
+from io import BytesIO
 from pathlib import Path
 from unittest.mock import patch
 
@@ -298,6 +300,78 @@ class UploadCollectionDiscoveryTests(unittest.TestCase):
         (sess / "report.pdf").write_bytes(b"%PDF-1.4 stub")
         return sess
 
+    def _stage_ccda_session(
+        self,
+        session_id: str,
+        *,
+        given: str = "Ccdatest",
+        family: str = "Patient",
+        birth_date: str = "19840302",
+        gender: str = "F",
+        condition: str = "Test-only C-CDA condition",
+        medication: str = "Test-only C-CDA medication",
+    ) -> Path:
+        sess = self._tmp / session_id
+        sess.mkdir(parents=True, exist_ok=True)
+        (sess / "summary.xml").write_text(
+            f"""<?xml version="1.0" encoding="UTF-8"?>
+<ClinicalDocument xmlns="urn:hl7-org:v3">
+  <recordTarget>
+    <patientRole>
+      <id root="1.2.3" extension="{session_id}"/>
+      <patient>
+        <name><given>{given}</given><family>{family}</family></name>
+        <administrativeGenderCode code="{gender}"/>
+        <birthTime value="{birth_date}"/>
+      </patient>
+    </patientRole>
+  </recordTarget>
+  <title>Continuity of Care Document</title>
+  <component>
+    <structuredBody>
+      <component>
+        <section>
+          <code code="11450-4"/>
+          <title>Problems</title>
+          <entry>
+            <act>
+              <entryRelationship>
+                <observation>
+                  <effectiveTime><low value="20240101"/></effectiveTime>
+                  <value code="999001" displayName="{condition}" codeSystemName="SNOMED CT"/>
+                </observation>
+              </entryRelationship>
+            </act>
+          </entry>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="10160-0"/>
+          <title>Medications</title>
+          <entry>
+            <substanceAdministration>
+              <effectiveTime><low value="20240203"/></effectiveTime>
+              <statusCode code="active"/>
+              <consumable>
+                <manufacturedProduct>
+                  <manufacturedMaterial>
+                    <code code="999002" displayName="{medication}" codeSystemName="RxNorm"/>
+                  </manufacturedMaterial>
+                </manufacturedProduct>
+              </consumable>
+            </substanceAdministration>
+          </entry>
+        </section>
+      </component>
+    </structuredBody>
+  </component>
+</ClinicalDocument>
+""",
+            encoding="utf-8",
+        )
+        return sess
+
     def _stage_clinical_session(self, session_id: str) -> Path:
         """Create a source with clinical-document resources beyond core facts."""
         sess = self._tmp / session_id
@@ -445,6 +519,20 @@ class UploadCollectionDiscoveryTests(unittest.TestCase):
         self.assertTrue(by_kind["fhir-pull"]["available"])
         self.assertFalse(by_kind["extracted-pdf"]["available"])
 
+    def test_upload_collection_includes_ccda_xml_as_structured_source(self) -> None:
+        self._stage_ccda_session("ccda-source")
+        r = self.client.get("/api/harmonize/upload-ccda-source/sources")
+        self.assertEqual(r.status_code, 200)
+        srcs = r.json()["sources"]
+        self.assertEqual(len(srcs), 1)
+        self.assertEqual(srcs[0]["kind"], "ccda-xml")
+        self.assertEqual(srcs[0]["status"], "structured")
+        self.assertGreaterEqual(srcs[0]["resource_counts"].get("Condition", 0), 1)
+
+        conditions = self.client.get("/api/harmonize/upload-ccda-source/conditions")
+        self.assertEqual(conditions.status_code, 200)
+        self.assertIn("Test-only C-CDA condition", json.dumps(conditions.json()))
+
     def test_upload_collection_observations_include_fhir_source(self) -> None:
         self._stage_session("carol-x")
         r = self.client.get("/api/harmonize/upload-carol-x/observations")
@@ -481,6 +569,35 @@ class UploadCollectionDiscoveryTests(unittest.TestCase):
         self.assertIn("Synthea FHIR patient bundle", labels)
         self.assertIn("labs.json", labels)
         self.assertIn("report.pdf", labels)
+
+    def test_patient_workspace_excludes_mismatched_ccda_facts(self) -> None:
+        patient_id = self._sample_patient_id()
+        self._stage_ccda_session(
+            patient_id,
+            given="Victoria",
+            family="Wade",
+            birth_date="19750501",
+            gender="F",
+            condition="Test Mismatch Disorder",
+            medication="Test Mismatch Medication",
+        )
+
+        workspace = self.client.get(f"/api/harmonize/workspaces/{patient_id}").json()
+        sources = self.client.get(f"/api/harmonize/{workspace['id']}/sources").json()["sources"]
+        ccda_source = next(source for source in sources if source["kind"] == "ccda-xml")
+        self.assertEqual(ccda_source["status"], "identity_mismatch")
+        self.assertEqual(ccda_source["total_resources"], 0)
+
+        conditions = self.client.get(f"/api/harmonize/{workspace['id']}/conditions")
+        self.assertEqual(conditions.status_code, 200)
+        self.assertNotIn("Test Mismatch Disorder", json.dumps(conditions.json()))
+
+        exported = self.client.get(f"/api/harmonize/{workspace['id']}/export-workspace")
+        self.assertEqual(exported.status_code, 200)
+        with zipfile.ZipFile(BytesIO(exported.content)) as zf:
+            root = next(name.split("/", 1)[0] for name in zf.namelist() if "/" in name)
+            facts = json.loads(zf.read(f"{root}/evidence/canonical-facts.json"))["facts"]
+        self.assertNotIn("Test Mismatch Disorder", json.dumps(facts))
 
     def test_empty_upload_profile_is_empty_harmonize_workspace(self) -> None:
         from api.core import harmonize_service

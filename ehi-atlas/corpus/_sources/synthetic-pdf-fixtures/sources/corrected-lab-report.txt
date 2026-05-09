@@ -1,0 +1,34 @@
+PACIFIC SYNTHETIC LABORATORIES
+AMENDED FINAL REPORT - CHEMISTRY
+
+Patient: Morgan Vale
+DOB: 1962-04-18
+MRN: SYN-PDF-001
+Accession: PSL-260203-1142
+Ordering clinician: Dana Ivers, MD
+
+Specimen collected: 2026-02-03 08:14 PST
+Specimen received: 2026-02-03 09:02 PST
+Report status: AMENDED FINAL
+Amendment time: 2026-02-03 16:20 PST
+
+IMPORTANT AMENDMENT NOTE
+The preliminary creatinine result of 0.8 mg/dL was released in error and is VOID.
+The corrected final creatinine result is 1.8 mg/dL.
+Use the corrected final value for clinical interpretation.
+
+COMPREHENSIVE METABOLIC PANEL
+
+Test                         Result     Units              Reference Range     Flag
+Glucose                      118        mg/dL              70-99               H
+BUN                          31         mg/dL              7-25                H
+Creatinine                   1.8        mg/dL              0.6-1.3             H
+eGFR                         42         mL/min/1.73m2      >=60                L
+Sodium                       137        mmol/L             136-145
+Potassium                    4.8        mmol/L             3.5-5.1
+
+VOIDED PRELIMINARY VALUES - DO NOT USE
+Creatinine                   0.8        mg/dL              0.6-1.3
+
+Electronically signed by: Priya Shah, MD, Laboratory Director
+

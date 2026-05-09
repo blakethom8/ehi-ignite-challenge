@@ -175,7 +175,7 @@ This is the cleanest fix for the cross-page-table problem (table starts on page 
 
 ### How this enables the agentic vision
 
-Once each pass is a focused single-task call with its own schema slice, "use a sub-agent for this task" reduces to "select a different model for this pass." The infrastructure is already there — we have `VisionBackend` Protocol with both `AnthropicBackend` and `GoogleAIStudioBackend` implementations. Adding `OllamaBackend` for local Gemma is ~150 lines.
+Once each pass is a focused single-task call with its own schema slice, "use a sub-agent for this task" reduces to "select a different model for this pass." The infrastructure is already there — we have `VisionBackend` Protocol implementations for `AnthropicBackend`, hosted Gemma via `GoogleAIStudioBackend`, and local Gemma/MedGemma via `OllamaVisionBackend`.
 
 ```python
 PASSES = [
@@ -189,6 +189,8 @@ PASSES = [
 ]
 ```
 
+Local Gemma/MedGemma is exposed as `backend="gemma-ollama"` and can be tested through the registered `multipass-fhir-ollama-tabular` pipeline.
+
 ### How model selection per pass is decided
 
 Eval harness. The bake-off framework (Decision 5) runs each candidate pipeline through every PDF × ground truth. Per-pass model swaps are just configuration changes; we run the same eval and compare F1, cost, latency. The data picks.
@@ -198,6 +200,11 @@ Eval harness. The bake-off framework (Decision 5) runs each candidate pipeline t
 ## Decision 5 — Pipelines are pluggable; multiple architectures coexist
 
 **Decision:** the pipeline abstraction is a Protocol. Any architecture that takes a PDF and emits a FHIR Bundle is a valid pipeline. The framework supports running multiple in parallel and comparing outputs.
+
+This is an iterative workspace, not a winner-take-all replacement track. New
+pipelines and pipeline variations are additive experiments: they can improve a
+source type, a resource pass, a confidence signal, or a harmonization edge
+without displacing the existing default.
 
 ### The contract
 
@@ -408,6 +415,7 @@ The 4 condition + 41 lab "FPs" deserve manual triage. A planned Streamlit page w
 - `multipass-fhir` (all-Claude) is the **default architecture**.
 - `single-pass-vision` retained as a regression detector + lab-only-PDF fast path (Move C showed it matches multipass quality on pure lab PDFs at ~70× lower latency).
 - `multipass-fhir-gemma-tabular` (chunked Gemma) **kept registered but not the default** — 12 F1 points lower, 3.7× slower on chart documents. Useful for cost-constrained workflows on small PDFs.
+- `multipass-fhir-ollama-tabular` **kept registered as a local-model workspace variant** — same mixed-backend architecture, but table-shaped passes route through localhost Ollama (`gemma-ollama`). Its value is measured both as a parser and as another signal into harmonization.
 - `dedupe_gt=True` and `findable_only=True` are the **eval defaults** for fairness.
 - Next investigations (in `PIPELINE-LOG.md`): vision-wins reviewer, conditions prompt v4 targeting Z/R/S codes, multipass on documents beyond Cedars.
 

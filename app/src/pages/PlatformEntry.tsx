@@ -111,7 +111,7 @@ export function PlatformEntry() {
           </div>
 
           <div className="max-h-[500px] overflow-auto">
-            <table className="min-w-full border-separate border-spacing-0 text-left text-sm">
+            <table className="min-w-[760px] w-full border-separate border-spacing-0 text-left text-sm">
               <thead className="sticky top-0 z-10 bg-[#fbfcff] text-xs uppercase tracking-[0.12em] text-[#8a93a6]">
                 <tr>
                   <th className="border-b border-[#e7eaf1] px-5 py-3 font-semibold">Patient</th>
@@ -121,14 +121,13 @@ export function PlatformEntry() {
                   <th className="border-b border-[#e7eaf1] px-4 py-3 font-semibold">Conditions</th>
                   <th className="border-b border-[#e7eaf1] px-4 py-3 font-semibold">Meds</th>
                   <th className="border-b border-[#e7eaf1] px-4 py-3 font-semibold">Complexity</th>
-                  <th className="border-b border-[#e7eaf1] px-5 py-3 font-semibold" />
                 </tr>
               </thead>
               <tbody>
                 {isLoading
                   ? Array.from({ length: 8 }).map((_, index) => (
                       <tr key={index}>
-                        <td colSpan={8} className="px-5 py-2">
+                        <td colSpan={7} className="px-5 py-2">
                           <div className="h-12 animate-pulse rounded-xl bg-[#f0f2f6]" />
                         </td>
                       </tr>
@@ -138,14 +137,26 @@ export function PlatformEntry() {
                       return (
                         <tr
                           key={patient.id}
-                          className={`cursor-pointer transition-colors ${
+                          className={`group cursor-pointer transition-colors ${
                             selected ? "bg-[#eef1ff]" : "hover:bg-[#f7f8ff]"
                           }`}
                           onClick={() => navigate(`/explorer?patient=${patient.id}`)}
                         >
                           <td className="border-b border-[#eef0f5] px-5 py-3">
-                            <p className="font-semibold text-[#1c1c1e]">{patient.name}</p>
-                            <p className="mt-0.5 text-xs text-[#8a93a6]">{patient.complexity_tier.replace("_", " ")}</p>
+                            <div className="min-w-0">
+                              <p className="font-semibold text-[#1c1c1e]">{patient.name}</p>
+                              <p className="mt-0.5 text-xs text-[#8a93a6]">{patient.complexity_tier.replace("_", " ")}</p>
+                              <button
+                                type="button"
+                                className={`mt-2 rounded-lg px-3 py-1.5 text-xs font-semibold ${
+                                  selected
+                                    ? "bg-[#5b76fe] text-white"
+                                    : "bg-[#eef1ff] text-[#5b76fe]"
+                                }`}
+                              >
+                                {selected ? "Selected" : "Select"}
+                              </button>
+                            </div>
                           </td>
                           <td className="border-b border-[#eef0f5] px-4 py-3 text-[#5d687c]">
                             {Math.round(patient.age_years)} / {patient.gender}
@@ -160,18 +171,6 @@ export function PlatformEntry() {
                             <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-[#566070]">
                               {Math.round(patient.complexity_score)}
                             </span>
-                          </td>
-                          <td className="border-b border-[#eef0f5] px-5 py-3 text-right">
-                            <button
-                              type="button"
-                              className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${
-                                selected
-                                  ? "bg-[#5b76fe] text-white"
-                                  : "bg-[#eef1ff] text-[#5b76fe]"
-                              }`}
-                            >
-                              {selected ? "Selected" : "Select"}
-                            </button>
                           </td>
                         </tr>
                       );

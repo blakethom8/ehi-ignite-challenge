@@ -219,7 +219,10 @@ def _with_processing_state(patient_id: str, upload: AggregationUploadedFile) -> 
         else:
             parse_status = "ready_to_extract"
             next_step = "Run PDF extraction before this file contributes structured facts."
-    elif name.endswith((".xml", ".csv", ".txt")) or content_type in {"text/csv", "text/xml", "application/xml"}:
+    elif name.endswith(".xml") or content_type in {"text/xml", "application/xml"}:
+        parse_status = "structured"
+        next_step = "Ready for C-CDA conversion and harmonization if the XML is a ClinicalDocument."
+    elif name.endswith((".csv", ".txt")) or content_type == "text/csv":
         parse_status = "stored"
         next_step = "Stored as source material; parser support is planned for this format."
     else:

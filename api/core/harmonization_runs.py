@@ -200,7 +200,7 @@ def _review_items(
             _run_review_decision_defaults({
                 "id": f"source-{source['id']}",
                 "category": "source",
-                "severity": "high" if source["status"] in {"missing", "pending_extraction"} else "medium",
+                "severity": "high" if source["status"] in {"missing", "pending_extraction", "identity_mismatch"} else "medium",
                 "title": source["status_label"],
                 "body": f"{source['label']} is not ready to contribute structured facts.",
                 "source_id": source["id"],

@@ -8,6 +8,7 @@ the loop's tool dispatch + escalation + finalize paths are all exercised.
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -152,15 +153,15 @@ def test_has_credentials_rejects_placeholder() -> None:
 # ── Mode dispatch ──────────────────────────────────────────────────────────
 
 
-def test_run_mode_defaults_to_deterministic(trial_skill) -> None:
+def test_run_mode_defaults_to_agent(trial_skill) -> None:
     runner = _runner(trial_skill, brief={})
-    assert runner.resolve_run_mode() == "deterministic"
+    assert runner.resolve_run_mode() == "agent"
 
 
 def test_run_mode_brief_override_wins(
     trial_skill, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv("SKILLS_RUN_MODE", "deterministic")
+    monkeypatch.setenv("SKILLS_RUN_MODE", "auto")
     runner = _runner(trial_skill, brief={"_run_mode": "agent"})
     assert runner.resolve_run_mode() == "agent"
 
@@ -173,30 +174,30 @@ def test_run_mode_env_var_used_when_no_brief_override(
     assert runner.resolve_run_mode() == "agent"
 
 
-def test_run_mode_unknown_falls_back_to_deterministic(
+def test_run_mode_unknown_is_rejected(
     trial_skill, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("SKILLS_RUN_MODE", "telepathic")
     runner = _runner(trial_skill, brief={})
-    assert runner.resolve_run_mode() == "deterministic"
+    with pytest.raises(Exception, match="only agent mode is supported"):
+        runner.resolve_run_mode()
 
 
-def test_run_mode_auto_falls_back_when_no_credentials(
+def test_run_mode_auto_is_agent_without_fallback(
     trial_skill, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("SKILLS_RUN_MODE", "auto")
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     runner = _runner(trial_skill, brief={})
-    assert runner.resolve_run_mode() == "deterministic"
-
-
-def test_run_mode_auto_promotes_when_credentials_present(
-    trial_skill, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setenv("SKILLS_RUN_MODE", "auto")
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-real-looking-key")
-    runner = _runner(trial_skill, brief={})
     assert runner.resolve_run_mode() == "agent"
+
+
+def test_run_mode_deterministic_is_disabled(
+    trial_skill,
+) -> None:
+    runner = _runner(trial_skill, brief={"_run_mode": "deterministic"})
+    with pytest.raises(Exception, match="deterministic skill runs are disabled"):
+        runner.resolve_run_mode()
 
 
 # ── Agent loop happy path ─────────────────────────────────────────────────
@@ -240,6 +241,63 @@ async def test_agent_loop_finalizes_with_scripted_artifact(trial_skill) -> None:
     )
     assert output["summary"]["trials_reviewed"] == 0
     assert runner.agent_state["finalize_signal"] is True
+
+
+@pytest.mark.asyncio
+async def test_agent_loop_injects_pending_steering_messages(trial_skill) -> None:
+    runner = _runner(trial_skill, brief={"anchors": []})
+    queued = runner.workspace.append_message(
+        "Prioritize trials in Boston with no placebo-only arm.",
+        actor="clinician",
+        canvas_ref={"kind": "trial_list", "selected_nct_ids": ["NCT01234567"]},
+    )
+
+    artifact = {
+        "run_id": runner.workspace.run_id,
+        "skill_version": trial_skill.manifest.version,
+        "patient_id": runner.workspace.patient_id,
+        "summary": {
+            "trials_reviewed": 0,
+            "trials_surviving": 0,
+            "trials_excluded": 0,
+            "confidence_note": "steering acknowledged",
+        },
+        "trials": [],
+        "escalations": [],
+    }
+    calls: list[dict[str, Any]] = []
+
+    async def create_message(**kwargs: Any) -> FakeResponse:
+        calls.append(deepcopy(kwargs))
+        return FakeResponse(
+            stop_reason="tool_use",
+            content=[
+                _text("I will apply the steering message."),
+                _tool("submit_final_artifact", {"output": artifact}),
+            ],
+        )
+
+    cfg = AgentConfig(
+        model="claude-test", max_turns=5, max_tokens_per_turn=1024, api_key="x"
+    )
+    output = await drive_claude_agent_loop(
+        runner, create_message=create_message, config=cfg
+    )
+
+    assert output["summary"]["confidence_note"] == "steering acknowledged"
+    assert len(calls) == 1
+    first_turn_messages = calls[0]["messages"]
+    assert first_turn_messages[-1]["role"] == "user"
+    steering_text = first_turn_messages[-1]["content"]
+    assert queued.message_id in steering_text
+    assert "Prioritize trials in Boston" in steering_text
+    assert "selected_nct_ids" in steering_text
+
+    persisted = runner.workspace.messages()[0]
+    assert persisted.consumed is True
+    assert persisted.consumed_at
+    kinds = [event["kind"] for event in runner.workspace.transcript_events()]
+    assert "agent_steering_messages" in kinds
 
 
 @pytest.mark.asyncio
@@ -327,6 +385,154 @@ async def test_agent_loop_dispatches_workspace_cite_then_write(trial_skill) -> N
     workspace_md = runner.workspace.workspace_md_path.read_text("utf-8")
     assert "NCT12345678" in workspace_md
     assert "[cite:c_0001]" in workspace_md
+
+
+@pytest.mark.asyncio
+async def test_agent_loop_dispatches_canvas_upsert(trial_skill) -> None:
+    runner = _runner(trial_skill, brief={})
+
+    artifact = {
+        "run_id": runner.workspace.run_id,
+        "skill_version": trial_skill.manifest.version,
+        "patient_id": runner.workspace.patient_id,
+        "summary": {
+            "trials_reviewed": 0,
+            "trials_surviving": 0,
+            "trials_excluded": 0,
+            "confidence_note": "canvas test",
+        },
+        "trials": [],
+        "escalations": [],
+    }
+
+    create_message = _scripted(
+        [
+            FakeResponse(
+                stop_reason="tool_use",
+                content=[
+                    _tool(
+                        "workspace_canvas_upsert",
+                        {
+                            "node_id": "trial:NCT01234567",
+                            "kind": "candidate_trial",
+                            "title": "Demo trial",
+                            "summary": "fit pending",
+                            "data": {"nct_id": "NCT01234567"},
+                        },
+                    )
+                ],
+            ),
+            FakeResponse(
+                stop_reason="tool_use",
+                content=[_tool("submit_final_artifact", {"output": artifact})],
+            ),
+        ]
+    )
+
+    cfg = AgentConfig(
+        model="claude-test", max_turns=5, max_tokens_per_turn=1024, api_key="x"
+    )
+    await drive_claude_agent_loop(runner, create_message=create_message, config=cfg)
+    nodes = {node["node_id"]: node for node in runner.workspace.canvas_state()["nodes"]}
+    assert nodes["trial:NCT01234567"]["title"] == "Demo trial"
+    kinds = [event["kind"] for event in runner.workspace.transcript_events()]
+    assert "canvas_node_upserted" in kinds
+
+
+@pytest.mark.asyncio
+async def test_agent_loop_dispatches_chart_tools_with_audit_events(
+    trial_skill, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from api.core.skills import agent_loop
+
+    runner = _runner(trial_skill, brief={})
+
+    def fake_evidence(**kwargs: Any) -> dict[str, Any]:
+        return {
+            "intent": "condition",
+            "patient_name": "Test Patient",
+            "parse_warning_count": 0,
+            "active_flag_count": 0,
+            "interaction_count": 0,
+            "high_risk_active_condition_count": 1,
+            "evidence_lines": [f"Evidence for {kwargs['query']}"],
+            "citations": [
+                {
+                    "source_type": "Condition",
+                    "resource_id": "cond-1",
+                    "label": "Alzheimer's disease",
+                    "detail": "status=active",
+                    "event_date": None,
+                }
+            ],
+            "follow_ups": [],
+        }
+
+    monkeypatch.setattr(agent_loop, "get_relevant_provider_evidence", fake_evidence)
+
+    artifact = {
+        "run_id": runner.workspace.run_id,
+        "skill_version": trial_skill.manifest.version,
+        "patient_id": runner.workspace.patient_id,
+        "summary": {
+            "trials_reviewed": 0,
+            "trials_surviving": 0,
+            "trials_excluded": 0,
+            "confidence_note": "chart tools exercised",
+        },
+        "trials": [],
+        "escalations": [],
+    }
+
+    create_message = _scripted(
+        [
+            FakeResponse(
+                stop_reason="tool_use",
+                content=[
+                    _tool("get_patient_snapshot", {"max_facts": 4}, id="snap"),
+                    _tool(
+                        "query_chart_evidence",
+                        {
+                            "query": "Does the chart support Alzheimer's disease?",
+                            "max_facts": 3,
+                        },
+                        id="evidence",
+                    ),
+                    _tool(
+                        "run_sql",
+                        {"query": "DROP TABLE patient", "limit": 10},
+                        id="sql",
+                    ),
+                ],
+            ),
+            FakeResponse(
+                stop_reason="tool_use",
+                content=[_tool("submit_final_artifact", {"output": artifact})],
+            ),
+        ]
+    )
+
+    cfg = AgentConfig(
+        model="claude-test", max_turns=5, max_tokens_per_turn=1024, api_key="x"
+    )
+    await drive_claude_agent_loop(runner, create_message=create_message, config=cfg)
+
+    events = list(runner.workspace.transcript_events())
+    calls = [event for event in events if event["kind"] == "agent_tool_call"]
+    results = [event for event in events if event["kind"] == "agent_tool_result"]
+    assert {event["tool"] for event in calls} >= {
+        "get_patient_snapshot",
+        "query_chart_evidence",
+        "run_sql",
+    }
+    matching_evidence_results = [
+        event for event in results if event["tool"] == "query_chart_evidence"
+    ]
+    assert matching_evidence_results, events
+    evidence_result = matching_evidence_results[0]
+    assert evidence_result["result_summary"]["evidence_count"] == 1
+    sql_result = next(event for event in results if event["tool"] == "run_sql")
+    assert sql_result["result_summary"]["error"].startswith("rejected:")
 
 
 # ── Escalation pauses the loop ─────────────────────────────────────────────
@@ -535,6 +741,13 @@ def test_tool_registry_includes_submit_final_artifact_even_if_skill_omits_it(
     assert "workspace_cite" in names
     assert "workspace_write" in names
     assert "workspace_escalate" in names
+    assert "workspace_canvas_upsert" in names
+    assert "trial_pursuit_upsert" in names
+    assert "trial_pursuit_add_event" in names
+    assert "trial_pursuit_add_task" in names
+    assert "get_patient_snapshot" in names
+    assert "query_chart_evidence" in names
+    assert "run_sql" in names
 
 
 def test_tool_registry_drops_unknown_aliases() -> None:

@@ -14,7 +14,7 @@
 
 ### T00 · Per-pass schema versioning + extension URL unification
 
-- **Status:** Queued
+- **Status:** ✅ Completed `96f507c` · 2026-05-07 · 125 tests pass
 - **Goal:** Add a `schema_version: str` field to `ExtractionPass` so individual passes can evolve their schema without invalidating other passes' caches. Make the cache key include per-pass schema version. Document the convention in code comments.
 - **Why:** Today bumping global `_SCHEMA_VERSION` invalidates ALL pass caches. With 16 passes that's expensive churn. Per-pass versioning means changing the vital-signs schema doesn't re-extract conditions.
 - **Context files:**
@@ -41,7 +41,7 @@
 
 ### T01 · Vital-signs extraction pass
 
-- **Status:** Queued
+- **Status:** ✅ Completed `3f1e0ab` · 2026-05-07 · 132 tests pass
 - **Goal:** New extraction pass that captures vital signs from documents (BP, pulse, temperature, RR, O2 sat, weight, height, BMI). Emit as FHIR `Observation` resources with `category: vital-signs`.
 - **Why:** Cedars MyHealth review: page 2 has BP 119/71, Pulse 58, Temp 36.4°C, RR 16, O2 98%, Weight 95.7kg, Height 188cm, BMI 27.09 dated 12/12/2025 — we extracted ZERO of these. Vital signs are clinically critical and the Key Labs panel already filters by LOINC, so they slot into existing infrastructure seamlessly.
 - **Context files:**
@@ -64,7 +64,7 @@
 
 ### T02 · Update `eval.py` to support new fact types
 
-- **Status:** Queued
+- **Status:** ✅ Completed `a592e9a` · 2026-05-07 · 136 tests pass
 - **Goal:** Extend the eval harness `FactType` Literal and `_FACT_TYPES` mapping so vital signs (and future passes) participate in F1 scoring.
 - **Context files:**
   - `lib/extract/eval.py` (lines 58, 528, 147–269)
@@ -86,7 +86,7 @@
 
 ### T03 · Encounter extraction pass
 
-- **Status:** Queued
+- **Status:** ✅ Completed `40ecd9c` · 2026-05-07 · 144 tests pass
 - **Goal:** New pass that extracts office visits / clinical encounters as FHIR `Encounter` resources.
 - **Why:** Cedars MyHealth shows "04/22/2026 Office Visit at Beverly Hills Allergy with Ani Shirvanian, NP" — we extracted zero Encounter resources. Downstream code (`api/routers/patients.py:761` etc.) is ALREADY consuming `record.encounters` to build timelines, care team, sites of service. The whole "Encounters" tab in History.tsx is empty because extraction never emits these.
 - **Context files:**
@@ -107,7 +107,7 @@
 
 ### T04 · Practitioner extraction pass
 
-- **Status:** Queued
+- **Status:** ✅ Completed `95c6702` · 2026-05-07 · 153 tests pass
 - **Goal:** Extract care-team practitioners as FHIR `Practitioner` resources. Capture NPI when present.
 - **Context files:** same as T03 + Synthea Practitioner shape (look in any Synthea bundle for a Practitioner entry; canonical shape includes `identifier[system="http://hl7.org/fhir/sid/us-npi"]`, `name[]`, `telecom`, `address`).
 - **What to build:**
@@ -119,7 +119,7 @@
 
 ### T05 · Organization extraction pass
 
-- **Status:** Queued
+- **Status:** ✅ Completed `f58adf5` · 2026-05-07 · 162 tests pass
 - **Goal:** Extract care facilities as FHIR `Organization` resources.
 - **What to build:**
   1. **Schema** (`OrganizationEntry`, `OrganizationExtraction`): `organization_id: str | None`, `name: str | None`, `type_display: str | None` (e.g., "Healthcare Provider", "Hospital", "Lab"), `phone: str | None`, `address_line/city/state/postal_code: str | None`, `page: int | None`.
@@ -129,7 +129,7 @@
 
 ### T06 · Encounter linkage on existing resources
 
-- **Status:** Queued
+- **Status:** ✅ Completed `5473052` · 2026-05-07 · 169 tests pass
 - **Goal:** When the doc-context indicates an encounter (e.g., "documented in this encounter" sections), set `encounter: Reference(Encounter/...)` on Observations / Conditions / MedicationRequests / Procedures emitted within that encounter scope.
 - **Why:** Cedars MyHealth's "Progress Notes / documented in this encounter" sections clearly tie facts to specific visits. Today our resources reference no encounter, breaking timeline grouping.
 - **Approach:** Augment `_merge_to_bundle` to: (a) extract encounter section markers from the doc-context output (Pass 0 may need a small enhancement), (b) when a resource's source-text is in an "encounter" section, set its `encounter` reference.
@@ -141,7 +141,7 @@
 
 ### T07 · Clinical-notes extraction pass (DocumentReference + Composition)
 
-- **Status:** Queued
+- **Status:** ✅ Completed `71b7d48` · 2026-05-07 · 179 tests pass
 - **Goal:** Extract narrative clinical notes (Subjective, Physical Exam, Assessment & Plan, patient education paragraphs) as FHIR `DocumentReference` (narrative container) + `Composition` (sectioned structure).
 - **Why:** **The original ask.** Cedars MyHealth pages 22-24 have full SOAP-style progress notes that we currently discard.
 - **Context files:** existing `Composition` parsing pattern in `api/core/harmonize_service.py:1051–1064` (shows what downstream expects).
@@ -153,7 +153,7 @@
 
 ### T08 · Note ↔ Encounter linkage
 
-- **Status:** Queued
+- **Status:** ✅ Completed `d990d6f` · 2026-05-07 · 185 tests pass
 - **Depends on:** T03 (Encounter pass), T07 (Clinical-notes pass)
 - **Goal:** Link DocumentReference / Composition resources to the Encounter they belong to.
 - **Approach:** Match by encounter_date + author. If multiple encounters on same date, prefer match on practitioner.
@@ -164,7 +164,7 @@
 
 ### T09 · Patient extraction pass with US Core extensions
 
-- **Status:** Queued
+- **Status:** ✅ Completed `08521ae` · 2026-05-07 · 200 tests pass
 - **Goal:** Emit a FHIR `Patient` resource with full US Core extensions (race, ethnicity, birthsex, birthplace).
 - **Context files:** `lib/fhir_parser/extractors.py:230–260` (existing PARSING with US Core extensions — mirror the shape on emission).
 - **What to build:**
@@ -174,7 +174,7 @@
 
 ### T10 · Replace `Patient/unknown` references
 
-- **Status:** Queued
+- **Status:** ✅ Completed `90d8ea1` · 2026-05-07 · 211 tests pass
 - **Depends on:** T09
 - **Goal:** Once Patient resource exists in the bundle, all other resources should `subject: Reference(Patient/<actual-id>)` instead of `Patient/unknown`.
 
@@ -184,7 +184,7 @@
 
 ### T11 · Coverage extraction pass
 
-- **Status:** Queued
+- **Status:** ✅ Completed `9754df1` · 2026-05-07 · 221 tests pass
 - **Goal:** Extract insurance/payor info as FHIR `Coverage` resource.
 - **What to build:**
   1. **Schema** (`CoverageEntry`, `CoverageExtraction`): `coverage_id: str | None`, `status: Literal["active","cancelled","draft","entered-in-error"] = "active"`, `payor_name: str | None`, `member_id: str | None`, `subscriber_id: str | None`, `group_id: str | None`, `plan_type: str | None` (HMO, PPO, etc.), `effective_period_start/end: str | None`.
@@ -192,7 +192,7 @@
 
 ### T12 · Social-history Observations pass
 
-- **Status:** Queued
+- **Status:** ✅ Completed `624772e` · 2026-05-07 · 228 tests pass
 - **Goal:** Tobacco / alcohol / depression-screening (PHQ-9) / occupation as FHIR `Observation` with appropriate `category` (social-history or survey).
 - **What to build:**
   1. **Schema** (`SocialHistoryEntry`, `SocialHistoryExtraction`): `topic: Literal["tobacco","alcohol","drugs","occupation","sexual-orientation","gender-identity","phq-9","phq-2"]`, `value: str | None`, `value_quantity: float | None`, `effective_date: str | None`.
@@ -204,20 +204,20 @@
 
 ### T13 · NPI-based Practitioner matcher in lib/harmonize/
 
-- **Status:** Queued
+- **Status:** ✅ Completed `4bddfd6` · 2026-05-07 · 367 tests pass
 - **Goal:** Cross-source merge for Practitioner resources. Match by NPI; fall back to family+given+prefix normalized name.
 - **Context files:** `lib/harmonize/conditions.py` (model the matcher pattern), `lib/harmonize/__init__.py`.
 - **Files you may touch:** `lib/harmonize/practitioners.py` (new), `lib/tests/test_harmonize_practitioners.py` (new).
 
 ### T14 · Name+address Organization matcher
 
-- **Status:** Queued
+- **Status:** ✅ Completed `8d47bea` · 2026-05-07 · 377 tests pass
 - **Goal:** Cross-source merge for Organization. Match by normalized name + city/state.
 - **Files you may touch:** `lib/harmonize/organizations.py` (new), tests.
 
 ### T15 · DocumentReference dataclass in lib/fhir_parser/models.py
 
-- **Status:** Queued
+- **Status:** ✅ Completed `1d2fa7f` · 2026-05-07 · 385 tests pass
 - **Goal:** Add a `DocumentReferenceRecord` dataclass to `lib/fhir_parser/models.py` so `lib/fhir_parser/extractors.py` can read DocumentReferences from bundles. Mirror existing `EncounterRecord` pattern.
 
 ---

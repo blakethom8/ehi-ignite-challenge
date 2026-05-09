@@ -10,6 +10,10 @@ Best multipass-fhir result on Cedars Health Summary: **F1 0.70** (post-Move H, w
 
 | Date | Move | Subject | Headline result |
 |---|---|---|---|
+| 2026-05-09 | **AC** | Local MedGemma smoke | `medgemma:4b` ran locally on synthetic corrected lab: 1 Observation in 12.5s. Text baseline found 6 final lab rows in 0.1s. Early signal: local MedGemma vision needs prompt/cropping/table work before it is useful for dense labs. |
+| 2026-05-09 | **AB** | Pipeline suite runner | Added YAML-backed Lab suites: named pipeline × PDF matrices, dry-run validation, execution, and suite-level artifacts under `data/pdf-lab/suites/`. Smoke suite covers 5 lanes × 3 PDFs. |
+| 2026-05-09 | **AA** | Text-first workspace pipelines | Added `pdfplumber-lab-text` no-LLM lab baseline and `pdfplumber-text-fhir` text-first LLM multipass variant. Both are additive lanes for comparing raw-text extraction against vision-direct pipelines. |
+| 2026-05-09 | **Z** | Local Ollama backend for multipass | `gemma-ollama` now implements the shared `VisionBackend` contract. New additive workspace variant `multipass-fhir-ollama-tabular` routes table-shaped passes to localhost Ollama while preserving all existing pipelines. |
 | 2026-05-07 | **Y** | Scout-then-specialist pipeline architecture | New parallel pipeline `multipass-fhir-scout` registered behind the `ExtractionPipeline` Protocol. Replaces Pass 0 with a richer document-map pass that returns a routing manifest (per-resource-type presence + page hints + section structure). Specialist passes are dispatched only for present resource types, with prompt-augmented page hints. Same FHIR Bundle output shape — downstream consumers see no difference. Hypothesis: 40-60% cost reduction on sparse docs (lab-only, narrative-only) while holding F1 because page-scoped prompts have higher signal-to-noise. Real measurement deferred until PDF-LAB-STUDIO ships. |
 | 2026-05-07 | **X** | Code-resolution + interpretation + clinical-category post-passes | Three deterministic post-passes after multipass extraction. **LOINC coverage 0% → 100%** on the Function Health 2025-11-19 PDF (58/58 tests resolve via curated table). Interpretation flag derived from value vs reference range when extraction didn't print one. Clinical category (Metabolic / Kidney / Liver / etc.) attached as extension. Closes the visible parity gap with Function Health's parser. |
 | 2026-05-05 | **W** | Published workspace downstream read facade | Active published workspace snapshots now feed `/api/patients/{id}/...` so FHIR Charts, raw FHIR, Care Journey, and Clinical Insights work for uploaded workspaces. |
@@ -60,6 +64,90 @@ Pipeline framework + eval harness shipped 2026-05-03 (commits: pipeline Protocol
 ```
 
 Each entry should be 200–500 words. Tables and code snippets welcome. **Honesty about negative results matters as much as wins** — knowing what *didn't* work prevents future re-litigation.
+
+---
+
+## 2026-05-09 · Move AC — local MedGemma smoke
+
+**Agent:** Codex
+
+**What:** Started local Ollama and ran `medgemma-ollama` against the synthetic `corrected-lab-report.pdf` fixture. Also ran `pdfplumber-lab-text` on the same PDF as a cheap contrast lane.
+
+**Environment:** Ollama served `medgemma:4b` locally (`gemma3` family, 4.3B params, Q4_K_M, 3.3 GB). Run artifacts:
+
+- `data/local-model-lab/runs/2026-05-09T14-57-26_26d471_medgemma-ollama`
+- `data/local-model-lab/runs/2026-05-09T14-58-56_26d471_pdfplumber-lab-text`
+
+**Result:**
+
+| pipeline | latency | entries | notes |
+|---|---:|---:|---|
+| `medgemma-ollama` | 12.5s | 1 | Extracted only `Creatinine 1.8 mg/dL`; reference range was wrong (`"60"`). |
+| `pdfplumber-lab-text` | 0.1s | 6 | Extracted the six final CMP rows, with 100% LOINC resolution after deterministic post-pass. |
+
+The first deterministic text run over-extracted amendment/preliminary narrative and a voided value. Tightened `pdfplumber-lab-text` to skip obvious preliminary/voided blocks; rerun produced the six final rows only.
+
+**Conclusion:** Local MedGemma is successfully wired and runnable, but the first dense-lab vision result is weak on recall. This does not invalidate the local-model lane; it tells us where to iterate next: crop to table regions, raise DPI selectively, add OCR/text sidecar context, and make the prompt explicitly enumerate every row while ignoring voided/preliminary sections.
+
+---
+
+## 2026-05-09 · Move AB — pipeline suite runner
+
+**Agent:** Codex
+
+**What:** Added a YAML-backed experiment-suite layer for the PDF Lab. A suite declares a named set of pipelines and document cases, then expands to every pipeline × case cell. The CLI now supports:
+
+```bash
+uv run python -m lib.extract.lab suite --config docs/architecture/pdf-pipeline-suite-smoke.yaml --dry-run
+uv run python -m lib.extract.lab suite --config docs/architecture/pdf-pipeline-suite-smoke.yaml
+```
+
+Suite execution writes per-pipeline RunRecorder artifacts as before, plus a suite-level `suite.json`, `cells.json`, and `report.md` under `data/pdf-lab/suites/<suite-run-id>/`.
+
+**Why:** The workspace is heading toward 50+ additive pipelines and variants. Hand-running individual pipelines will not scale. We need stable matrices that preserve comparability across iterations, make dry-run validation cheap, and keep artifacts reviewable.
+
+**How:** Added `lib.extract.lab.suite` with `LabSuite`, `SuiteCase`, validation, dry-run planning, execution, and markdown reporting. Added `docs/architecture/pdf-pipeline-suite-smoke.yaml` covering 5 current lanes (`pdfplumber-lab-text`, `pdfplumber-text-fhir`, `multipass-fhir`, `multipass-fhir-scout`, `multipass-fhir-ollama-tabular`) across 3 PDFs. Added tests for manifest loading, CLI dry-run, and artifact writing.
+
+**Result:** Dry-run validates to 15 cells. Full extraction test suite passes: 411 tests.
+
+**Conclusion:** This is the beginning of the testing environment we need: stable suite manifests for repeatable comparison, additive pipelines retained side-by-side, and run artifacts written in a structure that can support dashboards, trend reports, and review workflows later.
+
+---
+
+## 2026-05-09 · Move AA — text-first workspace pipelines
+
+**Agent:** Codex
+
+**What:** Added two additive `ocr-text` workspace variants under `lib.extract.pipelines.text_first`:
+
+1. `pdfplumber-lab-text` — a no-LLM baseline that extracts embedded PDF text with pdfplumber, applies deterministic lab-row parsing, and emits FHIR Observation resources through the normal multipass merger and post-passes.
+2. `pdfplumber-text-fhir` — a text-first LLM variant that sends page-marked pdfplumber text to the same resource-specific Pydantic schemas used by `multipass-fhir`, then builds the same FHIR Bundle shape.
+
+**Why:** The workspace needs pipeline diversity, not replacement. Vision-direct pipelines tell us how well multimodal models read the document. Text-first pipelines tell us whether the embedded text layer is already good enough, whether failures are parser/OCR failures or model/FHIR-mapping failures, and whether harmonization benefits from a second independent extraction lane.
+
+**How:** Kept dependencies unchanged. `pdfplumber` was already in the project. The lab baseline is fully local and deterministic. The text-first FHIR variant uses Anthropic text-only structured calls via the existing `AnthropicBackend.call_with_schema` helper. Both pipelines register through the same `ExtractionPipeline` registry and can run in the PDF Lab / bake-off surfaces beside existing pipelines.
+
+**Result:** Focused tests cover registry visibility, deterministic lab row parsing, and emitted Bundle shape. These pipelines are not yet benchmarked against real PDFs in this move.
+
+**Conclusion:** The workspace now has three additive experimental lanes beyond the existing defaults: local Ollama tabular vision, deterministic embedded-text lab extraction, and text-first multipass extraction. Next step is to run all lanes on Cedars MyHealth, Function Health, and noisy/scanned fixtures, then compare extraction metrics and harmonization outcomes.
+
+---
+
+## 2026-05-09 · Move Z — local Ollama backend for multipass
+
+**Agent:** Codex
+
+**What:** Added `OllamaVisionBackend` to `lib.extract.pdf` and wired it into `get_backend(name="gemma-ollama")`. This converts Blake's local Ollama/Gemma work from a standalone lab path into a reusable backend for the main PDF processor. The backend rasterizes PDFs to page PNGs, sends page images to Ollama `/api/generate`, passes the Pydantic schema through Ollama's `format` field for structured JSON, chunks long PDFs, merges chunk responses with the existing schema-driven merger, and lets the normal multipass Pydantic validation enforce shape.
+
+Also registered `multipass-fhir-ollama-tabular`, a mixed-backend variant of `multipass-fhir`. It keeps document context, narrative, identity, and other high-ambiguity passes on the existing default path, while routing medications, immunizations, lab observations, and vital signs through `gemma-ollama`. This is additive: it expands the iterative workspace and preserves all existing pipelines.
+
+**Why:** The prior local model integration was useful but isolated: `medgemma-ollama` emitted lab/vital Observations directly and could not participate in the resource-pass bake-off. The architecture decision we actually need to test is per-pass model substitution inside the production processor. This change gives us that switch without changing downstream harmonization.
+
+**How:** Added one backend class, one pipeline subclass, focused tests for backend resolution and Ollama request shape, and docs in `docs/local-models/medgemma-ollama.md`, `PDF-PROCESSOR.md`, and the pipeline contributor README.
+
+**Result:** Local tests passed: `24 passed` across `test_pdf.py`, `test_medgemma_ollama.py`, and `test_scout_pipeline.py`. No live Ollama extraction was run in this move; the next measurement needs Blake's local daemon/model plus the existing Cedars and Function Health PDFs.
+
+**Conclusion:** Incorporation path is now clean. Local Gemma/MedGemma should be treated as another workspace signal, not a replacement. The strongest near-term test is to run `multipass-fhir-ollama-tabular` alongside `multipass-fhir`, `multipass-fhir-scout`, and any OCR/text variants on Function Health labs and Cedars MyHealth, then compare both extraction metrics and harmonization outcomes.
 
 ---
 

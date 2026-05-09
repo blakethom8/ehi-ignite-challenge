@@ -20,6 +20,7 @@ NEEDS_PREPARATION_STATUSES = {
     "unparsed_structured",
     "pending_extraction",
     "empty_extraction",
+    "identity_mismatch",
     "missing",
 }
 

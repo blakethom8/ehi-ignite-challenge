@@ -5,6 +5,7 @@ import { AlertTriangle, ArrowDown, ArrowUp, Clock3, Minus, Search, TestTubeDiago
 import { api } from "../../api/client";
 import { EmptyState } from "../../components/EmptyState";
 import type { KeyLabsResponse, LabValue, PatientOverview } from "../../types";
+import { formatDisplayNumber, formatMeasurement, formatSignedDisplayNumber } from "../../utils/format";
 
 function cls(...parts: (string | false | null | undefined)[]): string {
   return parts.filter(Boolean).join(" ");
@@ -56,8 +57,12 @@ function labKey(lab: LabValue): string {
 }
 
 function formatLabValue(lab: LabValue): string {
-  if (lab.value == null) return "-";
-  return `${lab.value}${lab.unit ? ` ${lab.unit}` : ""}`;
+  return formatMeasurement(lab.value, lab.unit);
+}
+
+function labValueParts(lab: LabValue): { value: string; unit: string | null } {
+  if (lab.value == null) return { value: "-", unit: null };
+  return { value: formatDisplayNumber(lab.value), unit: lab.unit || null };
 }
 
 function labIsFlagged(lab: LabValue, keyLabs?: KeyLabsResponse): boolean {
@@ -84,8 +89,7 @@ function referenceLabel(lab: LabValue): string {
 }
 
 function fmtReferenceNumber(value: number | null): string {
-  if (value == null) return "";
-  return Number.isInteger(value) ? value.toFixed(0) : value.toFixed(1);
+  return formatDisplayNumber(value, { fallback: "", maxFractionDigits: 1 });
 }
 
 function Sparkline({ lab }: { lab: LabValue }) {
@@ -171,7 +175,7 @@ function LabDetailPanel({ lab, panelName }: { lab: LabValue | null; panelName: s
             {trendIcon(lab.trend)}
             {trendSymbol(lab.trend)}
           </div>
-          <p className="mt-2 text-xs text-[#667085]">{delta == null ? "Need two results" : `${delta > 0 ? "+" : ""}${delta.toFixed(2)} since prior`}</p>
+          <p className="mt-2 text-xs text-[#667085]">{delta == null ? "Need two results" : `${formatSignedDisplayNumber(delta)} since prior`}</p>
         </div>
       </div>
 
@@ -222,7 +226,7 @@ function LabDetailPanel({ lab, panelName }: { lab: LabValue | null; panelName: s
                 {point.alert_severity && (
                   <span className={point.alert_severity === "critical" ? "h-2 w-2 rounded-full bg-red-500" : "h-2 w-2 rounded-full bg-amber-500"} />
                 )}
-                {point.value} <span className="text-xs font-medium text-[#667085]">{lab.unit}</span>
+                {formatDisplayNumber(point.value)} <span className="text-xs font-medium text-[#667085]">{lab.unit}</span>
               </span>
             </div>
           ))}
@@ -404,58 +408,70 @@ function LabsContent({
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[980px] text-sm">
+              <table className="w-full min-w-[760px] table-fixed text-sm">
+                <colgroup>
+                  <col className="w-[34%]" />
+                  <col className="w-[15%]" />
+                  <col className="w-[20%]" />
+                  <col className="w-[15%]" />
+                  <col className="w-[16%]" />
+                </colgroup>
                 <thead>
                   <tr className="border-b border-[#eef0f4] bg-[#f8fafc] text-left text-xs uppercase tracking-[0.12em] text-[#98a2b3]">
                     <th className="px-4 py-3 font-semibold">Marker</th>
                     <th className="px-4 py-3 text-right font-semibold">Latest</th>
                     <th className="px-4 py-3 font-semibold">Reference</th>
                     <th className="px-4 py-3 font-semibold">Status</th>
-                    <th className="px-4 py-3 text-center font-semibold">Trend</th>
-                    <th className="px-4 py-3 font-semibold">History</th>
-                    <th className="px-4 py-3 text-right font-semibold">Date</th>
+                    <th className="px-4 py-3 font-semibold">Trend</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredLabs.map((lab) => {
                     const active = selectedLab ? labKey(selectedLab) === labKey(lab) : false;
+                    const latestValue = labValueParts(lab);
                     return (
                       <tr
                         key={labKey(lab)}
                         onClick={() => setSelectedLabKey(labKey(lab))}
-                        className={`cursor-pointer border-b border-[#f2f4f7] last:border-0 ${active ? "bg-[#eef2ff]" : "hover:bg-[#f8fafc]"}`}
+                        className={cls(
+                          "cursor-pointer border-b border-[#eef0f4] transition-colors last:border-0",
+                          active ? "bg-[#f2f5ff] shadow-[inset_3px_0_0_#5b76fe]" : "hover:bg-[#fbfcff]",
+                        )}
                       >
-                        <td className="px-4 py-3">
-                          <p className="font-semibold text-[#1c1c1e]">{lab.display}</p>
-                          <p className="mt-0.5 text-xs text-[#98a2b3]">LOINC {lab.loinc_code}</p>
+                        <td className="px-4 py-3 align-top">
+                          <p className="max-w-[320px] font-semibold leading-5 text-[#1c1c1e]">{lab.display}</p>
+                          <p className="mt-1 text-xs font-medium text-[#98a2b3]">LOINC {lab.loinc_code}</p>
                         </td>
-                        <td className="px-4 py-3 text-right">
-                          <span className={lab.is_abnormal ? "font-semibold text-[#b42318]" : "font-semibold text-[#1c1c1e]"}>{formatLabValue(lab)}</span>
+                        <td className="px-4 py-3 text-right align-top">
+                          <span className={cls("block text-base font-semibold leading-5", lab.is_abnormal ? "text-[#b42318]" : "text-[#1c1c1e]")}>
+                            {latestValue.value}
+                          </span>
+                          {latestValue.unit && <span className="mt-0.5 block text-xs font-medium text-[#667085]">{latestValue.unit}</span>}
+                          <span className="mt-1 block text-xs text-[#98a2b3]">{fmtDate(lab.effective_dt)}</span>
                         </td>
-                        <td className="px-4 py-3 text-[#667085]">
+                        <td className="px-4 py-3 align-top leading-5 text-[#667085]">
                           {referenceLabel(lab)}
                         </td>
-                        <td className="px-4 py-3">
-                          <span className={`inline-flex rounded-full border px-2 py-1 text-xs font-semibold ${labStatusTone(lab)}`}>
+                        <td className="px-4 py-3 align-top">
+                          <span className={`inline-flex whitespace-nowrap rounded-md border px-2 py-1 text-xs font-semibold ${labStatusTone(lab)}`}>
                             {labStatusLabel(lab)}
                           </span>
                         </td>
-                        <td className="px-4 py-3">
-                          <div className={`mx-auto inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs font-semibold ${trendTone(lab.trend)}`}>
+                        <td className="px-4 py-3 align-top">
+                          <div className={`inline-flex whitespace-nowrap rounded-md border px-2 py-1 text-xs font-semibold ${trendTone(lab.trend)}`}>
                             {trendIcon(lab.trend)}
                             {trendSymbol(lab.trend)}
                           </div>
+                          <div className="mt-2 max-w-[112px] overflow-hidden">
+                            <Sparkline lab={lab} />
+                          </div>
                         </td>
-                        <td className="px-4 py-3">
-                          <Sparkline lab={lab} />
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-3 text-right text-[#667085]">{fmtDate(lab.effective_dt)}</td>
                       </tr>
                     );
                   })}
                   {filteredLabs.length === 0 && (
                     <tr>
-                      <td colSpan={7} className="px-4 py-10 text-center text-sm text-[#667085]">
+                      <td colSpan={5} className="px-4 py-10 text-center text-sm text-[#667085]">
                         No lab markers match this filter.
                       </td>
                     </tr>

@@ -1,0 +1,552 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PDF Lab — Perf Pass Results &amp; Gold-Standard Discussion · 2026-05-08</title>
+<style>
+  :root {
+    --ink: #1d2433;
+    --ink-soft: #4a5168;
+    --muted: #6b7390;
+    --rule: #e7eaf2;
+    --rule-strong: #cbd2e2;
+    --bg: #fafbfd;
+    --paper: #ffffff;
+    --accent: #5b76fe;
+    --accent-soft: #eef1ff;
+    --good: #10864c;
+    --bad: #b3261e;
+    --warn: #b86e00;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", "Helvetica Neue", system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  main {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 56px 28px 96px;
+    background: var(--paper);
+    border-left: 1px solid var(--rule);
+    border-right: 1px solid var(--rule);
+    min-height: 100vh;
+  }
+  header.doc {
+    border-bottom: 1px solid var(--rule);
+    padding-bottom: 22px;
+    margin-bottom: 36px;
+  }
+  header.doc .eyebrow {
+    color: var(--muted);
+    font-size: 13px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  header.doc h1 {
+    font-size: 28px;
+    line-height: 1.25;
+    margin: 0 0 10px;
+    letter-spacing: -0.01em;
+  }
+  header.doc .meta {
+    color: var(--muted);
+    font-size: 14px;
+  }
+  h2 {
+    font-size: 21px;
+    line-height: 1.3;
+    margin: 48px 0 14px;
+    letter-spacing: -0.01em;
+  }
+  h2 .num {
+    color: var(--accent);
+    font-weight: 600;
+    margin-right: 10px;
+  }
+  h3 {
+    font-size: 17px;
+    margin: 28px 0 8px;
+    color: var(--ink);
+  }
+  p { margin: 0 0 14px; color: var(--ink); }
+  p.lede {
+    font-size: 17px;
+    color: var(--ink-soft);
+  }
+  strong { color: var(--ink); font-weight: 600; }
+  em { color: var(--ink-soft); }
+  ul, ol {
+    margin: 0 0 16px;
+    padding-left: 22px;
+  }
+  ul li, ol li { margin-bottom: 6px; }
+  code {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.88em;
+    background: #f4f5fa;
+    border: 1px solid var(--rule);
+    padding: 1px 5px;
+    border-radius: 4px;
+    color: #2d3650;
+  }
+  pre {
+    background: #1d2433;
+    color: #d8dcec;
+    padding: 14px 16px;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 13px;
+    line-height: 1.55;
+    margin: 14px 0;
+  }
+  pre code {
+    background: none;
+    border: none;
+    color: inherit;
+    padding: 0;
+    font-size: inherit;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 16px 0 22px;
+    font-size: 14px;
+  }
+  th, td {
+    text-align: left;
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--rule);
+  }
+  th {
+    border-bottom: 1px solid var(--rule-strong);
+    color: var(--muted);
+    font-weight: 600;
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    background: #f7f8fc;
+  }
+  td.num { font-variant-numeric: tabular-nums; }
+  .delta-up { color: var(--good); font-weight: 600; }
+  .delta-down { color: var(--bad); font-weight: 600; }
+  .delta-neutral { color: var(--muted); }
+  blockquote {
+    margin: 18px 0;
+    padding: 12px 18px;
+    background: var(--accent-soft);
+    border-left: 3px solid var(--accent);
+    color: var(--ink);
+    border-radius: 0 4px 4px 0;
+  }
+  blockquote p:last-child { margin-bottom: 0; }
+  .callout {
+    margin: 22px 0;
+    padding: 14px 18px;
+    background: #fff8ec;
+    border-left: 3px solid var(--warn);
+    border-radius: 0 4px 4px 0;
+  }
+  .callout .label {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--warn);
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  hr {
+    border: none;
+    border-top: 1px solid var(--rule);
+    margin: 36px 0;
+  }
+  .question {
+    margin-top: 36px;
+    padding: 22px 22px 18px;
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    background: var(--accent-soft);
+  }
+  .question h3 {
+    margin-top: 0;
+    color: var(--accent);
+  }
+  footer {
+    margin-top: 64px;
+    padding-top: 16px;
+    border-top: 1px solid var(--rule);
+    color: var(--muted);
+    font-size: 13px;
+  }
+  @media (max-width: 640px) {
+    main { padding: 36px 18px 64px; }
+    header.doc h1 { font-size: 24px; }
+    h2 { font-size: 19px; }
+    table { font-size: 13px; }
+    th, td { padding: 7px 8px; }
+  }
+</style>
+</head>
+<body>
+<main>
+
+<header class="doc">
+  <div class="eyebrow">PDF Lab · Performance pass + research discussion</div>
+  <h1>Perf-pass results &amp; gold-standard methodology — what does the data actually say?</h1>
+  <div class="meta">2026-05-08 · feature/code-resolution-loinc · cedars-myhealth eval</div>
+</header>
+
+<p class="lede">
+  Three coordinated fixes shipped today (PERF-T01, T02, T03). Live re-run on cedars-myhealth shows
+  bidi-scout now beats default by 5 points; single-scout fails visibly per the no-fallback directive.
+  This document records what the numbers say, then steps back to question the methodology under them.
+</p>
+
+<h2><span class="num">§1</span>Live re-run — F1 deltas</h2>
+
+<p>
+  Cache cleared, fresh extraction across all three pipelines, scored against ground-truth v1
+  via the new two-stage matcher (code-first + Jaccard fuzzy fallback).
+</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Pipeline</th>
+      <th>F1 before</th>
+      <th>F1 after</th>
+      <th>Cost</th>
+      <th>Latency</th>
+      <th>Entries</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>multipass-fhir</code> (default)</td>
+      <td class="num">98%</td>
+      <td class="num"><strong>92%</strong></td>
+      <td class="num">$0.39</td>
+      <td class="num">134s</td>
+      <td class="num">198</td>
+    </tr>
+    <tr>
+      <td><code>multipass-fhir-scout</code></td>
+      <td class="num">98%*</td>
+      <td class="num delta-down"><strong>0%</strong></td>
+      <td class="num">$0.006</td>
+      <td class="num">1.1s</td>
+      <td class="num">0</td>
+    </tr>
+    <tr>
+      <td><code>multipass-fhir-bidi-scout</code></td>
+      <td class="num">94%</td>
+      <td class="num delta-up"><strong>97%</strong></td>
+      <td class="num">$0.40</td>
+      <td class="num">121s</td>
+      <td class="num">195</td>
+    </tr>
+  </tbody>
+</table>
+
+<p style="font-size: 13px; color: var(--muted); margin-top: -10px;">
+  * Pre-PERF scout 98% was the silent-fallback artifact — it was running all passes and pretending
+  to be scout.
+</p>
+
+<h3>What the numbers say</h3>
+
+<p>
+  <strong>PERF-T03 worked.</strong> Bidi-scout 94% → 97% F1, and now beats default by 5 points.
+  The practitioner trace confirms it: bidi extracts Cohen (p3), Shirvanian (p4), Razbannia (p9),
+  Miles (p14), Triche (p18) — same Authorizing-Provider pattern as default, with the section-hint
+  navigation now actually helping instead of poisoning extraction.
+</p>
+
+<p>
+  <strong>PERF-T02 worked exactly as you asked.</strong> Single-scout returned <code>presence: {}</code>
+  from Pass 0; the dispatcher ran zero specialists; bundle came back empty. The WARN log fired:
+</p>
+
+<pre><code>scout: empty/all-absent presence manifest — dispatching 0 specialists.
+Fix the Pass 0 prompt or the LLM output rather than relying on a fallback.</code></pre>
+
+<p>
+  Cost $0.006, 1.1s — barely a single LLM call. We can <em>see</em> the failure now instead of
+  paying $0.40 for it silently.
+</p>
+
+<p>
+  <strong>PERF-T01 honestly recalibrated the metric.</strong> Default's 98% → 92% isn't a regression —
+  same pipeline, fresh extraction, more honest matcher. The right comparison is bidi 97% vs default
+  92% on the same metric, where bidi now wins. Cost between the two is roughly flat ($0.40 each), so
+  bidi is no longer "more expensive for less accuracy" — it's "comparable cost, higher accuracy."
+  Worth promoting.
+</p>
+
+<hr>
+
+<h2><span class="num">§2</span>The gold-standard run — how does the data <em>feel</em>?</h2>
+
+<p>
+  The methodology was: Claude Opus 4.7 with extended thinking, run twice on the same PDF, then
+  intersect — only keep entries that show up in <strong>both</strong> runs. A reviewer agent (also
+  Opus) then critiques the intersection. Final output: 186 entries, declared GT v1.
+</p>
+
+<p>
+  The intent was sound. If the most expensive available model, with thinking, agrees with itself
+  across two independent runs, that's a stronger signal than any single run. Self-consistency
+  intersect specifically targets <strong>hallucinations</strong> — things the model invented in one
+  run but couldn't reproduce in another. Those drop out.
+</p>
+
+<h3>The structural gap</h3>
+
+<p>
+  But there's a gap I keep coming back to.
+</p>
+
+<blockquote>
+  <p>
+    <strong>Self-consistency catches hallucinations; it does not catch consistent misses.</strong>
+  </p>
+</blockquote>
+
+<p>
+  If Opus has a systematic blind spot — say, it underweights "Authorizing Provider" stamps on
+  lab-section headers because they're visually ambiguous between "running text" and "structured
+  field" — then both runs miss them, the intersection still misses them, and the reviewer
+  (also Opus) probably agrees with the omission because it shares the bias. The GT then encodes
+  the model's systematic errors as ground truth.
+</p>
+
+<p>
+  That's not hypothetical. It's exactly what we saw on the bidi-scout investigation: default
+  extracts those Authorizing-Provider stamps cleanly, bidi (with poisoned section_hint) misses
+  them. Whether GT has them depends on which prompt Opus got — and we've now seen evidence that
+  the prompt shape changes which entities Opus surfaces.
+</p>
+
+<h3>Reviewer-as-LLM-judge collapse</h3>
+
+<p>
+  The reviewer step has a known failure mode too. When the reviewer shares model family with the
+  extractor, it tends to agree more than a human would. The reviewer flags "this looks wrong"
+  mostly when the wrongness is in the model's own surface failure modes, not the deeper
+  systematic ones. So the review pass doesn't add as much independent signal as it appears to.
+</p>
+
+<h3>What the data actually feels like</h3>
+
+<p>
+  Honestly: better than nothing, much better than hand-extracting 186 facts, and useful for
+  <strong>comparing pipelines to each other</strong> — relative ranking is reliable. But it's a
+  scaffold, not bedrock. We can't claim "97% F1" as an absolute statement of pipeline quality —
+  we can claim "97% agreement with what Opus-with-thinking produces, intersected with itself."
+</p>
+
+<div class="callout">
+  <div class="label">Implication</div>
+  <p>
+    A measurement system where the GT is generated by the same model class we're testing is
+    biased toward agreement with that model. Pipeline rankings are valid; absolute scores are
+    not.
+  </p>
+</div>
+
+<h3>Two ways to harden the GT</h3>
+
+<ol>
+  <li>
+    <strong>Cross-model gold.</strong> Add a third extractor in a different model family —
+    Gemini 2.5 Pro or GPT-5 with vision — and require 3-of-3 agreement (not 2-of-3). Mismatches
+    across families are more meaningful than mismatches within. Costs another ~$3 per gold pass.
+  </li>
+  <li>
+    <strong>Synthea round-trip for golden test set.</strong> We already have 1,180 Synthea
+    bundles. If we render one to a clinical-PDF format and run our pipeline on it, the original
+    bundle <strong>is</strong> the GT — by construction, no LLM in the loop. That gives us a
+    held-out anchor where we genuinely know the answer. Downside: rendered Synthea PDFs are
+    cleaner than real-world EHI exports, so high F1 there doesn't translate directly.
+  </li>
+</ol>
+
+<p>
+  The combination — Synthea round-trip as the absolute anchor, cross-model gold as the relative
+  anchor on real PDFs — is probably what we want before we trust any number we publish.
+</p>
+
+<hr>
+
+<h2><span class="num">§3</span>MinerU &amp; LlamaParse — what they actually do</h2>
+
+<p>
+  Both are document parsers, not extractors. They take a PDF and return <em>structure</em> —
+  markdown, JSON-typed blocks, bounding boxes — but they don't know what FHIR is. So "wrapping"
+  them is a two-stage operation.
+</p>
+
+<h3>Stage 1 — document → markdown</h3>
+
+<p>
+  <strong>MinerU</strong> (opendatalab, Apache-2.0) runs locally. It chains layout detection
+  (DocLayout-YOLO) → table recognition (SLANet+) → formula recognition (UniMERNet) → text in
+  reading order (PaddleOCR or VLM-pipeline). v1.5 added a VLM backend. Output is markdown with
+  bbox per element. Currently scores 86.2 on OmniDocBench v1.5 — open-source SOTA.
+</p>
+
+<p>
+  <strong>LlamaParse</strong> (LlamaIndex) is the SaaS equivalent — REST API, 1,000 pages/day
+  free tier. Best-in-class table extraction across multiple 2026 comparison benchmarks. Has a
+  "premium" mode that uses VLMs for harder layouts.
+</p>
+
+<p>
+  <strong>Reducto</strong> is the same shape but HIPAA/SOC 2-compliant — relevant for production,
+  not for benchmarking.
+</p>
+
+<h3>Stage 2 — markdown → FHIR</h3>
+
+<p>
+  This is where our existing per-resource Pydantic schemas come back in. We feed the markdown
+  plus the schema to a cheap text model (Sonnet 4 or even Haiku) via <code>call_with_schema()</code>
+  — which already exists in <code>lib/extract/pdf.py</code>. No vision call needed because the
+  parser already did the visual work. So the "expensive" model only sees text, which is 5–20× cheaper
+  than image input.
+</p>
+
+<h3>The cost shape</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Pipeline</th>
+      <th>Stage 1 cost</th>
+      <th>Stage 2 cost</th>
+      <th>Total per PDF</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Current default</td>
+      <td class="num">—</td>
+      <td class="num">$0.40 (vision Opus/Sonnet)</td>
+      <td class="num">$0.40</td>
+    </tr>
+    <tr>
+      <td>MinerU-wrapped</td>
+      <td class="num">$0 (local)</td>
+      <td class="num delta-up">~$0.05 (text Sonnet)</td>
+      <td class="num delta-up">~$0.05</td>
+    </tr>
+    <tr>
+      <td>LlamaParse-wrapped</td>
+      <td class="num">free tier · 1k pp/day</td>
+      <td class="num">~$0.05</td>
+      <td class="num">~$0.05 + REST</td>
+    </tr>
+    <tr>
+      <td>Local Gemma 4 (Ollama)</td>
+      <td class="num delta-up">$0 (local vision)</td>
+      <td class="num">—</td>
+      <td class="num delta-up">$0</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>The quality question</h3>
+
+<p>
+  Cost-shape is clear; quality is genuinely unknown. Two competing hypotheses:
+</p>
+
+<ul>
+  <li>
+    <strong>Vision is essential.</strong> The image carries information markdown can't — faint
+    stamps, hand-annotations, table-vs-image ambiguity, layout that disambiguates "MD" suffix
+    from "MD" prefix. MinerU's markdown drops this and we lose recall.
+  </li>
+  <li>
+    <strong>Vision is overkill for clinical PDFs.</strong> Clinical exports are tabular,
+    machine-rendered, mostly black-on-white. MinerU's structured markdown captures everything
+    that matters; we've been paying for vision we don't need.
+  </li>
+</ul>
+
+<p>
+  The bake-off settles it. And the failure modes are diagnostic: if MinerU-wrapper drops
+  practitioners but keeps labs, we know where vision matters and where it doesn't, and we can
+  pick the right tool per pass — vision for narrative, parsed-text for tables.
+</p>
+
+<h3>Comparative-baseline value</h3>
+
+<p>
+  Independent of cost, there's a second reason to wire these up: <strong>if our Claude pipeline
+  doesn't beat MinerU on structure recall</strong>, the wedge isn't really "we extract better
+  than open source" — it's narrower than that. Possibly "we extract clinical semantics better."
+  That's still defensible but it tightens the story.
+</p>
+
+<hr>
+
+<h2><span class="num">§4</span>Where I'd actually focus</h2>
+
+<p>
+  Given how much of this conversation is about ground truth, I think the highest-leverage move
+  is <strong>Synthea round-trip first, then MinerU wrapper.</strong>
+</p>
+
+<p>
+  The Synthea round-trip gives us the first GT we can fully trust. ~4 hours of work — render a
+  Synthea bundle to PDF (Synthea has a built-in CCDA/CDA renderer, or we use a simple HTML→PDF
+  pipeline), run our pipeline, score against the original bundle. If we hit 80%+ F1 on a
+  known-answer test, that's a number we can stand behind in a way the 97% currently isn't. It
+  also lets us run hundreds of test PDFs cheaply (Synthea bundles are free), which is the test
+  bench we don't have today.
+</p>
+
+<p>
+  Then MinerU-wrapper makes sense as the next experiment because we'd finally have a metric to
+  evaluate it against. <strong>Without trustworthy GT, comparing pipelines is comparing-shadows.</strong>
+</p>
+
+<p>
+  LlamaParse would come third — same wrapping pattern, just SaaS, useful for the "what does
+  buying look like" data point but not a foundation.
+</p>
+
+<div class="question">
+  <h3>What's your read?</h3>
+  <p>
+    The "gold standard is actually scaffold" framing — does it match how it felt when you watched
+    the run? Specifically: were there moments where you thought "Opus is making this up" or "Opus
+    is missing this consistently"? Those instincts are the signal we'd be encoding into a
+    cross-model gold or a Synthea-anchored test set.
+  </p>
+  <p>
+    If you'd rather chase cost first (local Gemma) before fixing the GT problem, that's a fine
+    read too — it's a falsifiable experiment with a clean hypothesis (Move F's lab-recall regression
+    was chunking, not Gemma).
+  </p>
+</div>
+
+<footer>
+  Generated 2026-05-08 · branch <code>feature/code-resolution-loinc</code> ·
+  source: PERF-T01/T02/T03 commits 6710aa3, 8bebb9d, 75fa944 ·
+  cedars-myhealth (PDF SHA <code>511b7036</code>)
+</footer>
+
+</main>
+</body>
+</html>

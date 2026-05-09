@@ -334,7 +334,61 @@ def source_kind_for_path(path: Path) -> str:
     return "source-file"
 
 
-def discover_sources(collection: str, extra_sources: list[Path] | None = None) -> list[dict[str, Any]]:
+def _flatten_resources(resources_by_type: dict[str, list[dict[str, Any]]]) -> list[dict[str, Any]]:
+    resources: list[dict[str, Any]] = []
+    for rows in resources_by_type.values():
+        resources.extend(row for row in rows if isinstance(row, dict))
+    return resources
+
+
+def _original_for_source(kind: str, path: Path) -> Path | None:
+    if kind == "ccda-xml":
+        return path
+    if kind == "extracted-pdf" and path.name.endswith(".extracted.json"):
+        candidate = path.with_name(path.name.removesuffix(".extracted.json"))
+        return candidate if candidate.exists() else None
+    if path.suffix.lower() != ".json":
+        return path
+    return None
+
+
+def discover_harmonize_sources(collection: str) -> list[dict[str, Any]] | None:
+    """Prefer the API harmonize registry so exports match merged workspace state."""
+
+    try:
+        from api.core import harmonize_service
+    except Exception:
+        return None
+
+    coll = harmonize_service.get_collection(collection)
+    if coll is None:
+        return None
+    resources_by_source = harmonize_service.load_collection_resources(collection)
+    sources: list[dict[str, Any]] = []
+    for source in coll.sources:
+        path = source.path
+        sources.append(
+            {
+                "source_id": source.id,
+                "label": source.label,
+                "kind": source.kind,
+                "path": path,
+                "original_path": _original_for_source(source.kind, path),
+                "document_reference": source.document_reference,
+                "resources": _flatten_resources(resources_by_source.get(source.id, {})),
+                "demo_source": "synthea" in collection.lower() or "harmonize-demo" in str(path),
+            }
+        )
+    return sources
+
+
+def discover_sources(collection: str) -> list[dict[str, Any]]:
+    harmonize_sources = discover_harmonize_sources(collection)
+    if harmonize_sources is not None:
+        if not harmonize_sources:
+            raise SystemExit(f"No packageable sources found for collection '{collection}'")
+        return harmonize_sources
+
     sources: list[dict[str, Any]] = []
 
     demo_dir = REPO_ROOT / "data" / "harmonize-demo" / collection
@@ -373,25 +427,8 @@ def discover_sources(collection: str, extra_sources: list[Path] | None = None) -
                 }
             )
 
-    # If collection was passed without workspace- prefix, try workspace-<collection> too.
-    if extra_sources:
-        for path in extra_sources:
-            path = path.resolve()
-            if not path.exists():
-                raise SystemExit(f"Extra source not found: {path}")
-            sources.append(
-                {
-                    "source_id": f"extra-{path.stem}",
-                    "label": path.name,
-                    "kind": source_kind_for_path(path),
-                    "path": path,
-                    "original_path": path if path.suffix.lower() != ".json" else None,
-                    "demo_source": "josh-ccdas" in str(path) or "synthea" in str(path).lower() or "sample" in str(path).lower(),
-                }
-            )
-
     if not sources and not collection.startswith("workspace-"):
-        sources.extend(discover_sources(f"workspace-{collection}", extra_sources=extra_sources))
+        sources.extend(discover_sources(f"workspace-{collection}"))
 
     if not sources:
         raise SystemExit(f"No packageable sources found for collection '{collection}'")
@@ -432,7 +469,9 @@ def build_evidence(collection: str, sources: list[dict[str, Any]], harmonization
     for source in sources:
         bundle = source_bundle(source)
         resources_for_source: list[dict[str, Any]] = []
-        if bundle:
+        if isinstance(source.get("resources"), list):
+            resources_for_source = [res for res in source["resources"] if isinstance(res, dict)]
+        elif bundle:
             resources_for_source = bundle_entries(bundle)
         elif source.get("kind") == "ccda-xml" and isinstance(source.get("path"), Path):
             try:
@@ -647,8 +686,8 @@ if __name__ == '__main__': main()
 '''
 
 
-def build_package(collection: str, out: Path, include_originals: bool, extra_sources: list[Path] | None = None) -> Path:
-    sources = discover_sources(collection, extra_sources=extra_sources)
+def build_package(collection: str, out: Path, include_originals: bool) -> Path:
+    sources = discover_sources(collection)
     harmonization = load_harmonization(collection)
     evidence = build_evidence(collection, sources, harmonization)
     package_id = f"ehi-atlas-workspace-{collection}-{datetime.now().strftime('%Y%m%d')}"
@@ -830,9 +869,8 @@ def main() -> None:
     ap.add_argument("--collection", required=True, help="Collection/workspace id, e.g. synthea-demo or smoke-codex-upload-2026")
     ap.add_argument("--out", required=True, type=Path, help="Output zip path")
     ap.add_argument("--include-originals", action="store_true", help="Include original uploaded source files when available")
-    ap.add_argument("--extra-source", action="append", type=Path, default=[], help="Additional source file to include, e.g. a safe C-CDA XML sample")
     args = ap.parse_args()
-    out = build_package(args.collection, args.out, args.include_originals, extra_sources=args.extra_source)
+    out = build_package(args.collection, args.out, args.include_originals)
     print(out)
 
 

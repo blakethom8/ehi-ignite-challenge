@@ -1,0 +1,44 @@
+NORTH BAY SYNTHETIC IMAGING
+CT CHEST WITHOUT CONTRAST
+FINAL RADIOLOGY REPORT
+
+Patient: Morgan Vale
+DOB: 1962-04-18
+MRN: SYN-PDF-001
+Accession: NBSI-260122-7741
+Exam date/time: 2026-01-22 13:40 PST
+Ordering clinician: Dana Ivers, MD
+
+Page 1 of 2 - repeated facility header
+This report was generated with voice recognition software. Please disregard
+typographical artifacts that do not alter clinical meaning.
+
+INDICATION
+Follow-up of known right lower lobe pulmonary nodule.
+Family history: patient's mother had pulmonary embolism at age 72.
+
+TECHNIQUE
+CT chest without intravenous contrast. Axial images with coronal reformats.
+
+COMPARISON
+Outside CT chest dated 2025-10-20.
+
+FINDINGS
+Lungs: Stable solid 7 mm pulmonary nodule in the right lower lobe.
+No new suspicious pulmonary nodule. No focal consolidation.
+Pleura: No pleural effusion or pneumothorax.
+Mediastinum: No mediastinal lymphadenopathy.
+Heart: Mild coronary artery calcification.
+
+Page 2 of 2 - repeated facility header
+NORTH BAY SYNTHETIC IMAGING
+This report was generated with voice recognition software.
+
+IMPRESSION
+1. Stable 7 mm right lower lobe pulmonary nodule compared with 2025-10-20.
+2. No pleural effusion.
+3. No mediastinal lymphadenopathy.
+
+Electronically signed by: Marcus Lin, MD
+Signed: 2026-01-22 14:05 PST
+

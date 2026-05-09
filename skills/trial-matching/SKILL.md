@@ -16,6 +16,10 @@ required_tools:
   - workspace.write
   - workspace.cite
   - workspace.escalate
+  - workspace.canvas.upsert
+  - trial_pursuit.upsert
+  - trial_pursuit.add_event
+  - trial_pursuit.add_task
   - mcp.clinicaltrials_gov.search
   - mcp.clinicaltrials_gov.get_record
 optional_tools:
@@ -94,6 +98,16 @@ For each anchor condition:
    - `sex`: from `Patient.gender` (do not pass if `unknown`)
    - `location_radius`: optional, default unset (clinician-supplied)
 2. Take the top 30 results per anchor. Deduplicate by NCT id across anchors.
+3. Upsert each candidate to the right canvas with
+   `workspace.canvas.upsert(kind="candidate_trial", node_id="trial:{nct_id}", ...)`
+   as soon as it has enough structure to review. Canvas nodes are the
+   clinician's clickable working set; do not wait for the final Markdown
+   artifact to expose candidate trials.
+4. If a candidate appears suitable for pursuit, or if clinician steering
+   points at a canvas trial, create/update a durable mini-project with
+   `trial_pursuit.upsert`. The canvas is the working view; the pursuit is the
+   longitudinal board for packet preparation, outreach, submission, and
+   follow-up.
 
 Common parameter mistakes for `mcp.clinicaltrials_gov.search`:
 
@@ -180,6 +194,19 @@ After writing the per-trial sections, write a top-level summary section
 with: total trials reviewed, surviving, excluded reasons distribution,
 overall confidence note, and any escalation decisions the clinician
 already approved during the run.
+
+Also upsert:
+
+- a `summary` canvas node with the aggregate run counts,
+- `candidate_trial` nodes for every surviving trial,
+- a `packet_task` node for outreach preparation once at least one trial
+  survives.
+
+For selected or high-fit trials, create/update a trial pursuit and add concrete
+tasks with `trial_pursuit.add_task`, such as confirming a recent lab, calling a
+site coordinator, preparing an outreach packet, or checking follow-up status.
+Record meaningful changes with `trial_pursuit.add_event` so the clinician can
+review the full pursuit history.
 
 ## Phase 5 — Validate output
 

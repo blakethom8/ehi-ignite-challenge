@@ -1096,7 +1096,7 @@ class HarmonizeCollection(BaseModel):
 class HarmonizeSource(BaseModel):
     id: str
     label: str
-    kind: str  # "fhir-pull" | "extracted-pdf"
+    kind: str  # "fhir-pull" | "extracted-pdf" | "ccda-xml"
     available: bool
     document_reference: str | None = None
     resource_counts: dict[str, int]
@@ -1107,6 +1107,7 @@ class HarmonizeSource(BaseModel):
         "pending_extraction",
         "extracted",
         "empty_extraction",
+        "identity_mismatch",
         "missing",
     ] = "missing"
     status_label: str = ""

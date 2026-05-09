@@ -16,6 +16,7 @@ import {
   FileJson2,
   FileSearch,
   FileUp,
+  Code2,
   GraduationCap,
   Heart,
   Layers3,
@@ -44,7 +45,7 @@ interface LayoutProps {
 
 type FilterMode = "all" | "high_risk" | "needs_review";
 type AppEnvironment = "platform" | "record" | "aggregator" | "clinical" | "marketplace" | "trials" | "medication" | "sharing" | "analysis" | "catalog";
-type TopArea = "platform" | "record" | "aggregator" | "clinical" | "marketplace" | "internal";
+type TopArea = "platform" | "record" | "aggregator" | "clinical" | "marketplace" | "internal" | "using-atlas";
 
 interface NavItem {
   to: string;
@@ -86,7 +87,7 @@ interface ModuleWorkspaceMap {
 const MARKETPLACE_PINNED_STORAGE_KEY = "ehi-marketplace-pinned-modules";
 const DEFAULT_MARKETPLACE_PINNED_IDS = ["trials", "medication-access", "payer-check", "second-opinion"];
 const MARKETPLACE_PINNED_LINK_OPTIONS = [
-  { id: "trials", key: "trialMatch", label: "Trial Match", path: "/trials" },
+  { id: "trials", key: "trialMatch", label: "Trial Match", path: "/skills/trial-finder" },
   { id: "medication-access", key: "medAccess", label: "Med Access", path: "/medication-access" },
   { id: "payer-check", key: "payerCheck", label: "Payer Check", path: "/payer-check" },
   { id: "second-opinion", key: "secondOpinion", label: "Second Opinion", path: "/second-opinion" },
@@ -406,6 +407,10 @@ const ANALYSIS_NAV_LINKS: NavItem[] = [
 
 const INTERNAL_NAV_LINKS: NavItem[] = [
   { to: "/analysis", label: "Module Overview", icon: BookMarked, description: "FHIR education and methodology" },
+  { to: "/pipeline-lab", label: "Pipeline Lab", icon: DatabaseZap, description: "PDF parser experiment leaderboard" },
+  { to: "/analysis/qa-eval-lab", label: "Q&A Eval Lab", icon: MessageSquareText, description: "Clinical question test development" },
+  { to: "/analysis/ccda-testing-lab", label: "C-CDA Testing Lab", icon: FileJson2, description: "C-CDA and PDF to FHIR playground" },
+  { to: "/ground-truth-review", label: "Reference Review", icon: ClipboardCheck, description: "Human-reviewed benchmark bundles" },
   { to: "/catalog", label: "Data Catalog", icon: Archive, description: "Platform contracts and schemas" },
   ...ANALYSIS_NAV_LINKS.filter((item) => item.to !== "/analysis"),
 ];
@@ -417,6 +422,8 @@ function withPatientQuery(path: string, patientId: string | null): string {
 
 function getEnvironment(pathname: string): AppEnvironment {
   if (pathname.startsWith("/platform")) return "platform";
+  if (pathname.startsWith("/pipeline-lab")) return "analysis";
+  if (pathname.startsWith("/ground-truth-review")) return "analysis";
   if (pathname.startsWith("/catalog")) return "catalog";
   if (pathname.startsWith("/analysis")) return "analysis";
   if (pathname.startsWith("/aggregate")) return "aggregator";
@@ -1268,7 +1275,9 @@ export function Layout({ children }: LayoutProps) {
       : environment === "clinical"
         ? "/clinical-insights/overview"
         : null;
-  const topArea = getTopArea(environment);
+  const topArea: TopArea = location.pathname.startsWith("/using-atlas")
+    ? "using-atlas"
+    : getTopArea(environment);
   const activeModuleMap = getActiveModuleMap(location.pathname);
   const ActiveModuleMapIcon = activeModuleMap?.icon;
   const headerHeight = isPlatform ? 76 : 126;
@@ -1305,6 +1314,7 @@ export function Layout({ children }: LayoutProps) {
   });
 
   const topLinks: { key: TopArea; label: string; to: string }[] = [
+    { key: "using-atlas", label: "Using Atlas", to: "/using-atlas" },
     { key: "aggregator", label: "Data Aggregator", to: withPatientQuery("/aggregate", patientId) },
     { key: "record", label: "FHIR Charts", to: withPatientQuery("/charts", patientId) },
     { key: "clinical", label: "Clinical Insights", to: withPatientQuery("/clinical-insights", patientId) },
@@ -1386,6 +1396,10 @@ export function Layout({ children }: LayoutProps) {
 
   const internalToolLinks: { key: string; label: string; to: string }[] = [
     { key: "dataLab", label: "Module Overview", to: "/analysis" },
+    { key: "pipelineLab", label: "Pipeline Lab", to: "/pipeline-lab" },
+    { key: "qaEvalLab", label: "Q&A Eval Lab", to: "/analysis/qa-eval-lab" },
+    { key: "ccdaLab", label: "C-CDA Testing Lab", to: "/analysis/ccda-testing-lab" },
+    { key: "referenceReview", label: "Reference Review", to: "/ground-truth-review" },
     { key: "catalog", label: "Data Catalog", to: "/catalog" },
     { key: "primer", label: "FHIR Primer", to: "/analysis/fhir-primer" },
     { key: "methodology", label: "Methodology", to: "/analysis/methodology" },
@@ -1450,7 +1464,7 @@ export function Layout({ children }: LayoutProps) {
     }
     if (key === "marketplace") return location.pathname === "/marketplace";
     if (key === "mySettings") return location.pathname.startsWith("/marketplace/settings") || location.pathname.startsWith("/sharing");
-    if (key === "trialMatch") return location.pathname.startsWith("/trials");
+    if (key === "trialMatch") return location.pathname.startsWith("/skills/trial-finder") || location.pathname.startsWith("/trials");
     if (key === "medAccess") return location.pathname.startsWith("/medication-access");
     if (key === "payerCheck") return location.pathname.startsWith("/payer-check");
     if (key === "trials") return location.pathname.startsWith("/trials");
@@ -1485,6 +1499,12 @@ export function Layout({ children }: LayoutProps) {
     if (key === "anesthesia") return location.pathname.startsWith("/explorer/anesthesia");
     if (key === "qa") return location.pathname.startsWith("/explorer/assistant");
     if (key === "dataLab") return location.pathname === "/analysis";
+    if (key === "pipelineLab") return location.pathname.startsWith("/pipeline-lab");
+    if (key === "qaEvalLab") return location.pathname.startsWith("/analysis/qa-eval-lab");
+    if (key === "ccdaLab") {
+      return location.pathname.startsWith("/analysis/ccda-testing-lab") || location.pathname.startsWith("/ccda-lab");
+    }
+    if (key === "referenceReview") return location.pathname.startsWith("/ground-truth-review");
     if (key === "catalog") return location.pathname.startsWith("/catalog");
     if (key === "primer") return location.pathname.startsWith("/analysis/fhir-primer");
     if (key === "methodology") return location.pathname.startsWith("/analysis/methodology");
@@ -1643,6 +1663,16 @@ export function Layout({ children }: LayoutProps) {
                     );
                   })}
                 </nav>
+                <a
+                  href="https://github.com/blakethom8/ehi-ignite-challenge"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="View source on GitHub"
+                  title="View source on GitHub"
+                  className="ml-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[#e9eaef] bg-white text-[#667085] transition-colors hover:border-[#cfd7ff] hover:text-[#1f2937]"
+                >
+                  <Code2 size={16} />
+                </a>
               </div>
             </div>
 
@@ -1672,11 +1702,11 @@ export function Layout({ children }: LayoutProps) {
           </div>
         </header>
 
-        <div className="flex flex-col overflow-hidden lg:flex-row" style={{ height: `calc(100vh - ${headerHeight}px)` }}>
+        <div className="flex flex-col overflow-hidden md:flex-row" style={{ height: `calc(100vh - ${headerHeight}px)` }}>
           {showSidebar && (
             <aside
-              className={`relative flex max-h-[50vh] w-full shrink-0 flex-col overflow-hidden border-b border-r border-[#e9eaef] transition-all duration-200 lg:max-h-full lg:border-b-0 ${
-              sidebarCollapsed ? "lg:w-14" : "lg:w-72"
+              className={`relative flex max-h-[50vh] w-full shrink-0 flex-col overflow-hidden border-b border-r border-[#e9eaef] transition-all duration-200 md:max-h-full md:border-b-0 ${
+              sidebarCollapsed ? "md:w-14" : "md:w-72"
             } ${isInternal ? "bg-[#f7fffc]" : "bg-white"}`}
             >
             {!isInternal && (
@@ -1702,7 +1732,7 @@ export function Layout({ children }: LayoutProps) {
                       </Link>
                       <button
                         onClick={toggleSidebar}
-                        className={`hidden lg:flex shrink-0 items-center justify-center w-6 h-6 rounded hover:bg-[#f5f6f8] text-[#a5a8b5] hover:text-[#555a6a] transition-colors ${sidebarCollapsed ? "absolute right-1 top-4" : ""}`}
+                        className={`hidden md:flex shrink-0 items-center justify-center w-6 h-6 rounded hover:bg-[#f5f6f8] text-[#a5a8b5] hover:text-[#555a6a] transition-colors ${sidebarCollapsed ? "absolute right-1 top-4" : ""}`}
                         title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
                       >
                         {sidebarCollapsed ? <ChevronsRight size={14} /> : <ChevronsLeft size={14} />}
@@ -1719,7 +1749,7 @@ export function Layout({ children }: LayoutProps) {
                         </div>
                         <button
                           onClick={toggleSidebar}
-                          className={`hidden lg:flex shrink-0 items-center justify-center w-6 h-6 rounded hover:bg-[#f5f6f8] text-[#a5a8b5] hover:text-[#555a6a] transition-colors ${sidebarCollapsed ? "absolute right-1 top-4" : ""}`}
+                          className={`hidden md:flex shrink-0 items-center justify-center w-6 h-6 rounded hover:bg-[#f5f6f8] text-[#a5a8b5] hover:text-[#555a6a] transition-colors ${sidebarCollapsed ? "absolute right-1 top-4" : ""}`}
                           title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
                         >
                           {sidebarCollapsed ? <ChevronsRight size={14} /> : <ChevronsLeft size={14} />}
@@ -1845,7 +1875,7 @@ export function Layout({ children }: LayoutProps) {
                     </div>
                     <button
                       onClick={toggleSidebar}
-                      className={`hidden lg:flex shrink-0 items-center justify-center w-6 h-6 rounded hover:bg-[#edf9f5] text-[#55706c] hover:text-[#0f172a] transition-colors ${sidebarCollapsed ? "absolute right-1 top-4" : ""}`}
+                      className={`hidden md:flex shrink-0 items-center justify-center w-6 h-6 rounded hover:bg-[#edf9f5] text-[#55706c] hover:text-[#0f172a] transition-colors ${sidebarCollapsed ? "absolute right-1 top-4" : ""}`}
                       title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
                     >
                       {sidebarCollapsed ? <ChevronsRight size={14} /> : <ChevronsLeft size={14} />}
@@ -1919,8 +1949,8 @@ export function Layout({ children }: LayoutProps) {
 
           {activeModuleMap && ActiveModuleMapIcon && (
             <aside
-              className={`relative flex max-h-[50vh] w-full shrink-0 flex-col overflow-hidden border-b border-r border-[#dfe4ff] bg-[#fbfcff] transition-all duration-200 lg:max-h-full lg:border-b-0 ${
-                moduleMapOpen ? "lg:w-72" : "lg:w-14"
+              className={`relative flex max-h-[50vh] w-full shrink-0 flex-col overflow-hidden border-b border-r border-[#dfe4ff] bg-[#fbfcff] transition-all duration-200 md:max-h-full md:border-b-0 ${
+                moduleMapOpen ? "md:w-72" : "md:w-14"
               }`}
             >
               <div className={`shrink-0 border-b border-[#dfe4ff] ${moduleMapOpen ? "px-3 py-4" : "px-1 py-3"}`}>
@@ -1939,7 +1969,7 @@ export function Layout({ children }: LayoutProps) {
                   <button
                     type="button"
                     onClick={() => setModuleMapOpen((open) => !open)}
-                    className={`hidden h-6 w-6 shrink-0 items-center justify-center rounded text-[#8d92a3] transition-colors hover:bg-[#eef1ff] hover:text-[#5b76fe] lg:flex ${
+                    className={`hidden h-6 w-6 shrink-0 items-center justify-center rounded text-[#8d92a3] transition-colors hover:bg-[#eef1ff] hover:text-[#5b76fe] md:flex ${
                       moduleMapOpen ? "" : "absolute right-1 top-4"
                     }`}
                     title={moduleMapOpen ? `Collapse ${activeModuleMap.title} map` : `Expand ${activeModuleMap.title} map`}

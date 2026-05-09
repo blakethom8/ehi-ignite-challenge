@@ -6,22 +6,29 @@
 > automation, and richer artifact production. Pairs with the runtime
 > contract in [`SKILL-AGENT-WORKSPACE.md`](SKILL-AGENT-WORKSPACE.md).
 >
-> **Last updated:** 2026-05-05
+> **Last updated:** 2026-05-09
 
 ---
 
 ## 1. What the agent can do today
 
 The Layer-1 tool registry in `api/core/skills/agent_loop.py` exposes
-exactly six tool aliases. A skill's `required_tools:` frontmatter
+a small typed tool surface. A skill's `required_tools:` frontmatter
 selects the subset it uses; `submit_final_artifact` is added
 automatically because there's no other way to end a run.
 
 | Skill alias | Agent-facing name | Kind | What it does |
 |---|---|---|---|
+| `get_patient_snapshot` | `get_patient_snapshot` | Local — Chart evidence | High-signal chart snapshot for the selected patient, using the provider-assistant evidence retriever. |
+| `query_chart_evidence` | `query_chart_evidence` | Local — Chart evidence | Retrieve chart-grounded evidence and citations for a specific criterion or clinical question. |
+| `run_sql` | `run_sql` | Local — SQL-on-FHIR | SELECT-only SQL against the materialized SQL-on-FHIR warehouse, with row caps and read-only connection. |
 | `workspace.write` | `workspace_write` | Local — Workspace primitive | Append-or-replace a section of `workspace.md`. Citations in `[cite:c_NNNN]` form must resolve. Anchors (e.g., `TRIAL_SECTIONS`) target named blocks. |
 | `workspace.cite` | `workspace_cite` | Local — Workspace primitive | Register a citation. Returns `c_NNNN`. `source_kind ∈ {fhir_resource, external_url, clinician_input, agent_inference}`. Disk-persisted to `citations.jsonl`. |
 | `workspace.escalate` | `workspace_escalate` | Local — Workspace primitive | Pause the run, surface a question to the clinician. `condition` must match a manifest-declared trigger or be `ad_hoc:` prefixed. |
+| `workspace.canvas.upsert` | `workspace_canvas_upsert` | Local — Canvas primitive | Create or update a typed side-canvas node: criteria, anchor, candidate trial, selected trial, packet task, summary, artifact. |
+| `trial_pursuit.upsert` | `trial_pursuit_upsert` | Local — Pursuit board | Create or update a durable patient-level trial pursuit for packet preparation, outreach, submission, and follow-up. |
+| `trial_pursuit.add_event` | `trial_pursuit_add_event` | Local — Pursuit board | Append an auditable event to a durable trial pursuit. |
+| `trial_pursuit.add_task` | `trial_pursuit_add_task` | Local — Pursuit board | Add a concrete task to a durable trial pursuit. |
 | `submit_final_artifact` | `submit_final_artifact` | Local — Lifecycle | Submit the structured output. Runtime validates against the skill's `output_schema`. The only legitimate way to end a run. |
 | `mcp.clinicaltrials_gov.search` | `clinicaltrials_search` | HTTP — Public API | ClinicalTrials.gov v2 search by condition + status + age band + sex. |
 | `mcp.clinicaltrials_gov.get_record` | `clinicaltrials_get_record` | HTTP — Public API | Full trial record + parsed inclusion / exclusion lines. |
@@ -36,15 +43,19 @@ That's the entire surface. Important properties:
   `Workspace.append_transcript`, which writes to disk *and* publishes
   to the per-run `EventHub` (see
   [`STREAMING-AND-GATEWAY.md`](STREAMING-AND-GATEWAY.md)).
+- **Every tool call is auditable.** The runtime emits `agent_tool_call`
+  before dispatch and `agent_tool_result` / `agent_tool_error` after
+  dispatch, including redacted args, duration, and a structured result
+  summary. The full source of truth remains the per-run transcript.
 - **No filesystem access outside the run dir.** The agent cannot
   create files, read files, or escape its case directory. There is
   no `read_file` / `write_file` / `bash` tool.
 - **No outbound network outside the registered MCP-style tools.**
   The agent has no general HTTP client, no browser, no shell.
 
-This is a deliberately small footprint for Phase 1. It's correct for
-trial-matching's structured workflow but it's a hard ceiling on what
-agents can achieve until we add more.
+This is still a deliberately small footprint for Phase 1. It is strong
+enough for Trial Finder to inspect the chart and query ClinicalTrials.gov,
+but it is still not a general browser or coding agent.
 
 ## 2. What the agent cannot do (yet) — and why
 
@@ -102,27 +113,22 @@ deterministic post-processors should consume the structured artifact
 
 ### 2.5 Mid-run patient/clinician chat
 
-**Status:** ⚠️ Limited — only escalation gates.
+**Status:** ✅ Basic steering queue available; richer streaming still pending.
 
 The agent can pause via `workspace_escalate`, the clinician resolves,
-the run resumes. There is no continuous chat window where the
-clinician can type "actually, also check trials in Boston" mid-run.
-That's a real gap for the kind of conversational refinement you
-described — already flagged as deferred in
-[`SELF-MODIFYING-WORKSPACE.md`](SELF-MODIFYING-WORKSPACE.md) §2 item 5.
-Discussed in §7.
+the run resumes. The frontend can also post steering messages to the
+run; the loop drains unconsumed messages between model turns and
+injects them back as user content. The remaining gap is token-level
+streaming and progressive tool-argument streaming.
 
 ### 2.6 Direct chart access tools
 
-**Status:** ⚠️ Indirect only.
+**Status:** ✅ Available in the skill runtime.
 
-The agent sees the chart through the *brief* (assembled by the
-runner, included in the system prompt) and through patient memory
-(pinned facts + context packages). It cannot freely query the chart
-mid-run. The existing `provider_assistant_agent_sdk.py` has
-`get_patient_snapshot`, `query_chart_evidence`, and `run_sql` tools we
-could lift into this registry — that's a small addition with clear
-upside, especially for skills beyond trial-matching.
+The agent can call `get_patient_snapshot`, `query_chart_evidence`, and
+`run_sql`. These reuse the provider-assistant evidence retriever and the
+SQL-on-FHIR read-only runner rather than giving the agent raw file or
+shell access.
 
 ## 3. Web search — option comparison
 

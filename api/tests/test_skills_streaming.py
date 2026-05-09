@@ -24,6 +24,7 @@ from fastapi.testclient import TestClient
 
 from api.core.skills import workspace as workspace_module
 from api.core.skills import patient_memory as memory_module
+from api.core.skills import trial_pursuits as trial_pursuits_module
 from api.core.skills.event_hub import EventHub
 from api.core.skills.loader import SKILLS_ROOT, load_skill
 from api.core.skills.patient_memory import PatientMemory
@@ -38,6 +39,7 @@ def isolated_cases_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path
     monkeypatch.setenv("SKILLS_CASES_PATH", str(cases_root))
     monkeypatch.setattr(workspace_module, "CASES_ROOT", cases_root)
     monkeypatch.setattr(memory_module, "CASES_ROOT", cases_root)
+    monkeypatch.setattr(trial_pursuits_module, "CASES_ROOT", cases_root)
     return cases_root
 
 
@@ -188,6 +190,22 @@ async def test_slow_subscriber_does_not_block_publisher() -> None:
 
 @pytest.mark.asyncio
 async def test_runner_publishes_emitted_events_through_hub(trial_skill) -> None:
+    async def create_message(**_kwargs: Any) -> dict[str, Any]:
+        return {
+            "stop_reason": "tool_use",
+            "content": [
+                {
+                    "type": "tool_use",
+                    "id": "t1",
+                    "name": "workspace_escalate",
+                    "input": {
+                        "condition": "no_anchor_condition",
+                        "prompt": "No target trial condition is available.",
+                    },
+                }
+            ],
+        }
+
     memory = PatientMemory("hub-001")
     run_dir = allocate_run_dir("hub-001", trial_skill.name)
     workspace = Workspace(
@@ -202,7 +220,7 @@ async def test_runner_publishes_emitted_events_through_hub(trial_skill) -> None:
         skill=trial_skill,
         workspace=workspace,
         patient_memory=memory,
-        brief={"anchors": []},
+        brief={"anchors": [], "_agent_overrides": {"create_message": create_message}},
         event_hub=hub,
     )
 
@@ -217,7 +235,6 @@ async def test_runner_publishes_emitted_events_through_hub(trial_skill) -> None:
     consumer = asyncio.create_task(consume())
     await asyncio.sleep(0.02)
 
-    # Drives Phase 0, escalates immediately on no anchors.
     result = await runner.run()
     await asyncio.wait_for(consumer, timeout=1.0)
 
@@ -231,6 +248,22 @@ async def test_runner_publishes_emitted_events_through_hub(trial_skill) -> None:
 async def test_runner_without_hub_still_records_to_disk(trial_skill) -> None:
     """Backwards-compatible: a runner with no hub still writes the
     transcript. Hub is purely the live fast path."""
+    async def create_message(**_kwargs: Any) -> dict[str, Any]:
+        return {
+            "stop_reason": "tool_use",
+            "content": [
+                {
+                    "type": "tool_use",
+                    "id": "t1",
+                    "name": "workspace_escalate",
+                    "input": {
+                        "condition": "no_anchor_condition",
+                        "prompt": "No target trial condition is available.",
+                    },
+                }
+            ],
+        }
+
     memory = PatientMemory("nohub-001")
     run_dir = allocate_run_dir("nohub-001", trial_skill.name)
     workspace = Workspace(
@@ -244,7 +277,7 @@ async def test_runner_without_hub_still_records_to_disk(trial_skill) -> None:
         skill=trial_skill,
         workspace=workspace,
         patient_memory=memory,
-        brief={"anchors": []},
+        brief={"anchors": [], "_agent_overrides": {"create_message": create_message}},
         event_hub=None,
     )
     await runner.run()
@@ -308,3 +341,175 @@ def test_sse_endpoint_404_for_unknown_run(trial_skill) -> None:
         params={"patient_id": "nobody"},
     )
     assert response.status_code == 404
+
+
+def test_messages_endpoint_appends_and_lists_run_messages(trial_skill) -> None:
+    memory = PatientMemory("messages-api-001")
+    run_dir = allocate_run_dir("messages-api-001", trial_skill.name)
+    workspace = Workspace(
+        skill=trial_skill,
+        patient_id="messages-api-001",
+        patient_memory=memory,
+        run_dir=run_dir,
+        brief={"anchors": []},
+    )
+    workspace.start()
+
+    from api.main import app
+
+    client = TestClient(app)
+    response = client.post(
+        f"/api/skills/{trial_skill.name}/runs/{run_dir.name}/messages",
+        params={"patient_id": "messages-api-001"},
+        json={
+            "actor": "clinician",
+            "message": "Look more closely at trials with travel support.",
+            "canvas_ref": {"kind": "trial_list", "selected_nct_ids": ["NCT01234567"]},
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["message_id"].startswith("m_")
+    assert payload["consumed"] is False
+
+    list_response = client.get(
+        f"/api/skills/{trial_skill.name}/runs/{run_dir.name}/messages",
+        params={"patient_id": "messages-api-001"},
+    )
+    assert list_response.status_code == 200
+    messages = list_response.json()["messages"]
+    assert len(messages) == 1
+    assert messages[0]["message"] == "Look more closely at trials with travel support."
+
+
+def test_inspector_endpoint_returns_run_workspace_contract(trial_skill) -> None:
+    memory = PatientMemory("inspector-api-001")
+    run_dir = allocate_run_dir("inspector-api-001", trial_skill.name)
+    workspace = Workspace(
+        skill=trial_skill,
+        patient_id="inspector-api-001",
+        patient_memory=memory,
+        run_dir=run_dir,
+        brief={
+            "anchors": [
+                {
+                    "display": "Alzheimer's disease",
+                    "resource_id": "cond-1",
+                    "risk_category": "NEUROLOGIC",
+                }
+            ],
+            "trial_guidance": "Boston only",
+        },
+    )
+    workspace.start()
+    workspace.upsert_canvas_node(
+        node_id="trial:NCT01234567",
+        kind="candidate_trial",
+        title="Demo trial",
+        data={"nct_id": "NCT01234567"},
+    )
+
+    from api.main import app
+
+    client = TestClient(app)
+    response = client.get(
+        f"/api/skills/{trial_skill.name}/runs/{run_dir.name}/inspector",
+        params={"patient_id": "inspector-api-001"},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["run"]["run_id"] == run_dir.name
+    assert payload["skill"]["name"] == trial_skill.name
+    assert payload["context"]["brief"]["trial_guidance"] == "Boston only"
+    assert any(tool["alias"] == "query_chart_evidence" for tool in payload["tools"])
+    assert payload["permissions"]["enabled_capabilities"]["canvas_writes"] is True
+    assert payload["artifacts"]["files"]
+
+
+def test_canvas_endpoint_lists_and_selects_nodes(trial_skill) -> None:
+    memory = PatientMemory("canvas-api-001")
+    run_dir = allocate_run_dir("canvas-api-001", trial_skill.name)
+    workspace = Workspace(
+        skill=trial_skill,
+        patient_id="canvas-api-001",
+        patient_memory=memory,
+        run_dir=run_dir,
+        brief={"anchors": []},
+    )
+    workspace.start()
+    workspace.upsert_canvas_node(
+        node_id="trial:NCT01234567",
+        kind="candidate_trial",
+        title="A test trial",
+        status="candidate",
+    )
+
+    from api.main import app
+
+    client = TestClient(app)
+    list_response = client.get(
+        f"/api/skills/{trial_skill.name}/runs/{run_dir.name}/canvas",
+        params={"patient_id": "canvas-api-001"},
+    )
+    assert list_response.status_code == 200
+    assert any(
+        node["node_id"] == "trial:NCT01234567"
+        for node in list_response.json()["nodes"]
+    )
+
+    select_response = client.post(
+        f"/api/skills/{trial_skill.name}/runs/{run_dir.name}/canvas/nodes/trial%3ANCT01234567/selection",
+        params={"patient_id": "canvas-api-001"},
+        json={"selected": True},
+    )
+    assert select_response.status_code == 200
+    assert select_response.json()["selected"] is True
+
+
+def test_trial_pursuit_endpoints_create_project_board_item() -> None:
+    from api.main import app
+
+    client = TestClient(app)
+    patient_id = "trial-pursuit-api-001"
+    create_response = client.post(
+        f"/api/skills/patients/{patient_id}/trial-pursuits",
+        json={
+            "nct_id": "NCT01234567",
+            "title": "A durable trial",
+            "status": "interested",
+            "sponsor": "Demo sponsor",
+            "fit_score": 82,
+            "created_from_run_id": "run-123",
+            "created_from_canvas_node_id": "trial:NCT01234567",
+            "evidence_snapshot": {"anchor": "Alzheimer's disease"},
+        },
+    )
+    assert create_response.status_code == 200
+    pursuit = create_response.json()
+    assert pursuit["nct_id"] == "NCT01234567"
+    assert pursuit["status"] == "interested"
+    assert pursuit["events"][0]["kind"] == "created"
+
+    task_response = client.post(
+        f"/api/skills/patients/{patient_id}/trial-pursuits/{pursuit['pursuit_id']}/tasks",
+        json={"title": "Call site coordinator"},
+    )
+    assert task_response.status_code == 200
+    assert task_response.json()["tasks"][0]["title"] == "Call site coordinator"
+
+    update_response = client.patch(
+        f"/api/skills/patients/{patient_id}/trial-pursuits/{pursuit['pursuit_id']}",
+        json={
+            "status": "packet",
+            "next_step": "Prepare outreach packet.",
+            "event_note": "Clinician wants to pursue this trial.",
+        },
+    )
+    assert update_response.status_code == 200
+    assert update_response.json()["status"] == "packet"
+
+    list_response = client.get(f"/api/skills/patients/{patient_id}/trial-pursuits")
+    assert list_response.status_code == 200
+    pursuits = list_response.json()["pursuits"]
+    assert len(pursuits) == 1
+    assert pursuits[0]["next_step"] == "Prepare outreach packet."

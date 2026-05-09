@@ -29,6 +29,8 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { api } from "../../api/client";
+import { skillsApi } from "../../api/skills";
+import type { SkillSummary } from "../../types/skills";
 
 function withPatient(path: string, patientId: string | null): string {
   return patientId ? `${path}?patient=${patientId}` : path;
@@ -123,10 +125,10 @@ const insightModules: InsightModule[] = [
     title: "Trial Matching",
     category: "Specialty",
     status: "Live",
-    route: "/trials",
-    body: "Per-condition search-readiness — classifies anchors and lists what to verify before generating a trial-search packet.",
+    route: "/skills/trial-finder",
+    body: "Runs the trial-matching skill in a live workspace with cited eligibility review, transcript, escalations, and save destinations.",
     fhir: ["Conditions", "Procedures", "Demographics"],
-    outputs: ["Anchor list", "Verify-before-search", "Inclusion bands"],
+    outputs: ["Anchor list", "Eligibility review", "Outreach packet"],
     readiness: "Strong current fit",
     recommended: true,
   },
@@ -373,6 +375,89 @@ function CanonicalWorkspaceStrip({ patientId }: { patientId: string | null }) {
             <p className="mt-1 truncate text-sm font-semibold text-[#1c1c1e]">{canonical?.storage_mode ?? "Not selected"}</p>
           </div>
         </div>
+      </div>
+    </section>
+  );
+}
+
+function routeForSkill(skill: SkillSummary, patientId: string | null): string {
+  const path = skill.name === "trial-matching" ? "/skills/trial-finder" : `/skills/${skill.name}`;
+  return withPatient(path, patientId);
+}
+
+function SkillRegistryPanel({ patientId }: { patientId: string | null }) {
+  const skillsQuery = useQuery({
+    queryKey: ["skills-registry"],
+    queryFn: skillsApi.listSkills,
+    refetchOnWindowFocus: false,
+  });
+  const skills = skillsQuery.data ?? [];
+
+  return (
+    <section className="rounded-2xl bg-white p-5 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-[#9a5a16]">Skill workspaces</p>
+          <h2 className="mt-1 text-xl font-semibold text-[#1c1c1e]">Installed clinical skill manifests</h2>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-[#667085]">
+            Skill files are the durable harness behind agent workspaces. Clinical Insights can run local/private skills
+            against the canonical patient workspace, while Marketplace handles modules that leave the private boundary.
+          </p>
+        </div>
+        <Link
+          to={withPatient("/skills/trial-finder", patientId)}
+          className="inline-flex w-fit items-center gap-2 rounded-xl bg-[#1c1c1e] px-4 py-2 text-sm font-semibold text-white no-underline hover:bg-[#333438]"
+        >
+          <Target size={16} />
+          Open Trial Finder
+        </Link>
+      </div>
+
+      {skillsQuery.isError ? (
+        <div className="mt-4 rounded-xl border border-[#fee2e2] bg-[#fff7f7] px-4 py-3 text-sm text-[#991b1b]">
+          Skill registry unavailable. The static clinical module inventory is still available below.
+        </div>
+      ) : null}
+
+      <div className="mt-5 grid gap-3 lg:grid-cols-2">
+        {skillsQuery.isLoading ? (
+          <div className="rounded-xl border border-dashed border-[#e9eaef] p-4 text-sm text-[#667085]">
+            Reading installed skill manifests.
+          </div>
+        ) : skills.length ? (
+          skills.map((skill) => (
+            <Link
+              key={skill.name}
+              to={routeForSkill(skill, patientId)}
+              className="rounded-xl border border-[#e9eaef] bg-[#fffdf9] p-4 no-underline hover:border-[#f4bd8d]"
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full bg-[#fff1df] px-2.5 py-1 text-[11px] font-semibold text-[#9a5a16]">
+                  {skill.shape}
+                </span>
+                <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-[#667085] shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+                  {skill.audience}
+                </span>
+                <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-[#667085] shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+                  v{skill.version}
+                </span>
+              </div>
+              <h3 className="mt-3 text-base font-semibold text-[#1c1c1e]">{skill.name}</h3>
+              <p className="mt-2 text-sm leading-6 text-[#667085]">{skill.description}</p>
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {skill.required_tools.slice(0, 5).map((tool) => (
+                  <span key={tool} className="rounded-md bg-white px-2 py-1 font-mono text-[10px] text-[#555a6a] shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+                    {tool}
+                  </span>
+                ))}
+              </div>
+            </Link>
+          ))
+        ) : (
+          <div className="rounded-xl border border-dashed border-[#e9eaef] p-4 text-sm text-[#667085]">
+            No installed skills were returned by the backend registry.
+          </div>
+        )}
       </div>
     </section>
   );
@@ -688,6 +773,8 @@ function ClinicalInsightsOverviewPage({ patientId }: { patientId: string | null 
       </section>
 
       <CanonicalWorkspaceStrip patientId={patientId} />
+
+      <SkillRegistryPanel patientId={patientId} />
 
       <section className="grid gap-4 lg:grid-cols-3">
         {pillars.map((pillar) => {
@@ -1209,6 +1296,8 @@ export function ClinicalInsights() {
       </section>
 
       <CanonicalWorkspaceStrip patientId={patientId} />
+
+      <SkillRegistryPanel patientId={patientId} />
 
       <section className="rounded-[24px] border border-[#f6dfc9] bg-[#fff8f1] p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">

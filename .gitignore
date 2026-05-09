@@ -29,6 +29,15 @@ data/patient-context/
 data/harmonization-runs/
 data/harmonize-demo/
 data/published-charts/
+data/cases/
+data/pdf-lab/runs/
+data/pdf-lab/runs.jsonl
+data/pdf-lab/reviews/
+data/pdf-lab/ground-truth/
+data/pdf-lab/suites/
+data/pipeline-evals/runs/
+data/pipeline-evals/runs.jsonl
+data/workspace-packages/workspace-*.zip
 data/sof.db
 data/sof.db-*
 data/sof.db.tmp

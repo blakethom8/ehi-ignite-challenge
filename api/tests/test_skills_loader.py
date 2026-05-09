@@ -43,6 +43,10 @@ def test_trial_matching_required_tools_include_workspace_primitives() -> None:
     assert "workspace.write" in tools
     assert "workspace.cite" in tools
     assert "workspace.escalate" in tools
+    assert "workspace.canvas.upsert" in tools
+    assert "trial_pursuit.upsert" in tools
+    assert "trial_pursuit.add_event" in tools
+    assert "trial_pursuit.add_task" in tools
 
 
 def test_trial_matching_escalation_triggers_present() -> None:

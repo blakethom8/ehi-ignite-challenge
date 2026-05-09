@@ -24,6 +24,7 @@ import type {
   SurgicalRiskComponent,
   SurgicalRiskResponse,
 } from "../../types";
+import { formatDisplayNumber } from "../../utils/format";
 
 type Tone = "red" | "amber" | "green" | "blue" | "neutral";
 
@@ -55,8 +56,7 @@ function fmtPatientAge(ageYears: number): string {
 }
 
 function fmtLabValue(value: number): string {
-  if (Number.isInteger(value)) return String(value);
-  return value.toFixed(2).replace(/\.?0+$/, "");
+  return formatDisplayNumber(value);
 }
 
 function shortLabName(display: string): string {

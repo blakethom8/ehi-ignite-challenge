@@ -14,6 +14,7 @@ import {
 import { api } from "../../api/client";
 import { EmptyState } from "../../components/EmptyState";
 import type { LabAlertFlag, LabHistoryPoint, LabValue } from "../../types";
+import { formatDisplayNumber, formatMeasurement } from "../../utils/format";
 
 type AlertVerdict = "CRITICAL" | "REVIEW" | "STABLE";
 
@@ -205,7 +206,7 @@ function FlagCard({
       <div className="mt-4 flex items-end justify-between gap-4">
         <div>
           <p className="text-3xl font-semibold text-[#111827]">
-            {flag.value}
+            {formatDisplayNumber(flag.value)}
             <span className="ml-1 text-base font-medium text-[#6b7280]">{flag.unit}</span>
           </p>
           <p
@@ -254,8 +255,7 @@ function MonitoredPanelRow({ panel, labs }: { panel: string; labs: LabValue[] })
               {lab.display}
               {lab.value !== null && (
                 <span className="font-normal opacity-70">
-                  {lab.value}
-                  {lab.unit ? ` ${lab.unit}` : ""}
+                  {formatMeasurement(lab.value, lab.unit)}
                 </span>
               )}
             </span>

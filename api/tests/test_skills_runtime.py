@@ -244,6 +244,108 @@ def test_double_resolve_rejected(trial_skill) -> None:
         ws.resolve_escalation(esc.approval_id, choice="again")
 
 
+# ── Mid-run steering messages ─────────────────────────────────────────────
+
+
+def test_workspace_messages_persist_and_drain(trial_skill) -> None:
+    ws = _fresh_workspace(trial_skill)
+    ws.start()
+
+    msg = ws.append_message(
+        "Prioritize recruiting trials near Boston.",
+        actor="clinician",
+        canvas_ref={"kind": "trial", "nct_id": "NCT01234567"},
+    )
+
+    assert msg.message_id.startswith("m_")
+    assert msg.consumed is False
+    assert msg.canvas_ref == {"kind": "trial", "nct_id": "NCT01234567"}
+    assert ws.messages()[0].message == "Prioritize recruiting trials near Boston."
+
+    pending = ws.drain_messages()
+    assert [m.message_id for m in pending] == [msg.message_id]
+
+    reloaded = ws.messages()[0]
+    assert reloaded.consumed is True
+    assert reloaded.consumed_at
+
+    assert ws.drain_messages() == []
+    kinds = [e["kind"] for e in ws.transcript_events()]
+    assert "message_added" in kinds
+    assert "message_consumed" in kinds
+
+
+def test_workspace_message_validation(trial_skill) -> None:
+    ws = _fresh_workspace(trial_skill)
+    ws.start()
+
+    with pytest.raises(WorkspaceContractError, match="message is required"):
+        ws.append_message("   ")
+    with pytest.raises(WorkspaceContractError, match="actor must be"):
+        ws.append_message("hello", actor="stranger")
+
+
+# ── Canvas state ──────────────────────────────────────────────────────────
+
+
+def test_canvas_initializes_from_brief_anchors(trial_skill) -> None:
+    ws = _fresh_workspace(trial_skill, patient_id="canvas-brief-001")
+    ws._brief.update(
+        {
+            "anchors": [
+                {
+                    "display": "Diabetes Mellitus",
+                    "resource_id": "Condition/dm-1",
+                    "risk_category": "METABOLIC",
+                }
+            ],
+            "trial_guidance": "Recruiting trials near Boston.",
+        }
+    )
+    ws.start()
+
+    state = ws.canvas_state()
+    nodes = {node["node_id"]: node for node in state["nodes"]}
+    assert nodes["criteria:trial-search"]["summary"] == "Recruiting trials near Boston."
+    assert nodes["anchor:Condition_dm-1"]["title"] == "Diabetes Mellitus"
+    assert nodes["anchor:Condition_dm-1"]["selected"] is True
+
+
+def test_canvas_upsert_and_selection_emit_events(trial_skill) -> None:
+    ws = _fresh_workspace(trial_skill)
+    ws.start()
+    node = ws.upsert_canvas_node(
+        node_id="trial:NCT01234567",
+        kind="candidate_trial",
+        title="A test trial",
+        status="candidate",
+        summary="fit 80",
+        data={"nct_id": "NCT01234567", "fit_score": 80},
+    )
+    assert node.selected is False
+
+    selected = ws.set_canvas_selection("trial:NCT01234567", selected=True)
+    assert selected.selected is True
+
+    reloaded = ws.canvas_state()
+    trial = next(n for n in reloaded["nodes"] if n["node_id"] == "trial:NCT01234567")
+    assert trial["selected"] is True
+    kinds = [event["kind"] for event in ws.transcript_events()]
+    assert "canvas_node_upserted" in kinds
+    assert "canvas_selection_changed" in kinds
+
+
+def test_canvas_sync_from_output_creates_trial_and_packet_nodes(trial_skill) -> None:
+    ws = _fresh_workspace(trial_skill)
+    ws.start()
+    output = _valid_output(ws)
+    ws.sync_canvas_from_output(output)
+    nodes = {node["node_id"]: node for node in ws.canvas_state()["nodes"]}
+    assert nodes["summary:trial-shortlist"]["kind"] == "summary"
+    assert nodes["trial:NCT12345678"]["kind"] == "candidate_trial"
+    assert nodes["packet:prepare-outreach"]["kind"] == "packet_task"
+
+
 # ── Finalize / output schema ────────────────────────────────────────────────
 
 
@@ -522,7 +624,80 @@ class MultiResponseStubTransport:
 @pytest.mark.asyncio
 async def test_runner_end_to_end_produces_valid_output(trial_skill) -> None:
     ws = _fresh_workspace(trial_skill, patient_id="e2e-001")
-    transport = MultiResponseStubTransport()
+    artifact = {
+        "run_id": ws.run_id,
+        "skill_version": trial_skill.manifest.version,
+        "patient_id": "e2e-001",
+        "summary": {
+            "trials_reviewed": 1,
+            "trials_surviving": 1,
+            "trials_excluded": 0,
+            "confidence_note": "scripted agent test",
+        },
+        "trials": [
+            {
+                "nct_id": "NCT01234567",
+                "title": "A test trial",
+                "fit_score": 80,
+                "evidence_tier": "T2",
+                "supporting_facts": [],
+                "gaps": [],
+                "excluded": False,
+                "escalation_triggered": False,
+            }
+        ],
+        "escalations": [],
+    }
+    responses = iter(
+        [
+            {
+                "stop_reason": "tool_use",
+                "content": [
+                    {
+                        "type": "tool_use",
+                        "id": "t1",
+                        "name": "workspace_cite",
+                        "input": {
+                            "claim": "Trial NCT01234567 retrieved",
+                            "source_kind": "external_url",
+                            "source_ref": "https://clinicaltrials.gov/study/NCT01234567",
+                            "evidence_tier": "T2",
+                        },
+                    }
+                ],
+            },
+            {
+                "stop_reason": "tool_use",
+                "content": [
+                    {
+                        "type": "tool_use",
+                        "id": "t2",
+                        "name": "workspace_write",
+                        "input": {
+                            "section": "NCT01234567",
+                            "content": "Agent-reviewed trial body [cite:c_0001].",
+                            "anchor": "TRIAL_SECTIONS",
+                        },
+                    }
+                ],
+            },
+            {
+                "stop_reason": "tool_use",
+                "content": [
+                    {
+                        "type": "tool_use",
+                        "id": "t3",
+                        "name": "submit_final_artifact",
+                        "input": {"output": artifact},
+                    }
+                ],
+            },
+        ]
+    )
+
+    async def create_message(**_kwargs: Any) -> dict[str, Any]:
+        return next(responses)
+
     runner = SkillRunner(
         skill=trial_skill,
         workspace=ws,
@@ -532,7 +707,7 @@ async def test_runner_end_to_end_produces_valid_output(trial_skill) -> None:
                 {"display": "Diabetes Mellitus", "resource_id": "Condition/dm-1"}
             ],
             "page_size": 5,
-            "_test_ctgov_transport": transport,
+            "_agent_overrides": {"create_message": create_message},
         },
     )
     result = await runner.run()
@@ -547,11 +722,28 @@ async def test_runner_end_to_end_produces_valid_output(trial_skill) -> None:
 @pytest.mark.asyncio
 async def test_runner_escalates_on_no_anchors(trial_skill) -> None:
     ws = _fresh_workspace(trial_skill, patient_id="noanchor-001")
+
+    async def create_message(**_kwargs: Any) -> dict[str, Any]:
+        return {
+            "stop_reason": "tool_use",
+            "content": [
+                {
+                    "type": "tool_use",
+                    "id": "t1",
+                    "name": "workspace_escalate",
+                    "input": {
+                        "condition": "no_anchor_condition",
+                        "prompt": "No target trial condition is available.",
+                    },
+                }
+            ],
+        }
+
     runner = SkillRunner(
         skill=trial_skill,
         workspace=ws,
         patient_memory=PatientMemory("noanchor-001"),
-        brief={"anchors": []},
+        brief={"anchors": [], "_agent_overrides": {"create_message": create_message}},
     )
     result = await runner.run()
     assert result.status == "escalated"

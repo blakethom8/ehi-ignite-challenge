@@ -1,0 +1,644 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Platform research discussion · 2026-05-08</title>
+<style>
+  :root {
+    --ink: #1d2433;
+    --ink-soft: #4a5168;
+    --muted: #6b7390;
+    --rule: #e7eaf2;
+    --rule-strong: #cbd2e2;
+    --bg: #fafbfd;
+    --paper: #ffffff;
+    --accent: #5b76fe;
+    --accent-soft: #eef1ff;
+    --good: #10864c;
+    --bad: #b3261e;
+    --warn: #b86e00;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", "Helvetica Neue", system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  main {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 56px 28px 96px;
+    background: var(--paper);
+    border-left: 1px solid var(--rule);
+    border-right: 1px solid var(--rule);
+    min-height: 100vh;
+  }
+  header.doc {
+    border-bottom: 1px solid var(--rule);
+    padding-bottom: 22px;
+    margin-bottom: 36px;
+  }
+  header.doc .eyebrow {
+    color: var(--muted);
+    font-size: 13px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  header.doc h1 {
+    font-size: 28px;
+    line-height: 1.25;
+    margin: 0 0 10px;
+    letter-spacing: -0.01em;
+  }
+  header.doc .meta {
+    color: var(--muted);
+    font-size: 14px;
+  }
+  h2 {
+    font-size: 22px;
+    line-height: 1.3;
+    margin: 56px 0 16px;
+    letter-spacing: -0.01em;
+  }
+  h2 .num {
+    color: var(--accent);
+    font-weight: 600;
+    margin-right: 10px;
+  }
+  h3 {
+    font-size: 17px;
+    margin: 28px 0 8px;
+    color: var(--ink);
+    font-weight: 600;
+  }
+  p { margin: 0 0 16px; color: var(--ink); }
+  p.lede {
+    font-size: 17px;
+    color: var(--ink-soft);
+  }
+  strong { color: var(--ink); font-weight: 600; }
+  em { color: var(--ink-soft); }
+  ul, ol {
+    margin: 0 0 18px;
+    padding-left: 22px;
+  }
+  ul li, ol li { margin-bottom: 8px; }
+  code {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.88em;
+    background: #f4f5fa;
+    border: 1px solid var(--rule);
+    padding: 1px 5px;
+    border-radius: 4px;
+    color: #2d3650;
+  }
+  blockquote {
+    margin: 18px 0;
+    padding: 12px 18px;
+    background: var(--accent-soft);
+    border-left: 3px solid var(--accent);
+    color: var(--ink);
+    border-radius: 0 4px 4px 0;
+  }
+  blockquote p:last-child { margin-bottom: 0; }
+  .callout {
+    margin: 22px 0;
+    padding: 14px 18px;
+    background: #fff8ec;
+    border-left: 3px solid var(--warn);
+    border-radius: 0 4px 4px 0;
+  }
+  .callout .label {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--warn);
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  hr {
+    border: none;
+    border-top: 1px solid var(--rule);
+    margin: 40px 0;
+  }
+  .question {
+    margin-top: 36px;
+    padding: 22px 22px 18px;
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    background: var(--accent-soft);
+  }
+  .question h3 {
+    margin-top: 0;
+    color: var(--accent);
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 16px 0 22px;
+    font-size: 14px;
+  }
+  th, td {
+    text-align: left;
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+  }
+  th {
+    border-bottom: 1px solid var(--rule-strong);
+    color: var(--muted);
+    font-weight: 600;
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    background: #f7f8fc;
+  }
+  .toc {
+    margin: 0 0 36px;
+    padding: 16px 20px;
+    background: #f7f8fc;
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    font-size: 14px;
+  }
+  .toc ol { margin: 0; padding-left: 22px; }
+  .toc li { margin-bottom: 4px; }
+  .toc a {
+    color: var(--ink);
+    text-decoration: none;
+    border-bottom: 1px dotted var(--rule-strong);
+  }
+  .toc a:hover { color: var(--accent); border-bottom-color: var(--accent); }
+  footer {
+    margin-top: 64px;
+    padding-top: 16px;
+    border-top: 1px solid var(--rule);
+    color: var(--muted);
+    font-size: 13px;
+  }
+  @media (max-width: 640px) {
+    main { padding: 36px 18px 64px; }
+    header.doc h1 { font-size: 24px; }
+    h2 { font-size: 19px; }
+    table { font-size: 13px; }
+    th, td { padding: 7px 8px; }
+  }
+</style>
+</head>
+<body>
+<main>
+
+<header class="doc">
+  <div class="eyebrow">Research discussion · platform &amp; positioning</div>
+  <h1>Synthea bias, subscription budgets, clinical-NLP backends, and the bench as the product</h1>
+  <div class="meta">2026-05-08 · follow-up to gold-standard discussion</div>
+</header>
+
+<p class="lede">
+  Five threads, more connected than they look: the GT bias question, the subscription-economics
+  experiment, the best-of-breed clinical-NLP architecture, the bench-as-platform vision, and what
+  D2C FHIR actually buys us. They tie together because they all answer one question — what kind
+  of company is this trying to be?
+</p>
+
+<div class="toc">
+  <ol>
+    <li><a href="#synthea">Synthea round-trip — does it bias us toward agents?</a></li>
+    <li><a href="#subscription">The codex / Claude-Code subscription experiment</a></li>
+    <li><a href="#clinical-nlp">Existing clinical-NLP parsers — the best-of-breed → FHIR adapter</a></li>
+    <li><a href="#platform">The bench as the platform</a></li>
+    <li><a href="#d2c">D2C FHIR — what does standardization actually buy?</a></li>
+    <li><a href="#close">Where this lands</a></li>
+  </ol>
+</div>
+
+<h2 id="synthea"><span class="num">§1</span>Synthea round-trip — does it bias us toward agents?</h2>
+
+<p>
+  This is a sharp question and worth being precise about. There are two distinct biases to worry
+  about, and they're not equally severe.
+</p>
+
+<h3>Generator bias — smaller than it sounds</h3>
+
+<p>
+  Synthea is <em>rule-based</em>, not LLM-generated. The bundles come from a Java state machine
+  (MITRE's open-source project) that simulates patient lifecycles using clinical ontologies and
+  evidence-based care pathways — sepsis protocols, diabetes progression, immunization schedules.
+  No agent in the loop. So the worry "are we testing whether our pipeline can invert another
+  agent's output?" is largely answered by the architecture: we'd be testing whether we can invert a
+  <em>renderer</em> (HTML/CCDA → PDF), not an LLM.
+</p>
+
+<p>
+  That said, the rule-based generator does have its own clinical model — it knows what
+  conditions co-occur, what medications follow which diagnoses, etc. If our pipeline learns the
+  shape of <em>typical</em> Synthea co-occurrence, it might over-predict on real PDFs that
+  violate those patterns. This is a real but small effect, and it's mostly fixed by also
+  evaluating against <em>atypical</em> real PDFs.
+</p>
+
+<h3>Distribution bias — the bigger problem</h3>
+
+<p>
+  The harder issue is that Synthea PDFs are <strong>too clean</strong>. Real EHI exports include:
+</p>
+<ul>
+  <li>Faxes and scans with dropped pixels and skew</li>
+  <li>Multiple-column layouts that confuse reading order</li>
+  <li>Redaction stamps on top of text</li>
+  <li>Copy-pasted prior-records sections with stale dates</li>
+  <li>Handwritten annotations on printed forms</li>
+  <li>OCR layers from older PDFs that disagree with the visual layer</li>
+</ul>
+<p>
+  Synthea has none of this. Tune to it and we tune to the easier half of the distribution. The
+  F1 number won't transfer to a real Cedars or Kaiser export.
+</p>
+
+<h3>So what's Synthea actually for?</h3>
+
+<p>
+  I'd reframe it. Synthea is best as a <strong>regression test</strong>, not a benchmark. It
+  tells us "the pipeline doesn't break on machine-clean clinical content with a known answer." It
+  doesn't tell us we're production-ready. The headline benchmark needs to be a small set of
+  human-annotated real PDFs.
+</p>
+
+<p>
+  Where Synthea earns its keep: <strong>scale and edge cases</strong>. 1,180 free test cases.
+  We can ask things human-annotation can't reach — what happens when there are 50 medications?
+  When the patient has 30 years of records? When immunizations span two CVX systems? Synthea is
+  the dense bench for unit-test-style sanity; human-annotated is the headline metric.
+</p>
+
+<div class="callout">
+  <div class="label">Practical implication</div>
+  <p>
+    The "trustworthy GT" stack is probably three layers: Synthea round-trip (broad sanity, free,
+    knowable answer); cross-model agreement on real PDFs (medium scale, still LLM-shaped); a
+    small human-annotated golden set of ~10–20 real PDFs (the only one we can publish a number
+    against without caveats). All three contribute different signal.
+  </p>
+</div>
+
+<hr>
+
+<h2 id="subscription"><span class="num">§2</span>The codex / Claude-Code subscription experiment</h2>
+
+<p>
+  This thread is more interesting than it first looks. The instinct: today's perf pass cost ~$1.50
+  in API calls plus my orchestration time. If we ran the same work through a Claude Code Max
+  subscription or a Codex CLI session, the marginal cost is zero — the subscription absorbs it. So
+  a test bench that costs $50 in API becomes ~free if developers run it through a subscribed
+  agent session.
+</p>
+
+<h3>What we'd actually learn</h3>
+
+<ul>
+  <li>
+    <strong>How subscription economics shift the bench-design calculus.</strong> Running 1,000
+    PDFs through 5 pipelines is $50 in API and ~free in a subscription. The "what should we
+    benchmark" question becomes unbounded. Different products fall out — instead of "F1 on 5
+    PDFs" we get "F1 distribution across 1,000 PDFs with confidence intervals."
+  </li>
+  <li>
+    <strong>Where rate limits hit.</strong> Multi-pass extraction is bursty: 13 parallel calls
+    per PDF. Subscriptions are designed for interactive coding, not batch eval. We'd find the
+    cliff fast and learn the practical batch size.
+  </li>
+  <li>
+    <strong>What an autonomous bench-running loop looks like.</strong> Codex CLI / Claude Code
+    can iterate: run pipeline → score → tweak prompt → re-run, all under one subscription
+    budget. This is a different mode than today's "human dispatches build agent" pattern.
+  </li>
+</ul>
+
+<h3>The second-order point</h3>
+
+<blockquote>
+  <p>
+    There's a second product wedge here beyond FHIR extraction: <strong>the bench as a
+    subscription-friendly artifact</strong>.
+  </p>
+</blockquote>
+
+<p>
+  If we ship the bench as a CLI that runs against any of (Claude Code, Codex, raw API), the user
+  picks the budget shape. That's a real differentiator vs LlamaParse / Reducto where pricing is
+  per-page and rigid. "Bring your own agent subscription" is a positioning we can credibly
+  occupy.
+</p>
+
+<p>
+  Concretely worth trying: open a Codex session, point it at the existing lab CLI, ask it to run
+  10 PDFs through 3 pipelines and report. Either it works (and we have a new ops mode) or it
+  hits rate limits (and we learn the practical ceiling). One session, real data.
+</p>
+
+<hr>
+
+<h2 id="clinical-nlp"><span class="num">§3</span>Existing clinical-NLP parsers — the best-of-breed → FHIR adapter</h2>
+
+<p>
+  This is the right instinct. There are clinical-NLP tools that are SOTA on specific tasks, and
+  none of them speak FHIR natively. Our value-add becomes the <em>FHIR shaper</em>, not the
+  extractor.
+</p>
+
+<h3>The candidates</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Tool</th>
+      <th>What it does</th>
+      <th>Output</th>
+      <th>Cost</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>AWS Comprehend Medical</strong></td>
+      <td>Clinical NER (Medication, Condition, Anatomy, ProtectedHealthInformation, etc.)</td>
+      <td>JSON entities with offsets, confidence, RxNorm/ICD10/SNOMED links</td>
+      <td>~$0.01 / 100 chars</td>
+    </tr>
+    <tr>
+      <td><strong>Azure Text Analytics for Health</strong></td>
+      <td>Same shape; recently added FHIR-emit option</td>
+      <td>JSON entities; optional FHIR R4 bundle</td>
+      <td>per char, free tier</td>
+    </tr>
+    <tr>
+      <td><strong>Google Healthcare NLP API</strong></td>
+      <td>Medical concept extraction with UMLS linking</td>
+      <td>JSON entities</td>
+      <td>per char</td>
+    </tr>
+    <tr>
+      <td><strong>MedCAT</strong></td>
+      <td>OSS biomedical NER with UMLS linking; trainable</td>
+      <td>JSON entities, configurable</td>
+      <td>free, self-host</td>
+    </tr>
+    <tr>
+      <td><strong>cTAKES</strong></td>
+      <td>OSS Mayo Clinic full clinical NLP pipeline; older but battle-tested</td>
+      <td>UIMA CAS XML, includes negation/temporal</td>
+      <td>free, self-host</td>
+    </tr>
+    <tr>
+      <td><strong>CLAMP</strong></td>
+      <td>Vanderbilt clinical concept extraction, UMLS-linked</td>
+      <td>configurable</td>
+      <td>free for academic</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>The architecture this enables</h3>
+
+<p>
+  <strong>Vision → markdown (MinerU) → entity extraction (Comprehend Medical) → FHIR adapter (us)
+  → validated bundle.</strong> Each stage is best-of-breed, and we own the FHIR layer plus the
+  bench. The pipeline becomes a <em>composition</em> we can configure per content type — vision
+  + LLM for narrative-heavy clinical notes; markdown + Comprehend Medical for tabular lab reports;
+  cTAKES for legacy formats with negation-rich language.
+</p>
+
+<h3>The repositioning</h3>
+
+<blockquote>
+  <p>
+    We're not "the best PDF parser." We're <strong>the best FHIR-shaper</strong>, and we'll
+    happily plug into whichever extraction backend is best for this content. The bench validates
+    the choice per content type.
+  </p>
+</blockquote>
+
+<p>
+  This is actually a stronger position than "we built the extractor." Extractors are commoditizing
+  fast — every quarter another model or another OSS tool ships. FHIR-shaping (clinical semantics
+  + US Core compliance + Provenance graph + episode reconstruction) is the durable craft.
+</p>
+
+<hr>
+
+<h2 id="platform"><span class="num">§4</span>The bench as the platform</h2>
+
+<p>
+  This is the most interesting thread you raised. Let me articulate what I think you're pointing
+  at.
+</p>
+
+<p>
+  Today, every team that wants to do PDF→FHIR is reinventing the wheel. There's no shared bench,
+  no shared GT, no public leaderboard. Every team writes its own evals against its own PDFs and
+  reports its own F1 in a way that doesn't compare to anyone else's number. (Look at any vendor
+  marketing page — F1 numbers everywhere, none comparable.)
+</p>
+
+<h3>The meta-position</h3>
+
+<p>
+  If our codebase becomes <strong>"the place where you bring your pipeline and we tell you how
+  it does on shared clinical PDFs,"</strong> we capture a meta-position: not the best extractor,
+  but the <em>arbiter</em> of who's the best. Like ImageNet for clinical PDF extraction. The
+  most valuable real estate in any benchmark domain is the benchmark itself.
+</p>
+
+<h3>What a good bench needs</h3>
+
+<ul>
+  <li><strong>Clear test set</strong> — mix of real annotated PDFs, Synthea round-trip, edge cases (multilingual, multi-encounter, scanned, etc.)</li>
+  <li><strong>Plug-in architecture</strong> — any pipeline that emits FHIR can be tested. Today's <code>ExtractionPipeline</code> Protocol is already close.</li>
+  <li><strong>Diagnostic outputs</strong> — not just F1; per-resource-type breakdowns, failure-mode taxonomies, latency, cost-per-PDF</li>
+  <li><strong>Cost transparency</strong> — everyone reports cost-per-PDF too. Without it, expensive pipelines look unfairly good.</li>
+  <li><strong>Reproducible</strong> — same PDF + pipeline + version → same result, modulo LLM determinism. Versioned with hashes.</li>
+  <li><strong>Public leaderboard</strong> — a website where new pipelines get scored automatically and ranked.</li>
+</ul>
+
+<h3>Status</h3>
+
+<p>
+  We have most of these. The protocol exists, the lab CLI exists, the eval harness exists,
+  versioned GT exists. What's missing:
+</p>
+<ul>
+  <li>A small set of human-annotated real PDFs (the GT problem from §1)</li>
+  <li>More than 3–4 pipelines plugged in (the §3 work)</li>
+  <li>A public leaderboard view (frontend work)</li>
+  <li>A way for outsiders to submit a pipeline (probably a Docker container interface)</li>
+</ul>
+
+<p>
+  This is genuinely a 1-2 week sprint to ship as v1, and it's something nobody else has shipped.
+  The challenge submission positions naturally as <strong>"a bench, an extractor that uses the
+  bench, and a clinical UX on top."</strong> Three layers, all defensible, mutually reinforcing.
+</p>
+
+<hr>
+
+<h2 id="d2c"><span class="num">§5</span>D2C FHIR — what does standardization actually buy?</h2>
+
+<p>
+  Short answer: yes, but the leverage is uneven across consumer use cases. The longer answer
+  matters because it shapes what we build first.
+</p>
+
+<h3>Where FHIR actually plugs in</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Channel</th>
+      <th>Accepts patient FHIR upload?</th>
+      <th>Notes</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Apple Health Records / CommonHealth</strong></td>
+      <td>No — read-only from authenticated EHR</td>
+      <td>Native FHIR consumers but the trust path is the EHR's auth, not arbitrary uploads</td>
+    </tr>
+    <tr>
+      <td><strong>Carequality / CommonWell / eHealth Exchange</strong></td>
+      <td>No — clinical-to-clinical only</td>
+      <td>Patient-uploaded data isn't accepted; needs a participating provider source</td>
+    </tr>
+    <tr>
+      <td><strong>CMS Interoperability APIs (payer)</strong></td>
+      <td>Read-only for members</td>
+      <td>Members pull their data; we can't push to it</td>
+    </tr>
+    <tr>
+      <td><strong>EHR ingestion at point-of-care</strong></td>
+      <td>Theoretically yes; practically per-EHR friction</td>
+      <td>Most EHRs reject anything without a recognized provider source</td>
+    </tr>
+    <tr>
+      <td><strong>Research portals / clinical trials</strong></td>
+      <td>Yes — many accept patient FHIR bundles</td>
+      <td>Real but low-volume use case</td>
+    </tr>
+    <tr>
+      <td><strong>Telehealth / second-opinion</strong></td>
+      <td>Increasingly yes</td>
+      <td>Not bound by legacy EHR ingest constraints</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>What this means for product</h3>
+
+<p>
+  The practical D2C use cases for our extracted FHIR are <em>mostly internal</em> to our own
+  surfaces:
+</p>
+
+<ol>
+  <li>
+    <strong>Personal health record consolidation.</strong> Patient gathers all their PDFs from
+    various sources, we extract, we present a unified longitudinal view. FHIR is the internal
+    format that makes this work; the user never sees it.
+  </li>
+  <li>
+    <strong>Pre-visit briefing.</strong> Patient brings the unified record to a new specialist.
+    Today: "here's a folder of PDFs." Tomorrow: "here's a 5-fact briefing derived from FHIR."
+    The receiving EHR can't ingest our FHIR — but the <em>physician</em> can read our briefing.
+    This is your north star.
+  </li>
+  <li>
+    <strong>Episode reconstruction across sources.</strong> Cedars + Kaiser + a sleep clinic and
+    a cardiology consult — FHIR makes deduplication and linkage tractable in a way "PDFs in a
+    folder" never will.
+  </li>
+</ol>
+
+<h3>The reframe</h3>
+
+<blockquote>
+  <p>
+    FHIR's value in D2C is less <em>"plug into existing exchanges"</em> and more <strong>"lossless
+    intermediate format for our own product surfaces."</strong> The exchange story is real but
+    slower-moving — driven by regulation (TEFCA, the CMS Final Rule) over years.
+  </p>
+</blockquote>
+
+<p>
+  We don't need exchanges to be valuable. We need the patient to walk into an appointment armed
+  with something the physician can absorb in 30 seconds — which requires the data to be
+  structured, deduplicated, linked, and ranked. FHIR is the format that makes that possible
+  internally. Whether we ever push to a HIE is a question for year 3, not year 1.
+</p>
+
+<hr>
+
+<h2 id="close"><span class="num">§6</span>Where this lands</h2>
+
+<p>
+  The five threads converge on one observation: <strong>we're not building a PDF parser.</strong>
+  We're building a clinical-data validation platform, with a strong PDF parser as one of its
+  loaded components, a bench as its meta-position, and a 5-fact clinical briefing as its
+  consumer-facing wedge. FHIR is the spine connecting all of these.
+</p>
+
+<p>
+  If that framing is right, the priority order changes:
+</p>
+
+<ol>
+  <li>
+    <strong>GT trust is the foundation.</strong> Synthea round-trip + a small human-annotated
+    set + cross-model agreement. Without trustworthy GT, none of the rest of the bench means
+    anything. <em>~3 days</em>
+  </li>
+  <li>
+    <strong>Multi-pipeline plug-in architecture.</strong> Wire MinerU + LlamaParse +
+    Comprehend Medical as alternative extractor backends, all funneling into our FHIR adapter.
+    The bench becomes a real comparison tool. <em>~2 days</em>
+  </li>
+  <li>
+    <strong>Subscription experiment.</strong> One Codex / Claude Code session running the full
+    bench. Learn the rate-limit cliff and the operational mode. <em>~half a day</em>
+  </li>
+  <li>
+    <strong>Local Gemma 4 backend.</strong> $0/PDF unlock if it works; falsifiable hypothesis
+    about Move F's chunking regression. <em>~1 day</em>
+  </li>
+</ol>
+
+<div class="question">
+  <h3>What I'd ask back</h3>
+  <p>
+    The "bench as the platform" framing — does it match what you've been seeing as the wedge? The
+    $490K Phase 1 prize rewards "innovative applications that transform EHI" — the bench
+    framing reads as <em>infrastructure</em>, which is harder to pitch as application but easier
+    to defend long-term.
+  </p>
+  <p>
+    The other open question is the FHIR-shaper-not-extractor positioning. It means de-emphasizing
+    "our extractor" and emphasizing "our FHIR semantics + Provenance + episode reconstruction."
+    That's a real strategic shift. Genuinely interested whether that lands or whether you'd
+    rather lead with extraction quality.
+  </p>
+</div>
+
+<footer>
+  Generated 2026-05-08 · branch <code>feature/code-resolution-loinc</code> ·
+  follow-up to <code>2026-05-08-perf-pass-and-gold-discussion.html</code>
+</footer>
+
+</main>
+</body>
+</html>

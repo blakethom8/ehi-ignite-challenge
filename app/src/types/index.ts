@@ -976,7 +976,7 @@ export interface HarmonizeSource {
   document_reference: string | null;
   resource_counts: Record<string, number>;
   total_resources: number;
-  status: "structured" | "unparsed_structured" | "pending_extraction" | "extracted" | "empty_extraction" | "missing";
+  status: "structured" | "unparsed_structured" | "pending_extraction" | "extracted" | "empty_extraction" | "identity_mismatch" | "missing";
   status_label: string;
 }
 
@@ -1505,4 +1505,507 @@ export interface HarmonizeProvenanceResponse {
       extension: { url: string; valueString: string }[];
     }[];
   };
+}
+
+export interface PipelineRunSummary {
+  run_id: string;
+  pipeline_name: string;
+  architecture: string | null;
+  lab_root: string;
+  status: string;
+  pdf_path: string;
+  pdf_label: string;
+  pdf_sha256: string | null;
+  artifact_dir: string;
+  source_pdf_artifact: string | null;
+  bundle_artifact: string | null;
+  eval_artifact: string | null;
+  bundle_shape_artifact: string | null;
+  ground_truth_artifact: string | null;
+  ground_truth_path: string | null;
+  has_ground_truth: boolean;
+  trace_count: number;
+  artifact_urls: Record<string, string>;
+  started_at: string | null;
+  finished_at: string | null;
+  latency_ms: number;
+  cost_usd: number;
+  total_entries: number;
+  weighted_f1: number | null;
+  loinc_resolution_rate: number | null;
+  patient_link_rate: number | null;
+  encounter_link_rate: number | null;
+  resource_counts: Record<string, number>;
+  error: string | null;
+}
+
+export interface PipelineLeaderboardRow {
+  name: string;
+  architecture: string;
+  description: string;
+  primary_backends: string[];
+  estimated_cost_per_pdf_usd: number | null;
+  run_count: number;
+  success_count: number;
+  failure_count: number;
+  success_rate: number | null;
+  last_run_at: string | null;
+  last_status: string | null;
+  last_run_id: string | null;
+  avg_latency_ms: number | null;
+  avg_cost_usd: number | null;
+  avg_entries: number | null;
+  best_weighted_f1: number | null;
+  latest_weighted_f1: number | null;
+  best_clinical_qa_score: number | null;
+  latest_clinical_qa_score: number | null;
+  latest_eval_run_id: string | null;
+  latest_loinc_resolution_rate: number | null;
+  latest_patient_link_rate: number | null;
+  latest_encounter_link_rate: number | null;
+  tested_pdf_count: number;
+  recent_runs: PipelineRunSummary[];
+}
+
+export interface PipelineSuiteSummary {
+  suite_run_id: string;
+  suite_name: string;
+  root: string;
+  cell_count: number;
+  succeeded: number;
+  failed: number;
+  created_at: string | null;
+  report_path: string | null;
+}
+
+export interface PipelineQuestionEvaluationSummary {
+  question_id: string;
+  title: string;
+  safety_critical: boolean;
+  abstained: boolean;
+  score: number;
+  correctness: number;
+  evidence_citation_quality: number;
+  hallucination_avoidance: number;
+  abstention_quality: number;
+  clinical_usefulness: number;
+  citation_count: number;
+  unsupported_claim_count: number;
+  answer_model: string | null;
+  answer_latency_ms: number;
+  tool_call_count: number;
+  missing_required_evidence_types: string[];
+}
+
+export interface PipelineEvaluationSummary {
+  eval_run_id: string;
+  suite_id: string;
+  suite_name: string;
+  suite_version: string;
+  status: string;
+  created_at: string;
+  finished_at: string | null;
+  pipeline_run_id: string;
+  pipeline_name: string;
+  lab_root: string;
+  pdf_label: string;
+  artifact_dir: string;
+  artifact_urls: Record<string, string>;
+  question_count: number;
+  safety_critical_count: number;
+  overall_score: number | null;
+  mean_correctness: number | null;
+  mean_evidence_citation_quality: number | null;
+  mean_hallucination_avoidance: number | null;
+  mean_abstention_quality: number | null;
+  unsupported_claim_rate: number | null;
+  abstention_rate: number | null;
+  latency_ms: number;
+  cost_usd: number;
+  bundle_stats: Record<string, unknown>;
+  question_results: PipelineQuestionEvaluationSummary[];
+}
+
+export interface PipelineQuestionEvaluationDetail {
+  question_id: string;
+  title: string;
+  clinical_question: string;
+  expected_answer: string | null;
+  grading_rubric: string | null;
+  required_evidence_types: string[];
+  ideal_citations: string[];
+  expected_supporting_facts: string[];
+  safety_critical: boolean;
+  abstention_allowed: boolean;
+  answer: string | null;
+  abstained: boolean;
+  citations: string[];
+  claims: string[];
+  answer_model: string | null;
+  prompt_template_id: string | null;
+  harness_name: string | null;
+  response_format_version: string | null;
+  answer_latency_ms: number;
+  tool_call_count: number;
+  tool_calls: Record<string, unknown>[];
+  cost_usd: number;
+  score: number | null;
+  correctness: number | null;
+  completeness: number | null;
+  evidence_citation_quality: number | null;
+  cited_fact_support: number | null;
+  hallucination_avoidance: number | null;
+  abstention_quality: number | null;
+  clinical_usefulness: number | null;
+  unsupported_claims: string[];
+  missing_required_evidence_types: string[];
+  grader: string | null;
+  grader_rationale: string | null;
+  cited_evidence: Record<string, unknown>[];
+  available_evidence_count: number;
+  artifact_urls: Record<string, string>;
+}
+
+export interface PipelineEvaluationDetail {
+  summary: PipelineEvaluationSummary;
+  context_builder: string | null;
+  question_runner: string | null;
+  answer_grader: string | null;
+  bundle_stats: Record<string, unknown>;
+  prompt_contract: Record<string, unknown>;
+  run_instructions: Record<string, unknown>;
+  questions: PipelineQuestionEvaluationDetail[];
+}
+
+export interface PipelineTestCriterion {
+  key: string;
+  label: string;
+  target: string;
+  measurement: string;
+  why_it_matters: string;
+}
+
+export interface PipelineTestPdfSummary {
+  pdf_sha256: string | null;
+  pdf_label: string;
+  original_path: string;
+  run_count: number;
+  pipeline_count: number;
+  pipelines: string[];
+  latest_run_at: string | null;
+  has_ground_truth: boolean;
+  ground_truth_path: string | null;
+}
+
+export interface PipelineGoldStandardSummary {
+  pipeline_name: string;
+  label: string;
+  definition: string;
+  measurement: string;
+  current_run_count: number;
+  latest_run_at: string | null;
+  artifact_policy: string;
+}
+
+export interface PipelineGroundTruthPdfSummary {
+  pdf_sha_prefix: string;
+  pdf_sha256: string;
+  pdf_label: string;
+  pdf_path: string;
+  latest_version: number;
+  created_at: string | null;
+  reviewer: string | null;
+  source_run_id: string | null;
+  resource_counts: Record<string, number>;
+  total_entries: number;
+  ground_truth_path: string;
+}
+
+export interface PipelineGroundTruthSummary {
+  definition: string;
+  what_it_is_not: string;
+  storage_policy: string;
+  comparison_policy: string;
+  creation_workflow: string[];
+  pdf_count: number;
+  versions: PipelineGroundTruthPdfSummary[];
+}
+
+export interface PipelineLabLeaderboardResponse {
+  generated_at: string;
+  lab_roots: string[];
+  pipelines: PipelineLeaderboardRow[];
+  recent_runs: PipelineRunSummary[];
+  evaluations: PipelineEvaluationSummary[];
+  suites: PipelineSuiteSummary[];
+  test_criteria: PipelineTestCriterion[];
+  test_pdfs: PipelineTestPdfSummary[];
+  gold_standard: PipelineGoldStandardSummary;
+  ground_truth: PipelineGroundTruthSummary;
+  totals: {
+    registered_pipelines: number;
+    pipelines_with_runs: number;
+    run_count: number;
+    success_count: number;
+    failure_count: number;
+    eval_run_count: number;
+    suite_count: number;
+  };
+}
+
+export type GroundTruthReviewStatus = "draft" | "published";
+export type GroundTruthReviewFactStatus =
+  | "accepted"
+  | "rejected"
+  | "edited"
+  | "missing"
+  | "uncertain"
+  | "needs_follow_up"
+  | "duplicate"
+  | "unsupported";
+export type GroundTruthReviewReasonCode =
+  | "wrong_value"
+  | "wrong_code"
+  | "wrong_date"
+  | "wrong_unit"
+  | "wrong_status"
+  | "wrong_linkage"
+  | "unsupported_by_pdf"
+  | "missing_from_output";
+export type GroundTruthReviewAnnotationType =
+  | "supports_fact"
+  | "contradicts_fact"
+  | "missing_fact"
+  | "extraction_error"
+  | "uncertain";
+
+export interface GroundTruthReviewBBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface GroundTruthReviewPdfAnnotation {
+  annotation_id: string;
+  page_number: number;
+  bbox: GroundTruthReviewBBox;
+  annotation_type: GroundTruthReviewAnnotationType;
+  linked_resource_ref: string | null;
+  note: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GroundTruthReviewFactDecision {
+  decision_id: string;
+  resource_ref: string;
+  resource_type: string;
+  resource_id: string | null;
+  status: GroundTruthReviewFactStatus;
+  reason_codes: GroundTruthReviewReasonCode[];
+  original_resource: Record<string, unknown> | null;
+  edited_resource: Record<string, unknown> | null;
+  reviewer_note: string;
+  linked_annotation_ids: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GroundTruthReviewSession {
+  review_id: string;
+  run_id: string;
+  pdf_sha256: string;
+  source_pdf_path: string;
+  candidate_bundle_path: string;
+  reviewer: string;
+  status: GroundTruthReviewStatus;
+  created_at: string;
+  updated_at: string;
+  published_ground_truth_version: number | null;
+  decisions: GroundTruthReviewFactDecision[];
+  annotations: GroundTruthReviewPdfAnnotation[];
+  notes: string;
+}
+
+export interface GroundTruthReviewProgress {
+  total_facts: number;
+  reviewed_facts: number;
+  accepted_facts: number;
+  rejected_facts: number;
+  edited_facts: number;
+  uncertain_facts: number;
+  missing_facts: number;
+  needs_review: number;
+}
+
+export interface GroundTruthReviewRunSummary {
+  run_id: string;
+  pipeline_name: string;
+  status: string;
+  pdf_label: string;
+  pdf_sha256: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+  total_entries: number;
+  resource_counts: Record<string, number>;
+  has_source_pdf: boolean;
+  has_bundle: boolean;
+  review_status: GroundTruthReviewStatus | "not_started";
+  reviewed_facts: number;
+  published_ground_truth_version: number | null;
+  existing_ground_truth_versions: number[];
+}
+
+export interface GroundTruthReviewFactSummary {
+  resource_ref: string;
+  resource_type: string;
+  resource_id: string | null;
+  display: string;
+  codes: string[];
+  value: string | null;
+  date: string | null;
+  status: string | null;
+  patient_ref: string | null;
+  encounter_ref: string | null;
+  source_locator: string | null;
+  original_resource: Record<string, unknown>;
+}
+
+export interface GroundTruthReviewRunDetail {
+  run: GroundTruthReviewRunSummary;
+  manifest: Record<string, unknown>;
+  facts: GroundTruthReviewFactSummary[];
+  facts_by_type: Record<string, GroundTruthReviewFactSummary[]>;
+  review: GroundTruthReviewSession;
+  progress: GroundTruthReviewProgress;
+  artifact_urls: Record<string, string>;
+}
+
+export interface GroundTruthReviewPublishResponse {
+  run_id: string;
+  pdf_sha256: string;
+  version: number;
+  ground_truth_path: string;
+  kept_resource_count: number;
+  rejected_resource_count: number;
+  missing_fact_count: number;
+  review: GroundTruthReviewSession;
+}
+
+export interface GroundTruthReviewPdfPage {
+  page_number: number;
+  width: number;
+  height: number;
+  image_url: string;
+}
+
+export interface GroundTruthReviewPdfPagesResponse {
+  run_id: string;
+  page_count: number;
+  scale: number;
+  pages: GroundTruthReviewPdfPage[];
+}
+
+export interface GroundTruthReviewPdfTextMatch {
+  page_number: number;
+  bbox: GroundTruthReviewBBox;
+  text: string;
+  score: number;
+  confidence: "high" | "medium" | "low" | string;
+  matched_terms: string[];
+  strategy: string;
+}
+
+export interface GroundTruthReviewFactLocationResponse {
+  run_id: string;
+  resource_ref: string;
+  query: string;
+  locator_version: string;
+  matches: GroundTruthReviewPdfTextMatch[];
+}
+
+export interface GroundTruthVersionSummary {
+  version: number;
+  created_at: string | null;
+  reviewer: string | null;
+  source_run_id: string | null;
+  notes: string;
+  total_entries: number;
+  resource_counts: Record<string, number>;
+  ground_truth_path: string;
+}
+
+export interface CcdaLabProcessorOption {
+  id: string;
+  label: string;
+  input_kinds: Array<"ccda" | "pdf">;
+  backend: string;
+  available: boolean;
+  description: string;
+}
+
+export interface CcdaLabProcessorsResponse {
+  options: CcdaLabProcessorOption[];
+  microsoft_configured: boolean;
+  microsoft_status: {
+    configured: boolean;
+    reachable: boolean;
+    mode: "api" | "cli" | "none";
+    endpoint: string | null;
+    detail: string;
+  };
+  upload_limit_bytes: number;
+}
+
+export interface CcdaLabResourceSample {
+  resource_type: string;
+  id: string | null;
+  display: string;
+  status: string;
+  date: string;
+  value: string;
+}
+
+export interface CcdaLabSourceSection {
+  title: string;
+  code: string | null;
+  entry_count: number;
+  expected_resource_types: string[];
+  emitted_matching_resources: number;
+}
+
+export interface CcdaLabSourceSummary {
+  document_title: string;
+  patient_display: string;
+  section_count: number;
+  entry_count: number;
+  sections: CcdaLabSourceSection[];
+}
+
+export interface CcdaLabCoverageSummary {
+  source_section_count: number;
+  source_entry_count: number;
+  mappable_section_count: number;
+  mapped_section_count: number;
+  emitted_resource_count: number;
+  emitted_clinical_resource_count: number;
+}
+
+export interface CcdaLabConversionResponse {
+  filename: string;
+  content_type: string | null;
+  input_kind: "ccda" | "pdf";
+  processor_id: string;
+  processor_label: string;
+  backend_used: "microsoft" | "fallback" | "pdf-pipeline";
+  latency_ms: number;
+  total_entries: number;
+  resource_counts: Record<string, number>;
+  coverage: CcdaLabCoverageSummary;
+  source_summary: CcdaLabSourceSummary | null;
+  bundle_shape: Record<string, unknown>;
+  samples: CcdaLabResourceSample[];
+  warnings: string[];
+  bundle: Record<string, unknown>;
 }

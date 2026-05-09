@@ -9,10 +9,9 @@ Determinism: same PDF + same prompt version + same schema version + same model
 
 Backend abstraction
 -------------------
-Extraction is delegated to a pluggable :class:`VisionBackend`. The ``anthropic``
-backend (Claude) is the only implementation today; the seam is in place for
-adding a Gemma 4 backend (Google AI Studio / Ollama) without touching this
-module's caller-facing API.
+Extraction is delegated to a pluggable :class:`VisionBackend`. The shipped
+backends cover Anthropic Claude, hosted Gemma via Google AI Studio, and local
+Gemma/MedGemma via Ollama.
 
 Backend selection precedence:
   1. ``backend=...`` kwarg (explicit override)
@@ -169,6 +168,12 @@ DEFAULT_SCHEMA_VERSION = "extraction-result-v0.1.0"
 # variant on the hosted API that supports vision + responseSchema reliably.
 DEFAULT_GOOGLE_MODEL = "gemma-4-31b-it"
 GOOGLE_GEMMA_RASTER_DPI = 150
+
+# Local Ollama defaults. Keep this generic: Blake has been testing both Gemma
+# and MedGemma model tags locally, and the concrete tag varies by Ollama pull.
+DEFAULT_OLLAMA_HOST = "http://127.0.0.1:11434"
+DEFAULT_OLLAMA_MODEL = "medgemma:4b"
+OLLAMA_RASTER_DPI = 144
 
 
 # ---------------------------------------------------------------------------
@@ -737,6 +742,162 @@ class GoogleAIStudioBackend:
         return out
 
 
+class OllamaVisionBackend:
+    """Local Gemma/MedGemma vision backend via Ollama's HTTP API.
+
+    This implements the shared :class:`VisionBackend` contract so the existing
+    single-pass and multi-pass extraction code can route individual passes to a
+    local model without using the lab-only ``medgemma-ollama`` pipeline.
+
+    Ollama supports JSON-schema structured output through the ``format`` field
+    on ``/api/generate``. We send the Pydantic schema directly, then still
+    validate the returned JSON with the same Pydantic model downstream.
+    """
+
+    name = "gemma-ollama"
+    _RASTERIZE_LOCK = threading.Lock()
+    DEFAULT_MAX_PAGES_PER_CHUNK = 4
+
+    def __init__(
+        self,
+        model: str | None = None,
+        *,
+        host: str | None = None,
+        dpi: int = OLLAMA_RASTER_DPI,
+        max_pages_per_chunk: int | None = None,
+        timeout_s: int = 600,
+        num_ctx: int = 8192,
+    ) -> None:
+        self.model = (
+            model
+            or os.environ.get("EHI_OLLAMA_VISION_MODEL")
+            or os.environ.get("EHI_MEDGEMMA_MODEL")
+            or DEFAULT_OLLAMA_MODEL
+        )
+        self.host = (host or os.environ.get("OLLAMA_HOST") or DEFAULT_OLLAMA_HOST).rstrip("/")
+        self.dpi = dpi
+        self.max_pages_per_chunk = max_pages_per_chunk or self.DEFAULT_MAX_PAGES_PER_CHUNK
+        self.timeout_s = timeout_s
+        self.num_ctx = num_ctx
+
+    def extract(
+        self,
+        *,
+        pdf_bytes: bytes,
+        system_prompt: str,
+        schema_json: dict[str, Any],
+        max_tokens: int = 16384,
+    ) -> dict[str, Any]:
+        page_images = self._rasterize(pdf_bytes)
+        if len(page_images) > self.max_pages_per_chunk:
+            chunks = [
+                page_images[i : i + self.max_pages_per_chunk]
+                for i in range(0, len(page_images), self.max_pages_per_chunk)
+            ]
+            responses: list[dict[str, Any]] = []
+            for idx, chunk in enumerate(chunks, start=1):
+                label = (
+                    f"chunk {idx}/{len(chunks)} "
+                    f"(pages {(idx - 1) * self.max_pages_per_chunk + 1}-"
+                    f"{(idx - 1) * self.max_pages_per_chunk + len(chunk)})"
+                )
+                responses.append(
+                    self._extract_single_request(
+                        page_images=chunk,
+                        system_prompt=system_prompt,
+                        schema_json=schema_json,
+                        max_tokens=max_tokens,
+                        chunk_label=label,
+                    )
+                )
+            return _merge_chunk_responses(responses, schema_json)
+
+        return self._extract_single_request(
+            page_images=page_images,
+            system_prompt=system_prompt,
+            schema_json=schema_json,
+            max_tokens=max_tokens,
+            chunk_label=None,
+        )
+
+    def _extract_single_request(
+        self,
+        *,
+        page_images: list[bytes],
+        system_prompt: str,
+        schema_json: dict[str, Any],
+        max_tokens: int,
+        chunk_label: str | None,
+    ) -> dict[str, Any]:
+        chunk_note = f"\nThis request covers {chunk_label}." if chunk_label else ""
+        prompt = (
+            f"{system_prompt}\n\n"
+            "Extract this medical PDF into JSON that exactly matches the provided schema. "
+            "Return only JSON. Do not include markdown or prose."
+            f"{chunk_note}"
+        )
+        payload = {
+            "model": self.model,
+            "prompt": prompt,
+            "images": [
+                base64.standard_b64encode(image).decode("utf-8")
+                for image in page_images
+            ],
+            "stream": False,
+            "format": schema_json,
+            "options": {
+                "temperature": 0.0,
+                "num_ctx": self.num_ctx,
+                "num_predict": max_tokens,
+            },
+        }
+        req = urllib.request.Request(
+            f"{self.host}/api/generate",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=self.timeout_s) as resp:
+                body = json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            err_text = exc.read().decode("utf-8", errors="replace")
+            raise RuntimeError(
+                f"Ollama returned HTTP {exc.code} for model {self.model!r}: {err_text[:500]}"
+            ) from exc
+        except urllib.error.URLError as exc:
+            raise RuntimeError(
+                f"Could not reach Ollama at {self.host}. Start it with `ollama serve`."
+            ) from exc
+
+        text = _strip_markdown_code_fence(str(body.get("response") or ""))
+        try:
+            parsed = json.loads(text)
+        except json.JSONDecodeError:
+            parsed = _extract_json_object_from_text(text)
+        if not isinstance(parsed, dict):
+            raise RuntimeError(
+                f"Ollama returned non-JSON text for model {self.model!r}. "
+                f"First 300 chars: {text[:300]!r}"
+            )
+        return parsed
+
+    def _rasterize(self, pdf_bytes: bytes) -> list[bytes]:
+        """Render PDF pages to PNG bytes for Ollama vision models."""
+        import pypdfium2 as pdfium
+
+        with OllamaVisionBackend._RASTERIZE_LOCK:
+            doc = pdfium.PdfDocument(io.BytesIO(pdf_bytes))
+            scale = self.dpi / 72.0
+            out: list[bytes] = []
+            for page in doc:
+                pil = page.render(scale=scale).to_pil()
+                buf = io.BytesIO()
+                pil.save(buf, format="PNG")
+                out.append(buf.getvalue())
+        return out
+
+
 # ---------------------------------------------------------------------------
 # Schema dialect translation: Pydantic JSON Schema → Gemini responseSchema
 # ---------------------------------------------------------------------------
@@ -1031,10 +1192,11 @@ def get_backend(
             model=model or DEFAULT_GOOGLE_MODEL,
             api_key=client if isinstance(client, str) else None,
         )
+    if name == "gemma-ollama":
+        return OllamaVisionBackend(model=model)
     raise ValueError(
         f"Unknown vision backend: {name!r}. "
-        f"Known: 'anthropic', 'gemma-google-ai-studio'. "
-        f"Local Ollama backend (gemma-ollama) is a future addition."
+        f"Known: 'anthropic', 'gemma-google-ai-studio', 'gemma-ollama'."
     )
 
 

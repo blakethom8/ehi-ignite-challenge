@@ -3540,6 +3540,53 @@ class MultiPassFHIRGemmaTabularPipeline(MultiPassFHIRPipeline):
 
 
 @register
+class MultiPassFHIROllamaTabularPipeline(MultiPassFHIRPipeline):
+    """multipass-fhir variant for local Gemma/MedGemma tabular extraction.
+
+    This is the local analogue of ``multipass-fhir-gemma-tabular``. It keeps
+    narrative and identity-heavy passes on the default Claude path, while
+    routing bounded table-like passes through ``gemma-ollama`` so we can run a
+    fair bake-off against Blake's localhost model.
+    """
+
+    metadata = PipelineMetadata(
+        name="multipass-fhir-ollama-tabular",
+        description=(
+            "Same as multipass-fhir, but table-shaped passes (medications, "
+            "immunizations, lab observations, vital signs) run against local "
+            "Gemma/MedGemma through Ollama. Designed for localhost bake-offs."
+        ),
+        architecture="multipass-vision-local",
+        primary_backends=["anthropic", "gemma-ollama"],
+        estimated_cost_per_pdf_usd=0.18,
+    )
+
+    def __init__(
+        self,
+        *,
+        patient_id: str = "unknown",
+        ollama_model: str | None = None,
+        max_workers: int = 6,
+    ) -> None:
+        ollama_override = {
+            "backend": "gemma-ollama",
+            **({"model": ollama_model} if ollama_model else {}),
+        }
+        super().__init__(
+            patient_id=patient_id,
+            backend_name="anthropic",
+            model=None,
+            max_workers=max_workers,
+            pass_overrides={
+                "medications": dict(ollama_override),
+                "immunizations": dict(ollama_override),
+                "lab_observations": dict(ollama_override),
+                "vital_signs": dict(ollama_override),
+            },
+        )
+
+
+@register
 class MultiPassFHIRScoutPipeline(MultiPassFHIRPipeline):
     """multipass-fhir variant: scout-then-specialist architecture.
 

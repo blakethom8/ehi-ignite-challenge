@@ -47,6 +47,12 @@ const EVENT_TONE: Record<
   agent_run_started: { icon: Bot, bg: "#eef1ff", fg: "#3a4ca8", label: "Agent started" },
   agent_text: { icon: MessageSquareText, bg: "#f5f6f8", fg: "#555a6a", label: "Agent thinking" },
   agent_turn: { icon: Zap, bg: "#eef1ff", fg: "#3a4ca8", label: "Agent turn" },
+  agent_tool_call: {
+    icon: Wrench,
+    bg: "#fff7ed",
+    fg: "#9a5a16",
+    label: "Tool call",
+  },
   agent_tool_result: {
     icon: ArrowRightLeft,
     bg: "#f0fdf4",
@@ -196,12 +202,24 @@ function describeEvent(event: TranscriptEvent): string {
     if (tools) parts.push(`tools: ${tools}`);
     return parts.join(" · ");
   }
+  if (kind === "agent_tool_call") {
+    const args = event.args as Record<string, unknown> | undefined;
+    const renderedArgs = args ? truncate(JSON.stringify(args), 140) : "";
+    return `${String(event.tool ?? "")}${renderedArgs ? ` · ${renderedArgs}` : ""}`;
+  }
   if (kind === "agent_tool_result") {
     const preview = event.result_preview as string | undefined;
-    return `${String(event.tool ?? "")}${preview ? ` → ${truncate(preview, 120)}` : ""}`;
+    const duration = event.duration_ms as number | undefined;
+    const summary = event.result_summary as Record<string, unknown> | undefined;
+    const parts = [String(event.tool ?? "")].filter(Boolean);
+    if (duration !== undefined) parts.push(`${duration}ms`);
+    if (summary) parts.push(truncate(JSON.stringify(summary), 120));
+    if (preview && !summary) parts.push(`→ ${truncate(preview, 120)}`);
+    return parts.join(" · ");
   }
   if (kind === "agent_tool_error") {
-    return `${String(event.tool ?? "")}: ${truncate(String(event.error ?? ""), 160)}`;
+    const duration = event.duration_ms as number | undefined;
+    return `${String(event.tool ?? "")}${duration !== undefined ? ` · ${duration}ms` : ""}: ${truncate(String(event.error ?? ""), 160)}`;
   }
   if (kind === "agent_run_paused") {
     return String(event.reason ?? "paused");

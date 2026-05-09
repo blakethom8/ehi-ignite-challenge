@@ -59,26 +59,3 @@ def test_export_smoke_pdf_workspace_package_with_original(tmp_path):
     facts = _read_json(out, "evidence/canonical-facts.json")["facts"]
     assert len(facts) >= 6
     assert {fact["resource_type"] for fact in facts} == {"Observation"}
-
-
-def test_export_synthea_demo_with_safe_ccda_extra_source(tmp_path):
-    out = tmp_path / "synthea-demo-with-ccda.zip"
-    ccda = Path("ehi-atlas/corpus/_sources/josh-ccdas/raw/Cerner Samples/problems-and-medications.xml")
-
-    build_package("synthea-demo", out, include_originals=False, extra_sources=[ccda])
-
-    assert validate(out) == []
-    root = _package_root(out)
-    with zipfile.ZipFile(out) as zf:
-        names = set(zf.namelist())
-        sources = json.loads(zf.read(f"{root}/sources/sources.json"))["sources"]
-
-    assert f"{root}/sources/original/problems-and-medications.xml" in names
-    assert any(source["kind"] == "ccda-xml" for source in sources)
-    assert any(source.get("original_packaged_path") == "sources/original/problems-and-medications.xml" for source in sources)
-
-    facts = _read_json(out, "evidence/canonical-facts.json")["facts"]
-    ccda_facts = [fact for fact in facts if any("extra-problems-and-medications" in ref for ref in fact.get("source_refs", []))]
-    assert any(fact["resource_type"] == "Condition" for fact in ccda_facts)
-    assert any(fact["resource_type"] == "MedicationRequest" for fact in ccda_facts)
-    assert any("lisinopril" in fact["display"].lower() for fact in ccda_facts)

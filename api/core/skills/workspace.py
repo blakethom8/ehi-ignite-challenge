@@ -86,6 +86,34 @@ class TranscriptEvent:
     at: str = field(default_factory=lambda: _now_iso())
 
 
+@dataclass
+class RunMessage:
+    """Clinician/patient steering message for an active skill run."""
+
+    message_id: str
+    actor: str
+    message: str
+    canvas_ref: dict[str, Any] | None = None
+    consumed: bool = False
+    consumed_at: str | None = None
+    created_at: str = field(default_factory=lambda: _now_iso())
+
+
+@dataclass
+class CanvasNode:
+    """Typed object rendered in the run canvas."""
+
+    node_id: str
+    kind: str
+    title: str
+    status: str = "active"
+    summary: str = ""
+    data: dict[str, Any] = field(default_factory=dict)
+    selected: bool = False
+    created_at: str = field(default_factory=lambda: _now_iso())
+    updated_at: str = field(default_factory=lambda: _now_iso())
+
+
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
@@ -195,12 +223,20 @@ class Workspace:
         return self._status
 
     @property
+    def failure_reason(self) -> str | None:
+        return self._failure_reason
+
+    @property
     def brief(self) -> dict[str, Any]:
         return dict(self._brief)
 
     @property
     def workspace_md_path(self) -> Path:
         return self.run_dir / "workspace.md"
+
+    @property
+    def canvas_path(self) -> Path:
+        return self.run_dir / "canvas.json"
 
     def start(self) -> None:
         """Initialize (or re-attach to) the run dir.
@@ -231,6 +267,7 @@ class Workspace:
             self.append_transcript(
                 TranscriptEvent(kind="run_started", payload={"run_id": self.run_id})
             )
+            self._initialize_canvas_from_brief()
         else:
             self.append_transcript(
                 TranscriptEvent(kind="run_resumed", payload={"run_id": self.run_id})
@@ -445,6 +482,230 @@ class Workspace:
             flags=re.DOTALL,
         )
 
+    # ── Canvas primitive ────────────────────────────────────────────────
+
+    def canvas_state(self) -> dict[str, Any]:
+        if not self.canvas_path.is_file():
+            return {
+                "version": 1,
+                "run_id": self.run_id,
+                "updated_at": _now_iso(),
+                "nodes": [],
+            }
+        try:
+            payload = json.loads(self.canvas_path.read_text("utf-8"))
+        except json.JSONDecodeError:
+            raise WorkspaceContractError("canvas.json is not valid JSON")
+        if not isinstance(payload, dict):
+            raise WorkspaceContractError("canvas.json must be an object")
+        payload.setdefault("version", 1)
+        payload.setdefault("run_id", self.run_id)
+        payload.setdefault("updated_at", _now_iso())
+        payload.setdefault("nodes", [])
+        if not isinstance(payload["nodes"], list):
+            raise WorkspaceContractError("canvas.nodes must be a list")
+        return payload
+
+    def upsert_canvas_node(
+        self,
+        *,
+        kind: str,
+        title: str,
+        node_id: str | None = None,
+        status: str = "active",
+        summary: str = "",
+        data: dict[str, Any] | None = None,
+        selected: bool | None = None,
+    ) -> CanvasNode:
+        if not kind.strip():
+            raise WorkspaceContractError("canvas node kind is required")
+        if not title.strip():
+            raise WorkspaceContractError("canvas node title is required")
+
+        safe_id = self._normalize_canvas_node_id(
+            node_id or f"{kind}:{title}"
+        )
+        state = self.canvas_state()
+        nodes = list(state.get("nodes") or [])
+        now = _now_iso()
+        existing: dict[str, Any] | None = None
+        out: list[dict[str, Any]] = []
+        for raw in nodes:
+            if isinstance(raw, dict) and raw.get("node_id") == safe_id:
+                existing = raw
+            else:
+                out.append(raw)
+
+        created_at = (
+            str(existing.get("created_at"))
+            if existing and existing.get("created_at")
+            else now
+        )
+        node = CanvasNode(
+            node_id=safe_id,
+            kind=kind.strip(),
+            title=title.strip(),
+            status=status.strip() or "active",
+            summary=summary.strip(),
+            data=dict(data or {}),
+            selected=bool(existing.get("selected")) if existing and selected is None else bool(selected),
+            created_at=created_at,
+            updated_at=now,
+        )
+        out.append(node.__dict__)
+        out.sort(key=lambda item: (str(item.get("kind", "")), str(item.get("title", ""))))
+        state.update({"updated_at": now, "nodes": out})
+        self._write_canvas_state(state)
+        self.append_transcript(
+            TranscriptEvent(
+                kind="canvas_node_upserted",
+                payload={
+                    "node_id": node.node_id,
+                    "node_kind": node.kind,
+                    "title": node.title,
+                    "status": node.status,
+                    "selected": node.selected,
+                },
+            )
+        )
+        return node
+
+    def set_canvas_selection(
+        self,
+        node_id: str,
+        *,
+        selected: bool,
+        actor: str = "clinician",
+    ) -> CanvasNode:
+        safe_id = self._normalize_canvas_node_id(node_id)
+        state = self.canvas_state()
+        nodes = list(state.get("nodes") or [])
+        now = _now_iso()
+        updated_node: CanvasNode | None = None
+        updated_nodes: list[dict[str, Any]] = []
+        for raw in nodes:
+            if not isinstance(raw, dict):
+                continue
+            if raw.get("node_id") == safe_id:
+                raw = dict(raw)
+                raw["selected"] = selected
+                raw["updated_at"] = now
+                updated_node = CanvasNode(**raw)
+            updated_nodes.append(raw)
+        if updated_node is None:
+            raise WorkspaceContractError(f"canvas node '{safe_id}' not found")
+        state.update({"updated_at": now, "nodes": updated_nodes})
+        self._write_canvas_state(state)
+        self.append_transcript(
+            TranscriptEvent(
+                kind="canvas_selection_changed",
+                payload={
+                    "node_id": updated_node.node_id,
+                    "node_kind": updated_node.kind,
+                    "selected": updated_node.selected,
+                    "actor": actor,
+                },
+            )
+        )
+        return updated_node
+
+    def sync_canvas_from_output(self, output: dict[str, Any]) -> None:
+        summary = output.get("summary") if isinstance(output, dict) else None
+        if isinstance(summary, dict):
+            self.upsert_canvas_node(
+                node_id="summary:trial-shortlist",
+                kind="summary",
+                title="Trial shortlist summary",
+                status="ready",
+                summary=str(summary.get("confidence_note") or ""),
+                data=summary,
+            )
+        trials = output.get("trials") if isinstance(output, dict) else None
+        if isinstance(trials, list):
+            for trial in trials:
+                if not isinstance(trial, dict):
+                    continue
+                nct_id = str(trial.get("nct_id") or "").strip()
+                title = str(trial.get("title") or nct_id or "Candidate trial")
+                if not nct_id:
+                    continue
+                excluded = bool(trial.get("excluded"))
+                self.upsert_canvas_node(
+                    node_id=f"trial:{nct_id}",
+                    kind="candidate_trial",
+                    title=title,
+                    status="excluded" if excluded else "candidate",
+                    summary=self._trial_canvas_summary(trial),
+                    data=trial,
+                    selected=False,
+                )
+        if isinstance(trials, list) and trials:
+            self.upsert_canvas_node(
+                node_id="packet:prepare-outreach",
+                kind="packet_task",
+                title="Prepare outreach packet",
+                status="blocked" if self.status == "failed" else "ready",
+                summary="Select one or more trials, then ask the agent to prepare contact notes and paperwork.",
+                data={"trial_count": len(trials)},
+            )
+
+    def _initialize_canvas_from_brief(self) -> None:
+        anchors = self._brief.get("anchors")
+        guidance = str(self._brief.get("trial_guidance") or "").strip()
+        self.upsert_canvas_node(
+            node_id="criteria:trial-search",
+            kind="criteria",
+            title="Trial search criteria",
+            status="draft",
+            summary=guidance or "No clinician guidance supplied yet.",
+            data={
+                "status": self._brief.get("status") or ["RECRUITING"],
+                "trial_guidance": guidance,
+            },
+        )
+        if isinstance(anchors, list):
+            for index, anchor in enumerate(anchors):
+                if not isinstance(anchor, dict):
+                    continue
+                title = str(anchor.get("display") or anchor.get("resource_id") or f"Anchor {index + 1}")
+                resource_id = str(anchor.get("resource_id") or title)
+                self.upsert_canvas_node(
+                    node_id=f"anchor:{resource_id}",
+                    kind="anchor",
+                    title=title,
+                    status="selected",
+                    summary=str(anchor.get("risk_category") or ""),
+                    data=anchor,
+                    selected=True,
+                )
+
+    def _write_canvas_state(self, state: dict[str, Any]) -> None:
+        self.canvas_path.write_text(
+            json.dumps(state, indent=2, sort_keys=True, default=str),
+            encoding="utf-8",
+        )
+
+    def _normalize_canvas_node_id(self, value: str) -> str:
+        cleaned = re.sub(r"[^A-Za-z0-9:._-]", "_", value.strip())
+        cleaned = re.sub(r"_+", "_", cleaned).strip("_")
+        if not cleaned:
+            cleaned = f"node:{uuid.uuid4().hex[:12]}"
+        return cleaned[:120]
+
+    @staticmethod
+    def _trial_canvas_summary(trial: dict[str, Any]) -> str:
+        bits: list[str] = []
+        if trial.get("fit_score") is not None:
+            bits.append(f"fit {trial.get('fit_score')}")
+        if trial.get("status"):
+            bits.append(str(trial["status"]))
+        if trial.get("phase"):
+            bits.append(str(trial["phase"]))
+        gaps = trial.get("gaps")
+        if isinstance(gaps, list) and gaps:
+            bits.append(f"{len(gaps)} gaps")
+        return " · ".join(bits)
+
     # ── Citation primitive ──────────────────────────────────────────────
 
     def cite(
@@ -595,6 +856,94 @@ class Workspace:
 
     def pending_escalations(self) -> list[Escalation]:
         return [e for e in self._escalations if not e.resolved]
+
+    # ── Mid-run steering messages ──────────────────────────────────────
+
+    def append_message(
+        self,
+        message: str,
+        *,
+        actor: str = "clinician",
+        canvas_ref: dict[str, Any] | None = None,
+    ) -> RunMessage:
+        """Persist a user steering message for this run.
+
+        REST clients use this as the uplink half of the interactive
+        workspace contract. The agent loop drains unconsumed messages
+        between model turns and injects them as `user` content.
+        """
+        text = message.strip()
+        if not text:
+            raise WorkspaceContractError("message is required")
+        if actor not in {"clinician", "patient", "system"}:
+            raise WorkspaceContractError(
+                "actor must be clinician, patient, or system"
+            )
+        msg = RunMessage(
+            message_id=f"m_{uuid.uuid4().hex[:12]}",
+            actor=actor,
+            message=text,
+            canvas_ref=dict(canvas_ref) if canvas_ref else None,
+        )
+        with (self.run_dir / "messages.jsonl").open("a", encoding="utf-8") as fp:
+            fp.write(json.dumps(msg.__dict__, default=str) + "\n")
+        self.append_transcript(
+            TranscriptEvent(
+                kind="message_added",
+                payload={
+                    "message_id": msg.message_id,
+                    "actor": msg.actor,
+                    "message": msg.message,
+                    "canvas_ref": msg.canvas_ref,
+                },
+            )
+        )
+        return msg
+
+    def messages(self) -> list[RunMessage]:
+        path = self.run_dir / "messages.jsonl"
+        if not path.is_file():
+            return []
+        out: list[RunMessage] = []
+        for line in path.read_text("utf-8").splitlines():
+            if not line.strip():
+                continue
+            payload = json.loads(line)
+            out.append(RunMessage(**payload))
+        return out
+
+    def drain_messages(self) -> list[RunMessage]:
+        """Return unconsumed steering messages and mark them consumed."""
+        messages = self.messages()
+        pending = [msg for msg in messages if not msg.consumed]
+        if not pending:
+            return []
+        now = _now_iso()
+        pending_ids = {msg.message_id for msg in pending}
+        updated: list[RunMessage] = []
+        for msg in messages:
+            if msg.message_id in pending_ids:
+                msg.consumed = True
+                msg.consumed_at = now
+            updated.append(msg)
+        self._rewrite_messages(updated)
+        for msg in pending:
+            self.append_transcript(
+                TranscriptEvent(
+                    kind="message_consumed",
+                    payload={
+                        "message_id": msg.message_id,
+                        "actor": msg.actor,
+                    },
+                )
+            )
+        return pending
+
+    def _rewrite_messages(self, messages: list[RunMessage]) -> None:
+        path = self.run_dir / "messages.jsonl"
+        with path.open("w", encoding="utf-8") as fp:
+            for msg in messages:
+                fp.write(json.dumps(msg.__dict__, default=str) + "\n")
 
     # ── Finalize ────────────────────────────────────────────────────────
 
@@ -784,5 +1133,7 @@ def load_workspace(skill: Skill, patient_id: str, run_id: str) -> Workspace:
             workspace._next_approval_seq = last + 1
     status_path = run_dir / "status.json"
     if status_path.is_file():
-        workspace._status = json.loads(status_path.read_text("utf-8")).get("status", "created")
+        status_payload = json.loads(status_path.read_text("utf-8"))
+        workspace._status = status_payload.get("status", "created")
+        workspace._failure_reason = status_payload.get("failure_reason")
     return workspace

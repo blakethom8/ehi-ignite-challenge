@@ -8,6 +8,7 @@ import {
 import { api } from "../../api/client";
 import { EmptyState } from "../../components/EmptyState";
 import type { EncounterEvent, EncounterDetail } from "../../types";
+import { formatMeasurement } from "../../utils/format";
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -315,7 +316,7 @@ function DetailsTab({ data }: { data: EncounterDetail }) {
                 <div className="text-right shrink-0">
                   {obs.value_type === "quantity" && obs.value_quantity !== null ? (
                     <p className="font-semibold text-[#1c1c1e]">
-                      {obs.value_quantity} {obs.value_unit}
+                      {formatMeasurement(obs.value_quantity, obs.value_unit)}
                     </p>
                   ) : obs.value_concept_display ? (
                     <p className="text-[#555a6a]">{obs.value_concept_display}</p>

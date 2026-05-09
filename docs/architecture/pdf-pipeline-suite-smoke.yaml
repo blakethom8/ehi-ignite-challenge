@@ -1,0 +1,27 @@
+name: pdf-workspace-smoke
+description: >
+  Additive PDF pipeline workspace smoke suite. Starts with local/no-LLM and
+  reference lanes so new variants can be added without losing comparability.
+
+settings:
+  skip_cache: false
+
+pipelines:
+  - pdfplumber-lab-text
+  - pdfplumber-text-fhir
+  - multipass-fhir
+  - multipass-fhir-scout
+  - multipass-fhir-ollama-tabular
+
+cases:
+  - label: synthetic-corrected-lab
+    pdf: ehi-atlas/corpus/_sources/synthetic-pdf-fixtures/raw/corrected-lab-report.pdf
+    tags: [synthetic, lab, corrected]
+
+  - label: synthetic-med-reconciliation
+    pdf: ehi-atlas/corpus/_sources/synthetic-pdf-fixtures/raw/medication-reconciliation.pdf
+    tags: [synthetic, medication]
+
+  - label: function-health-2025-11-29
+    pdf: data/aggregation-uploads/5cbc121b-cd71-4428-b8b7-31e53eba8184/e90088bf06c5-bt_functionhealth_results_11-29-2025.pdf
+    tags: [real-user-owned, lab, dense]

@@ -5,6 +5,7 @@ import { AlertTriangle, Building2, User, ChevronDown, ChevronRight, Clock, Datab
 import type { ReactNode } from "react";
 import { api } from "../../api/client";
 import type { PatientOverview, KeyLabsResponse, LabValue, LabHistoryPoint, LabAlertFlag, TimelineMonth, TimelineResponse } from "../../types";
+import { formatDisplayNumber } from "../../utils/format";
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -257,7 +258,7 @@ function LabPanel({ name, labs }: { name: string; labs: LabValue[] }) {
                 <td className="py-2 px-2 text-right">
                   {lab.value != null ? (
                     <span className={lab.is_abnormal ? "text-[#b91c1c] font-semibold" : "text-[#1c1c1e]"}>
-                      {lab.value} <span className="text-[#a5a8b5] text-xs">{lab.unit}</span>
+                      {formatDisplayNumber(lab.value)} <span className="text-[#a5a8b5] text-xs">{lab.unit}</span>
                     </span>
                   ) : (
                     <span className="text-[#a5a8b5]">—</span>

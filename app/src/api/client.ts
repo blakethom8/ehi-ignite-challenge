@@ -54,6 +54,17 @@ import type {
   AggregationUploadPayload,
   AggregationUploadResponse,
   CanonicalPatientSummary,
+  GroundTruthReviewFactLocationResponse,
+  GroundTruthReviewPublishResponse,
+  GroundTruthReviewPdfPagesResponse,
+  GroundTruthReviewRunDetail,
+  GroundTruthReviewRunSummary,
+  GroundTruthReviewSession,
+  GroundTruthVersionSummary,
+  CcdaLabConversionResponse,
+  CcdaLabProcessorsResponse,
+  PipelineEvaluationDetail,
+  PipelineLabLeaderboardResponse,
 } from "../types";
 import { mockPatients } from "./mockData";
 
@@ -245,6 +256,72 @@ export const api = {
   /** Raw FHIR bundle JSON for a patient */
   getRawFhir: (patientId: string): Promise<Record<string, unknown>> =>
     http.get<Record<string, unknown>>(`/patients/${patientId}/fhir`).then((r) => r.data),
+
+  /** PDF/FHIR pipeline experiment leaderboard */
+  getPipelineLabLeaderboard: (): Promise<PipelineLabLeaderboardResponse> =>
+    http.get<PipelineLabLeaderboardResponse>("/pipeline-lab/leaderboard").then((r) => r.data),
+
+  getPipelineLabEvaluationDetail: (evalRunId: string): Promise<PipelineEvaluationDetail> =>
+    http.get<PipelineEvaluationDetail>(`/pipeline-lab/evaluations/${encodeURIComponent(evalRunId)}`).then((r) => r.data),
+
+  /** Internal C-CDA/PDF -> FHIR playground */
+  getCcdaLabProcessors: (): Promise<CcdaLabProcessorsResponse> =>
+    http.get<CcdaLabProcessorsResponse>("/internal/ccda-lab/processors").then((r) => r.data),
+
+  convertCcdaLabDocument: (
+    file: File,
+    processorId: string,
+    skipCache = false,
+  ): Promise<CcdaLabConversionResponse> => {
+    const form = new FormData();
+    form.append("file", file);
+    form.append("processor_id", processorId);
+    form.append("skip_cache", String(skipCache));
+    return http
+      .post<CcdaLabConversionResponse>("/internal/ccda-lab/convert", form, {
+        headers: { "Content-Type": "multipart/form-data" },
+      })
+      .then((r) => r.data);
+  },
+
+  /** Human review workspace for candidate reference bundles */
+  listGroundTruthReviewRuns: (): Promise<GroundTruthReviewRunSummary[]> =>
+    http.get<GroundTruthReviewRunSummary[]>("/ground-truth-review/runs").then((r) => r.data),
+
+  getGroundTruthReviewRun: (runId: string): Promise<GroundTruthReviewRunDetail> =>
+    http
+      .get<GroundTruthReviewRunDetail>(`/ground-truth-review/runs/${encodeURIComponent(runId)}`)
+      .then((r) => r.data),
+
+  getGroundTruthReviewPdfPages: (runId: string): Promise<GroundTruthReviewPdfPagesResponse> =>
+    http
+      .get<GroundTruthReviewPdfPagesResponse>(`/ground-truth-review/runs/${encodeURIComponent(runId)}/pdf/pages`)
+      .then((r) => r.data),
+
+  locateGroundTruthReviewFact: (runId: string, resourceRef: string): Promise<GroundTruthReviewFactLocationResponse> =>
+    http
+      .get<GroundTruthReviewFactLocationResponse>(`/ground-truth-review/runs/${encodeURIComponent(runId)}/locate-fact`, {
+        params: { resource_ref: resourceRef },
+      })
+      .then((r) => r.data),
+
+  saveGroundTruthReview: (runId: string, review: GroundTruthReviewSession): Promise<GroundTruthReviewSession> =>
+    http
+      .put<GroundTruthReviewSession>(`/ground-truth-review/runs/${encodeURIComponent(runId)}/review`, review)
+      .then((r) => r.data),
+
+  publishGroundTruthReview: (
+    runId: string,
+    payload: { reviewer?: string; notes?: string } = {},
+  ): Promise<GroundTruthReviewPublishResponse> =>
+    http
+      .post<GroundTruthReviewPublishResponse>(`/ground-truth-review/runs/${encodeURIComponent(runId)}/publish`, payload)
+      .then((r) => r.data),
+
+  listReviewedReferenceVersions: (pdfSha: string): Promise<GroundTruthVersionSummary[]> =>
+    http
+      .get<GroundTruthVersionSummary[]>(`/ground-truth-review/ground-truth/${encodeURIComponent(pdfSha)}`)
+      .then((r) => r.data),
 
   // -------------------------------------------------------------------------
   // Harmonize — cross-source merge with FHIR Provenance

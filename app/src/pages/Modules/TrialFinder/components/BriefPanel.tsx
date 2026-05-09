@@ -7,6 +7,12 @@ interface BriefPanelProps {
   rankedActive: RankedConditionItem[];
   isStarting: boolean;
   onStart: (anchors: AnchorChoice[]) => void;
+  selectedIds?: Set<string>;
+  onSelectedIdsChange?: (selectedIds: Set<string>) => void;
+  showHero?: boolean;
+  showTrustContract?: boolean;
+  showStartButton?: boolean;
+  startLabel?: string;
 }
 
 export interface AnchorChoice {
@@ -26,6 +32,12 @@ export function BriefPanel({
   rankedActive,
   isStarting,
   onStart,
+  selectedIds,
+  onSelectedIdsChange,
+  showHero = true,
+  showTrustContract = true,
+  showStartButton = true,
+  startLabel = "Run trial finder",
 }: BriefPanelProps) {
   const eligible = useMemo(
     () =>
@@ -34,17 +46,24 @@ export function BriefPanel({
       ),
     [rankedActive]
   );
-  const [selected, setSelected] = useState<Set<string>>(
+  const [internalSelected, setInternalSelected] = useState<Set<string>>(
     () => new Set(eligible.slice(0, 3).map((c) => c.condition_id))
   );
+  const selected = selectedIds ?? internalSelected;
+
+  const updateSelected = (next: Set<string>) => {
+    if (onSelectedIdsChange) {
+      onSelectedIdsChange(next);
+    } else {
+      setInternalSelected(next);
+    }
+  };
 
   const toggle = (id: string) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+    const next = new Set(selected);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    updateSelected(next);
   };
 
   const anchorPayload: AnchorChoice[] = Array.from(selected).flatMap((id) => {
@@ -67,21 +86,23 @@ export function BriefPanel({
 
   return (
     <div className="space-y-4">
-      <section className="rounded-2xl bg-[#eef1ff] p-5 shadow-[rgb(199_208_250)_0px_0px_0px_1px]">
-        <div className="flex items-center gap-2">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-[#5b76fe]">
-            Trial finder
+      {showHero ? (
+        <section className="rounded-2xl bg-[#eef1ff] p-5 shadow-[rgb(199_208_250)_0px_0px_0px_1px]">
+          <div className="flex items-center gap-2">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-[#5b76fe]">
+              Trial finder
+            </p>
+          </div>
+          <h1 className="mt-1 text-2xl font-semibold text-[#1c1c1e]">
+            {patientName}
+          </h1>
+          <p className="mt-2 text-sm leading-6 text-[#3a4ca8]">
+            The agent will read the anchors below, query ClinicalTrials.gov,
+            parse inclusion criteria against the chart, and produce a citation-grounded
+            shortlist. You can pause it at any escalation gate.
           </p>
-        </div>
-        <h1 className="mt-1 text-2xl font-semibold text-[#1c1c1e]">
-          {patientName}
-        </h1>
-        <p className="mt-2 text-sm leading-6 text-[#3a4ca8]">
-          The agent will read the anchors below, query ClinicalTrials.gov,
-          parse inclusion criteria against the chart, and produce a citation-grounded
-          shortlist. You can pause it at any escalation gate.
-        </p>
-      </section>
+        </section>
+      ) : null}
 
       <section className="rounded-2xl bg-white p-5 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
         <div className="flex items-center justify-between">
@@ -147,42 +168,46 @@ export function BriefPanel({
         )}
       </section>
 
-      <section className="rounded-2xl bg-white p-5 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
-        <div className="flex items-center gap-2">
-          <ListChecks size={16} className="text-[#5b76fe]" />
-          <h2 className="text-sm font-semibold text-[#1c1c1e]">
-            Trust contract
-          </h2>
-        </div>
-        <ul className="mt-3 space-y-2 text-xs leading-5 text-[#555a6a]">
-          <li className="flex items-start gap-2">
-            <CheckCircle size={13} className="mt-0.5 shrink-0 text-[#00b473]" />
-            Every fact in the artifact carries a citation chip back to the
-            chart resource or external source.
-          </li>
-          <li className="flex items-start gap-2">
-            <CheckCircle size={13} className="mt-0.5 shrink-0 text-[#00b473]" />
-            The agent will pause at declared approval gates — no
-            unresolved-low-confidence outputs ship into the artifact.
-          </li>
-          <li className="flex items-start gap-2">
-            <CheckCircle size={13} className="mt-0.5 shrink-0 text-[#00b473]" />
-            No outreach is sent. The packet is produced for you to review,
-            edit, and dispatch.
-          </li>
-        </ul>
-      </section>
+      {showTrustContract ? (
+        <section className="rounded-2xl bg-white p-5 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+          <div className="flex items-center gap-2">
+            <ListChecks size={16} className="text-[#5b76fe]" />
+            <h2 className="text-sm font-semibold text-[#1c1c1e]">
+              Trust contract
+            </h2>
+          </div>
+          <ul className="mt-3 space-y-2 text-xs leading-5 text-[#555a6a]">
+            <li className="flex items-start gap-2">
+              <CheckCircle size={13} className="mt-0.5 shrink-0 text-[#00b473]" />
+              Every fact in the artifact carries a citation chip back to the
+              chart resource or external source.
+            </li>
+            <li className="flex items-start gap-2">
+              <CheckCircle size={13} className="mt-0.5 shrink-0 text-[#00b473]" />
+              The agent will pause at declared approval gates — no
+              unresolved-low-confidence outputs ship into the artifact.
+            </li>
+            <li className="flex items-start gap-2">
+              <CheckCircle size={13} className="mt-0.5 shrink-0 text-[#00b473]" />
+              No outreach is sent. The packet is produced for you to review,
+              edit, and dispatch.
+            </li>
+          </ul>
+        </section>
+      ) : null}
 
-      <button
-        type="button"
-        onClick={start}
-        disabled={!anchorPayload.length || isStarting}
-        className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#5b76fe] px-4 py-3 text-sm font-semibold text-white shadow-sm transition disabled:cursor-not-allowed disabled:opacity-60"
-        style={{ letterSpacing: 0.175 }}
-      >
-        <Target size={16} />
-        {isStarting ? "Starting run…" : "Run trial finder"}
-      </button>
+      {showStartButton ? (
+        <button
+          type="button"
+          onClick={start}
+          disabled={!anchorPayload.length || isStarting}
+          className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#5b76fe] px-4 py-3 text-sm font-semibold text-white shadow-sm transition disabled:cursor-not-allowed disabled:opacity-60"
+          style={{ letterSpacing: 0.175 }}
+        >
+          <Target size={16} />
+          {isStarting ? "Starting run…" : startLabel}
+        </button>
+      ) : null}
     </div>
   );
 }

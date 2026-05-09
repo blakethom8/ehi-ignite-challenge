@@ -45,6 +45,8 @@ __all__ = [
 
 from . import single_pass_vision  # noqa: F401  (K.2 — baseline)
 from . import multipass_fhir      # noqa: F401  (K.4 — schema-direct multi-pass)
+from . import medgemma_ollama    # noqa: F401  local MedGemma/Ollama lab pipeline
+from . import text_first          # noqa: F401  additive pdfplumber text-first variants
 
 # Pipelines will be registered as they land in K.5:
 # from . import ocr_then_extract    # noqa: F401  (K.5)

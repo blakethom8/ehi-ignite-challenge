@@ -14,9 +14,9 @@ A run executes against a stable tool surface:
   for the trial-matching skill
 
 Tools are filtered against `skill.manifest.required_tools` so a skill
-sees only what it declared. The runner caller decides which loop to use
-(deterministic vs agent) via `SKILLS_RUN_MODE` or a per-run override —
-this module just runs the agent path when invoked.
+sees only what it declared. This module runs the production agent path;
+tests can inject a fake `create_message` callable, but product runs do
+not fall back to a scripted clinical workflow.
 
 The implementation uses the bare `anthropic` SDK (already in deps) for
 direct control over the message loop, tool dispatch, and event emission.
@@ -28,10 +28,20 @@ from __future__ import annotations
 
 import json
 import os
+from time import perf_counter
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Awaitable, Callable
 
+from api.core.loader import load_active_published_run
+from api.core.provider_assistant import get_relevant_provider_evidence
 from api.core.skills import clinicaltrials_gov as ctgov
+from api.core.skills.trial_pursuits import TrialPursuitStore
+from api.core.sof_tools import (
+    SqlRunResult,
+    build_tool_description as _sof_build_tool_description,
+    run_sql as _sof_run_sql,
+    tool_result_payload as _sof_tool_result_payload,
+)
 
 if TYPE_CHECKING:
     from api.core.skills.runner import SkillRunner
@@ -176,13 +186,207 @@ async def _tool_submit_final_artifact(
             "ERROR: submit_final_artifact requires an `output` object "
             "conforming to the skill's output_schema."
         )
+    runner.workspace.sync_canvas_from_output(output)
     runner.agent_state["final_artifact"] = output
     runner.agent_state["finalize_signal"] = True
     return "Artifact captured. End your turn now."
 
 
+async def _tool_workspace_canvas_upsert(
+    args: dict[str, Any], runner: "SkillRunner"
+) -> str:
+    node = runner.workspace.upsert_canvas_node(
+        node_id=args.get("node_id"),
+        kind=args["kind"],
+        title=args["title"],
+        status=args.get("status") or "active",
+        summary=args.get("summary") or "",
+        data=args.get("data") or {},
+        selected=args.get("selected"),
+    )
+    return json.dumps(node.__dict__, default=str)
+
+
+async def _tool_trial_pursuit_upsert(
+    args: dict[str, Any], runner: "SkillRunner"
+) -> str:
+    store = TrialPursuitStore(runner.workspace.patient_id)
+    payload = dict(args)
+    payload.setdefault("created_from_run_id", runner.workspace.run_id)
+    pursuit = store.upsert(payload, actor="agent")
+    return json.dumps(
+        {
+            "pursuit_id": pursuit.pursuit_id,
+            "nct_id": pursuit.nct_id,
+            "status": pursuit.status,
+            "next_step": pursuit.next_step,
+            "tasks": [task.__dict__ for task in pursuit.tasks],
+        },
+        default=str,
+    )
+
+
+async def _tool_trial_pursuit_add_event(
+    args: dict[str, Any], runner: "SkillRunner"
+) -> str:
+    store = TrialPursuitStore(runner.workspace.patient_id)
+    pursuit = store.add_event(
+        str(args["pursuit_id"]),
+        kind=str(args["kind"]),
+        note=str(args["note"]),
+        actor="agent",
+        data_payload=dict(args.get("data") or {}),
+    )
+    return json.dumps(
+        {
+            "pursuit_id": pursuit.pursuit_id,
+            "nct_id": pursuit.nct_id,
+            "status": pursuit.status,
+            "events": [event.__dict__ for event in pursuit.events[-3:]],
+        },
+        default=str,
+    )
+
+
+async def _tool_trial_pursuit_add_task(
+    args: dict[str, Any], runner: "SkillRunner"
+) -> str:
+    store = TrialPursuitStore(runner.workspace.patient_id)
+    pursuit = store.add_task(
+        str(args["pursuit_id"]),
+        title=str(args["title"]),
+        due_at=args.get("due_at"),
+        actor="agent",
+    )
+    return json.dumps(
+        {
+            "pursuit_id": pursuit.pursuit_id,
+            "nct_id": pursuit.nct_id,
+            "status": pursuit.status,
+            "tasks": [task.__dict__ for task in pursuit.tasks],
+        },
+        default=str,
+    )
+
+
+async def _tool_get_patient_snapshot(
+    args: dict[str, Any], runner: "SkillRunner"
+) -> str:
+    max_facts = _bounded_int(args.get("max_facts"), default=10, minimum=3, maximum=12)
+    snapshot = get_relevant_provider_evidence(
+        patient_id=runner.workspace.patient_id,
+        query=(
+            "Summarize the current trial-matching context: active conditions, "
+            "major safety signals, demographics relevant to eligibility, and "
+            "chart facts likely to affect inclusion or exclusion criteria."
+        ),
+        history=None,
+        max_facts=max_facts,
+        max_citations=8,
+    )
+    return json.dumps(snapshot, default=str)
+
+
+async def _tool_query_chart_evidence(
+    args: dict[str, Any], runner: "SkillRunner"
+) -> str:
+    query = str(args.get("query") or "").strip()
+    if not query:
+        return json.dumps({"error": "query is required"}, default=str)
+    max_facts = _bounded_int(args.get("max_facts"), default=8, minimum=3, maximum=12)
+    evidence = get_relevant_provider_evidence(
+        patient_id=runner.workspace.patient_id,
+        query=query,
+        history=None,
+        max_facts=max_facts,
+        max_citations=8,
+    )
+    return json.dumps(evidence, default=str)
+
+
+async def _tool_run_sql(args: dict[str, Any], runner: "SkillRunner") -> str:
+    query = str(args.get("query") or "").strip()
+    if not query:
+        return json.dumps({"error": "query is required"}, default=str)
+    limit = _bounded_int(args.get("limit"), default=50, minimum=1, maximum=500)
+    result = _run_sql_for_patient_scope(runner.workspace.patient_id, query, limit)
+    payload = _sof_tool_result_payload(result)
+    content = payload.get("content") or []
+    if content and isinstance(content[0], dict):
+        text = content[0].get("text")
+        if isinstance(text, str):
+            return text
+    return json.dumps(result.to_dict(), default=str)
+
+
+def _run_sql_for_patient_scope(
+    patient_id: str, query_text: str, limit: int
+) -> SqlRunResult:
+    if load_active_published_run(patient_id) is not None:
+        return SqlRunResult(
+            columns=[],
+            rows=[],
+            row_count=0,
+            truncated=False,
+            query=query_text,
+            error=(
+                "global SQL-on-FHIR is disabled because this patient has an "
+                "active published chart snapshot; use chart evidence tools "
+                "for the active snapshot."
+            ),
+        )
+    return _sof_run_sql(query_text, limit=limit)
+
+
 # Skill alias → ToolSpec.
 TOOL_REGISTRY: dict[str, ToolSpec] = {
+    "get_patient_snapshot": ToolSpec(
+        name="get_patient_snapshot",
+        skill_alias="get_patient_snapshot",
+        description=(
+            "Return a high-signal chart snapshot for the selected patient, "
+            "focused on active conditions, safety signals, and facts relevant "
+            "to trial eligibility. Use this before searching registries."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "max_facts": {"type": "integer", "minimum": 3, "maximum": 12},
+            },
+        },
+        handler=_tool_get_patient_snapshot,
+    ),
+    "query_chart_evidence": ToolSpec(
+        name="query_chart_evidence",
+        skill_alias="query_chart_evidence",
+        description=(
+            "Retrieve chart-grounded evidence and citations for a specific "
+            "clinical question or trial eligibility criterion."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "query": {"type": "string"},
+                "max_facts": {"type": "integer", "minimum": 3, "maximum": 12},
+            },
+            "required": ["query"],
+        },
+        handler=_tool_query_chart_evidence,
+    ),
+    "run_sql": ToolSpec(
+        name="run_sql",
+        skill_alias="run_sql",
+        description=_sof_build_tool_description(),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "query": {"type": "string"},
+                "limit": {"type": "integer", "minimum": 1, "maximum": 500},
+            },
+            "required": ["query"],
+        },
+        handler=_tool_run_sql,
+    ),
     "workspace.write": ToolSpec(
         name="workspace_write",
         skill_alias="workspace.write",
@@ -260,6 +464,121 @@ TOOL_REGISTRY: dict[str, ToolSpec] = {
             "required": ["condition", "prompt"],
         },
         handler=_tool_workspace_escalate,
+    ),
+    "workspace.canvas.upsert": ToolSpec(
+        name="workspace_canvas_upsert",
+        skill_alias="workspace.canvas.upsert",
+        description=(
+            "Create or update one typed right-canvas object. Use this for "
+            "search criteria, chart anchors, candidate trials, selected "
+            "trials, packet tasks, and other UI objects the clinician can "
+            "click. `node_id` should be stable, e.g. trial:NCT01234567."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "node_id": {"type": "string"},
+                "kind": {
+                    "type": "string",
+                    "enum": [
+                        "criteria",
+                        "anchor",
+                        "candidate_trial",
+                        "selected_trial",
+                        "packet_task",
+                        "summary",
+                        "artifact",
+                    ],
+                },
+                "title": {"type": "string"},
+                "status": {"type": "string"},
+                "summary": {"type": "string"},
+                "data": {"type": "object"},
+                "selected": {"type": "boolean"},
+            },
+            "required": ["kind", "title"],
+        },
+        handler=_tool_workspace_canvas_upsert,
+    ),
+    "trial_pursuit.upsert": ToolSpec(
+        name="trial_pursuit_upsert",
+        skill_alias="trial_pursuit.upsert",
+        description=(
+            "Create or update a durable patient-level trial pursuit. Use this "
+            "when a candidate trial should become a longitudinal mini-project "
+            "for review, packet preparation, outreach, submission, or follow-up."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "nct_id": {"type": "string", "pattern": r"^NCT\d{8}$"},
+                "title": {"type": "string"},
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "interested",
+                        "reviewing",
+                        "packet",
+                        "contacted",
+                        "submitted",
+                        "follow_up",
+                        "closed",
+                    ],
+                },
+                "sponsor": {"type": "string"},
+                "trial_status": {"type": "string"},
+                "source_url": {"type": "string"},
+                "source_kind": {"type": "string"},
+                "source_updated_at": {"type": "string"},
+                "fit_score": {"type": "number"},
+                "next_step": {"type": "string"},
+                "notes": {"type": "string"},
+                "tags": {"type": "array", "items": {"type": "string"}},
+                "created_from_canvas_node_id": {"type": "string"},
+                "evidence_snapshot": {"type": "object"},
+            },
+            "required": ["nct_id", "title"],
+        },
+        handler=_tool_trial_pursuit_upsert,
+    ),
+    "trial_pursuit.add_event": ToolSpec(
+        name="trial_pursuit_add_event",
+        skill_alias="trial_pursuit.add_event",
+        description=(
+            "Append an auditable event to a durable trial pursuit, such as "
+            "eligibility reviewed, coordinator contacted, submission sent, "
+            "follow-up due, or closed with reason."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "pursuit_id": {"type": "string"},
+                "kind": {"type": "string"},
+                "note": {"type": "string"},
+                "data": {"type": "object"},
+            },
+            "required": ["pursuit_id", "kind", "note"],
+        },
+        handler=_tool_trial_pursuit_add_event,
+    ),
+    "trial_pursuit.add_task": ToolSpec(
+        name="trial_pursuit_add_task",
+        skill_alias="trial_pursuit.add_task",
+        description=(
+            "Add a task to a durable trial pursuit, for example collect labs, "
+            "call coordinator, prepare packet, request imaging report, or "
+            "check follow-up status."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "pursuit_id": {"type": "string"},
+                "title": {"type": "string"},
+                "due_at": {"type": "string"},
+            },
+            "required": ["pursuit_id", "title"],
+        },
+        handler=_tool_trial_pursuit_add_task,
     ),
     "submit_final_artifact": ToolSpec(
         name="submit_final_artifact",
@@ -380,6 +699,12 @@ Hard rules — the runtime enforces these:
 3. End the run by calling `submit_final_artifact` with the structured
    output, then end your turn. The output must conform to the
    skill's output_schema (the runtime validates).
+4. Keep the side canvas useful as you work. Upsert typed canvas nodes for
+   criteria, anchors, candidate trials, selected trials, and packet tasks
+   whenever you have structured state the clinician can act on.
+5. When a trial becomes something the clinician may pursue beyond this run,
+   create or update a durable trial pursuit. Use pursuit tasks/events for
+   packet preparation, outreach, submission, and follow-up.
 
 Below: the skill body, then optional patient memory and brief inputs."""
 
@@ -479,6 +804,21 @@ async def drive_claude_agent_loop(
     )
 
     for turn_index in range(cfg.max_turns):
+        pending_messages = runner.workspace.drain_messages()
+        if pending_messages:
+            messages.append(
+                {
+                    "role": "user",
+                    "content": _steering_messages_to_text(pending_messages),
+                }
+            )
+            runner._emit(
+                "agent_steering_messages",
+                turn=turn_index,
+                message_count=len(pending_messages),
+                message_ids=[msg.message_id for msg in pending_messages],
+            )
+
         response = await create_message(
             model=cfg.model,
             max_tokens=cfg.max_tokens_per_turn,
@@ -534,6 +874,21 @@ async def drive_claude_agent_loop(
         for call in tool_calls:
             handler = handlers.get(call["name"])
             if handler is None:
+                runner._emit(
+                    "agent_tool_call",
+                    turn=turn_index,
+                    tool_call_id=call["id"],
+                    tool=call["name"],
+                    args=_redact_tool_args(call["input"]),
+                )
+                runner._emit(
+                    "agent_tool_error",
+                    turn=turn_index,
+                    tool_call_id=call["id"],
+                    tool=call["name"],
+                    duration_ms=0,
+                    error=f"tool '{call['name']}' is not available to this skill",
+                )
                 tool_results.append(
                     _tool_result_block(
                         call["id"],
@@ -542,12 +897,24 @@ async def drive_claude_agent_loop(
                     )
                 )
                 continue
+            started = perf_counter()
+            runner._emit(
+                "agent_tool_call",
+                turn=turn_index,
+                tool_call_id=call["id"],
+                tool=call["name"],
+                args=_redact_tool_args(call["input"]),
+            )
             try:
                 result_text = await handler(call["input"], runner)
             except Exception as exc:  # noqa: BLE001
+                duration_ms = round((perf_counter() - started) * 1000)
                 runner._emit(
                     "agent_tool_error",
+                    turn=turn_index,
+                    tool_call_id=call["id"],
                     tool=call["name"],
+                    duration_ms=duration_ms,
                     error=repr(exc),
                 )
                 tool_results.append(
@@ -556,10 +923,15 @@ async def drive_claude_agent_loop(
                     )
                 )
                 continue
+            duration_ms = round((perf_counter() - started) * 1000)
             runner._emit(
                 "agent_tool_result",
+                turn=turn_index,
+                tool_call_id=call["id"],
                 tool=call["name"],
+                duration_ms=duration_ms,
                 result_preview=_preview(result_text),
+                result_summary=_summarize_tool_result(call["name"], result_text),
             )
             tool_results.append(_tool_result_block(call["id"], result_text))
 
@@ -634,6 +1006,134 @@ def _preview(text: str, max_chars: int = 160) -> str:
     return flat[: max_chars - 1] + "…"
 
 
+def _bounded_int(
+    raw: Any, *, default: int, minimum: int, maximum: int
+) -> int:
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        value = default
+    return max(minimum, min(value, maximum))
+
+
+def _redact_tool_args(args: dict[str, Any]) -> dict[str, Any]:
+    """Return transcript-safe args: no secrets, no massive payloads."""
+    secret_keys = {
+        "api_key",
+        "authorization",
+        "cookie",
+        "password",
+        "secret",
+        "token",
+    }
+
+    def scrub(value: Any, *, key: str = "") -> Any:
+        if key.lower() in secret_keys:
+            return "[redacted]"
+        if isinstance(value, dict):
+            return {str(k): scrub(v, key=str(k)) for k, v in value.items()}
+        if isinstance(value, list):
+            return [scrub(item) for item in value[:25]]
+        if isinstance(value, str):
+            if len(value) > 600:
+                return value[:597] + "..."
+            return value
+        return value
+
+    return {str(k): scrub(v, key=str(k)) for k, v in (args or {}).items()}
+
+
+def _summarize_tool_result(tool_name: str, result_text: str) -> dict[str, Any]:
+    try:
+        parsed = json.loads(result_text)
+    except json.JSONDecodeError:
+        return {"type": "text", "chars": len(result_text)}
+
+    if isinstance(parsed, list):
+        summary: dict[str, Any] = {"type": "list", "count": len(parsed)}
+        if tool_name == "clinicaltrials_search":
+            summary["source"] = "clinicaltrials.gov"
+            summary["nct_ids"] = [
+                item.get("nct_id")
+                for item in parsed[:5]
+                if isinstance(item, dict) and item.get("nct_id")
+            ]
+        return summary
+
+    if isinstance(parsed, dict):
+        summary = {"type": "object"}
+        if "row_count" in parsed:
+            summary.update(
+                {
+                    "row_count": parsed.get("row_count"),
+                    "truncated": parsed.get("truncated"),
+                    "error": parsed.get("error"),
+                }
+            )
+        if "evidence_lines" in parsed:
+            lines = parsed.get("evidence_lines")
+            citations = parsed.get("citations")
+            summary.update(
+                {
+                    "evidence_count": len(lines) if isinstance(lines, list) else 0,
+                    "citation_count": len(citations)
+                    if isinstance(citations, list)
+                    else 0,
+                    "intent": parsed.get("intent"),
+                }
+            )
+        if "nct_id" in parsed:
+            summary.update(
+                {
+                    "source": "clinicaltrials.gov",
+                    "nct_id": parsed.get("nct_id"),
+                    "inclusion_count": len(parsed.get("inclusion_lines") or []),
+                    "exclusion_count": len(parsed.get("exclusion_lines") or []),
+                }
+            )
+        if "node_id" in parsed:
+            summary.update(
+                {
+                    "node_id": parsed.get("node_id"),
+                    "node_kind": parsed.get("kind"),
+                    "status": parsed.get("status"),
+                }
+            )
+        if "pursuit_id" in parsed:
+            summary.update(
+                {
+                    "pursuit_id": parsed.get("pursuit_id"),
+                    "nct_id": parsed.get("nct_id"),
+                    "status": parsed.get("status"),
+                }
+            )
+        if "error" in parsed and len(summary) == 1:
+            summary["error"] = parsed.get("error")
+        return summary
+
+    return {"type": type(parsed).__name__}
+
+
+def _steering_messages_to_text(messages: list[Any]) -> str:
+    parts = [
+        "The clinician/patient added steering messages for this active run. "
+        "Incorporate them into the next step. If they conflict with the "
+        "brief, ask for clarification with workspace_escalate."
+    ]
+    for msg in messages:
+        canvas_ref = getattr(msg, "canvas_ref", None)
+        ref_text = (
+            f"\nCanvas reference: {json.dumps(canvas_ref, sort_keys=True)}"
+            if canvas_ref
+            else ""
+        )
+        parts.append(
+            f"\n[{getattr(msg, 'actor', 'clinician')}:{getattr(msg, 'message_id', '')}] "
+            f"{getattr(msg, 'message', '')}{ref_text}"
+        )
+    return "\n".join(parts)
+
+
 def _make_default_create_message(cfg: AgentConfig) -> CreateMessage:
     """Build the default messages.create coroutine.
 
@@ -644,8 +1144,8 @@ def _make_default_create_message(cfg: AgentConfig) -> CreateMessage:
 
     if not cfg.has_credentials:
         raise AgentLoopAbort(
-            "agent mode requires ANTHROPIC_API_KEY (or set "
-            "SKILLS_RUN_MODE=deterministic to use the deterministic loop)"
+            "agent mode requires ANTHROPIC_API_KEY; skill runs do not have a "
+            "deterministic fallback"
         )
     client = AsyncAnthropic(api_key=cfg.api_key)
 

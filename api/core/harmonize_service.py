@@ -17,7 +17,9 @@ that bag. The registry now has three halves:
    becomes a fhir-pull source; each ``.pdf`` upload becomes an
    extracted-pdf source whose extraction lives at
    ``<file>.extracted.json`` next to it (produced by the manual
-   extract endpoint or pre-staged out-of-band).
+   extract endpoint or pre-staged out-of-band). Each C-CDA ``.xml`` upload
+   becomes a ccda-xml source that is converted to FHIR-shaped resources before
+   merge, subject to patient identity checks.
 
 This makes the application document-agnostic: any user can upload any
 documents and the harmonizer surfaces a per-upload-session merged record
@@ -41,6 +43,12 @@ from pathlib import Path
 from typing import Any
 
 from api.core.loader import path_from_patient_id, patient_display_name
+from api.core.ccda import (
+    compare_patient_identity,
+    convert_ccda_to_fhir_bundle,
+    is_ccda_xml,
+    is_converter_required,
+)
 from lib.harmonize import (
     SourceBundle,
     merge_allergies,
@@ -107,7 +115,7 @@ class SourceDefinition:
 
     id: str
     label: str
-    kind: str  # "fhir-pull" | "extracted-pdf"
+    kind: str  # "fhir-pull" | "extracted-pdf" | "ccda-xml"
     path: Path
     document_reference: str | None = None
 
@@ -348,6 +356,7 @@ _COLLECTIONS: dict[str, CollectionDefinition] = {
 #   foo.pdf                 → extracted-pdf source (extraction at
 #                             foo.extracted.json if cached)
 #   bar.json                → fhir-pull source (if FHIR-shaped)
+#   baz.xml                 → ccda-xml source (if it is a CDA ClinicalDocument)
 #
 # The collection ID is ``upload-<session>``. The ``session`` segment is
 # whatever the upload flow chose to key on (currently the patient_id, but
@@ -407,6 +416,16 @@ def _upload_session_to_collection(session_dir: Path) -> CollectionDefinition | N
                     document_reference=f"DocumentReference/upload-{entry.stem}",
                 )
             )
+        elif suffix == ".xml" and is_ccda_xml(entry):
+            sources.append(
+                SourceDefinition(
+                    id=f"ccda-{entry.stem}",
+                    label=entry.name,
+                    kind="ccda-xml",
+                    path=entry,
+                    document_reference=f"DocumentReference/upload-{entry.stem}",
+                )
+            )
     if not sources:
         return None
     return CollectionDefinition(
@@ -415,7 +434,8 @@ def _upload_session_to_collection(session_dir: Path) -> CollectionDefinition | N
         description=(
             f"Documents uploaded under session ``{session_dir.name}``: "
             f"{sum(1 for s in sources if s.kind == 'extracted-pdf')} PDF(s), "
-            f"{sum(1 for s in sources if s.kind == 'fhir-pull')} FHIR file(s)."
+            f"{sum(1 for s in sources if s.kind == 'fhir-pull')} FHIR file(s), "
+            f"{sum(1 for s in sources if s.kind == 'ccda-xml')} C-CDA file(s)."
         ),
         sources=tuple(sources),
     )
@@ -586,8 +606,22 @@ def _load_resources_by_type(source: SourceDefinition) -> dict[str, list[dict]]:
     """Return ``{resourceType: [resource, ...]}`` for one source."""
     if not source.path.exists():
         return {}
-    raw = json.loads(source.path.read_text())
     out: dict[str, list[dict]] = {}
+    if source.kind == "ccda-xml":
+        try:
+            raw_bundle = convert_ccda_to_fhir_bundle(str(source.path), source.id)
+        except Exception:
+            if is_converter_required():
+                raise
+            return {}
+        for entry in raw_bundle.get("entry", []):
+            r = entry.get("resource", {}) if isinstance(entry, dict) else {}
+            rt = r.get("resourceType") if isinstance(r, dict) else None
+            if rt:
+                out.setdefault(rt, []).append(r)
+        return out
+
+    raw = json.loads(source.path.read_text())
     if source.kind == "fhir-pull":
         # Health-Skillz envelope variants:
         #   dict with top-level fhir: {ResourceType: [...]}
@@ -619,6 +653,38 @@ def _load_resources_by_type(source: SourceDefinition) -> dict[str, list[dict]]:
     return out
 
 
+def _first_patient(resources_by_type: dict[str, list[dict]]) -> dict[str, Any] | None:
+    for patient in resources_by_type.get("Patient", []):
+        if isinstance(patient, dict):
+            return patient
+    return None
+
+
+def _baseline_patient_for_identity_check(
+    coll: CollectionDefinition,
+    loaded: dict[str, dict[str, list[dict]]],
+) -> dict[str, Any] | None:
+    """Choose a non-C-CDA patient anchor for source identity checks."""
+
+    for source in coll.sources:
+        if source.kind == "ccda-xml":
+            continue
+        patient = _first_patient(loaded.get(source.id, {}))
+        if patient is not None:
+            return patient
+    return None
+
+
+def _ccda_identity_status(
+    baseline_patient: dict[str, Any] | None,
+    source_resources: dict[str, list[dict]],
+) -> str:
+    if baseline_patient is None:
+        return "not_checked"
+    candidate = _first_patient(source_resources)
+    return compare_patient_identity(baseline_patient, candidate).status
+
+
 # Cache by mtime tuple so re-extracting any source PDF naturally invalidates.
 def _mtime_key(collection: CollectionDefinition) -> tuple:
     return tuple(
@@ -632,7 +698,16 @@ def _cached_load(collection_id: str, mtime_signature: tuple) -> dict[str, dict[s
     coll = get_collection(collection_id)
     if not coll:
         return {}
-    return {s.id: _load_resources_by_type(s) for s in coll.sources}
+    loaded = {s.id: _load_resources_by_type(s) for s in coll.sources}
+    baseline_patient = _baseline_patient_for_identity_check(coll, loaded)
+    if baseline_patient is None:
+        return loaded
+    for source in coll.sources:
+        if source.kind != "ccda-xml":
+            continue
+        if _ccda_identity_status(baseline_patient, loaded.get(source.id, {})) == "mismatch":
+            loaded[source.id] = {}
+    return loaded
 
 
 def load_collection_resources(collection_id: str) -> dict[str, dict[str, list[dict]]]:
@@ -652,6 +727,7 @@ def collection_source_manifest(collection_id: str) -> list[dict[str, Any]] | Non
     if not coll:
         return None
     resources = load_collection_resources(collection_id)
+    baseline_patient = _baseline_patient_for_identity_check(coll, resources)
     out = []
     for s in coll.sources:
         rs = resources.get(s.id, {})
@@ -677,6 +753,21 @@ def collection_source_manifest(collection_id: str) -> list[dict[str, Any]] | Non
             else:
                 status = "empty_extraction"
                 status_label = "Extracted with no structured facts"
+        elif s.kind == "ccda-xml":
+            raw_rs = _load_resources_by_type(s) if available else {}
+            identity_status = _ccda_identity_status(baseline_patient, raw_rs)
+            if not available:
+                status = "missing"
+                status_label = "C-CDA source file missing"
+            elif identity_status == "mismatch":
+                status = "identity_mismatch"
+                status_label = "C-CDA patient identity does not match workspace patient"
+            elif total > 0:
+                status = "structured"
+                status_label = "Converted C-CDA facts ready"
+            else:
+                status = "unparsed_structured"
+                status_label = "C-CDA parsed with no supported facts"
         else:
             status = "missing" if not available else "structured"
             status_label = "Source ready" if available else "Source file missing"

@@ -1,6 +1,5 @@
 import { Link, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import type { ReactNode } from "react";
 import {
   Activity,
   AlertTriangle,
@@ -12,7 +11,6 @@ import {
   FileBarChart,
   FileJson2,
   Heart,
-  Layers3,
   ListChecks,
   Share2,
   ShieldCheck,
@@ -20,6 +18,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { api } from "../../api/client";
+import type { CanonicalSourceSummary } from "../../types";
 
 function withPatient(path: string, patientId: string | null): string {
   return patientId ? `${path}?patient=${patientId}` : path;
@@ -27,105 +26,81 @@ function withPatient(path: string, patientId: string | null): string {
 
 function formatDate(value: string | null | undefined): string {
   if (!value) return "Unknown";
-  return new Date(value).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value.slice(0, 10);
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
-type Tone = "blue" | "teal" | "amber" | "slate";
-
-const toneClasses: Record<Tone, { band: string; label: string; icon: string; soft: string }> = {
-  blue: {
-    band: "border-[#dfe4ff] bg-[#f7f8ff]",
-    label: "text-[#5b76fe]",
-    icon: "bg-[#eef1ff] text-[#5b76fe]",
-    soft: "bg-[#eef1ff] text-[#5b76fe]",
-  },
-  teal: {
-    band: "border-[#cdeee9] bg-[#f4fffc]",
-    label: "text-[#0f766e]",
-    icon: "bg-[#c3faf5] text-[#187574]",
-    soft: "bg-[#e7fbf7] text-[#0f766e]",
-  },
-  amber: {
-    band: "border-[#f6dfc9] bg-[#fff8f1]",
-    label: "text-[#9a5a16]",
-    icon: "bg-[#ffe6cd] text-[#744000]",
-    soft: "bg-[#fff1df] text-[#9a5a16]",
-  },
-  slate: {
-    band: "border-[#dfe3ea] bg-[#f7f8fb]",
-    label: "text-[#555a6a]",
-    icon: "bg-[#eef0f5] text-[#555a6a]",
-    soft: "bg-[#eef0f5] text-[#555a6a]",
-  },
-};
-
-function SectionBand({
-  label,
-  title,
-  body,
-  tone = "blue",
-  children,
-}: {
-  label: string;
-  title: string;
-  body: string;
-  tone?: Tone;
-  children: ReactNode;
-}) {
-  return (
-    <section className={`space-y-4 rounded-[24px] border p-4 lg:p-5 ${toneClasses[tone].band}`}>
-      <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-        <div>
-          <p className={`text-xs font-semibold uppercase tracking-wider ${toneClasses[tone].label}`}>{label}</p>
-          <h2 className="mt-1 text-xl font-semibold text-[#1c1c1e]">{title}</h2>
-        </div>
-        <p className="max-w-xl text-sm leading-6 text-[#667085]">{body}</p>
-      </div>
-      {children}
-    </section>
-  );
+function formatNumber(value: number | null | undefined): string {
+  return (value ?? 0).toLocaleString();
 }
 
-function StatCard({ label, value, note, tone = "blue" }: { label: string; value: string; note: string; tone?: Tone }) {
+function statusClass(status: string): string {
+  if (status === "structured" || status === "extracted") return "bg-emerald-50 text-emerald-800";
+  if (status === "ready_to_extract" || status === "stored") return "bg-amber-50 text-amber-800";
+  if (status === "unsupported") return "bg-red-50 text-red-700";
+  return "bg-slate-100 text-slate-700";
+}
+
+function MetricText({ label, value, note }: { label: string; value: string; note?: string }) {
   return (
-    <div className="rounded-2xl bg-white p-5 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
-      <p className={`text-[10px] font-semibold uppercase tracking-wider ${toneClasses[tone].label}`}>{label}</p>
-      <p className="mt-2 text-2xl font-semibold text-[#1c1c1e]">{value}</p>
-      <p className="mt-1 text-sm text-[#667085]">{note}</p>
+    <div className="min-w-0">
+      <p className="text-[11px] font-semibold uppercase tracking-wider text-[#667085]">{label}</p>
+      <p className="mt-1 text-xl font-semibold text-[#1c1c1e]">{value}</p>
+      {note && <p className="mt-0.5 text-xs leading-5 text-[#667085]">{note}</p>}
     </div>
   );
 }
 
-function ActionCard({
+function FactLine({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-4 border-b border-[#eef0f4] py-2 last:border-b-0">
+      <span className="text-sm text-[#667085]">{label}</span>
+      <span className="text-right text-sm font-semibold text-[#1c1c1e]">{value}</span>
+    </div>
+  );
+}
+
+function ChartLinkRow({
   icon: Icon,
   title,
   body,
   to,
-  action,
-  tone = "blue",
 }: {
   icon: LucideIcon;
   title: string;
   body: string;
   to: string;
-  action: string;
-  tone?: Tone;
 }) {
   return (
     <Link
       to={to}
-      className="group flex min-h-[220px] flex-col rounded-2xl bg-white p-5 no-underline shadow-[rgb(224_226_232)_0px_0px_0px_1px] transition-colors hover:bg-[#fbfcff]"
+      className="group grid gap-3 border-b border-[#eef0f4] py-3 no-underline last:border-b-0 sm:grid-cols-[28px_minmax(0,1fr)_auto] sm:items-center"
     >
-      <div className="flex items-start justify-between gap-4">
-        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${toneClasses[tone].icon}`}>
-          <Icon size={18} />
-        </div>
-        <ArrowRight size={16} className="mt-1 text-[#a5a8b5] transition-colors group-hover:text-[#5b76fe]" />
+      <Icon size={17} className="text-[#5b76fe]" />
+      <div className="min-w-0">
+        <p className="text-sm font-semibold text-[#1c1c1e]">{title}</p>
+        <p className="mt-0.5 text-sm leading-5 text-[#667085]">{body}</p>
       </div>
-      <h2 className="mt-4 text-base font-semibold text-[#1c1c1e]">{title}</h2>
-      <p className="mt-2 text-sm leading-6 text-[#667085]">{body}</p>
-      <div className="mt-auto pt-5 text-sm font-semibold text-[#5b76fe]">{action}</div>
+      <span className="inline-flex items-center gap-1 text-sm font-semibold text-[#5b76fe]">
+        Open <ArrowRight size={14} className="transition-transform group-hover:translate-x-0.5" />
+      </span>
     </Link>
+  );
+}
+
+function SourceRow({ source }: { source: CanonicalSourceSummary }) {
+  return (
+    <div className="grid gap-2 border-b border-[#eef0f4] py-2 last:border-b-0 md:grid-cols-[minmax(0,1fr)_150px_110px] md:items-center">
+      <div className="min-w-0">
+        <p className="truncate text-sm font-semibold text-[#1c1c1e]">{source.label}</p>
+        <p className="mt-0.5 text-xs text-[#8d92a3]">{source.kind}</p>
+      </div>
+      <span className={`w-fit rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass(source.status)}`}>
+        {source.status_label}
+      </span>
+      <p className="text-sm text-[#555a6a] md:text-right">{formatNumber(source.total_resources)} facts</p>
+    </div>
   );
 }
 
@@ -148,249 +123,222 @@ export function PatientRecordOverview() {
   const overview = overviewQ.data;
   const canonical = canonicalQ.data;
   const chartName = canonical?.patient_name || overview?.name;
+  const sourceCount = canonical?.source_count ?? 0;
+  const preparedSourceCount = canonical?.prepared_source_count ?? 0;
+  const needsPreparationCount = canonical?.needs_preparation_count ?? Math.max(sourceCount - preparedSourceCount, 0);
+  const reviewItemCount = canonical?.review_item_count ?? 0;
   const readinessPct = canonical
     ? Math.max(
         0,
         Math.min(
           100,
           Math.round(
-            canonical.source_count > 0
-              ? (canonical.prepared_source_count / canonical.source_count) * 100 - Math.min(canonical.review_item_count * 4, 20)
+            sourceCount > 0
+              ? (preparedSourceCount / sourceCount) * 100 - Math.min(reviewItemCount * 4, 20)
               : 0,
           ),
         ),
       )
-    : 78;
+    : 0;
+  const chartFactTotal = canonical?.total_resources ?? overview?.total_resources ?? 0;
+  const chartStatus = !patientId
+    ? "No patient selected"
+    : !canonical
+      ? "Loading chart state"
+      : sourceCount === 0
+        ? "No sources connected"
+        : needsPreparationCount > 0
+          ? "Sources need preparation"
+          : reviewItemCount > 0
+            ? "Review needed before publish"
+            : "Ready for downstream modules";
+
+  const factLines = overview
+    ? [
+        ["Patient", `${Math.floor(overview.age_years)} years · ${overview.gender}`],
+        ["Record span", `${formatDate(overview.earliest_encounter_dt)} to ${formatDate(overview.latest_encounter_dt)}`],
+        ["Active problems", formatNumber(canonical?.canonical_condition_count ?? overview.active_condition_count)],
+        ["Active medications", formatNumber(canonical?.canonical_medication_count ?? overview.active_med_count)],
+        ["Encounters", formatNumber(canonical?.encounter_count ?? overview.encounter_count)],
+        ["Labs and observations", formatNumber(canonical?.canonical_observation_count ?? overview.unique_loinc_count)],
+      ]
+    : canonical
+      ? [
+          ["Workspace", canonical.workspace_id],
+          ["Record span", `${formatDate(canonical.date_start)} to ${formatDate(canonical.date_end)}`],
+          ["Conditions", formatNumber(canonical.canonical_condition_count)],
+          ["Medications", formatNumber(canonical.canonical_medication_count)],
+          ["Encounters", formatNumber(canonical.encounter_count)],
+          ["Labs and observations", formatNumber(canonical.canonical_observation_count)],
+        ]
+      : [];
 
   return (
-    <main className="mx-auto max-w-7xl space-y-5 p-4 lg:p-6">
-      <section className="rounded-3xl bg-white p-6 shadow-[rgb(224_226_232)_0px_0px_0px_1px] lg:p-8">
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-          <div className="max-w-3xl">
-            <p className="inline-flex items-center gap-2 rounded-full bg-[#eef1ff] px-3 py-1 text-xs font-semibold uppercase tracking-wider text-[#5b76fe]">
+    <main className="mx-auto max-w-6xl space-y-5 p-4 lg:p-6">
+      <section className="rounded-lg border border-[#dfe4ea] bg-white px-5 py-5">
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
+          <div className="min-w-0">
+            <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#5b76fe]">
               <Database size={13} />
-          Module Overview
+              Module Overview
             </p>
-            <h1 className="mt-5 text-3xl font-semibold tracking-tight text-[#1c1c1e] lg:text-4xl">
-              {chartName ? `${chartName}'s FHIR Chart` : "The patient-owned FHIR Chart"}
+            <h1 className="mt-2 text-2xl font-semibold tracking-tight text-[#1c1c1e] lg:text-3xl">
+              {chartName ? `${chartName}'s FHIR Chart` : "Patient-owned FHIR Chart"}
             </h1>
-            <p className="mt-3 max-w-3xl text-base leading-7 text-[#667085]">
-              This page reads from the canonical patient workspace: source files are collected, prepared, and exposed as
-              one source-aware chart for downstream modules.
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-[#667085]">
+              This is the operating view for the canonical chart: what data has been collected, what is usable, and what still blocks downstream modules.
             </p>
           </div>
 
-          <div className="min-w-[260px] rounded-2xl bg-[#fafbff] p-4 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-[#a5a8b5]">Activation readiness</p>
+          <div className="border-t border-[#eef0f4] pt-4 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm font-semibold text-[#1c1c1e]">{chartStatus}</p>
+              <span className="text-sm font-semibold text-[#5b76fe]">{readinessPct}%</span>
+            </div>
             <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#e9eaef]">
               <div className="h-full rounded-full bg-[#00b473]" style={{ width: `${readinessPct}%` }} />
             </div>
-            <p className="mt-3 text-sm font-semibold text-[#1c1c1e]">{readinessPct}% module-ready</p>
             <div className="mt-3 space-y-2 text-sm text-[#667085]">
-              <div className="flex items-center gap-2"><CheckCircle2 size={14} className="text-[#00b473]" /> Workspace selected</div>
-              <div className="flex items-center gap-2"><CheckCircle2 size={14} className="text-[#00b473]" /> {canonical?.prepared_source_count ?? 0} prepared sources</div>
-              <div className="flex items-center gap-2"><AlertTriangle size={14} className="text-[#f59e0b]" /> {canonical?.review_item_count ?? 0} review items</div>
+              <div className="flex items-center gap-2">
+                <CheckCircle2 size={14} className="text-[#00b473]" />
+                {preparedSourceCount}/{sourceCount} sources prepared
+              </div>
+              <div className="flex items-center gap-2">
+                {reviewItemCount > 0 ? (
+                  <AlertTriangle size={14} className="text-[#f59e0b]" />
+                ) : (
+                  <CheckCircle2 size={14} className="text-[#00b473]" />
+                )}
+                {reviewItemCount} review items
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      <SectionBand
-        label="Chart Takeaways"
-        title="What this page should tell you quickly"
-        body="Start here to know whether the chart has enough connected data, what is usable, and what still needs review."
-        tone="blue"
-      >
-        <div className="grid gap-4 md:grid-cols-3">
-          <StatCard
-            label="Data gathered"
-            value={`${canonical?.source_count ?? 0} sources`}
-            note={`${canonical?.prepared_source_count ?? 0} prepared for canonical use`}
-            tone="blue"
-          />
-          <StatCard
-            label="Usable chart facts"
-            value={(canonical?.total_resources ?? overview?.total_resources ?? 0).toLocaleString()}
-            note="Prepared resources available to downstream modules"
-            tone="teal"
-          />
-          <StatCard
-            label="Needs review"
-            value={`${canonical?.review_item_count ?? 0} items`}
-            note="Unprepared sources or source conflicts before module activation"
-            tone="amber"
-          />
-        </div>
-      </SectionBand>
+      <section className="rounded-lg border border-[#dfe4ea] bg-white p-5">
+        <div className="grid gap-6 lg:grid-cols-[1fr_1.2fr]">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-[#5b76fe]">Data aggregation</p>
+            <h2 className="mt-1 text-lg font-semibold text-[#1c1c1e]">Current chart posture</h2>
+            <p className="mt-2 text-sm leading-6 text-[#667085]">
+              Aggregation should answer three questions without ceremony: how many sources are connected, how much is prepared, and what still needs review.
+            </p>
 
-      <section className="grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
-        <div className="rounded-[24px] border border-[#cdeee9] bg-[#f4fffc] p-5">
-          <div className="flex items-center gap-2">
-            <ShieldCheck size={18} className="text-[#0f766e]" />
-            <h2 className="text-lg font-semibold text-[#1c1c1e]">How the chart gets made</h2>
+            <div className="mt-5 grid gap-4 border-y border-[#eef0f4] py-4 sm:grid-cols-2">
+              <MetricText label="Sources" value={formatNumber(sourceCount)} note={`${preparedSourceCount} prepared`} />
+              <MetricText label="Prepared facts" value={formatNumber(chartFactTotal)} note="available to chart views" />
+              <MetricText label="Needs preparation" value={formatNumber(needsPreparationCount)} note="PDFs or files pending processing" />
+              <MetricText label="Review items" value={formatNumber(reviewItemCount)} note="conflicts or unresolved decisions" />
+            </div>
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Link to={withPatient("/aggregate/sources", patientId)} className="inline-flex items-center gap-1 rounded-lg bg-[#5b76fe] px-3 py-2 text-sm font-semibold text-white">
+                Source Intake <ArrowRight size={14} />
+              </Link>
+              <Link to={withPatient("/aggregate/harmonize", patientId)} className="inline-flex items-center gap-1 rounded-lg border border-[#dfe4ea] px-3 py-2 text-sm font-semibold text-[#555a6a] hover:border-[#5b76fe] hover:text-[#5b76fe]">
+                Harmonized Record
+              </Link>
+              <Link to={withPatient("/aggregate/publish", patientId)} className="inline-flex items-center gap-1 rounded-lg border border-[#dfe4ea] px-3 py-2 text-sm font-semibold text-[#555a6a] hover:border-[#5b76fe] hover:text-[#5b76fe]">
+                Publish Chart
+              </Link>
+            </div>
           </div>
-          <div className="mt-5 grid gap-3">
-            {[
-              ["Collect", "Bring patient records together from portals, files, clinics, labs, pharmacies, and payers."],
-              ["Clean", "Turn raw FHIR and other formats into consistent chart facts."],
-              ["Check", "Preserve source links and flag conflicts before any module acts on the chart."],
-              ["Use", "Send clean chart facts into Clinical Insights, Marketplace modules, and sharing packets."],
-            ].map(([title, body]) => (
-              <div key={title} className="rounded-xl border border-[#e9eaef] p-4">
-                <p className="text-sm font-semibold text-[#1c1c1e]">{title}</p>
-                <p className="mt-1 text-sm leading-6 text-[#667085]">{body}</p>
-              </div>
+
+          <div>
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-sm font-semibold text-[#1c1c1e]">Sources feeding this chart</h3>
+              {canonical?.storage_mode && <span className="text-xs text-[#8d92a3]">{canonical.storage_mode}</span>}
+            </div>
+            <div className="mt-3 rounded-lg border border-[#eef0f4] px-3">
+              {canonicalQ.isLoading && <p className="py-3 text-sm text-[#667085]">Loading source summary...</p>}
+              {!canonicalQ.isLoading && canonical?.sources.length ? (
+                canonical.sources.slice(0, 6).map((source) => <SourceRow key={source.id} source={source} />)
+              ) : !canonicalQ.isLoading ? (
+                <p className="py-3 text-sm text-[#667085]">No connected sources yet. Start in Source Intake.</p>
+              ) : null}
+            </div>
+            {canonical && canonical.sources.length > 6 && (
+              <p className="mt-2 text-xs text-[#667085]">Showing 6 of {canonical.sources.length} sources.</p>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <section className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
+        <div className="rounded-lg border border-[#dfe4ea] bg-white p-5">
+          <div className="flex items-center gap-2">
+            <UserRound size={17} className="text-[#5b76fe]" />
+            <h2 className="text-base font-semibold text-[#1c1c1e]">Patient facts in the chart</h2>
+          </div>
+          <div className="mt-4">
+            {!patientId && (
+              <p className="text-sm leading-6 text-[#667085]">Select a patient from the header to populate this overview.</p>
+            )}
+            {patientId && overviewQ.isLoading && !patientId.startsWith("workspace-") && (
+              <p className="text-sm leading-6 text-[#667085]">Loading patient facts...</p>
+            )}
+            {factLines.map(([label, value]) => (
+              <FactLine key={label} label={label} value={value} />
             ))}
           </div>
         </div>
 
-        <div className="rounded-[24px] border border-[#f6dfc9] bg-[#fff8f1] p-5">
+        <div className="rounded-lg border border-[#dfe4ea] bg-white p-5">
           <div className="flex items-center gap-2">
-            <Layers3 size={18} className="text-[#9a5a16]" />
-            <h2 className="text-lg font-semibold text-[#1c1c1e]">Selected patient</h2>
+            <ShieldCheck size={17} className="text-[#0f766e]" />
+            <h2 className="text-base font-semibold text-[#1c1c1e]">Open the chart views</h2>
           </div>
-          <div className="mt-5 space-y-3">
-            {!patientId && (
-              <div className="rounded-xl border border-dashed border-[#d5d9e5] p-5">
-                <div className="flex items-center gap-2">
-                  <UserRound size={16} className="text-[#a5a8b5]" />
-                  <p className="text-sm font-semibold text-[#1c1c1e]">Select a patient to populate this chart.</p>
-                </div>
-                <p className="mt-2 text-sm leading-6 text-[#667085]">
-                  The top patient selector sets the patient context for record, marketplace, and module views.
-                </p>
-              </div>
-            )}
-            {patientId && overviewQ.isLoading && <div className="h-40 animate-pulse rounded-xl bg-[#e9eaef]" />}
-            {overview && (
-              <>
-                <div className="rounded-xl bg-[#fafbff] p-4">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-[#a5a8b5]">Demographics</p>
-                  <p className="mt-1 text-sm font-semibold text-[#1c1c1e]">
-                    {Math.floor(overview.age_years)} years · {overview.gender}
-                  </p>
-                </div>
-                <div className="rounded-xl bg-[#fafbff] p-4">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-[#a5a8b5]">Record span</p>
-                  <p className="mt-1 text-sm font-semibold text-[#1c1c1e]">
-                    {formatDate(overview.earliest_encounter_dt)} to {formatDate(overview.latest_encounter_dt)}
-                  </p>
-                </div>
-                <div className="rounded-xl bg-[#fafbff] p-4">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-[#a5a8b5]">Module-ready facts</p>
-                  <p className="mt-1 text-sm font-semibold text-[#1c1c1e]">
-                    {canonical?.canonical_condition_count ?? overview.active_condition_count} conditions ·{" "}
-                    {canonical?.canonical_medication_count ?? overview.active_med_count} meds ·{" "}
-                    {canonical?.encounter_count ?? overview.encounter_count} encounters
-                  </p>
-                </div>
-              </>
-            )}
-            {patientId && !overview && !overviewQ.isLoading && canonical && (
-              <>
-                <div className="rounded-xl bg-[#fafbff] p-4">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-[#a5a8b5]">Workspace</p>
-                  <p className="mt-1 text-sm font-semibold text-[#1c1c1e]">{canonical.workspace_id}</p>
-                </div>
-                <div className="rounded-xl bg-[#fafbff] p-4">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-[#a5a8b5]">Record span</p>
-                  <p className="mt-1 text-sm font-semibold text-[#1c1c1e]">
-                    {formatDate(canonical.date_start)} to {formatDate(canonical.date_end)}
-                  </p>
-                </div>
-                <div className="rounded-xl bg-[#fafbff] p-4">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-[#a5a8b5]">Canonical source posture</p>
-                  <p className="mt-1 text-sm font-semibold text-[#1c1c1e]">
-                    {canonical.source_count} sources · {canonical.total_resources.toLocaleString()} prepared resources
-                  </p>
-                </div>
-              </>
-            )}
+          <div className="mt-3">
+            <ChartLinkRow
+              icon={BarChart3}
+              title="Clinical Snapshot"
+              body="Demographics, active problems, medications, allergies, labs, and provenance."
+              to={withPatient("/explorer", patientId)}
+            />
+            <ChartLinkRow
+              icon={CalendarDays}
+              title="History"
+              body="Longitudinal encounters, conditions, medications, procedures, and immunizations."
+              to={withPatient("/explorer/history", patientId)}
+            />
+            <ChartLinkRow
+              icon={Heart}
+              title="Care Journey"
+              body="Medication episodes, conditions, and care activity on one timeline."
+              to={withPatient("/explorer/care-journey", patientId)}
+            />
+            <ChartLinkRow
+              icon={FileBarChart}
+              title="Labs and Observations"
+              body="Latest observations and raw patient data available to downstream modules."
+              to={withPatient("/explorer/patient-data", patientId)}
+            />
+            <ChartLinkRow
+              icon={Share2}
+              title="Sharing Packet"
+              body="Create a scoped packet for a care team or second opinion."
+              to={withPatient("/sharing", patientId)}
+            />
           </div>
         </div>
       </section>
 
-      <SectionBand
-        label="FHIR Charts"
-        title="What you can do with this chart"
-        body="Open the working views that make the chart useful: a snapshot, timeline, latest observations, source data, and sharing packet."
-        tone="teal"
-      >
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <ActionCard
-            icon={BarChart3}
-            title="Chart Snapshot"
-            body="A fast patient summary with active problems, medications, allergies, labs, and provenance."
-            to={withPatient("/explorer", patientId)}
-            action="Open snapshot"
-            tone="blue"
-          />
-          <ActionCard
-            icon={Activity}
-            title="Medication Episodes"
-            body="Convert fragmented FHIR medication requests into active therapy windows and hold candidates."
-            to={withPatient("/explorer/care-journey", patientId)}
-            action="Review episodes"
-            tone="amber"
-          />
-          <ActionCard
-            icon={FileBarChart}
-            title="Latest Observations"
-            body="Show the most recent labs and vitals that matter for downstream modules."
-            to={withPatient("/explorer/patient-data", patientId)}
-            action="Inspect observations"
-            tone="teal"
-          />
-          <ActionCard
-            icon={ListChecks}
-            title="Critical Review Queue"
-            body="Highlight stale status, conflicting facts, inferred values, and fields that need human review."
-            to={withPatient("/sharing", patientId)}
-            action="Open review queue"
-            tone="slate"
-          />
+      <section className="rounded-lg border border-[#dfe4ea] bg-[#f7f9fc] p-5">
+        <div className="grid gap-3 text-sm leading-6 text-[#667085] md:grid-cols-3">
+          <div className="flex gap-2">
+            <Activity size={16} className="mt-1 shrink-0 text-[#5b76fe]" />
+            <p><span className="font-semibold text-[#1c1c1e]">Collect:</span> add portal exports, PDFs, labs, pharmacy records, and other patient-held files.</p>
+          </div>
+          <div className="flex gap-2">
+            <ListChecks size={16} className="mt-1 shrink-0 text-[#5b76fe]" />
+            <p><span className="font-semibold text-[#1c1c1e]">Clean:</span> prepare sources into consistent chart facts with provenance intact.</p>
+          </div>
+          <div className="flex gap-2">
+            <FileJson2 size={16} className="mt-1 shrink-0 text-[#5b76fe]" />
+            <p><span className="font-semibold text-[#1c1c1e]">Use:</span> publish the reviewed chart into FHIR Charts, Clinical Insights, and marketplace modules.</p>
+          </div>
         </div>
-      </SectionBand>
-
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-        <ActionCard
-          icon={UserRound}
-          title="Summary"
-          body="Clinician-readable patient summary with demographics, active problems, medications, allergies, and labs."
-          to={withPatient("/explorer", patientId)}
-          action="Open summary"
-        />
-        <ActionCard
-          icon={CalendarDays}
-          title="History"
-          body="Longitudinal tables and timelines for encounters, medications, procedures, and immunizations."
-          to={withPatient("/explorer/history", patientId)}
-          action="Open history"
-          tone="slate"
-        />
-        <ActionCard
-          icon={Heart}
-          title="Care Journey"
-          body="Visual timeline of medication episodes, conditions, and care activity."
-          to={withPatient("/explorer/care-journey", patientId)}
-          action="Open timeline"
-          tone="teal"
-        />
-        <ActionCard
-          icon={FileJson2}
-          title="Source Data"
-          body="FHIR bundle metrics, resource distribution, and data quality signals."
-          to={withPatient("/explorer/patient-data", patientId)}
-          action="Open FHIR data"
-          tone="amber"
-        />
-        <ActionCard
-          icon={Share2}
-          title="Sharing"
-          body="Build a second-opinion or care-team packet from this FHIR Chart."
-          to={withPatient("/sharing", patientId)}
-          action="Build packet"
-        />
       </section>
     </main>
   );

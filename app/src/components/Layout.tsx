@@ -17,7 +17,6 @@ import {
   FileSearch,
   FileUp,
   Code2,
-  GraduationCap,
   Heart,
   Layers3,
   MessageSquareText,
@@ -44,7 +43,7 @@ interface LayoutProps {
 }
 
 type FilterMode = "all" | "high_risk" | "needs_review";
-type AppEnvironment = "platform" | "record" | "aggregator" | "clinical" | "marketplace" | "trials" | "medication" | "sharing" | "analysis" | "catalog";
+type AppEnvironment = "platform" | "record" | "aggregator" | "clinical" | "marketplace" | "trials" | "medication" | "sharing" | "analysis";
 type TopArea = "platform" | "record" | "aggregator" | "clinical" | "marketplace" | "internal" | "using-atlas";
 
 interface NavItem {
@@ -380,18 +379,6 @@ const ANALYSIS_NAV_LINKS: NavItem[] = [
     description: "Data format deep dive",
   },
   {
-    to: "/analysis/flight-school",
-    label: "Flight School",
-    icon: GraduationCap,
-    description: "Guided learning missions",
-  },
-  {
-    to: "/analysis/methodology",
-    label: "Methodology",
-    icon: Layers3,
-    description: "Interpretability strategy",
-  },
-  {
     to: "/analysis/definitions",
     label: "Definitions",
     icon: Database,
@@ -406,13 +393,12 @@ const ANALYSIS_NAV_LINKS: NavItem[] = [
 ];
 
 const INTERNAL_NAV_LINKS: NavItem[] = [
-  { to: "/analysis", label: "Module Overview", icon: BookMarked, description: "FHIR education and methodology" },
+  { to: "/analysis", label: "Module Overview", icon: BookMarked, description: "Internal tools overview" },
   { to: "/ai-workspace/trial-finder", label: "AI Workspace", icon: MessageSquareText, description: "Clean agent workspace shell" },
   { to: "/pipeline-lab", label: "Pipeline Lab", icon: DatabaseZap, description: "PDF parser experiment leaderboard" },
   { to: "/analysis/qa-eval-lab", label: "Q&A Eval Lab", icon: MessageSquareText, description: "Clinical question test development" },
   { to: "/analysis/ccda-testing-lab", label: "C-CDA Testing Lab", icon: FileJson2, description: "C-CDA and PDF to FHIR playground" },
   { to: "/ground-truth-review", label: "Reference Review", icon: ClipboardCheck, description: "Human-reviewed benchmark bundles" },
-  { to: "/catalog", label: "Data Catalog", icon: Archive, description: "Platform contracts and schemas" },
   ...ANALYSIS_NAV_LINKS.filter((item) => item.to !== "/analysis"),
 ];
 
@@ -426,7 +412,6 @@ function getEnvironment(pathname: string): AppEnvironment {
   if (pathname.startsWith("/ai-workspace")) return "analysis";
   if (pathname.startsWith("/pipeline-lab")) return "analysis";
   if (pathname.startsWith("/ground-truth-review")) return "analysis";
-  if (pathname.startsWith("/catalog")) return "catalog";
   if (pathname.startsWith("/analysis")) return "analysis";
   if (pathname.startsWith("/aggregate")) return "aggregator";
   if (pathname.startsWith("/clinical-insights")) return "clinical";
@@ -533,18 +518,10 @@ function getWorkspaceCopy(environment: AppEnvironment): { title: string; sidebar
   }
   if (environment === "analysis") {
     return {
-      title: "Data Analysis & Methodology Environment",
+      title: "Internal Tools",
       sidebarTitle: "Data Lab",
-      subtitle: "Definitions, methodology, and reliability evidence",
+      subtitle: "Evaluation, conversion, and benchmark tooling",
       icon: BookMarked,
-    };
-  }
-  if (environment === "catalog") {
-    return {
-      title: "Internal Data Catalog",
-      sidebarTitle: "Data Catalog",
-      subtitle: "Platform contracts, schemas, and module inputs",
-      icon: Archive,
     };
   }
   if (environment === "sharing") {
@@ -567,7 +544,7 @@ function getTopArea(environment: AppEnvironment): TopArea {
   if (environment === "platform") return "platform";
   if (environment === "record") return "record";
   if (environment === "aggregator") return "aggregator";
-  if (environment === "analysis" || environment === "catalog") return "internal";
+  if (environment === "analysis") return "internal";
   if (environment === "marketplace" || environment === "trials" || environment === "medication" || environment === "sharing") {
     return "marketplace";
   }
@@ -1267,7 +1244,7 @@ export function Layout({ children }: LayoutProps) {
   const environment: AppEnvironment = getEnvironment(location.pathname);
   const isPlatform = environment === "platform";
   const isAnalysis = environment === "analysis";
-  const isInternal = environment === "analysis" || environment === "catalog";
+  const isInternal = environment === "analysis";
   const clinicalNavGroups = getClinicalNavGroups(environment);
   const workspace = getWorkspaceCopy(environment);
   const WorkspaceIcon = workspace.icon;
@@ -1403,9 +1380,7 @@ export function Layout({ children }: LayoutProps) {
     { key: "qaEvalLab", label: "Q&A Eval Lab", to: "/analysis/qa-eval-lab" },
     { key: "ccdaLab", label: "C-CDA Testing Lab", to: "/analysis/ccda-testing-lab" },
     { key: "referenceReview", label: "Reference Review", to: "/ground-truth-review" },
-    { key: "catalog", label: "Data Catalog", to: "/catalog" },
     { key: "primer", label: "FHIR Primer", to: "/analysis/fhir-primer" },
-    { key: "methodology", label: "Methodology", to: "/analysis/methodology" },
     { key: "coverage", label: "Coverage", to: "/analysis/coverage" },
   ];
 
@@ -1509,9 +1484,7 @@ export function Layout({ children }: LayoutProps) {
       return location.pathname.startsWith("/analysis/ccda-testing-lab") || location.pathname.startsWith("/ccda-lab");
     }
     if (key === "referenceReview") return location.pathname.startsWith("/ground-truth-review");
-    if (key === "catalog") return location.pathname.startsWith("/catalog");
     if (key === "primer") return location.pathname.startsWith("/analysis/fhir-primer");
-    if (key === "methodology") return location.pathname.startsWith("/analysis/methodology");
     if (key === "coverage") return location.pathname.startsWith("/analysis/coverage");
     return false;
   };

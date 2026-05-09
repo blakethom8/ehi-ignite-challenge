@@ -1,5 +1,5 @@
 import { Suspense, lazy, type ComponentType } from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { Layout } from "./components/Layout";
@@ -23,6 +23,14 @@ function lazyNamed<TModule extends Record<string, unknown>>(
 function PageFallback() {
   return (
     <div className="flex min-h-[360px] items-center justify-center p-8">
+      <div className="h-12 w-12 rounded-full border-4 border-[#dfe4ea] border-t-[#5b76fe]" />
+    </div>
+  );
+}
+
+function FullscreenPageFallback() {
+  return (
+    <div className="flex h-screen items-center justify-center bg-[#f7f8fb] p-8">
       <div className="h-12 w-12 rounded-full border-4 border-[#dfe4ea] border-t-[#5b76fe]" />
     </div>
   );
@@ -53,7 +61,6 @@ const MedicationAccess = lazyNamed(() => import("./pages/Modules/MedicationAcces
 const Marketplace = lazyNamed(() => import("./pages/Modules/Marketplace"), "Marketplace");
 const MarketplaceConcept = lazyNamed(() => import("./pages/Modules/MarketplaceConcept"), "MarketplaceConcept");
 const DataSharing = lazyNamed(() => import("./pages/Modules/DataSharing"), "DataSharing");
-const DataCatalog = lazyNamed(() => import("./pages/Modules/DataCatalog"), "DataCatalog");
 const PublishReadinessPage = lazyNamed(() => import("./pages/Modules/DataAggregator/PublishReadinessPage"), "PublishReadinessPage");
 const SourceIntakePage = lazyNamed(() => import("./pages/Modules/DataAggregator/SourceIntakePage"), "SourceIntakePage");
 const WorkspaceLibraryPage = lazyNamed(() => import("./pages/Modules/DataAggregator/WorkspaceLibraryPage"), "WorkspaceLibraryPage");
@@ -66,10 +73,8 @@ const PatientMemoryView = lazyNamed(() => import("./pages/Modules/PatientMemoryV
 const PatientContext = lazyNamed(() => import("./pages/Modules/PatientContext"), "PatientContext");
 const AggregationMethodology = lazyNamed(() => import("./pages/Modules/AggregationMethodology"), "AggregationMethodology");
 const AnalysisOverview = lazyNamed(() => import("./pages/Analysis/Overview"), "AnalysisOverview");
-const AnalysisMethodology = lazyNamed(() => import("./pages/Analysis/Methodology"), "AnalysisMethodology");
 const AnalysisDefinitions = lazyNamed(() => import("./pages/Analysis/Definitions"), "AnalysisDefinitions");
 const AnalysisCoverage = lazyNamed(() => import("./pages/Analysis/Coverage"), "AnalysisCoverage");
-const AnalysisFlightSchool = lazyNamed(() => import("./pages/Analysis/FlightSchool"), "AnalysisFlightSchool");
 const AnalysisFhirPrimer = lazyNamed(() => import("./pages/Analysis/FhirPrimer"), "AnalysisFhirPrimer");
 const QaEvalLab = lazyNamed(() => import("./pages/Analysis/QaEvalLab"), "QaEvalLab");
 const PipelineLab = lazyNamed(() => import("./pages/PipelineLab/Leaderboard"), "PipelineLab");
@@ -86,7 +91,10 @@ const queryClient = new QueryClient({
   },
 });
 
-export default function App() {
+function AppShell() {
+  const location = useLocation();
+  const isFullscreenWorkspace = location.pathname.startsWith("/ai-workspace");
+
   const routes = [
     { path: "/platform", element: <PlatformEntry /> },
     { path: "/charts", element: <PatientRecordOverview /> },
@@ -143,46 +151,65 @@ export default function App() {
     { path: "/second-opinion", element: <DataSharing /> },
     { path: "/analysis", element: <AnalysisOverview /> },
     { path: "/analysis/fhir-primer", element: <AnalysisFhirPrimer /> },
-    { path: "/analysis/methodology", element: <AnalysisMethodology /> },
     { path: "/analysis/definitions", element: <AnalysisDefinitions /> },
     { path: "/analysis/coverage", element: <AnalysisCoverage /> },
-    { path: "/analysis/flight-school", element: <AnalysisFlightSchool /> },
     { path: "/analysis/ccda-testing-lab", element: <CcdaPipelineLab /> },
     { path: "/analysis/qa-eval-lab", element: <QaEvalLab /> },
     { path: "/pipeline-lab", element: <PipelineLab /> },
     { path: "/ccda-lab", element: <CcdaPipelineLab /> },
     { path: "/ground-truth-review", element: <GroundTruthReview /> },
     { path: "/ground-truth-review/:runId", element: <GroundTruthReview /> },
-    { path: "/ai-workspace/trial-finder", element: <TrialFinderWorkspace /> },
-    { path: "/catalog", element: <DataCatalog /> },
   ];
 
+  const fullscreenRoutes = [
+    { path: "/ai-workspace/trial-finder", element: <TrialFinderWorkspace /> },
+  ];
+
+  return (
+    <>
+      <Routes>
+        <Route path="/" element={<Landing />} />
+        <Route path="/architecture" element={<PlatformArchitecture />} />
+        <Route path="/records-pool" element={<PatientRecordPool />} />
+        <Route path="/guided-tour" element={<GuidedTour />} />
+        <Route path="/using-atlas/*" element={<Suspense fallback={<PageFallback />}><UsingAtlasRoutes /></Suspense>} />
+        {routes.map((route) => (
+          <Route
+            key={route.path}
+            path={route.path}
+            element={
+              <Layout>
+                <Suspense fallback={<PageFallback />}>
+                  {route.element}
+                </Suspense>
+              </Layout>
+            }
+          />
+        ))}
+        {fullscreenRoutes.map((route) => (
+          <Route
+            key={route.path}
+            path={route.path}
+            element={
+              <Suspense fallback={<FullscreenPageFallback />}>
+                {route.element}
+              </Suspense>
+            }
+          />
+        ))}
+      </Routes>
+      {!isFullscreenWorkspace && <ChatWidget />}
+    </>
+  );
+}
+
+export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <AppErrorBoundary>
           <ChatProvider>
-            <Routes>
-              <Route path="/" element={<Landing />} />
-              <Route path="/architecture" element={<PlatformArchitecture />} />
-              <Route path="/records-pool" element={<PatientRecordPool />} />
-              <Route path="/guided-tour" element={<GuidedTour />} />
-              <Route path="/using-atlas/*" element={<Suspense fallback={<PageFallback />}><UsingAtlasRoutes /></Suspense>} />
-              {routes.map((route) => (
-                <Route
-                  key={route.path}
-                  path={route.path}
-                  element={
-                    <Layout>
-                      <Suspense fallback={<PageFallback />}>
-                        {route.element}
-                      </Suspense>
-                    </Layout>
-                  }
-                />
-              ))}
-            </Routes>
-            <ChatWidget />
+            <AppShell />
           </ChatProvider>
         </AppErrorBoundary>
       </BrowserRouter>

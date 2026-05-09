@@ -76,11 +76,11 @@ export function AnalysisOverview() {
             Module Overview
           </p>
           <h1 className="mt-3 max-w-4xl text-3xl font-semibold tracking-tight text-[#0f172a] lg:text-4xl">
-            FHIR Data Definitions and Methodology
+            Internal Tools
           </h1>
           <p className="mt-3 max-w-5xl text-sm leading-6 text-[#35524d] lg:text-base">
-            This module is the public-facing tutorial surface for understanding what we ingest from FHIR,
-            how we interpret it, and which signals are safe to operationalize in clinical workflows.
+            This section is for active evaluation and conversion tooling: pipeline tests, C-CDA/PDF conversion,
+            reference review, coverage checks, and the remaining FHIR reference material.
           </p>
 
           <div className="mt-5 border-t border-[#b7e6dc]/70 pt-4">

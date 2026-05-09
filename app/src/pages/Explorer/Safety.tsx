@@ -174,14 +174,14 @@ function FlagCard({ flag }: { flag: SafetyFlag }) {
         </div>
       )}
 
-      {/* Methodology chip — only on cards with an AI-derived flag */}
+      {/* Reliability chip — only on cards with an AI-derived flag */}
       {flag.status !== "NONE" && (
         <div className="border-t border-[#e9eaef] px-5 py-2.5 flex justify-end">
           <Link
-            to="/analysis/methodology"
+            to="/analysis/coverage"
             className="text-[11px] text-[#a5a8b5] hover:text-[#5b76fe] hover:underline transition-colors"
           >
-            Why you can trust this · Methodology →
+            Why you can trust this · Coverage →
           </Link>
         </div>
       )}

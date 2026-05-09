@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { FormEvent } from "react";
+import type { DragEvent, FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -276,6 +276,9 @@ const containsOptions = [
   "Not sure",
 ];
 
+const sourceFileAccept =
+  ".pdf,.json,.ndjson,.xml,.csv,.txt,.jpg,.jpeg,.png,.heic,application/pdf,application/json,text/csv,text/xml";
+
 const emptyUploadForm = {
   data_type: "PDF report",
   source_name: "",
@@ -293,6 +296,17 @@ function bytesLabel(bytes: number): string {
   if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
   if (bytes >= 1024) return `${Math.round(bytes / 1024)} KB`;
   return `${bytes} B`;
+}
+
+function dragIncludesFiles(event: DragEvent<HTMLElement>): boolean {
+  return Array.from(event.dataTransfer.types).includes("Files");
+}
+
+function firstDroppedFile(event: DragEvent<HTMLElement>): File | null {
+  const itemFile = Array.from(event.dataTransfer.items ?? [])
+    .find((item) => item.kind === "file")
+    ?.getAsFile();
+  return itemFile ?? event.dataTransfer.files?.[0] ?? null;
 }
 
 function parseStatusClass(status: AggregationUploadedFile["parse_status"]): string {
@@ -954,6 +968,15 @@ function UploadDetailModal({
   onSubmit: (event: FormEvent) => void;
 }) {
   const modalInputRef = useRef<HTMLInputElement | null>(null);
+  const [isFileDragActive, setIsFileDragActive] = useState(false);
+
+  function handleFileDrop(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsFileDragActive(false);
+    const droppedFile = firstDroppedFile(event);
+    if (droppedFile) onFileChange(droppedFile);
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[#101828]/35 px-4 py-8 backdrop-blur-[2px]">
@@ -1037,21 +1060,42 @@ function UploadDetailModal({
           </section>
 
           <aside className="space-y-4">
-            <div className="rounded-lg border border-[#dfe4ea] bg-[#f8faff] p-4">
+            <div
+              className={cls(
+                "rounded-lg border bg-[#f8faff] p-4 transition-colors",
+                isFileDragActive ? "border-[#5b76fe] bg-[#eef2ff]" : "border-[#dfe4ea]",
+              )}
+              onDragEnter={(event) => {
+                if (!dragIncludesFiles(event)) return;
+                event.preventDefault();
+                setIsFileDragActive(true);
+              }}
+              onDragOver={(event) => {
+                if (!dragIncludesFiles(event)) return;
+                event.preventDefault();
+                event.dataTransfer.dropEffect = "copy";
+                setIsFileDragActive(true);
+              }}
+              onDragLeave={(event) => {
+                if (event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget)) return;
+                setIsFileDragActive(false);
+              }}
+              onDrop={handleFileDrop}
+            >
               <div className="flex items-start gap-4 rounded-xl border border-[#dfe4ff] bg-[#fafbff] p-4">
                 <div className="flex h-20 w-16 shrink-0 items-center justify-center rounded-lg bg-white text-sm font-bold text-[#5b76fe] shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
                   FILE
                 </div>
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-[#1c1c1e]">{file?.name || "No file selected"}</p>
-                  <p className="mt-1 text-sm text-[#667085]">{file ? `${bytesLabel(file.size)} · ${file.type || "unknown type"}` : "Choose a file to continue."}</p>
+                  <p className="mt-1 text-sm text-[#667085]">{file ? `${bytesLabel(file.size)} · ${file.type || "unknown type"}` : "Drop a file here or choose one to continue."}</p>
                 </div>
               </div>
               <input
                 ref={modalInputRef}
                 type="file"
                 className="hidden"
-                accept=".pdf,.json,.ndjson,.xml,.csv,.txt,.jpg,.jpeg,.png,.heic,application/pdf,application/json,text/csv,text/xml"
+                accept={sourceFileAccept}
                 onChange={(event) => onFileChange(event.target.files?.[0] ?? null)}
               />
               <button type="button" onClick={() => modalInputRef.current?.click()} className="mt-4 w-full rounded-lg border border-[#dfe4ea] px-3 py-2 text-sm font-semibold text-[#555a6a]">
@@ -1101,6 +1145,7 @@ function SourceInventoryPage({
   const [sourceTypesOpen, setSourceTypesOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [selectedSource, setSelectedSource] = useState<SourceSelection | null>(null);
+  const [isSourceDropActive, setIsSourceDropActive] = useState(false);
   const [activeExtractJobId, setActiveExtractJobId] = useState<string | null>(null);
   const lastFinalizedExtractJobRef = useRef<string | null>(null);
   const pendingUploadedSelectionRef = useRef<string | null>(null);
@@ -1253,6 +1298,14 @@ function SourceInventoryPage({
     deleteMutation.mutate(file.file_id);
   }
 
+  function handleSourceDrop(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsSourceDropActive(false);
+    const droppedFile = firstDroppedFile(event);
+    if (droppedFile) openUpload(droppedFile);
+  }
+
   return (
     <div className="space-y-5">
       {uploadModalOpen && (
@@ -1331,7 +1384,28 @@ function SourceInventoryPage({
       )}
 
       <section className="space-y-4">
-        <div className="overflow-hidden rounded-lg border border-[#dfe4ea] bg-white">
+        <div
+          className={cls(
+            "overflow-hidden rounded-lg border bg-white transition-colors",
+            isSourceDropActive ? "border-[#5b76fe] bg-[#f8faff]" : "border-[#dfe4ea]",
+          )}
+          onDragEnter={(event) => {
+            if (!dragIncludesFiles(event)) return;
+            event.preventDefault();
+            setIsSourceDropActive(true);
+          }}
+          onDragOver={(event) => {
+            if (!dragIncludesFiles(event)) return;
+            event.preventDefault();
+            event.dataTransfer.dropEffect = "copy";
+            setIsSourceDropActive(true);
+          }}
+          onDragLeave={(event) => {
+            if (event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget)) return;
+            setIsSourceDropActive(false);
+          }}
+          onDrop={handleSourceDrop}
+        >
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#eef0f5] px-4 py-3">
             <div className="flex items-center gap-2">
               <FileText size={18} className="text-[#5b76fe]" />
@@ -1341,6 +1415,31 @@ function SourceInventoryPage({
               <FileUp size={15} />
               Add file
             </button>
+          </div>
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => openUpload()}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                openUpload();
+              }
+            }}
+            className={cls(
+              "m-4 flex min-h-24 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed px-4 py-5 text-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#5b76fe]",
+              isSourceDropActive
+                ? "border-[#5b76fe] bg-[#eef2ff] text-[#4157d8]"
+                : "border-[#cfd7e6] bg-[#fafbff] text-[#667085] hover:border-[#5b76fe] hover:bg-[#f8faff]",
+            )}
+          >
+            <FileUp size={22} className={isSourceDropActive ? "text-[#5b76fe]" : "text-[#667085]"} />
+            <p className="mt-2 text-sm font-semibold text-[#1c1c1e]">
+              {isSourceDropActive ? "Drop to add this file" : "Drag and drop a file here"}
+            </p>
+            <p className="mt-1 max-w-xl text-xs leading-5">
+              PDFs, FHIR JSON, C-CDA/XML, lab reports, CSVs, images, and text files open the same source details form before saving.
+            </p>
           </div>
           {sourceCount ? (
             <div className="divide-y divide-[#eef0f4]">

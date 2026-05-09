@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Link } from "react-router-dom";
 import {
+  ArrowLeft,
   ChevronsLeft,
   ChevronsRight,
   Info,
@@ -62,12 +64,12 @@ function loadLayout(storageKey: string, definition: WorkspaceDefinition): Layout
 }
 
 function roleTone(role: WorkspaceSurfaceDefinition["role"]): string {
-  if (role === "chat") return "bg-[#eef1ff] text-[#4d63d8]";
-  if (role === "inspector") return "bg-[#f4ecff] text-[#6d28d9]";
-  if (role === "management") return "bg-[#edf9f5] text-[#047857]";
-  if (role === "source") return "bg-[#fff7ed] text-[#b86e00]";
-  if (role === "artifact") return "bg-[#f7f8fc] text-[#475569]";
-  return "bg-[#f5f7fb] text-[#344054]";
+  if (role === "chat") return "bg-[#5b76fe]";
+  if (role === "inspector") return "bg-[#9b72cf]";
+  if (role === "management") return "bg-[#00b473]";
+  if (role === "source") return "bg-[#e6a43a]";
+  if (role === "artifact") return "bg-[#667085]";
+  return "bg-[#8aa6ff]";
 }
 
 export function WorkspaceFrame({ definition, storageKey, renderSurface }: WorkspaceFrameProps) {
@@ -134,39 +136,69 @@ export function WorkspaceFrame({ definition, storageKey, renderSurface }: Worksp
     : openSurfaces;
 
   return (
-    <div className="min-h-[calc(100vh-126px)] bg-[#f6f7fb] text-[#1c1c1e]">
-      <div className="border-b border-[#dfe4ea] bg-white px-4 py-3">
+    <div className="flex h-screen min-h-0 flex-col overflow-hidden bg-[#f4f6fa] text-[#1c1c1e]">
+      <div className="shrink-0 border-b border-[#e3e7ef] bg-white/95 px-4 py-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded bg-[#eef1ff] px-2 py-1 text-xs font-semibold uppercase tracking-wide text-[#5b76fe]">
-                AI Workspace
-              </span>
-              <span className="text-xs font-medium text-[#7a8190]">{definition.primarySkill}</span>
+          <div className="flex min-w-0 items-center gap-3">
+            <Link
+              to="/clinical-insights"
+              aria-label="Exit workspace"
+              title="Exit workspace"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#dfe4ea] bg-white text-[#667085] transition hover:border-[#cfd7ff] hover:text-[#1c1c1e]"
+            >
+              <ArrowLeft size={16} />
+            </Link>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-[#00b473]" />
+                <span className="text-[11px] font-semibold uppercase text-[#667085]">Clinical trials</span>
+              </div>
+              <h1 className="mt-0.5 truncate text-lg font-semibold text-[#111827]">{definition.title}</h1>
             </div>
-            <h1 className="mt-1 text-xl font-semibold text-[#111827]">{definition.title}</h1>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+
+          <div className="flex min-w-0 flex-1 items-center justify-end gap-3">
+            <div className="hidden min-w-0 items-center gap-1 overflow-x-auto rounded-xl border border-[#e3e7ef] bg-[#f7f8fb] p-1 lg:flex">
+              {definition.defaultSurfaces.map((surface) => {
+                const state = layout[surface.id];
+                const open = state?.open ?? false;
+                return (
+                  <button
+                    key={surface.id}
+                    type="button"
+                    onClick={() => updateSurface(surface.id, { open: !open, collapsed: false })}
+                    className={`inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                      open
+                        ? "bg-white text-[#1c1c1e] shadow-[rgb(224_226_232)_0px_0px_0px_1px]"
+                        : "text-[#667085] hover:bg-white/70 hover:text-[#1c1c1e]"
+                    }`}
+                  >
+                    <span className={`h-1.5 w-1.5 rounded-full ${roleTone(surface.role)}`} />
+                    {surface.title}
+                  </button>
+                );
+              })}
+            </div>
             <button
               type="button"
               onClick={() => setOverviewOpen(true)}
-              className="inline-flex items-center gap-2 rounded border border-[#dfe4ea] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:border-[#cfd7ff]"
+              title="Overview"
+              className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#dfe4ea] bg-white text-[#667085] transition hover:border-[#cfd7ff] hover:text-[#1c1c1e]"
             >
               <Info size={16} />
-              Overview
             </button>
             <button
               type="button"
               onClick={resetLayout}
-              className="inline-flex items-center gap-2 rounded border border-[#dfe4ea] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:border-[#cfd7ff]"
+              title="Reset layout"
+              className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#dfe4ea] bg-white text-[#667085] transition hover:border-[#cfd7ff] hover:text-[#1c1c1e]"
             >
               <RotateCcw size={16} />
-              Reset layout
             </button>
           </div>
         </div>
 
-        <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+        <div className="mt-3 flex gap-1 overflow-x-auto pb-1 lg:hidden">
           {definition.defaultSurfaces.map((surface) => {
             const state = layout[surface.id];
             const open = state?.open ?? false;
@@ -175,15 +207,13 @@ export function WorkspaceFrame({ definition, storageKey, renderSurface }: Worksp
                 key={surface.id}
                 type="button"
                 onClick={() => updateSurface(surface.id, { open: !open, collapsed: false })}
-                className={`inline-flex shrink-0 items-center gap-2 rounded border px-3 py-2 text-sm font-medium ${
+                className={`inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-semibold ${
                   open
-                    ? "border-[#cfd7ff] bg-[#f8f9ff] text-[#1d2433]"
-                    : "border-[#e8edf3] bg-white text-[#667085] hover:border-[#cfd7ff]"
+                    ? "bg-white text-[#1c1c1e] shadow-[rgb(224_226_232)_0px_0px_0px_1px]"
+                    : "text-[#667085] hover:bg-white/70 hover:text-[#1c1c1e]"
                 }`}
               >
-                <span className={`rounded px-1.5 py-0.5 text-[11px] font-semibold uppercase ${roleTone(surface.role)}`}>
-                  {surface.role}
-                </span>
+                <span className={`h-1.5 w-1.5 rounded-full ${roleTone(surface.role)}`} />
                 {surface.title}
               </button>
             );
@@ -191,7 +221,7 @@ export function WorkspaceFrame({ definition, storageKey, renderSurface }: Worksp
         </div>
       </div>
 
-      <div className="flex h-[calc(100vh-254px)] min-h-[620px] gap-0 overflow-x-auto overflow-y-hidden">
+      <div className="flex min-h-0 flex-1 gap-3 overflow-x-auto overflow-y-hidden p-3">
         {visibleSurfaces.length === 0 ? (
           <div className="flex flex-1 items-center justify-center p-8">
             <div className="max-w-md border border-[#dfe4ea] bg-white p-6 text-center">
@@ -207,16 +237,16 @@ export function WorkspaceFrame({ definition, storageKey, renderSurface }: Worksp
             return (
               <section
                 key={surface.id}
-                className="relative flex shrink-0 flex-col border-r border-[#dfe4ea] bg-white"
+                className="group relative flex shrink-0 flex-col overflow-hidden rounded-xl border border-[#e1e6ef] bg-white shadow-[rgba(17,24,39,0.04)_0px_12px_28px]"
                 style={{ width }}
               >
-                <div className="flex h-12 shrink-0 items-center gap-2 border-b border-[#eef2f6] px-3">
+                <div className="flex h-11 shrink-0 items-center gap-2 border-b border-[#eef2f6] bg-white px-3">
                   <button
                     type="button"
                     onClick={() => updateSurface(surface.id, { collapsed: !state.collapsed })}
                     disabled={!surface.canCollapse}
                     title={state.collapsed ? "Expand pane" : "Collapse pane"}
-                    className="flex h-8 w-8 items-center justify-center rounded text-[#667085] hover:bg-[#f5f6f8] disabled:cursor-not-allowed disabled:opacity-30"
+                    className="flex h-7 w-7 items-center justify-center rounded-lg text-[#667085] hover:bg-[#f5f6f8] disabled:cursor-not-allowed disabled:opacity-30"
                   >
                     {state.collapsed ? <ChevronsRight size={16} /> : <ChevronsLeft size={16} />}
                   </button>
@@ -224,14 +254,13 @@ export function WorkspaceFrame({ definition, storageKey, renderSurface }: Worksp
                     <>
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-sm font-semibold text-[#1d2433]">{surface.title}</div>
-                        <div className="text-[11px] font-medium uppercase text-[#98a2b3]">{surface.role}</div>
                       </div>
                       {surface.canFullscreen && (
                         <button
                           type="button"
                           onClick={() => setFullscreenSurfaceId(fullscreen ? null : surface.id)}
                           title={fullscreen ? "Restore pane" : "Fullscreen pane"}
-                          className="flex h-8 w-8 items-center justify-center rounded text-[#667085] hover:bg-[#f5f6f8]"
+                          className="flex h-7 w-7 items-center justify-center rounded-lg text-[#667085] hover:bg-[#f5f6f8]"
                         >
                           {fullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
                         </button>
@@ -240,7 +269,7 @@ export function WorkspaceFrame({ definition, storageKey, renderSurface }: Worksp
                         type="button"
                         onClick={() => updateSurface(surface.id, { open: false })}
                         title="Close pane"
-                        className="flex h-8 w-8 items-center justify-center rounded text-[#667085] hover:bg-[#fff5f5] hover:text-[#b42318]"
+                        className="flex h-7 w-7 items-center justify-center rounded-lg text-[#667085] hover:bg-[#fff5f5] hover:text-[#b42318]"
                       >
                         <PanelLeftClose size={15} />
                       </button>

@@ -2,17 +2,17 @@ import type { WorkspaceDefinition } from "./contracts";
 
 export const trialFinderWorkspace: WorkspaceDefinition = {
   id: "clinical-trials.trial-finder",
-  title: "Trial Finder Workspace",
+  title: "Trial Finder",
   description:
     "A chat-first agent workspace for finding, reviewing, selecting, and managing clinical-trial pursuits for a patient.",
   primarySkill: "trial-matching",
   defaultSurfaces: [
     {
       id: "chat",
-      title: "Agent Chat",
+      title: "Chat",
       role: "chat",
       defaultOpen: true,
-      defaultWidth: 520,
+      defaultWidth: 390,
       minWidth: 360,
       canCollapse: false,
       canFullscreen: true,
@@ -20,10 +20,10 @@ export const trialFinderWorkspace: WorkspaceDefinition = {
     },
     {
       id: "trial-candidates",
-      title: "Candidate Trials",
+      title: "Matches",
       role: "canvas",
       defaultOpen: true,
-      defaultWidth: 520,
+      defaultWidth: 470,
       minWidth: 380,
       canCollapse: true,
       canFullscreen: true,
@@ -31,10 +31,10 @@ export const trialFinderWorkspace: WorkspaceDefinition = {
     },
     {
       id: "trial-detail",
-      title: "Trial Detail",
+      title: "Review",
       role: "canvas",
       defaultOpen: true,
-      defaultWidth: 480,
+      defaultWidth: 490,
       minWidth: 360,
       canCollapse: true,
       canFullscreen: true,

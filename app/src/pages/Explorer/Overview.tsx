@@ -1105,13 +1105,13 @@ export function ExplorerOverview() {
           ))}
         </ul>
 
-        {/* Flight School banner */}
+        {/* Primer banner */}
         <div className="mt-5 max-w-xs w-full rounded-xl border border-[#b2e8e0] bg-[#f0faf8] px-4 py-3 text-left">
           <Link
-            to="/analysis/flight-school"
+            to="/analysis/fhir-primer"
             className="text-sm text-[#187574] hover:underline"
           >
-            First time here? Take the 15-minute Flight School →
+            First time here? Open the FHIR primer →
           </Link>
         </div>
 

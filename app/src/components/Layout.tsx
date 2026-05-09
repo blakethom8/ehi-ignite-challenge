@@ -83,30 +83,6 @@ interface ModuleWorkspaceMap {
   sections: ModuleMapSection[];
 }
 
-const MARKETPLACE_PINNED_STORAGE_KEY = "ehi-marketplace-pinned-modules";
-const DEFAULT_MARKETPLACE_PINNED_IDS = ["trials", "medication-access", "payer-check", "second-opinion"];
-const MARKETPLACE_PINNED_LINK_OPTIONS = [
-  { id: "trials", key: "trialMatch", label: "Trial Match", path: "/skills/trial-finder" },
-  { id: "medication-access", key: "medAccess", label: "Med Access", path: "/medication-access" },
-  { id: "payer-check", key: "payerCheck", label: "Payer Check", path: "/payer-check" },
-  { id: "second-opinion", key: "secondOpinion", label: "Second Opinion", path: "/second-opinion" },
-  { id: "grants", key: "grants", label: "Grants", path: "/grants" },
-  { id: "research-opportunities", key: "research", label: "Research", path: "/research-opportunities" },
-  { id: "caregiver-sharing", key: "sharing", label: "Caregiver Packet", path: "/sharing" },
-];
-
-function loadMarketplacePinnedIds(): string[] {
-  try {
-    const raw = localStorage.getItem(MARKETPLACE_PINNED_STORAGE_KEY);
-    if (!raw) return DEFAULT_MARKETPLACE_PINNED_IDS;
-    const parsed = JSON.parse(raw) as unknown;
-    if (Array.isArray(parsed)) return parsed.filter((id): id is string => typeof id === "string");
-    return DEFAULT_MARKETPLACE_PINNED_IDS;
-  } catch {
-    return DEFAULT_MARKETPLACE_PINNED_IDS;
-  }
-}
-
 const MODULE_WORKSPACE_MAPS: ModuleWorkspaceMap[] = [
   {
     basePath: "/preop",
@@ -1219,7 +1195,6 @@ export function Layout({ children }: LayoutProps) {
 
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [patientPickerOpen, setPatientPickerOpen] = useState(false);
-  const [marketplacePinnedIds, setMarketplacePinnedIds] = useState<string[]>(loadMarketplacePinnedIds);
   const [moduleMapOpen, setModuleMapOpen] = useState(true);
   const [openModuleMapSections, setOpenModuleMapSections] = useState<Set<string>>(() => new Set(["trial-review"]));
   const [createWorkspaceOpen, setCreateWorkspaceOpen] = useState(false);
@@ -1243,7 +1218,6 @@ export function Layout({ children }: LayoutProps) {
 
   const environment: AppEnvironment = getEnvironment(location.pathname);
   const isPlatform = environment === "platform";
-  const isAnalysis = environment === "analysis";
   const isInternal = environment === "analysis";
   const clinicalNavGroups = getClinicalNavGroups(environment);
   const workspace = getWorkspaceCopy(environment);
@@ -1259,30 +1233,30 @@ export function Layout({ children }: LayoutProps) {
     : getTopArea(environment);
   const activeModuleMap = getActiveModuleMap(location.pathname);
   const ActiveModuleMapIcon = activeModuleMap?.icon;
-  const headerHeight = isPlatform ? 76 : 126;
+  const headerHeight = 72;
   const sidebarTone =
     topArea === "clinical"
       ? {
-          icon: "text-[#9a5a16]",
-          active: "bg-[#fff1df] font-medium text-[#9a5a16]",
-          activeCollapsed: "bg-[#fff1df] text-[#9a5a16]",
-          group: "text-[#9a5a16]",
-          hover: "hover:bg-[#fff8f1] hover:text-[#1c1c1e]",
+          icon: "text-[#8f5f2e]",
+          active: "border-[#8f5f2e] bg-[#f3eee7] font-medium text-[#171717]",
+          activeCollapsed: "bg-[#f3eee7] text-[#171717]",
+          group: "text-[#8f5f2e]",
+          hover: "hover:bg-[#f3eee7] hover:text-[#171717]",
         }
       : topArea === "record"
         ? {
-            icon: "text-[#0f766e]",
-            active: "bg-[#e7fbf7] font-medium text-[#0f766e]",
-            activeCollapsed: "bg-[#e7fbf7] text-[#0f766e]",
-            group: "text-[#0f766e]",
-            hover: "hover:bg-[#f4fffc] hover:text-[#1c1c1e]",
+            icon: "text-[#2f6f68]",
+            active: "border-[#2f6f68] bg-[#edf5f2] font-medium text-[#171717]",
+            activeCollapsed: "bg-[#edf5f2] text-[#171717]",
+            group: "text-[#2f6f68]",
+            hover: "hover:bg-[#edf5f2] hover:text-[#171717]",
           }
         : {
-            icon: "text-[#5b76fe]",
-            active: "bg-[#eef1ff] font-medium text-[#5b76fe]",
-            activeCollapsed: "bg-[#eef1ff] text-[#5b76fe]",
-            group: "text-[#5b76fe]",
-            hover: "hover:bg-[#f5f6f8] hover:text-[#1c1c1e]",
+            icon: "text-[#3f5edb]",
+            active: "border-[#3f5edb] bg-[#eef1ff] font-medium text-[#171717]",
+            activeCollapsed: "bg-[#eef1ff] text-[#171717]",
+            group: "text-[#3f5edb]",
+            hover: "hover:bg-[#f0f1ed] hover:text-[#171717]",
           };
 
   const { data: corpusStats } = useQuery({
@@ -1300,16 +1274,6 @@ export function Layout({ children }: LayoutProps) {
     { key: "marketplace", label: "Marketplace", to: withPatientQuery("/marketplace", patientId) },
     { key: "internal", label: "Internal Tools", to: "/analysis" },
   ];
-
-  useEffect(() => {
-    const refreshMarketplacePinnedIds = () => setMarketplacePinnedIds(loadMarketplacePinnedIds());
-    window.addEventListener("storage", refreshMarketplacePinnedIds);
-    window.addEventListener("ehi-marketplace-workspace-updated", refreshMarketplacePinnedIds);
-    return () => {
-      window.removeEventListener("storage", refreshMarketplacePinnedIds);
-      window.removeEventListener("ehi-marketplace-workspace-updated", refreshMarketplacePinnedIds);
-    };
-  }, []);
 
   useEffect(() => {
     if (!activeModuleMap) return;
@@ -1337,157 +1301,6 @@ export function Layout({ children }: LayoutProps) {
       return next;
     });
   }, []);
-
-  const marketplaceLinks: {
-    key: AppEnvironment | "trialMatch" | "medAccess" | "payerCheck" | "secondOpinion" | "grants" | "research";
-    label: string;
-    to: string;
-  }[] = [
-    ...MARKETPLACE_PINNED_LINK_OPTIONS.filter((link) => marketplacePinnedIds.includes(link.id)).map((link) => ({
-      key: link.key as "trialMatch" | "medAccess" | "payerCheck" | "secondOpinion" | "grants" | "research" | "sharing",
-      label: link.label,
-      to: withPatientQuery(link.path, patientId),
-    })),
-  ];
-
-  const chartLinks: { key: string; label: string; to: string }[] = [
-    { key: "chartHome", label: "Module Overview", to: withPatientQuery("/charts", patientId) },
-    { key: "snapshot", label: "Clinical Snapshot", to: withPatientQuery("/explorer", patientId) },
-    { key: "labs", label: "Labs", to: withPatientQuery("/explorer/labs", patientId) },
-    { key: "history", label: "History", to: withPatientQuery("/explorer/history", patientId) },
-    { key: "journey", label: "Care Journey", to: withPatientQuery("/explorer/care-journey", patientId) },
-    { key: "sources", label: "FHIR Sources", to: withPatientQuery("/explorer/patient-data", patientId) },
-  ];
-
-  const aggregatorLinks: { key: string; label: string; to: string }[] = [
-    { key: "walkthrough", label: "Overview", to: withPatientQuery("/aggregate", patientId) },
-    { key: "workspaceLibrary", label: "Workspace Library", to: withPatientQuery("/aggregate/workspaces", patientId) },
-    { key: "sourceIntake", label: "Source Intake", to: withPatientQuery("/aggregate/sources", patientId) },
-    { key: "harmonizedRecord", label: "Harmonized Record", to: withPatientQuery("/aggregate/harmonize", patientId) },
-    { key: "patientContext", label: "Patient Context", to: withPatientQuery("/aggregate/context", patientId) },
-    { key: "publishReadiness", label: "Publish Chart", to: withPatientQuery("/aggregate/publish", patientId) },
-  ];
-
-  const clinicalInsightLinks: { key: string; label: string; to: string }[] = [
-    { key: "preop", label: "Pre-Op Support", to: withPatientQuery("/preop", patientId) },
-    { key: "trialFinder", label: "Trial Finder (agentic)", to: withPatientQuery("/skills/trial-finder", patientId) },
-  ];
-
-  const internalToolLinks: { key: string; label: string; to: string }[] = [
-    { key: "dataLab", label: "Module Overview", to: "/analysis" },
-    { key: "aiWorkspace", label: "AI Workspace", to: "/ai-workspace/trial-finder" },
-    { key: "pipelineLab", label: "Pipeline Lab", to: "/pipeline-lab" },
-    { key: "qaEvalLab", label: "Q&A Eval Lab", to: "/analysis/qa-eval-lab" },
-    { key: "ccdaLab", label: "C-CDA Testing Lab", to: "/analysis/ccda-testing-lab" },
-    { key: "referenceReview", label: "Reference Review", to: "/ground-truth-review" },
-    { key: "primer", label: "FHIR Primer", to: "/analysis/fhir-primer" },
-    { key: "coverage", label: "Coverage", to: "/analysis/coverage" },
-  ];
-
-  const subnav =
-    topArea === "platform"
-      ? null
-      : topArea === "aggregator"
-      ? {
-          label: "Data aggregation",
-          links: aggregatorLinks,
-          tone: "blue",
-        }
-      : topArea === "record"
-        ? {
-            label: "FHIR chart views",
-            links: chartLinks,
-            tone: "teal",
-          }
-        : topArea === "clinical"
-          ? {
-              label: "Pinned clinical modules",
-              links: clinicalInsightLinks,
-              tone: "amber",
-            }
-          : topArea === "internal"
-            ? {
-                label: "Internal tools",
-                links: internalToolLinks,
-                tone: "green",
-              }
-            : {
-                label: "Pinned modules",
-                links: marketplaceLinks,
-                tone: "blue",
-              };
-
-  const subnavTone =
-    subnav?.tone === "amber"
-      ? {
-          wrap: "border-[#f6dfc9] bg-[#fff8f1]",
-          label: "text-[#9a5a16]",
-          active: "bg-white text-[#9a5a16] shadow-sm",
-        }
-      : subnav?.tone === "teal" || subnav?.tone === "green"
-        ? {
-            wrap: "border-[#cdeee9] bg-[#f4fffc]",
-            label: "text-[#0f766e]",
-            active: "bg-white text-[#0f766e] shadow-sm",
-          }
-        : {
-            wrap: "border-[#dfe4ff] bg-[#f7f8ff]",
-            label: "text-[#5b76fe]",
-            active: "bg-white text-[#5b76fe] shadow-sm",
-          };
-
-  const isSubnavActive = (key: string): boolean => {
-    if (key === "workspace") {
-      return location.pathname.startsWith("/marketplace/workspace");
-    }
-    if (key === "marketplace") return location.pathname === "/marketplace";
-    if (key === "mySettings") return location.pathname.startsWith("/marketplace/settings") || location.pathname.startsWith("/sharing");
-    if (key === "trialMatch") return location.pathname.startsWith("/skills/trial-finder") || location.pathname.startsWith("/trials");
-    if (key === "medAccess") return location.pathname.startsWith("/medication-access");
-    if (key === "payerCheck") return location.pathname.startsWith("/payer-check");
-    if (key === "trials") return location.pathname.startsWith("/trials");
-    if (key === "medication") return location.pathname.startsWith("/medication-access");
-    if (key === "payer") return location.pathname.startsWith("/payer-check");
-    if (key === "grants") return location.pathname.startsWith("/grants");
-    if (key === "research") return location.pathname.startsWith("/research-opportunities");
-    if (key === "sharing") return location.pathname.startsWith("/sharing");
-    if (key === "secondOpinion") return location.pathname.startsWith("/second-opinion");
-    if (key === "chartHome") return location.pathname.startsWith("/charts") || location.pathname.startsWith("/record");
-    if (key === "snapshot") return location.pathname === "/explorer";
-    if (key === "labs") return location.pathname.startsWith("/explorer/labs");
-    if (key === "history") return location.pathname.startsWith("/explorer/history");
-    if (key === "journey") return location.pathname.startsWith("/explorer/care-journey");
-    if (key === "sources") return location.pathname.startsWith("/explorer/patient-data");
-    if (key === "walkthrough") return location.pathname === "/aggregate" || location.pathname.startsWith("/aggregate/methodology");
-    if (key === "workspaceLibrary") return location.pathname.startsWith("/aggregate/workspaces");
-    if (key === "sourceIntake") return location.pathname.startsWith("/aggregate/sources");
-    if (key === "harmonizedRecord") {
-      return location.pathname.startsWith("/aggregate/harmonize") || location.pathname.startsWith("/aggregate/cleaning");
-    }
-    if (key === "patientContext") return location.pathname.startsWith("/aggregate/context");
-    if (key === "publishReadiness") return location.pathname.startsWith("/aggregate/publish");
-    if (key === "preop") {
-      return (
-        location.pathname.startsWith("/preop") ||
-        location.pathname === "/journey"
-      );
-    }
-    if (key === "medSafety") return location.pathname.startsWith("/explorer/safety");
-    if (key === "clearance") return location.pathname.startsWith("/explorer/clearance");
-    if (key === "anesthesia") return location.pathname.startsWith("/explorer/anesthesia");
-    if (key === "qa") return location.pathname.startsWith("/explorer/assistant");
-    if (key === "dataLab") return location.pathname === "/analysis";
-    if (key === "aiWorkspace") return location.pathname.startsWith("/ai-workspace");
-    if (key === "pipelineLab") return location.pathname.startsWith("/pipeline-lab");
-    if (key === "qaEvalLab") return location.pathname.startsWith("/analysis/qa-eval-lab");
-    if (key === "ccdaLab") {
-      return location.pathname.startsWith("/analysis/ccda-testing-lab") || location.pathname.startsWith("/ccda-lab");
-    }
-    if (key === "referenceReview") return location.pathname.startsWith("/ground-truth-review");
-    if (key === "primer") return location.pathname.startsWith("/analysis/fhir-primer");
-    if (key === "coverage") return location.pathname.startsWith("/analysis/coverage");
-    return false;
-  };
 
   const isPathActive = (path: string): boolean => {
     if (path === "/explorer") return location.pathname === "/explorer";
@@ -1566,7 +1379,6 @@ export function Layout({ children }: LayoutProps) {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  const showSubnav = subnav !== null;
   const showSidebar = !isPlatform;
 
   return (
@@ -1594,122 +1406,103 @@ export function Layout({ children }: LayoutProps) {
         />
       )}
 
-      <div className={`h-screen overflow-hidden ${isInternal ? "bg-[#edf7f5]" : "bg-[#f5f6f8]"}`}>
+      <div className="h-screen overflow-hidden bg-[#f7f5f0]">
         <header
-          className={`border-b border-[#e9eaef] ${isInternal ? "bg-[#f7fffc]" : "bg-white"}`}
+          className="border-b border-[#e5ded2]/80 bg-[#fbfaf7]/95 backdrop-blur"
           style={{ height: headerHeight }}
         >
-          <div className="flex h-full flex-col justify-center gap-2 px-4 lg:px-6">
+          <div className="flex h-full items-center gap-4 px-4 lg:px-6">
             <div className="flex items-center justify-between gap-4">
-              <Link to="/" className="min-w-0 group cursor-pointer no-underline">
-                <div className="flex items-center gap-2">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-[#a5a8b5] group-hover:text-[#5b76fe] transition-colors">EHI Exchange Platform</p>
-                  <span className="rounded px-1.5 py-0.5 text-[10px] font-medium leading-none text-[#555a6a] bg-[#f5f6f8] border border-[#e9eaef]">
-                    Aggregate once · Activate anywhere
+              <Link to="/" className="group flex min-w-0 items-center gap-3 no-underline">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#171717] text-[11px] font-semibold text-[#fbfaf7]">
+                  AT
+                </span>
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-semibold tracking-tight text-[#171717] transition-colors group-hover:text-[#3f5edb]">
+                    Atlas
                   </span>
-                </div>
-                <p className="truncate text-sm font-semibold text-[#1c1c1e] group-hover:text-[#5b76fe] transition-colors">
-                  {workspace.title}
-                </p>
+                  <span className="hidden truncate text-xs text-[#6f6a60] sm:block">
+                    {workspace.title}
+                  </span>
+                </span>
               </Link>
-
-              <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
-                {!isInternal && (
-                  <PatientSelector
-                    patientId={patientId}
-                    onSelect={handleSelectPatient}
-                    onCreateWorkspace={handleCreatePatientWorkspace}
-                    onAdvancedOpen={() => setPatientPickerOpen(true)}
-                  />
-                )}
-
-                <nav className="flex min-w-0 max-w-[820px] items-center gap-1 overflow-x-auto rounded-xl border border-[#e9eaef] bg-white p-1">
-                  {topLinks.map((link) => {
-                    const active = topArea === link.key;
-                    const activeClass = link.key === "internal" ? "bg-[#dff6ef] text-[#0f766e]" : "bg-[#eef1ff] text-[#5b76fe]";
-                    return (
-                      <Link
-                        key={link.key}
-                        to={link.to}
-                        className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors lg:text-sm ${
-                          active ? activeClass : "text-[#667085] hover:text-[#1f2937]"
-                        }`}
-                      >
-                        {link.label}
-                      </Link>
-                    );
-                  })}
-                </nav>
-                <a
-                  href="https://github.com/blakethom8/ehi-ignite-challenge"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="View source on GitHub"
-                  title="View source on GitHub"
-                  className="ml-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[#e9eaef] bg-white text-[#667085] transition-colors hover:border-[#cfd7ff] hover:text-[#1f2937]"
-                >
-                  <Code2 size={16} />
-                </a>
-              </div>
             </div>
 
-            {showSubnav && (
-              <div className={`flex min-w-0 items-center gap-2 rounded-xl border px-2 py-1.5 ${subnavTone.wrap}`}>
-                <span className={`hidden shrink-0 px-2 text-[10px] font-semibold uppercase tracking-wider md:inline ${subnavTone.label}`}>
-                  {subnav.label}
-                </span>
-                <nav className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
-                  {subnav.links.map((link) => {
-                    const active = isSubnavActive(String(link.key));
-                    return (
-                      <Link
-                        key={link.key}
-                        to={link.to}
-                        className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
-                          active ? subnavTone.active : "text-[#667085] hover:bg-white/70 hover:text-[#1f2937]"
-                        }`}
-                      >
-                        {link.label}
-                      </Link>
-                    );
-                  })}
-                </nav>
-              </div>
-            )}
+            <nav className="flex min-w-0 flex-1 items-center justify-start gap-1 overflow-x-auto px-2 lg:justify-center">
+              {topLinks.map((link) => {
+                const active = topArea === link.key;
+                return (
+                  <Link
+                    key={link.key}
+                    to={link.to}
+                    className={`shrink-0 rounded-full px-3 py-2 text-sm transition-colors ${
+                      active
+                        ? "bg-[#e9e4da] font-semibold text-[#171717]"
+                        : "font-medium text-[#6f6a60] hover:bg-[#efebe3] hover:text-[#171717]"
+                    }`}
+                  >
+                    {link.label}
+                  </Link>
+                );
+              })}
+            </nav>
+
+            <div className="flex shrink-0 items-center justify-end gap-2">
+              {!isInternal && (
+                <div className="hidden md:block">
+                <PatientSelector
+                  patientId={patientId}
+                  onSelect={handleSelectPatient}
+                  onCreateWorkspace={handleCreatePatientWorkspace}
+                  onAdvancedOpen={() => setPatientPickerOpen(true)}
+                />
+                </div>
+              )}
+              <a
+                href="https://github.com/blakethom8/ehi-ignite-challenge"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="View source on GitHub"
+                title="View source on GitHub"
+                className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-full text-[#6f6a60] transition-colors hover:bg-[#efebe3] hover:text-[#171717] sm:flex"
+              >
+                <Code2 size={16} />
+              </a>
+            </div>
           </div>
         </header>
 
         <div className="flex flex-col overflow-hidden md:flex-row" style={{ height: `calc(100vh - ${headerHeight}px)` }}>
           {showSidebar && (
             <aside
-              className={`relative flex max-h-[50vh] w-full shrink-0 flex-col overflow-hidden border-b border-r border-[#e9eaef] transition-all duration-200 md:max-h-full md:border-b-0 ${
+              className={`relative flex max-h-[50vh] w-full shrink-0 flex-col overflow-hidden border-b border-r border-[#e5ded2] bg-[#fbfaf7] transition-all duration-200 md:max-h-full md:border-b-0 ${
               sidebarCollapsed ? "md:w-14" : "md:w-72"
-            } ${isInternal ? "bg-[#f7fffc]" : "bg-white"}`}
+            }`}
             >
             {!isInternal && (
               <>
                 {/* Workspace header + collapse toggle */}
-                <div className="shrink-0 border-b border-[#e9eaef] px-2 pb-3 pt-4 lg:px-3">
+                <div className="shrink-0 border-b border-[#e5ded2] px-2 pb-3 pt-4 lg:px-3">
                   {sidebarOverviewPath ? (
                     <div className="flex items-start justify-between gap-2">
                       <Link
                         to={withPatientQuery(sidebarOverviewPath, patientId)}
                         title={sidebarCollapsed ? `${workspace.sidebarTitle} overview` : undefined}
-                        className={`flex min-w-0 flex-1 items-start gap-2 rounded-lg no-underline transition-colors hover:bg-[#f5f6f8] ${
+                        className={`flex min-w-0 flex-1 items-start gap-2 rounded-xl no-underline transition-colors hover:bg-[#efebe3] ${
                           sidebarCollapsed ? "justify-center p-2" : "-ml-1 px-1 py-1.5"
                         }`}
                       >
                         <WorkspaceIcon size={18} className={`mt-0.5 shrink-0 ${sidebarTone.icon}`} />
                         {!sidebarCollapsed && (
                           <span className="min-w-0">
-                            <span className="block text-sm font-semibold tracking-tight text-[#1c1c1e]">{workspace.sidebarTitle}</span>
-                            <span className="mt-1 block text-xs leading-5 text-[#a5a8b5]">{workspace.subtitle}</span>
+                            <span className="block text-sm font-semibold tracking-tight text-[#171717]">{workspace.sidebarTitle}</span>
+                            <span className="mt-1 block text-xs leading-5 text-[#6f6a60]">{workspace.subtitle}</span>
                           </span>
                         )}
                       </Link>
                       <button
                         onClick={toggleSidebar}
-                        className={`hidden md:flex shrink-0 items-center justify-center w-6 h-6 rounded hover:bg-[#f5f6f8] text-[#a5a8b5] hover:text-[#555a6a] transition-colors ${sidebarCollapsed ? "absolute right-1 top-4" : ""}`}
+                        className={`hidden md:flex shrink-0 items-center justify-center w-6 h-6 rounded-full hover:bg-[#efebe3] text-[#8a8174] hover:text-[#171717] transition-colors ${sidebarCollapsed ? "absolute right-1 top-4" : ""}`}
                         title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
                       >
                         {sidebarCollapsed ? <ChevronsRight size={14} /> : <ChevronsLeft size={14} />}
@@ -1721,19 +1514,19 @@ export function Layout({ children }: LayoutProps) {
                         <div className={`flex items-center gap-2 ${sidebarCollapsed ? "justify-center w-full" : ""}`}>
                           <WorkspaceIcon size={18} className={`shrink-0 ${sidebarTone.icon}`} />
                           {!sidebarCollapsed && (
-                            <span className="text-sm font-semibold tracking-tight text-[#1c1c1e]">{workspace.sidebarTitle}</span>
+                            <span className="text-sm font-semibold tracking-tight text-[#171717]">{workspace.sidebarTitle}</span>
                           )}
                         </div>
                         <button
                           onClick={toggleSidebar}
-                          className={`hidden md:flex shrink-0 items-center justify-center w-6 h-6 rounded hover:bg-[#f5f6f8] text-[#a5a8b5] hover:text-[#555a6a] transition-colors ${sidebarCollapsed ? "absolute right-1 top-4" : ""}`}
+                          className={`hidden md:flex shrink-0 items-center justify-center w-6 h-6 rounded-full hover:bg-[#efebe3] text-[#8a8174] hover:text-[#171717] transition-colors ${sidebarCollapsed ? "absolute right-1 top-4" : ""}`}
                           title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
                         >
                           {sidebarCollapsed ? <ChevronsRight size={14} /> : <ChevronsLeft size={14} />}
                         </button>
                       </div>
                       {!sidebarCollapsed && (
-                        <p className="mt-1 text-xs text-[#a5a8b5]">{workspace.subtitle}</p>
+                        <p className="mt-1 text-xs text-[#6f6a60]">{workspace.subtitle}</p>
                       )}
                     </>
                   )}
@@ -1750,7 +1543,7 @@ export function Layout({ children }: LayoutProps) {
                           isAdvanced ? (
                             <button
                               onClick={() => setAdvancedOpen((prev) => !prev)}
-                              className="mb-2 flex w-full items-center justify-between px-2 text-[10px] font-semibold uppercase tracking-wider text-[#a5a8b5] hover:text-[#555a6a] transition-colors"
+                              className="mb-2 flex w-full items-center justify-between px-2 text-[10px] font-semibold uppercase tracking-wider text-[#8a8174] hover:text-[#171717] transition-colors"
                             >
                               <span>{group.label}</span>
                               {advancedOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
@@ -1779,7 +1572,7 @@ export function Layout({ children }: LayoutProps) {
                                         `flex min-w-0 flex-1 items-center rounded-lg transition-colors ${
                                           sidebarCollapsed
                                             ? `justify-center p-2.5 ${isActive || childActive ? sidebarTone.activeCollapsed : `text-[#555a6a] ${sidebarTone.hover}`}`
-                                            : `gap-3 px-3 py-2.5 text-sm ${isActive || childActive ? sidebarTone.active : `text-[#555a6a] ${sidebarTone.hover}`}`
+                                            : `gap-3 border-l-2 px-3 py-2.5 text-sm ${isActive || childActive ? sidebarTone.active : `border-transparent text-[#504a42] ${sidebarTone.hover}`}`
                                         }`
                                       }
                                     >
@@ -1795,7 +1588,7 @@ export function Layout({ children }: LayoutProps) {
                                       <button
                                         onClick={() => setPreOpOpen((prev) => !prev)}
                                         className={`flex w-8 shrink-0 items-center justify-center rounded-lg transition-colors ${
-                                          childActive ? sidebarTone.active : `text-[#a5a8b5] ${sidebarTone.hover}`
+                                          childActive ? sidebarTone.active : `text-[#8a8174] ${sidebarTone.hover}`
                                         }`}
                                         title={expanded ? "Collapse Pre-Op Support modules" : "Expand Pre-Op Support modules"}
                                       >
@@ -1805,7 +1598,7 @@ export function Layout({ children }: LayoutProps) {
                                   </div>
 
                                   {expanded && (
-                                    <div className="ml-5 mt-1 space-y-0.5 border-l border-[#f0d7bf] pl-2">
+                                    <div className="ml-5 mt-1 space-y-0.5 border-l border-[#ded6ca] pl-2">
                                       {children?.map(({ to: childTo, label: childLabel, icon: ChildIcon, description: childDescription }) => (
                                         <NavLink
                                           key={childTo}
@@ -1814,8 +1607,8 @@ export function Layout({ children }: LayoutProps) {
                                           className={({ isActive }) =>
                                             `flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs transition-colors ${
                                               isActive
-                                                ? "bg-white font-medium text-[#9a5a16] shadow-[rgb(246_223_201)_0px_0px_0px_1px]"
-                                                : "text-[#667085] hover:bg-[#fff8f1] hover:text-[#1c1c1e]"
+                                                ? "bg-[#f3eee7] font-medium text-[#171717]"
+                                                : "text-[#6f6a60] hover:bg-[#efebe3] hover:text-[#171717]"
                                             }`
                                           }
                                         >
@@ -1842,40 +1635,40 @@ export function Layout({ children }: LayoutProps) {
 
             {isInternal && (
               <>
-                <div className="shrink-0 border-b border-[#d5ebe5] px-2 pb-3 pt-4 lg:px-3">
+                <div className="shrink-0 border-b border-[#e5ded2] px-2 pb-3 pt-4 lg:px-3">
                   <div className="flex items-center justify-between">
                     <div className={`flex items-center gap-2 ${sidebarCollapsed ? "justify-center w-full" : ""}`}>
-                      <WorkspaceIcon size={18} className="shrink-0 text-[#0f766e]" />
+                      <WorkspaceIcon size={18} className="shrink-0 text-[#2f6f68]" />
                       {!sidebarCollapsed && (
-                        <span className="text-sm font-semibold tracking-tight text-[#0f172a]">{workspace.sidebarTitle}</span>
+                        <span className="text-sm font-semibold tracking-tight text-[#171717]">{workspace.sidebarTitle}</span>
                       )}
                     </div>
                     <button
                       onClick={toggleSidebar}
-                      className={`hidden md:flex shrink-0 items-center justify-center w-6 h-6 rounded hover:bg-[#edf9f5] text-[#55706c] hover:text-[#0f172a] transition-colors ${sidebarCollapsed ? "absolute right-1 top-4" : ""}`}
+                      className={`hidden md:flex shrink-0 items-center justify-center w-6 h-6 rounded-full hover:bg-[#efebe3] text-[#8a8174] hover:text-[#171717] transition-colors ${sidebarCollapsed ? "absolute right-1 top-4" : ""}`}
                       title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
                     >
                       {sidebarCollapsed ? <ChevronsRight size={14} /> : <ChevronsLeft size={14} />}
                     </button>
                   </div>
                   {!sidebarCollapsed && (
-                    <p className="mt-1 text-xs text-[#55706c]">{workspace.subtitle}</p>
+                    <p className="mt-1 text-xs text-[#6f6a60]">{workspace.subtitle}</p>
                   )}
                 </div>
 
                 {!sidebarCollapsed && (
-                  <div className="shrink-0 border-b border-[#d5ebe5] px-4 py-3">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-[#55706c]">Corpus Snapshot</p>
+                  <div className="shrink-0 border-b border-[#e5ded2] px-4 py-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-[#6f6a60]">Corpus Snapshot</p>
                     <div className="mt-2 grid grid-cols-2 gap-2">
-                      <div className="rounded-lg bg-white px-2.5 py-2 shadow-[rgb(213_235_229)_0px_0px_0px_1px]">
-                        <p className="text-[10px] uppercase tracking-wider text-[#55706c]">Patients</p>
-                        <p className="text-sm font-semibold text-[#0f172a]">
+                      <div className="rounded-lg bg-[#f3eee7] px-2.5 py-2">
+                        <p className="text-[10px] uppercase tracking-wider text-[#6f6a60]">Patients</p>
+                        <p className="text-sm font-semibold text-[#171717]">
                           {corpusStats ? corpusStats.total_patients.toLocaleString() : "..."}
                         </p>
                       </div>
-                      <div className="rounded-lg bg-white px-2.5 py-2 shadow-[rgb(213_235_229)_0px_0px_0px_1px]">
-                        <p className="text-[10px] uppercase tracking-wider text-[#55706c]">Resources</p>
-                        <p className="text-sm font-semibold text-[#0f172a]">
+                      <div className="rounded-lg bg-[#f3eee7] px-2.5 py-2">
+                        <p className="text-[10px] uppercase tracking-wider text-[#6f6a60]">Resources</p>
+                        <p className="text-sm font-semibold text-[#171717]">
                           {corpusStats ? corpusStats.total_resources.toLocaleString() : "..."}
                         </p>
                       </div>
@@ -1883,9 +1676,9 @@ export function Layout({ children }: LayoutProps) {
                   </div>
                 )}
 
-                <nav className={`space-y-0.5 border-t border-[#d5ebe5] ${sidebarCollapsed ? "px-1 py-2" : "px-3 py-4"}`}>
+                <nav className={`space-y-0.5 ${sidebarCollapsed ? "px-1 py-2" : "px-3 py-4"}`}>
                   {!sidebarCollapsed && (
-                    <p className="mb-2 px-2 text-xs font-medium uppercase tracking-wider text-[#55706c]">Data Views</p>
+                    <p className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-wider text-[#6f6a60]">Data Views</p>
                   )}
                   {INTERNAL_NAV_LINKS.map(({ to, label, icon: Icon, description }) => (
                     <NavLink
@@ -1896,8 +1689,8 @@ export function Layout({ children }: LayoutProps) {
                       className={({ isActive }) =>
                         `flex items-center rounded-lg transition-colors ${
                           sidebarCollapsed
-                            ? `justify-center p-2.5 ${isActive ? "bg-[#dff6ef] text-[#0f766e]" : "text-[#35524d] hover:bg-[#edf9f5] hover:text-[#0f172a]"}`
-                            : `gap-3 px-3 py-2.5 text-sm ${isActive ? "bg-[#dff6ef] font-medium text-[#0f766e]" : "text-[#35524d] hover:bg-[#edf9f5] hover:text-[#0f172a]"}`
+                            ? `justify-center p-2.5 ${isActive ? "bg-[#edf5f2] text-[#171717]" : "text-[#504a42] hover:bg-[#efebe3] hover:text-[#171717]"}`
+                            : `gap-3 border-l-2 px-3 py-2.5 text-sm ${isActive ? "border-[#2f6f68] bg-[#edf5f2] font-medium text-[#171717]" : "border-transparent text-[#504a42] hover:bg-[#efebe3] hover:text-[#171717]"}`
                         }`
                       }
                     >
@@ -1915,8 +1708,8 @@ export function Layout({ children }: LayoutProps) {
             )}
 
             {!sidebarCollapsed && (
-              <div className={`shrink-0 border-t px-4 py-3 ${isAnalysis ? "border-[#d5ebe5]" : "border-[#e9eaef]"}`}>
-                <p className={`text-xs ${isAnalysis ? "text-[#55706c]" : "text-[#a5a8b5]"}`}>
+              <div className="shrink-0 border-t border-[#e5ded2] px-4 py-3">
+                <p className="text-xs text-[#8a8174]">
                   EHI Ignite Challenge · Phase 1
                 </p>
               </div>
@@ -2031,7 +1824,7 @@ export function Layout({ children }: LayoutProps) {
             </aside>
           )}
 
-          <main className={`flex-1 overflow-y-auto px-4 py-3 ${isInternal ? "bg-[#edf7f5]" : "bg-[#f5f6f8]"}`}>
+          <main className="flex-1 overflow-y-auto bg-[#f7f5f0] px-4 py-3">
             {children}
           </main>
         </div>

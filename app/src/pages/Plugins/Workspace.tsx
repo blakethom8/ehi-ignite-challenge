@@ -5,10 +5,10 @@ import { WorkspaceFrame } from "../../components/atlas/WorkspaceFrame";
 import { WORKSPACES } from "../../components/atlas/data";
 import type { PaneVisibility, WorkspaceId } from "../../components/atlas/types";
 
-export function PackageWorkspace() {
-  const { packageId = "trial-finder", sessionId } = useParams();
+export function PluginWorkspace() {
+  const { pluginId = "trial-finder", sessionId } = useParams();
   const workspace =
-    WORKSPACES[packageId as WorkspaceId] ?? WORKSPACES["trial-finder"];
+    WORKSPACES[pluginId as WorkspaceId] ?? WORKSPACES["trial-finder"];
   const controlsRef = useRef<{
     panes: PaneVisibility;
     togglePane: (p: keyof PaneVisibility) => void;
@@ -35,7 +35,7 @@ export function PackageWorkspace() {
     >
       <WorkspaceFrame
         workspace={workspace}
-        showPackageHome={!sessionId}
+        showPluginHome={!sessionId}
         controlsRef={controlsRef}
       />
     </AppShell>

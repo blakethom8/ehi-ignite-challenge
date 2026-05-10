@@ -21,12 +21,12 @@ const PACKAGE_ICONS: Record<string, typeof Telescope> = {
   Boxes,
 };
 
-type PackageHomeProps = {
+type PluginHomeProps = {
   workspace: Workspace;
   onStartRun: () => void;
 };
 
-export function PackageHome({ workspace, onStartRun }: PackageHomeProps) {
+export function PluginHome({ workspace, onStartRun }: PluginHomeProps) {
   const Icon = PACKAGE_ICONS[workspace.icon] ?? Telescope;
   const workflows = WORKFLOWS[workspace.id as WorkspaceId] ?? [];
   const perms = [
@@ -62,7 +62,7 @@ export function PackageHome({ workspace, onStartRun }: PackageHomeProps) {
               className="text-[10.5px] font-bold uppercase tracking-[0.12em]"
               style={{ color: "var(--ink-3)" }}
             >
-              MARKETPLACE PACKAGE · INSTALLED
+              PLUGIN · INSTALLED
             </div>
             <div
               className="mt-2 flex items-baseline gap-2.5 text-[26px] font-semibold leading-[1.1] tracking-tight"
@@ -119,7 +119,7 @@ export function PackageHome({ workspace, onStartRun }: PackageHomeProps) {
 
         <Section
           title="Permissions ledger"
-          note="What this package is allowed to do, scoped to your workspace."
+          note="What this plugin is allowed to do, scoped to your workspace."
         >
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
             {perms.map((p, i) => {
@@ -280,7 +280,7 @@ export function PackageHome({ workspace, onStartRun }: PackageHomeProps) {
           </div>
         </Section>
 
-        <Section title="About this package">
+        <Section title="About this plugin">
           <div
             className="overflow-hidden rounded-md border"
             style={{ background: "var(--surface-1)", borderColor: "var(--line-1)" }}

@@ -21,7 +21,7 @@ export { ChatPane } from "./ChatPane";
 export { WorkbenchPane } from "./WorkbenchPane";
 export { FilesPane } from "./FilesPane";
 export { InspectorPane } from "./InspectorPane";
-export { PackageHome } from "./PackageHome";
+export { PluginHome } from "./PluginHome";
 
 // Reusable primitives ---------------------------------------------------
 export { CitationChip, type CitationChipProps } from "./CitationChip";

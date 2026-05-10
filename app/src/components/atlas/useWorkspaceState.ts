@@ -161,7 +161,7 @@ export function useWorkspaceState(workspaceId: WorkspaceId) {
         time: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
         trace: family === "clinical"
           ? { tool: "fhir.search", target: "Observation?patient=8.4127.881" }
-          : { tool: "marketplace.run", target: "trial-finder@2.4.1 / re-rank" },
+          : { tool: "plugin.run", target: "trial-finder@2.4.1 / re-rank" },
         blocks:
           family === "clinical"
             ? [

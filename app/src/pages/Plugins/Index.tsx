@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { Boxes, Pill, Send, Telescope } from "lucide-react";
 
-const PACKAGES = [
+const PLUGINS = [
   {
     id: "trial-finder",
     icon: Telescope,
@@ -31,7 +31,7 @@ const PACKAGES = [
   },
 ];
 
-export function WorkspacesIndex() {
+export function PluginsIndex() {
   return (
     <div
       className="mx-auto w-full max-w-[1100px] flex-1 px-10 py-9"
@@ -46,24 +46,24 @@ export function WorkspacesIndex() {
           style={{ color: "var(--ink-3)" }}
         >
           <Boxes className="h-3.5 w-3.5" strokeWidth={1.5} />
-          Workspace marketplace
+          Plugin marketplace
         </div>
         <h1
           className="mt-2 text-[26px] font-semibold leading-[1.1] tracking-tight"
           style={{ color: "var(--ink-1)" }}
         >
-          Installable workspace packages
+          Installable plugins
         </h1>
         <p
           className="mt-3 max-w-[70ch] text-[13.5px] leading-[1.55]"
           style={{ color: "var(--ink-2)" }}
         >
-          Marketplace packages run inside the same shell as Caspian, but with their own context strip, permissions ledger, and approval gates. Each package operates against a consented patient anchor. Outbound actions never leave the workspace without an explicit clinician approval.
+          Plugins run inside the same shell as Caspian, but with their own context strip, permissions ledger, and approval gates. Each plugin operates against a consented patient anchor. Outbound actions never leave the workspace without an explicit clinician approval.
         </p>
       </div>
 
       <div className="mt-7 grid grid-cols-1 gap-3 md:grid-cols-2">
-        {PACKAGES.map((p) => {
+        {PLUGINS.map((p) => {
           const Icon = p.icon;
           return (
             <Link
@@ -127,7 +127,7 @@ export function WorkspacesIndex() {
                   className="font-medium transition-colors group-hover:text-[var(--action)]"
                   style={{ color: "var(--ink-3)" }}
                 >
-                  Open package home →
+                  Open plugin home →
                 </span>
               </div>
             </Link>

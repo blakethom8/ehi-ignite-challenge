@@ -94,7 +94,7 @@ export function SessionsPane({ workspace, activeSessionId, onSelectSession }: Se
         </span>
       </div>
       <div className="flex-1 overflow-y-auto pb-3">
-        {workspace.family === "marketplace" && (
+        {workspace.family === "plugin" && (
           <Group title="Package">
             <button
               onClick={() => onSelectSession("__home__")}

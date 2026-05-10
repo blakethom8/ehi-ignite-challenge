@@ -3,7 +3,7 @@ import { ChatPane } from "./ChatPane";
 import { ContextStrip } from "./ContextStrip";
 import { FilesPane } from "./FilesPane";
 import { InspectorPane } from "./InspectorPane";
-import { PackageHome } from "./PackageHome";
+import { PluginHome } from "./PluginHome";
 import { SessionsPane } from "./SessionsPane";
 import { WorkbenchPane } from "./WorkbenchPane";
 import { useWorkspaceState } from "./useWorkspaceState";
@@ -26,7 +26,7 @@ const MAX_SIZES: Record<keyof PaneSizes, number> = {
 type WorkspaceFrameProps = {
   workspace: Workspace;
   /** Forces showing the package home view instead of the active session. */
-  showPackageHome?: boolean;
+  showPluginHome?: boolean;
   /** Map external pane controls into the frame. */
   controlsRef?: React.MutableRefObject<{
     panes: ReturnType<typeof useWorkspaceState>["panes"];
@@ -36,7 +36,7 @@ type WorkspaceFrameProps = {
 
 export function WorkspaceFrame({
   workspace,
-  showPackageHome,
+  showPluginHome,
   controlsRef,
 }: WorkspaceFrameProps) {
   const state = useWorkspaceState(workspace.id);
@@ -90,7 +90,7 @@ export function WorkspaceFrame({
   );
 
   const showRightStack = state.panes.files || state.panes.inspector;
-  const showActiveSession = !showPackageHome;
+  const showActiveSession = !showPluginHome;
 
   return (
     <div
@@ -115,7 +115,7 @@ export function WorkspaceFrame({
               <SessionsPane
                 workspace={workspace}
                 activeSessionId={
-                  showPackageHome ? "__home__" : state.activeSessionId
+                  showPluginHome ? "__home__" : state.activeSessionId
                 }
                 onSelectSession={(id) => state.setActiveSessionId(id === "__home__" ? null : id)}
               />
@@ -208,7 +208,7 @@ export function WorkspaceFrame({
             )}
           </>
         ) : (
-          <PackageHome
+          <PluginHome
             workspace={workspace}
             onStartRun={() => state.setActiveSessionId(null)}
           />

@@ -19,8 +19,18 @@ import { AppShell, WorkspaceFrame } from "../../components/atlas";
 
 Every routed page in the app should be wrapped in `<AppShell>` so the
 module bar, titlebar, and platform drawer render consistently. Workspace
-routes (`/caspian`, `/workspaces/:packageId`) compose `<AppShell>` with
+routes (`/caspian`, `/workspaces/:pluginId`) compose `<AppShell>` with
 `<WorkspaceFrame>` for the five-pane layout.
+
+The product distinguishes two workspace families:
+
+- **Caspian** — first-party clinical workspace, private patient
+  boundary, lives at `/caspian`. Page source: `pages/Caspian/Workspace.tsx`.
+- **Plugins** — installable, vendor-published workspace packages
+  (Trial Finder, Medication Access, Site Coordination, …), consented
+  external trust posture, live at `/workspaces/:pluginId`. Page
+  source: `pages/Plugins/Workspace.tsx` (the generic shell host) +
+  `pages/Plugins/Index.tsx` (the catalog at `/workspaces`).
 
 ## Inventory
 
@@ -32,17 +42,18 @@ routes (`/caspian`, `/workspaces/:packageId`) compose `<AppShell>` with
 | `PlatformDrawer` | Slide-in left drawer (Settings, Account, Billing, Org, Permissions, Help, Sign out). |
 | `Titlebar` | Breadcrumbs + Run workflow + ⌘K + bell + S/C/P/F/I pane toggles. |
 
-### Workspace shell (Caspian + Marketplace)
+### Workspace shell (Caspian + plugins)
 | Component | Role |
 |---|---|
-| `WorkspaceFrame` | Composes the five panes. Owns resizers, persists pane sizes to localStorage, switches between active session and package home. |
-| `ContextStrip` | 40px strip under the titlebar. Caspian = patient identity. Marketplace = package identity + run state. |
-| `SessionsPane` | Workspace switcher, search, package row (marketplace), recent sessions, workflow library, pinned artifacts. |
+| `WorkspaceFrame` | Composes the five panes. Owns resizers, persists pane sizes to localStorage, switches between active session and the plugin home. |
+| `ContextStrip` | 40px strip under the titlebar. Caspian = patient identity. Plugin = plugin identity + run state. |
+| `SessionsPane` | Workspace switcher, search, plugin home row (for plugins), recent sessions, workflow library, pinned artifacts. |
 | `ChatPane` | Header with boundary pill, message list, sticky composer. Citation chips and action chips inline. |
 | `WorkbenchPane` | Multi-tab artifact viewer (preop brief, anticoag note, summary JSON, diff, trial board, packet outline, manifest). |
 | `FilesPane` | Directory tree with folders, files, pinned object refs. |
 | `InspectorPane` | Evidence / Trace / Context tabs. |
-| `PackageHome` | Marketplace entry view: hero + permissions ledger + workflow cards + recent runs + about. |
+| `PluginHome` | Plugin entry view: hero + permissions ledger + workflow cards + recent runs + about. |
+| `PluginHome` | Marketplace entry view: hero + permissions ledger + workflow cards + recent runs + about. |
 
 ### Reusable primitives
 | Component | Role |

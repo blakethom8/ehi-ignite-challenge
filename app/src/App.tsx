@@ -46,9 +46,9 @@ function FullscreenPageFallback() {
 }
 
 // Atlas shell pages (the five top-level modules)
-const CaspianWorkspace = lazyNamed(() => import("./pages/Atlas/CaspianWorkspace"), "CaspianWorkspace");
-const PackageWorkspace = lazyNamed(() => import("./pages/Atlas/PackageWorkspace"), "PackageWorkspace");
-const WorkspacesIndex = lazyNamed(() => import("./pages/Atlas/WorkspacesIndex"), "WorkspacesIndex");
+const CaspianWorkspace = lazyNamed(() => import("./pages/Caspian/Workspace"), "CaspianWorkspace");
+const PluginWorkspace = lazyNamed(() => import("./pages/Plugins/Workspace"), "PluginWorkspace");
+const PluginsIndex = lazyNamed(() => import("./pages/Plugins/Index"), "PluginsIndex");
 
 // Patient Record module — source-of-truth chart layer (absorbs Data Aggregator)
 const PatientRecordOverview = lazyNamed(() => import("./pages/PatientRecord/Overview"), "PatientRecordOverview");
@@ -142,10 +142,10 @@ function AppShellRoutes() {
     { path: "/caspian", element: <CaspianWorkspace />, fullBleed: true },
     { path: "/caspian/sessions/:sessionId", element: <CaspianWorkspace />, fullBleed: true },
 
-    // Workspaces (marketplace packages)
-    { path: "/workspaces", element: <WorkspacesIndex /> },
-    { path: "/workspaces/:packageId", element: <PackageWorkspace />, fullBleed: true },
-    { path: "/workspaces/:packageId/sessions/:sessionId", element: <PackageWorkspace />, fullBleed: true },
+    // Workspaces — the user-facing tab for installable plugins
+    { path: "/workspaces", element: <PluginsIndex /> },
+    { path: "/workspaces/:pluginId", element: <PluginWorkspace />, fullBleed: true },
+    { path: "/workspaces/:pluginId/sessions/:sessionId", element: <PluginWorkspace />, fullBleed: true },
 
     // Patient Record — source-of-truth chart layer (absorbs Data Aggregator)
     { path: "/patient-record", element: <PatientRecordOverview /> },

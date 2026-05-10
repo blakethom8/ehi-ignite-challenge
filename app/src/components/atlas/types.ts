@@ -24,7 +24,7 @@ export type PaneSizes = {
 
 export type Workspace = {
   id: WorkspaceId;
-  family: "clinical" | "marketplace";
+  family: "clinical" | "plugin";
   title: string;
   subtitle: string;
   icon: string;

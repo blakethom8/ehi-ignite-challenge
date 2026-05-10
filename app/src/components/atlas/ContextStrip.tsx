@@ -18,7 +18,7 @@ export function ContextStrip({ workspace }: ContextStripProps) {
   if (workspace.family === "clinical") {
     return <CaspianStrip />;
   }
-  return <PackageStrip workspace={workspace} />;
+  return <PluginStrip workspace={workspace} />;
 }
 
 function CaspianStrip() {
@@ -75,7 +75,7 @@ function CaspianStrip() {
   );
 }
 
-function PackageStrip({ workspace }: { workspace: Workspace }) {
+function PluginStrip({ workspace }: { workspace: Workspace }) {
   const Icon = ICONS[workspace.icon] ?? Telescope;
   const PermIcons = [Database, Globe, Send];
   return (

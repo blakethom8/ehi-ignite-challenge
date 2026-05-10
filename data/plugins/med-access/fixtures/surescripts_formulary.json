@@ -1,0 +1,21 @@
+{
+  "results": [
+    {
+      "rxnormCode": "1364430",
+      "name": "apixaban 5 MG Oral Tablet",
+      "plan": "Aetna Open Access PPO",
+      "covered": false,
+      "tier": "non-formulary",
+      "paRequired": true,
+      "notes": "Step therapy: warfarin failed/contraindicated required"
+    },
+    {
+      "rxnormCode": "860975",
+      "name": "metformin hydrochloride 500 MG Oral Tablet",
+      "plan": "Aetna Open Access PPO",
+      "covered": true,
+      "tier": "1",
+      "paRequired": false
+    }
+  ]
+}

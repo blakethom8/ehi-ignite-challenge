@@ -23,6 +23,11 @@ __pycache__/
 *.pyc
 data/traces.db
 data/traces.db-*
+data/atlas-signing.key
+data/provenance.db
+data/provenance.db-*
+data/runs.db
+data/runs.db-*
 data/aggregation-uploads/
 data/aggregation-profiles/
 data/patient-context/

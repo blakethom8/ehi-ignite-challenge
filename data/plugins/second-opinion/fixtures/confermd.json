@@ -1,0 +1,27 @@
+{
+  "specialists": [
+    {
+      "id": "dr-yates-msk",
+      "name": "Dr. Yates",
+      "institution": "MSKCC",
+      "specialty": "endocrinology",
+      "available": true,
+      "responseSlaDays": 5
+    },
+    {
+      "id": "dr-okafor-cleveland",
+      "name": "Dr. Okafor",
+      "institution": "Cleveland Clinic",
+      "specialty": "cardiology",
+      "available": true,
+      "responseSlaDays": 7
+    }
+  ],
+  "routing": {
+    "endpoint": "https://api.confermd.com/v1/route",
+    "ack": {
+      "status": "queued",
+      "referenceId": "CMR-2026-0998"
+    }
+  }
+}

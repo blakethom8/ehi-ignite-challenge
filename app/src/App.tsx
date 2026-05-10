@@ -1,14 +1,15 @@
 import { Suspense, lazy, type ComponentType } from "react";
-import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import { BrowserRouter, Navigate, Routes, Route, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
-import { Layout } from "./components/Layout";
+import { AppShell } from "./components/atlas/AppShell";
 import { ChatProvider } from "./context/ChatContext";
 import { ChatWidget } from "./components/ChatWidget";
 import { Landing } from "./pages/Landing";
 import { PlatformArchitecture } from "./pages/PlatformArchitecture";
 import { PatientRecordPool } from "./pages/PatientRecordPool";
 import { GuidedTour } from "./pages/GuidedTour";
+import { PlaceholderShell } from "./pages/Atlas/PlaceholderShell";
 
 function lazyNamed<TModule extends Record<string, unknown>>(
   loader: () => Promise<TModule>,
@@ -23,15 +24,24 @@ function lazyNamed<TModule extends Record<string, unknown>>(
 function PageFallback() {
   return (
     <div className="flex min-h-[360px] items-center justify-center p-8">
-      <div className="h-12 w-12 rounded-full border-4 border-[#dfe4ea] border-t-[#5b76fe]" />
+      <div
+        className="h-10 w-10 rounded-full border-4 border-[var(--line-1)]"
+        style={{ borderTopColor: "var(--action)" }}
+      />
     </div>
   );
 }
 
 function FullscreenPageFallback() {
   return (
-    <div className="flex h-screen items-center justify-center bg-[#f7f8fb] p-8">
-      <div className="h-12 w-12 rounded-full border-4 border-[#dfe4ea] border-t-[#5b76fe]" />
+    <div
+      className="flex h-screen items-center justify-center p-8"
+      style={{ background: "var(--bg-app)" }}
+    >
+      <div
+        className="h-10 w-10 rounded-full border-4 border-[var(--line-1)]"
+        style={{ borderTopColor: "var(--action)" }}
+      />
     </div>
   );
 }
@@ -81,6 +91,9 @@ const PipelineLab = lazyNamed(() => import("./pages/PipelineLab/Leaderboard"), "
 const GroundTruthReview = lazyNamed(() => import("./pages/GroundTruthReview/ReferenceReview"), "GroundTruthReview");
 const UsingAtlasRoutes = lazyNamed(() => import("./pages/UsingAtlas/routes"), "UsingAtlasRoutes");
 const TrialFinderWorkspace = lazyNamed(() => import("./pages/AIWorkspace/TrialFinderWorkspace"), "TrialFinderWorkspace");
+const CaspianWorkspace = lazyNamed(() => import("./pages/Atlas/CaspianWorkspace"), "CaspianWorkspace");
+const PackageWorkspace = lazyNamed(() => import("./pages/Atlas/PackageWorkspace"), "PackageWorkspace");
+const MarketplaceIndex = lazyNamed(() => import("./pages/Atlas/MarketplaceIndex"), "MarketplaceIndex");
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -91,11 +104,86 @@ const queryClient = new QueryClient({
   },
 });
 
-function AppShell() {
-  const location = useLocation();
-  const isFullscreenWorkspace = location.pathname.startsWith("/ai-workspace");
+type ShellRoute = {
+  path: string;
+  element: React.ReactNode;
+  /** Atlas workspace shell pages render full-bleed and own their own layout. */
+  fullBleed?: boolean;
+};
 
-  const routes = [
+function AppShellRoute({
+  element,
+  fullBleed,
+}: {
+  element: React.ReactNode;
+  fullBleed?: boolean;
+}) {
+  if (fullBleed) {
+    return (
+      <Suspense fallback={<FullscreenPageFallback />}>{element}</Suspense>
+    );
+  }
+  return (
+    <AppShell>
+      <Suspense fallback={<PageFallback />}>{element}</Suspense>
+    </AppShell>
+  );
+}
+
+function AppShellRoutes() {
+  const location = useLocation();
+  const isFullscreenWorkspace =
+    location.pathname.startsWith("/ai-workspace") ||
+    location.pathname.startsWith("/caspian") ||
+    location.pathname.startsWith("/workspaces/");
+
+  // Atlas IA routes (new shell)
+  const atlasRoutes: ShellRoute[] = [
+    { path: "/caspian", element: <CaspianWorkspace />, fullBleed: true },
+    { path: "/caspian/sessions/:sessionId", element: <CaspianWorkspace />, fullBleed: true },
+    { path: "/workspaces", element: <MarketplaceIndex /> },
+    { path: "/workspaces/:packageId", element: <PackageWorkspace />, fullBleed: true },
+    { path: "/workspaces/:packageId/sessions/:sessionId", element: <PackageWorkspace />, fullBleed: true },
+    {
+      path: "/learn",
+      element: (
+        <PlaceholderShell
+          eyebrow="Internal section · learn"
+          title="Runbooks, evals, vendor reviews"
+          body="Internal-only docs, prompt evaluations, runbooks, changelog, and the vendor review log live here. External users see this as documentation."
+          ctaLabel="Open Atlas docs"
+          ctaHref="/using-atlas"
+        />
+      ),
+    },
+    {
+      path: "/patient-record",
+      element: (
+        <PlaceholderShell
+          eyebrow="Patient Record"
+          title="Source-of-truth chart layer"
+          body="The Patient Record module is the canonical chart layer. It now includes the former Data Aggregator pipeline (PDF parsing, harmonization, and review) as sub-routes."
+          ctaLabel="Open the chart"
+          ctaHref="/record"
+        />
+      ),
+    },
+    {
+      path: "/fhir-charts",
+      element: (
+        <PlaceholderShell
+          eyebrow="FHIR Charts"
+          title="FHIR resource browser"
+          body="Browse the patient's FHIR resources, encounters, and timelines. Explorer pages remain available under /explorer while we migrate them into this module."
+          ctaLabel="Open Explorer"
+          ctaHref="/explorer"
+        />
+      ),
+    },
+  ];
+
+  // Legacy routes — keep working under the new chrome.
+  const legacyRoutes: ShellRoute[] = [
     { path: "/platform", element: <PlatformEntry /> },
     { path: "/charts", element: <PatientRecordOverview /> },
     { path: "/record", element: <PatientRecordOverview /> },
@@ -161,10 +249,6 @@ function AppShell() {
     { path: "/ground-truth-review/:runId", element: <GroundTruthReview /> },
   ];
 
-  const fullscreenRoutes = [
-    { path: "/ai-workspace/trial-finder", element: <TrialFinderWorkspace /> },
-  ];
-
   return (
     <>
       <Routes>
@@ -172,31 +256,38 @@ function AppShell() {
         <Route path="/architecture" element={<PlatformArchitecture />} />
         <Route path="/records-pool" element={<PatientRecordPool />} />
         <Route path="/guided-tour" element={<GuidedTour />} />
-        <Route path="/using-atlas/*" element={<Suspense fallback={<PageFallback />}><UsingAtlasRoutes /></Suspense>} />
-        {routes.map((route) => (
+        <Route
+          path="/using-atlas/*"
+          element={<Suspense fallback={<PageFallback />}><UsingAtlasRoutes /></Suspense>}
+        />
+        {/* Legacy redirects — see .claude/handoff/atlas/README.md §Routing */}
+        <Route path="/data-aggregator" element={<Navigate to="/patient-record" replace />} />
+        <Route path="/data-aggregator/*" element={<Navigate to="/patient-record" replace />} />
+        {/* Atlas IA routes */}
+        {atlasRoutes.map((r) => (
           <Route
-            key={route.path}
-            path={route.path}
-            element={
-              <Layout>
-                <Suspense fallback={<PageFallback />}>
-                  {route.element}
-                </Suspense>
-              </Layout>
-            }
+            key={r.path}
+            path={r.path}
+            element={<AppShellRoute element={r.element} fullBleed={r.fullBleed} />}
           />
         ))}
-        {fullscreenRoutes.map((route) => (
+        {/* Legacy routes — wrapped in AppShell, no longer in legacy Layout. */}
+        {legacyRoutes.map((r) => (
           <Route
-            key={route.path}
-            path={route.path}
-            element={
-              <Suspense fallback={<FullscreenPageFallback />}>
-                {route.element}
-              </Suspense>
-            }
+            key={r.path}
+            path={r.path}
+            element={<AppShellRoute element={r.element} />}
           />
         ))}
+        {/* Legacy fullscreen workspace */}
+        <Route
+          path="/ai-workspace/trial-finder"
+          element={
+            <Suspense fallback={<FullscreenPageFallback />}>
+              <TrialFinderWorkspace />
+            </Suspense>
+          }
+        />
       </Routes>
       {!isFullscreenWorkspace && <ChatWidget />}
     </>
@@ -209,7 +300,7 @@ export default function App() {
       <BrowserRouter>
         <AppErrorBoundary>
           <ChatProvider>
-            <AppShell />
+            <AppShellRoutes />
           </ChatProvider>
         </AppErrorBoundary>
       </BrowserRouter>

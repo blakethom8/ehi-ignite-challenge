@@ -9,6 +9,7 @@ export type WorkspaceId =
   | "caspian"
   | "trial-finder"
   | "med-access"
+  | "second-opinion"
   | "site-coord";
 
 export type PaneId = "sessions" | "chat" | "workbench" | "files" | "inspector";

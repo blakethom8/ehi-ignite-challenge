@@ -1,0 +1,151 @@
+/* Atlas Agentic Workspaces — design tokens
+   Drop in to replace your current token layer (app/src/index.css).
+   Values match prototype/styles.css exactly. */
+
+:root {
+  /* ============== SURFACES — cool paper, never beige ============== */
+  --bg-app:          #eef2f6;
+  --bg-chrome:       #f4f7fb;
+  --surface-0:       #ffffff;
+  --surface-1:       #fafbfc;
+  --surface-2:       #f1f4f8;
+  --surface-3:       #e8edf3;
+  --surface-elevated:#ffffff;
+
+  /* ============== INK (text) ============== */
+  --ink-1: #0b1220;
+  --ink-2: #2b3648;
+  --ink-3: #5b6677;
+  --ink-4: #8b95a6;
+  --ink-5: #b6bfcc;
+
+  /* ============== LINES ============== */
+  --line-1: #dde3ea;
+  --line-2: #cdd5df;
+  --line-3: #aab3c0;
+
+  /* ============== ACTION — clinical blue ============== */
+  --action:        #1d4ed8;
+  --action-hover:  #1e40af;
+  --action-press:  #1e3a8a;
+  --action-tint:   #e8eefe;
+  --action-tint-2: #dbe5fd;
+  --action-line:   #b9c9f7;
+
+  /* ============== SEMANTIC ============== */
+  --critical:      #b91c1c;
+  --critical-tint: #fdecec;
+  --critical-line: #f4b4b4;
+  --caution:       #a85a07;
+  --caution-tint:  #fdf5e6;
+  --caution-line:  #f0d39a;
+  --clear:         #047857;
+  --clear-tint:    #e7f6ef;
+  --clear-line:    #a0d9bc;
+  --info:          #0e7490;
+  --info-tint:     #e6f5f7;
+
+  /* ============== MODULE IDENTITY ============== */
+  --mod-record: #475569;
+  --mod-preop:  #1d4ed8;
+  --mod-trials: #4338ca;
+  --mod-meds:   #0f766e;
+
+  /* ============== CHROME (dark titlebar + module bar) ============== */
+  /* These are constant across light/dark mode — the dark chrome is
+     part of the brand, not a theme switch. */
+  --chrome-modulebar: #0c1320;
+  --chrome-titlebar:  #0f172a;
+  --chrome-text:           rgba(229, 233, 240, 0.85);
+  --chrome-text-muted:     rgba(229, 233, 240, 0.62);
+  --chrome-hover-bg:       rgba(255, 255, 255, 0.05);
+  --chrome-active-bg:      rgba(255, 255, 255, 0.08);
+  --chrome-divider:        rgba(255, 255, 255, 0.06);
+
+  /* ============== TYPE ============== */
+  --font-sans:  "Inter Tight", -apple-system, "Segoe UI", sans-serif;
+  --font-serif: "Source Serif 4", "Iowan Old Style", Georgia, serif;
+  --font-mono:  "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  /* ============== SPACING (4px base) ============== */
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 20px;
+  --s6: 24px;
+  --s8: 32px;
+
+  /* ============== RADII ============== */
+  --r-1:    4px;
+  --r-2:    6px;
+  --r-3:    10px;
+  --r-pill: 999px;
+
+  /* ============== SHADOW ============== */
+  --shadow-1: 0 1px 2px  rgba(15, 23, 42, 0.04);
+  --shadow-2: 0 4px 14px rgba(15, 23, 42, 0.06);
+  --shadow-3: 0 18px 40px rgba(15, 23, 42, 0.10);
+
+  /* ============== MOTION ============== */
+  --motion-fast:  120ms ease-out;
+  --motion-modal: 160ms ease-out;
+}
+
+[data-theme="dark"] {
+  --bg-app:          #0c1014;
+  --bg-chrome:       #11161c;
+  --surface-0:       #161b22;
+  --surface-1:       #1a2029;
+  --surface-2:       #21283280;
+  --surface-3:       #2a3340;
+  --surface-elevated:#1a2029;
+
+  --ink-1: #e8edf3;
+  --ink-2: #c2cad6;
+  --ink-3: #8e98a7;
+  --ink-4: #6a7383;
+  --ink-5: #4a5260;
+
+  --line-1: #262d37;
+  --line-2: #2f3845;
+  --line-3: #3a4554;
+
+  --action:        #5b8af0;
+  --action-hover:  #7da4f5;
+  --action-press:  #4a78dc;
+  --action-tint:   rgba(91, 138, 240, 0.14);
+  --action-tint-2: rgba(91, 138, 240, 0.22);
+  --action-line:   rgba(91, 138, 240, 0.35);
+
+  --critical-tint: rgba(185, 28, 28, 0.14);
+  --caution-tint:  rgba(168, 90, 7, 0.16);
+  --clear-tint:    rgba(4, 120, 87, 0.16);
+  --info-tint:     rgba(14, 116, 144, 0.16);
+}
+
+/* Optional accent palette swaps (apply to <html data-accent="indigo">) */
+[data-accent="indigo"] {
+  --action:        #4338ca;
+  --action-hover:  #3730a3;
+  --action-press:  #312e81;
+  --action-tint:   #ecebfe;
+  --action-tint-2: #dcdafe;
+  --action-line:   #c4c1f8;
+}
+[data-accent="teal"] {
+  --action:        #0f766e;
+  --action-hover:  #115e59;
+  --action-press:  #134e4a;
+  --action-tint:   #e3f6f3;
+  --action-tint-2: #cdeae6;
+  --action-line:   #9fd8d0;
+}
+[data-accent="graphite"] {
+  --action:        #334155;
+  --action-hover:  #1f2937;
+  --action-press:  #0f172a;
+  --action-tint:   #eaedf2;
+  --action-tint-2: #d8dde5;
+  --action-line:   #b9c0cb;
+}

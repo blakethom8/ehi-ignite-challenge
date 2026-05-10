@@ -2915,7 +2915,7 @@ export function HarmonizeView() {
           <p className="mt-3 mx-auto max-w-xl text-sm leading-6 text-[#667085]">
             Either pull the Synthea sample data into{" "}
             <code className="text-xs">data/synthea-samples/synthea-r4-individual/fhir/</code>,
-            or upload at least one document on the Data Aggregator page — uploads
+            or upload at least one document on the Patient Record page — uploads
             automatically register as a harmonize collection.
           </p>
           <div className="mt-5 flex flex-wrap items-center justify-center gap-2">

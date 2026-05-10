@@ -336,7 +336,7 @@ export function PatientRecordOverview() {
           </div>
           <div className="flex gap-2">
             <FileJson2 size={16} className="mt-1 shrink-0 text-[#5b76fe]" />
-            <p><span className="font-semibold text-[#1c1c1e]">Use:</span> publish the reviewed chart into FHIR Charts, Clinical Insights, and marketplace modules.</p>
+            <p><span className="font-semibold text-[#1c1c1e]">Use:</span> publish the reviewed chart into FHIR Charts, Caspian, and marketplace modules.</p>
           </div>
         </div>
       </section>

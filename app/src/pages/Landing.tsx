@@ -13,7 +13,7 @@ import {
 const platformCards = [
   {
     title: "Open the Platform",
-    body: "Start in the working app shell with Data Aggregator, FHIR Charts, Clinical Insights, Marketplace, and Internal Tools.",
+    body: "Start in the working app shell with Patient Record, FHIR Charts, Caspian, Marketplace, and Internal Tools.",
     to: "/platform",
     action: "Enter platform",
     icon: GitBranch,
@@ -38,7 +38,7 @@ const platformCards = [
 const contextCards = [
   {
     title: "System Architecture",
-    body: "How scattered sources flow into Data Aggregator, FHIR Charts, private insights, marketplace modules, sharing, and internal tools.",
+    body: "How scattered sources flow into Patient Record, FHIR Charts, private insights, marketplace modules, sharing, and internal tools.",
     to: "/architecture",
     action: "View architecture",
     icon: Boxes,

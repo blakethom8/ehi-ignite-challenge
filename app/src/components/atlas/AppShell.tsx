@@ -69,9 +69,14 @@ export function AppShell({
   const navigate = useNavigate();
   const location = useLocation();
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [workspaceId, setWorkspaceId] = useState<WorkspaceId>(
-    () => (localStorage.getItem("atlas:workspaceId") as WorkspaceId) || "clinical-insights",
-  );
+  const [workspaceId, setWorkspaceId] = useState<WorkspaceId>(() => {
+    // Migration: the slug "clinical-insights" was renamed to "caspian" in
+    // Phase 6 of the Atlas IA refactor. If a user had the old slug stored,
+    // promote it transparently.
+    const stored = localStorage.getItem("atlas:workspaceId");
+    if (stored === "clinical-insights") return "caspian";
+    return (stored as WorkspaceId) || "caspian";
+  });
 
   useEffect(() => {
     localStorage.setItem("atlas:workspaceId", workspaceId);
@@ -99,7 +104,7 @@ export function AppShell({
 
   const handleSwitchWorkspace = (w: WorkspaceId) => {
     setWorkspaceId(w);
-    if (w === "clinical-insights") navigate("/caspian");
+    if (w === "caspian") navigate("/caspian");
     else navigate(`/workspaces/${w}`);
   };
 

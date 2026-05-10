@@ -201,7 +201,7 @@ export function ModuleBar({
               key={m.id}
               onClick={() => {
                 onSelect(m.id);
-                if (m.id === "caspian") onSwitchWorkspace("clinical-insights");
+                if (m.id === "caspian") onSwitchWorkspace("caspian");
               }}
               className={`relative flex flex-[0_0_auto] cursor-pointer items-center whitespace-nowrap rounded px-3 py-2 text-[12px] font-medium leading-none transition-colors ${
                 active

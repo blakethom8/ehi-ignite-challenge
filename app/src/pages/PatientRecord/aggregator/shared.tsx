@@ -61,7 +61,7 @@ const pageCopy: Record<AggregatorPage, { badge: string; title: string; body: str
     badge: "Publish Chart",
     title: "Activate the chart for downstream use",
     body:
-      "Pin a reviewed harmonization run as the active chart snapshot for FHIR Charts, Clinical Insights, and future clinical workflows.",
+      "Pin a reviewed harmonization run as the active chart snapshot for FHIR Charts, Caspian, and future clinical workflows.",
   },
 };
 
@@ -383,7 +383,7 @@ function snapshotRollbackWarning(snapshot: PublishedChartSnapshot, activeSnapsho
   const lines = [
     `Activate snapshot ${snapshot.snapshot_id.slice(0, 8)} as the active chart?`,
     "",
-    "FHIR Charts and Clinical Insights will read from this snapshot after activation.",
+    "FHIR Charts and Caspian will read from this snapshot after activation.",
     `Selected snapshot: ${snapshot.candidate_fact_count} facts from ${snapshot.source_count} sources.`,
   ];
   if (activeSnapshot) {
@@ -1718,7 +1718,7 @@ function ReadinessPage({
                 )}
               </div>
               <p className="mt-2 text-sm leading-6 text-emerald-950">
-                FHIR Charts and Clinical Insights should now read from snapshot{" "}
+                FHIR Charts and Caspian should now read from snapshot{" "}
                 <span className="font-mono">{activeSnapshot.snapshot_id.slice(0, 8)}</span>{" "}
                 from run <span className="font-mono">{activeSnapshot.run_id.slice(0, 8)}</span>.
               </p>
@@ -1739,10 +1739,10 @@ function ReadinessPage({
                 Open FHIR Charts
               </Link>
               <Link
-                to={`/clinical-insights?patient=${patientId}`}
+                to={`/caspian?patient=${patientId}`}
                 className="inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-100"
               >
-                Clinical Insights
+                Caspian
                 <ArrowRight size={14} />
               </Link>
             </div>
@@ -2073,7 +2073,7 @@ function WorkspaceEditorModal({
             />
           </label>
           <div className="rounded-lg border border-[#dfe4ea] bg-[#f7f9fc] p-3 text-sm leading-6 text-[#667085]">
-            Workspaces are saved in server-local demo storage. Source Intake, Harmonized Record, FHIR Charts, and Clinical Insights all use this selected workspace id.
+            Workspaces are saved in server-local demo storage. Source Intake, Harmonized Record, FHIR Charts, and Caspian all use this selected workspace id.
           </div>
           {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
         </div>

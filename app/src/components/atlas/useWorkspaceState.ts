@@ -50,7 +50,7 @@ export function useWorkspaceState(workspaceId: WorkspaceId) {
   const [chats, setChats] = useState<Record<WorkspaceId, ChatMessage[]>>(() => INITIAL_CHAT);
   const [tabsByWs, setTabsByWs] = useState<Record<WorkspaceId, WorkbenchTab[]>>(() => INITIAL_TABS);
   const [activeTabByWs, setActiveTabByWs] = useState<Partial<Record<WorkspaceId, string>>>({
-    "clinical-insights": "tab_brief",
+    "caspian": "tab_brief",
     "trial-finder": "tab_board",
   });
   const [citationId, setCitationId] = useState<string | null>(null);
@@ -154,7 +154,7 @@ export function useWorkspaceState(workspaceId: WorkspaceId) {
   const handleSend = useCallback(
     (text: string) => {
       const userMsg: ChatMessage = { id: `u${Date.now()}`, role: "user", content: text };
-      const family = workspaceId === "clinical-insights" ? "clinical" : "marketplace";
+      const family = workspaceId === "caspian" ? "clinical" : "marketplace";
       const reply: ChatMessage = {
         id: `a${Date.now()}`,
         role: "assistant",
@@ -168,7 +168,7 @@ export function useWorkspaceState(workspaceId: WorkspaceId) {
                 "Acknowledged. I'll fold that into the briefing — citations will keep flowing into [pre-op-packet-v2.md] and the inspector will track every pinned source. Drop a citation chip to open the underlying FHIR resource.",
               ]
             : [
-                "Acknowledged. I'll re-rank the shortlist and surface anything that crosses the consent boundary in this thread. The package keeps a clean read-only handle on the Clinical Insights workspace — no PHI leaves the run.",
+                "Acknowledged. I'll re-rank the shortlist and surface anything that crosses the consent boundary in this thread. The package keeps a clean read-only handle on the Caspian workspace — no PHI leaves the run.",
               ],
       };
       setChats((prev) => ({

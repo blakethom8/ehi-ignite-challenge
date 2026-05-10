@@ -5,7 +5,7 @@ import { WORKSPACES } from "../../components/atlas/data";
 import type { PaneVisibility } from "../../components/atlas/types";
 
 export function CaspianWorkspace() {
-  const workspace = WORKSPACES["clinical-insights"];
+  const workspace = WORKSPACES["caspian"];
   const controlsRef = useRef<{
     panes: PaneVisibility;
     togglePane: (p: keyof PaneVisibility) => void;

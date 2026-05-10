@@ -6,7 +6,7 @@ export type ModuleId =
   | "learn";
 
 export type WorkspaceId =
-  | "clinical-insights"
+  | "caspian"
   | "trial-finder"
   | "med-access"
   | "site-coord";

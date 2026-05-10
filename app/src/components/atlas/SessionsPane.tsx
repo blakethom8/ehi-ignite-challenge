@@ -28,7 +28,7 @@ export function SessionsPane({ workspace, activeSessionId, onSelectSession }: Se
       }}
     >
       <Link
-        to={workspace.id === "clinical-insights" ? "/caspian" : `/workspaces/${workspace.id}`}
+        to={workspace.id === "caspian" ? "/caspian" : `/workspaces/${workspace.id}`}
         className="mx-2 mt-3 flex cursor-pointer items-center gap-2 rounded-md border px-2.5 py-1.5 transition-colors hover:border-[var(--line-2)]"
         style={{
           background: "var(--surface-0)",

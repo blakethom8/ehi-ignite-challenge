@@ -179,9 +179,9 @@ export function PatientRecordPool() {
     : [];
 
   const quietActions = [
-    { title: "Data Aggregator", to: patientUrl("/patient-record/methodology", selectedPatient), icon: GitBranch },
+    { title: "Patient Record", to: patientUrl("/patient-record/methodology", selectedPatient), icon: GitBranch },
     { title: "FHIR Chart", to: patientUrl("/patient-record", selectedPatient), icon: Database },
-    { title: "Clinical Insights", to: patientUrl("/caspian", selectedPatient), icon: Stethoscope },
+    { title: "Caspian", to: patientUrl("/caspian", selectedPatient), icon: Stethoscope },
     { title: "Medication Access", to: patientUrl("/medication-access", selectedPatient), icon: Pill },
   ];
 

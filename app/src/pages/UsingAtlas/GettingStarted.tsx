@@ -146,7 +146,7 @@ const APPLICATION_SURFACES: SurfaceCardProps[] = [
   },
   {
     icon: Sparkles,
-    label: "Clinical Insights",
+    label: "Caspian",
     role: "Internal agent harness",
     body: "Atlas's own AI assistant: full bundle access, cited Q&A, and evidence packets assembled from validated facts. The reasoning layer Atlas builds in-house.",
   },
@@ -158,7 +158,7 @@ const APPLICATION_SURFACES: SurfaceCardProps[] = [
   },
   {
     icon: Blocks,
-    label: "Marketplace",
+    label: "Workspaces",
     role: "Skills + modules",
     body: "A controlled-access space for skills and modules — modeled after open-skills patterns like Claude Skills and Codex. The bundle stays scoped; skills add web search, specialized analysis, or domain workflows without raw data exposure.",
   },

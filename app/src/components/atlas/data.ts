@@ -4,8 +4,8 @@
 import type { Workspace, WorkspaceId } from "./types";
 
 export const WORKSPACES: Record<WorkspaceId, Workspace> = {
-  "clinical-insights": {
-    id: "clinical-insights",
+  "caspian": {
+    id: "caspian",
     family: "clinical",
     title: "Caspian",
     subtitle: "First-party clinical workspace",
@@ -94,7 +94,7 @@ export type Session = {
 };
 
 export const SESSIONS: Record<WorkspaceId, Session[]> = {
-  "clinical-insights": [
+  "caspian": [
     { id: "s1", title: "Pre-op clearance — Hollister", state: "running", meta: "in progress", workflow: "preop" },
     { id: "s2", title: "Medication safety review", state: "needs", meta: "1 approval pending", workflow: "medsafety" },
     { id: "s3", title: "Longitudinal synthesis", state: "done", meta: "saved · 4h ago" },
@@ -122,7 +122,7 @@ export type Workflow = {
 };
 
 export const WORKFLOWS: Record<WorkspaceId, Workflow[]> = {
-  "clinical-insights": [
+  "caspian": [
     { id: "preop", title: "Run pre-op review", desc: "Surfaces medication holds, anesthesia notes, recent labs, and clearance recommendation.", tags: ["pre-surgery", "evidence-grounded"] },
     { id: "medsafety", title: "Medication safety audit", desc: "Interactions, contraindications, dosing against renal function and active conditions.", tags: ["safety"] },
     { id: "longi", title: "Longitudinal synthesis", desc: "Multi-year condition trajectory across encounters.", tags: ["narrative"] },
@@ -162,7 +162,7 @@ export type FileNode = {
 };
 
 export const FILE_TREES: Record<WorkspaceId, FileTreeNode[]> = {
-  "clinical-insights": [
+  "caspian": [
     { type: "group", label: "Patient workspace" },
     {
       type: "folder",
@@ -371,7 +371,7 @@ export type ChatMessage =
     };
 
 export const INITIAL_CHAT: Record<WorkspaceId, ChatMessage[]> = {
-  "clinical-insights": [
+  "caspian": [
     {
       id: "u1",
       role: "user",
@@ -426,7 +426,7 @@ export const INITIAL_CHAT: Record<WorkspaceId, ChatMessage[]> = {
       time: "12:08",
       trace: { tool: "marketplace.run", target: "trial-finder@2.4.1 / shortlist" },
       blocks: [
-        "Pulled patient anchors from the Clinical Insights workspace under a consented, read-only handle. No patient identifiers leave this run [manifest.json]. Searching ClinicalTrials.gov against: chronic myeloid leukemia, BCR-ABL+, post-imatinib intolerance, ECOG 1, 50 mi radius.",
+        "Pulled patient anchors from the Caspian workspace under a consented, read-only handle. No patient identifiers leave this run [manifest.json]. Searching ClinicalTrials.gov against: chronic myeloid leukemia, BCR-ABL+, post-imatinib intolerance, ECOG 1, 50 mi radius.",
         "14 candidates returned. Ranking by clinical fit × operational fit × consent posture. Top three are queued in [ranked-shortlist.md] and the full board is open in the Workbench.",
       ],
       actions: [
@@ -475,7 +475,7 @@ export type WorkbenchTab = {
 };
 
 export const INITIAL_TABS: Record<WorkspaceId, WorkbenchTab[]> = {
-  "clinical-insights": [
+  "caspian": [
     { id: "tab_brief", label: "pre-op-packet-v2.md", icon: "FileText", kind: "preop-brief", dirty: true },
     { id: "tab_diff", label: "v1 → v2 diff", icon: "GitCompare", kind: "diff" },
     { id: "tab_sum", label: "clearance-summary.json", icon: "Braces", kind: "summary-json" },

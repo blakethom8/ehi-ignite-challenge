@@ -95,7 +95,7 @@ export function AggregationMethodology() {
               A patient-first method for turning scattered health data into usable context
             </h1>
             <p className="mt-3 max-w-4xl text-base leading-7 text-[#667085]">
-              The Data Aggregator is not just an ingestion pipeline. It is a guided process for collecting fragmented EHI,
+              The Patient Record is not just an ingestion pipeline. It is a guided process for collecting fragmented EHI,
               reconciling it into a common semantic layer, and capturing the patient context that structured records almost
               always miss.
             </p>

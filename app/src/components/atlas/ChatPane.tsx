@@ -89,7 +89,7 @@ export function ChatPane({
       </div>
       <div ref={scrollRef} className="overflow-y-auto px-6 py-4 pb-2">
         <div
-          className="mb-4 flex items-center gap-2 border-b pb-3 text-[11px]"
+          className="mb-4 flex items-center gap-2 border-b pb-3 text-[10.5px]"
           style={{ borderColor: "var(--line-1)", color: "var(--ink-4)" }}
         >
           <span>Session opened 12 min ago</span>
@@ -135,7 +135,7 @@ export function ChatPane({
             }}
             placeholder={placeholder}
             rows={2}
-            className="resize-none border-0 bg-transparent text-[13.5px] leading-relaxed outline-none"
+            className="resize-none border-0 bg-transparent text-[13px] leading-relaxed outline-none"
             style={{ color: "var(--ink-1)" }}
           />
           <div className="flex items-center gap-1.5">
@@ -219,7 +219,7 @@ function Message({
     return (
       <div className="mb-5 ml-auto max-w-[720px]">
         <div
-          className="rounded-[14px_14px_4px_14px] border px-4 py-3 text-[13.5px] leading-relaxed"
+          className="rounded-[14px_14px_4px_14px] border px-4 py-3 text-[13px] leading-relaxed"
           style={{
             background: "var(--surface-3)",
             borderColor: "var(--line-1)",
@@ -274,7 +274,7 @@ function Message({
           </div>
         )}
         <div
-          className="text-[14.5px] leading-[1.65]"
+          className="text-[14px] leading-[1.62]"
           style={{
             fontFamily: "var(--font-serif)",
             color: "var(--ink-1)",

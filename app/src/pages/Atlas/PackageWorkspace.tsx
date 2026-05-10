@@ -1,25 +1,42 @@
+import { useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { AppShell } from "../../components/atlas/AppShell";
-import { PlaceholderShell } from "./PlaceholderShell";
+import { WorkspaceFrame } from "../../components/atlas/WorkspaceFrame";
+import { WORKSPACES } from "../../components/atlas/data";
+import type { PaneVisibility, WorkspaceId } from "../../components/atlas/types";
 
 export function PackageWorkspace() {
-  const { packageId = "trial-finder" } = useParams();
+  const { packageId = "trial-finder", sessionId } = useParams();
+  const workspace =
+    WORKSPACES[packageId as WorkspaceId] ?? WORKSPACES["trial-finder"];
+  const controlsRef = useRef<{
+    panes: PaneVisibility;
+    togglePane: (p: keyof PaneVisibility) => void;
+  } | null>(null);
+  const [, force] = useState(0);
+
   return (
     <AppShell
       contained={false}
       crumbs={[
         { label: "Workspaces" },
-        { label: packageId, active: true },
+        { label: workspace.title },
+        sessionId
+          ? { label: sessionId, active: true }
+          : { label: "Package home", active: true },
       ]}
       showPaneToggles
+      panes={controlsRef.current?.panes}
+      onTogglePane={(p) => {
+        controlsRef.current?.togglePane(p);
+        force((n) => n + 1);
+      }}
       onRunWorkflow={() => undefined}
     >
-      <PlaceholderShell
-        eyebrow={`Marketplace package · ${packageId}`}
-        title="The package workspace shell lands here in Phase 3"
-        body="Marketplace packages enter on a package home (permissions ledger, workflows, recent runs). Starting a workflow opens the active session view inside the same shell."
-        ctaLabel="Open the legacy Trial Finder workspace"
-        ctaHref="/ai-workspace/trial-finder"
+      <WorkspaceFrame
+        workspace={workspace}
+        showPackageHome={!sessionId}
+        controlsRef={controlsRef}
       />
     </AppShell>
   );

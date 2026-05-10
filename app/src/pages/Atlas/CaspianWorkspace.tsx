@@ -1,7 +1,17 @@
+import { useRef, useState } from "react";
 import { AppShell } from "../../components/atlas/AppShell";
-import { PlaceholderShell } from "./PlaceholderShell";
+import { WorkspaceFrame } from "../../components/atlas/WorkspaceFrame";
+import { WORKSPACES } from "../../components/atlas/data";
+import type { PaneVisibility } from "../../components/atlas/types";
 
 export function CaspianWorkspace() {
+  const workspace = WORKSPACES["clinical-insights"];
+  const controlsRef = useRef<{
+    panes: PaneVisibility;
+    togglePane: (p: keyof PaneVisibility) => void;
+  } | null>(null);
+  const [, force] = useState(0);
+
   return (
     <AppShell
       contained={false}
@@ -10,15 +20,14 @@ export function CaspianWorkspace() {
         { label: "Pre-op clearance — Hollister", active: true },
       ]}
       showPaneToggles
+      panes={controlsRef.current?.panes}
+      onTogglePane={(p) => {
+        controlsRef.current?.togglePane(p);
+        force((n) => n + 1);
+      }}
       onRunWorkflow={() => undefined}
     >
-      <PlaceholderShell
-        eyebrow="First-party workspace · Caspian"
-        title="The clinical workspace lands here in Phase 3"
-        body="Caspian is the first-party agentic workspace. Phase 3 brings the five-pane shell: sessions, chat, workbench, files, inspector. The dark chrome above is final."
-        ctaLabel="Open the legacy Clinical Insights view"
-        ctaHref="/clinical-insights"
-      />
+      <WorkspaceFrame workspace={workspace} controlsRef={controlsRef} />
     </AppShell>
   );
 }

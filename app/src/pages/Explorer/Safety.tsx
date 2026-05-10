@@ -178,7 +178,7 @@ function FlagCard({ flag }: { flag: SafetyFlag }) {
       {flag.status !== "NONE" && (
         <div className="border-t border-[#e9eaef] px-5 py-2.5 flex justify-end">
           <Link
-            to="/analysis/coverage"
+            to="/learn/coverage"
             className="text-[11px] text-[#a5a8b5] hover:text-[#5b76fe] hover:underline transition-colors"
           >
             Why you can trust this · Coverage →

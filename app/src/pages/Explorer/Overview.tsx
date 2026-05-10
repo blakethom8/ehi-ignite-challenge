@@ -1108,7 +1108,7 @@ export function ExplorerOverview() {
         {/* Primer banner */}
         <div className="mt-5 max-w-xs w-full rounded-xl border border-[#b2e8e0] bg-[#f0faf8] px-4 py-3 text-left">
           <Link
-            to="/analysis/fhir-primer"
+            to="/learn/fhir-primer"
             className="text-sm text-[#187574] hover:underline"
           >
             First time here? Open the FHIR primer →

@@ -187,7 +187,7 @@ export function AnalysisOverview() {
       </section>
 
       <section className="mt-7 grid gap-4 md:grid-cols-3">
-        <Link to="/analysis/ccda-testing-lab" className="rounded-2xl border border-[#cdeee9] bg-white p-4 transition hover:border-[#0f766e] hover:shadow-sm">
+        <Link to="/learn/ccda-lab" className="rounded-2xl border border-[#cdeee9] bg-white p-4 transition hover:border-[#0f766e] hover:shadow-sm">
           <p className="flex items-center gap-2 text-sm font-semibold text-[#0f172a]">
             <FileCode2 size={16} className="text-[#0f766e]" />
             C-CDA Testing Lab

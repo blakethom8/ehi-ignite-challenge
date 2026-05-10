@@ -2920,7 +2920,7 @@ export function HarmonizeView() {
           </p>
           <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
             <Link
-              to="/aggregate/sources"
+              to="/patient-record/sources"
               className="inline-flex items-center gap-2 rounded-lg bg-[#5b76fe] px-4 py-2 text-sm font-semibold text-white hover:bg-[#4760e8]"
             >
               <FileUp size={14} />
@@ -3086,7 +3086,7 @@ export function HarmonizeView() {
                 Add sources
               </Link>
               <Link
-                to="/aggregate/workspaces"
+                to="/patient-record/workspaces"
                 className="inline-flex items-center gap-2 rounded-lg border border-[#dfe4ea] bg-white px-4 py-2 text-sm font-semibold text-[#555a6a] hover:border-[#5b76fe] hover:text-[#5b76fe]"
               >
                 Workspace library

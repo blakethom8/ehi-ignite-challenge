@@ -109,7 +109,7 @@ export function SectionNav() {
         <ul className="space-y-0.5">
           <li>
             <Link
-              to="/explorer"
+              to="/fhir-charts"
               className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-[#4a5168] transition-colors hover:bg-[#f5f6fb] hover:text-[#1d2433]"
             >
               Open patient explorer
@@ -117,7 +117,7 @@ export function SectionNav() {
           </li>
           <li>
             <Link
-              to="/analysis"
+              to="/learn"
               className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-[#4a5168] transition-colors hover:bg-[#f5f6fb] hover:text-[#1d2433]"
             >
               Data lab reference

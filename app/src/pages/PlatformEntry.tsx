@@ -50,17 +50,17 @@ export function PlatformEntry() {
   const actions = [
     {
       title: "Data Aggregator",
-      to: patientUrl("/aggregate", selectedPatient),
+      to: patientUrl("/patient-record/methodology", selectedPatient),
       icon: GitBranch,
     },
     {
       title: "FHIR Chart",
-      to: patientUrl("/charts", selectedPatient),
+      to: patientUrl("/patient-record", selectedPatient),
       icon: Database,
     },
     {
       title: "Clinical Insights",
-      to: patientUrl("/clinical-insights", selectedPatient),
+      to: patientUrl("/caspian", selectedPatient),
       icon: Brain,
     },
   ];

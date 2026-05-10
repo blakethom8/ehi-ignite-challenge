@@ -1073,7 +1073,7 @@ export function ChatMessageBubble({
         {!compact && msg.trace && msg.trace.tool_calls.some((tc) => tc.tool_name === "build_clinical_context") && (
           <p className="text-[11px] text-[#a5a8b5]">
             <Link
-              to="/analysis/coverage"
+              to="/learn/coverage"
               target="_blank"
               rel="noopener noreferrer"
               className="hover:text-[#5b76fe] hover:underline transition-colors"

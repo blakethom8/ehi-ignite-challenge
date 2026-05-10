@@ -152,7 +152,7 @@ export function GuidedTour() {
                 <ArrowRight size={16} />
               </Link>
               <Link
-                to="/preop"
+                to="/caspian"
                 className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#dfe3eb] bg-white px-5 py-3 text-sm font-semibold text-[#526075] shadow-sm transition-colors hover:border-[#5b76fe] hover:text-[#5b76fe]"
               >
                 Open clinical app demo

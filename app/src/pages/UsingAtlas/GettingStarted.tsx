@@ -278,12 +278,12 @@ export function GettingStarted() {
           <SectionLink
             label="Open the patient explorer"
             description="Working prototype across 1,180 synthetic patients — safety panel, medications, labs, timeline."
-            to="/explorer"
+            to="/fhir-charts"
           />
           <SectionLink
             label="Read the Phase 1 submission"
             description="The full design narrative: problem framing, architecture decisions, trustworthy-AI design."
-            to="/analysis"
+            to="/learn"
           />
         </div>
       </section>

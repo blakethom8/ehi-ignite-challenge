@@ -46,7 +46,7 @@ const contextCards = [
   {
     title: "Product Direction",
     body: "The product direction is a patient-owned data layer with focused clinical and marketplace modules built on top.",
-    to: "/clinical-insights",
+    to: "/caspian",
     action: "View modules",
     icon: Sparkles,
   },
@@ -97,7 +97,7 @@ export function Landing() {
                   New to FHIR data format?
                 </p>
                 <Link
-                  to="/analysis/fhir-primer"
+                  to="/learn/fhir-primer"
                   className="inline-flex w-fit items-center gap-1 text-sm font-semibold text-[#5b76fe] transition-all hover:gap-2 hover:text-[#445ee8]"
                 >
                   Read the plain-language primer

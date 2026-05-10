@@ -160,7 +160,7 @@ export function DataSharing() {
               <p className="mt-1 text-sm text-[#667085]">A shareable packet is a scoped view of the unified patient record.</p>
             </div>
             <Link
-              to={withPatient("/charts", patientId)}
+              to={withPatient("/patient-record", patientId)}
               className="inline-flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-semibold text-[#5b76fe] hover:bg-[#eef1ff]"
             >
               FHIR Chart

@@ -303,7 +303,7 @@ export function TrustworthyAi() {
           <SectionLink
             label="Open the patient explorer"
             description="See the safety panel, citations, and missing-information flags in a working prototype."
-            to="/explorer"
+            to="/fhir-charts"
           />
         </div>
       </section>

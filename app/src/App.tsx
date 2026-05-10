@@ -9,7 +9,6 @@ import { Landing } from "./pages/Landing";
 import { PlatformArchitecture } from "./pages/PlatformArchitecture";
 import { PatientRecordPool } from "./pages/PatientRecordPool";
 import { GuidedTour } from "./pages/GuidedTour";
-import { PlaceholderShell } from "./pages/Atlas/PlaceholderShell";
 
 function lazyNamed<TModule extends Record<string, unknown>>(
   loader: () => Promise<TModule>,
@@ -70,7 +69,6 @@ const PublishReadinessPage = lazyNamed(() => import("./pages/Modules/DataAggrega
 const SourceIntakePage = lazyNamed(() => import("./pages/Modules/DataAggregator/SourceIntakePage"), "SourceIntakePage");
 const WorkspaceLibraryPage = lazyNamed(() => import("./pages/Modules/DataAggregator/WorkspaceLibraryPage"), "WorkspaceLibraryPage");
 const HarmonizeView = lazyNamed(() => import("./pages/Modules/HarmonizeView"), "HarmonizeView");
-const ClinicalInsights = lazyNamed(() => import("./pages/Modules/ClinicalInsights"), "ClinicalInsights");
 const LabExplainer = lazyNamed(() => import("./pages/Modules/LabExplainer"), "LabExplainer");
 const CcdaPipelineLab = lazyNamed(() => import("./pages/Modules/CcdaPipelineLab"), "CcdaPipelineLab");
 const TrialFinder = lazyNamed(() => import("./pages/Modules/TrialFinder"), "TrialFinder");
@@ -130,103 +128,69 @@ function AppShellRoutes() {
     location.pathname.startsWith("/caspian") ||
     location.pathname.startsWith("/workspaces/");
 
-  // Atlas IA routes (new shell)
+  // Atlas IA routes — the five top-level modules + their canonical sub-routes.
   const atlasRoutes: ShellRoute[] = [
+    // Caspian (first-party agentic workspace)
     { path: "/caspian", element: <CaspianWorkspace />, fullBleed: true },
     { path: "/caspian/sessions/:sessionId", element: <CaspianWorkspace />, fullBleed: true },
+
+    // Workspaces (marketplace packages)
     { path: "/workspaces", element: <MarketplaceIndex /> },
     { path: "/workspaces/:packageId", element: <PackageWorkspace />, fullBleed: true },
     { path: "/workspaces/:packageId/sessions/:sessionId", element: <PackageWorkspace />, fullBleed: true },
-    {
-      path: "/learn",
-      element: (
-        <PlaceholderShell
-          eyebrow="Internal section · learn"
-          title="Runbooks, evals, vendor reviews"
-          body="Internal-only docs, prompt evaluations, runbooks, changelog, and the vendor review log live here. External users see this as documentation."
-          ctaLabel="Open Atlas docs"
-          ctaHref="/using-atlas"
-        />
-      ),
-    },
-    {
-      path: "/patient-record",
-      element: (
-        <PlaceholderShell
-          eyebrow="Patient Record"
-          title="Source-of-truth chart layer"
-          body="The Patient Record module is the canonical chart layer. It now includes the former Data Aggregator pipeline (PDF parsing, harmonization, and review) as sub-routes."
-          ctaLabel="Open the chart"
-          ctaHref="/record"
-        />
-      ),
-    },
-    {
-      path: "/fhir-charts",
-      element: (
-        <PlaceholderShell
-          eyebrow="FHIR Charts"
-          title="FHIR resource browser"
-          body="Browse the patient's FHIR resources, encounters, and timelines. Explorer pages remain available under /explorer while we migrate them into this module."
-          ctaLabel="Open Explorer"
-          ctaHref="/explorer"
-        />
-      ),
-    },
+
+    // Patient Record — source-of-truth chart layer (folds in former Data Aggregator)
+    { path: "/patient-record", element: <PatientRecordOverview /> },
+    { path: "/patient-record/methodology", element: <AggregationMethodology /> },
+    { path: "/patient-record/sources", element: <SourceIntakePage /> },
+    { path: "/patient-record/harmonize", element: <HarmonizeView /> },
+    { path: "/patient-record/cleaning", element: <HarmonizeView /> },
+    { path: "/patient-record/workspaces", element: <WorkspaceLibraryPage /> },
+    { path: "/patient-record/publish", element: <PublishReadinessPage /> },
+    { path: "/patient-record/context", element: <PatientContext /> },
+
+    // FHIR Charts — FHIR resource browser (former Explorer)
+    { path: "/fhir-charts", element: <ExplorerOverview /> },
+    { path: "/fhir-charts/timeline", element: <ExplorerTimeline /> },
+    { path: "/fhir-charts/labs", element: <ExplorerLabs /> },
+    { path: "/fhir-charts/history", element: <ExplorerHistory /> },
+    { path: "/fhir-charts/care-journey", element: <ExplorerCareJourney /> },
+    { path: "/fhir-charts/corpus", element: <ExplorerCorpus /> },
+    { path: "/fhir-charts/safety", element: <ExplorerSafety /> },
+    { path: "/fhir-charts/immunizations", element: <ExplorerImmunizations /> },
+    { path: "/fhir-charts/conditions", element: <ExplorerConditions /> },
+    { path: "/fhir-charts/procedures", element: <ExplorerProcedures /> },
+    { path: "/fhir-charts/clearance", element: <ExplorerClearance /> },
+    { path: "/fhir-charts/anesthesia", element: <ExplorerAnesthesia /> },
+    { path: "/fhir-charts/distributions", element: <ExplorerDistributions /> },
+    { path: "/fhir-charts/interactions", element: <ExplorerInteractions /> },
+    { path: "/fhir-charts/assistant", element: <ExplorerAssistant /> },
+    { path: "/fhir-charts/patient-data", element: <ExplorerPatientData /> },
+
+    // Learn — internal section (runbooks, evals, methodology)
+    { path: "/learn", element: <AnalysisOverview /> },
+    { path: "/learn/fhir-primer", element: <AnalysisFhirPrimer /> },
+    { path: "/learn/definitions", element: <AnalysisDefinitions /> },
+    { path: "/learn/coverage", element: <AnalysisCoverage /> },
+    { path: "/learn/ccda-lab", element: <CcdaPipelineLab /> },
+    { path: "/learn/qa-eval-lab", element: <QaEvalLab /> },
+    { path: "/learn/pipeline-lab", element: <PipelineLab /> },
+    { path: "/learn/ground-truth-review", element: <GroundTruthReview /> },
+    { path: "/learn/ground-truth-review/:runId", element: <GroundTruthReview /> },
   ];
 
-  // Legacy routes — keep working under the new chrome.
-  const legacyRoutes: ShellRoute[] = [
+  // Routes that don't map into the five-module IA but are still reachable.
+  const supportRoutes: ShellRoute[] = [
     { path: "/platform", element: <PlatformEntry /> },
-    { path: "/charts", element: <PatientRecordOverview /> },
-    { path: "/record", element: <PatientRecordOverview /> },
-    { path: "/aggregate", element: <AggregationMethodology /> },
-    { path: "/aggregate/methodology", element: <AggregationMethodology /> },
-    { path: "/aggregate/workspaces", element: <WorkspaceLibraryPage /> },
-    { path: "/aggregate/sources", element: <SourceIntakePage /> },
-    { path: "/aggregate/cleaning", element: <HarmonizeView /> },
-    { path: "/aggregate/context", element: <PatientContext /> },
-    { path: "/aggregate/harmonize", element: <HarmonizeView /> },
-    { path: "/aggregate/publish", element: <PublishReadinessPage /> },
-    { path: "/clinical-insights/overview", element: <ClinicalInsights /> },
-    { path: "/clinical-insights", element: <ClinicalInsights /> },
-    { path: "/clinical-insights/packages", element: <ClinicalInsights /> },
-    { path: "/clinical-insights/context-library", element: <ClinicalInsights /> },
-    { path: "/clinical-insights/favorites", element: <ClinicalInsights /> },
-    { path: "/clinical-insights/create", element: <ClinicalInsights /> },
-    { path: "/clinical-insights/labs", element: <LabExplainer /> },
-    { path: "/marketplace/settings", element: <DataSharing /> },
-    { path: "/explorer", element: <ExplorerOverview /> },
-    { path: "/explorer/timeline", element: <ExplorerTimeline /> },
-    { path: "/explorer/labs", element: <ExplorerLabs /> },
-    { path: "/explorer/history", element: <ExplorerHistory /> },
-    { path: "/explorer/care-journey", element: <ExplorerCareJourney /> },
-    { path: "/explorer/corpus", element: <ExplorerCorpus /> },
-    { path: "/explorer/safety", element: <ExplorerSafety /> },
-    { path: "/explorer/immunizations", element: <ExplorerImmunizations /> },
-    { path: "/explorer/conditions", element: <ExplorerConditions /> },
-    { path: "/explorer/procedures", element: <ExplorerProcedures /> },
-    { path: "/explorer/clearance", element: <ExplorerClearance /> },
-    { path: "/explorer/anesthesia", element: <ExplorerAnesthesia /> },
-    { path: "/explorer/distributions", element: <ExplorerDistributions /> },
-    { path: "/explorer/interactions", element: <ExplorerInteractions /> },
-    { path: "/explorer/assistant", element: <ExplorerAssistant /> },
-    { path: "/explorer/patient-data", element: <ExplorerPatientData /> },
     { path: "/journey", element: <PatientJourney /> },
     { path: "/skills/trial-finder", element: <TrialFinder /> },
     { path: "/skills/patients/memory", element: <PatientMemoryView /> },
     { path: "/sharing", element: <DataSharing /> },
     { path: "/second-opinion", element: <DataSharing /> },
-    { path: "/analysis", element: <AnalysisOverview /> },
-    { path: "/analysis/fhir-primer", element: <AnalysisFhirPrimer /> },
-    { path: "/analysis/definitions", element: <AnalysisDefinitions /> },
-    { path: "/analysis/coverage", element: <AnalysisCoverage /> },
-    { path: "/analysis/ccda-testing-lab", element: <CcdaPipelineLab /> },
-    { path: "/analysis/qa-eval-lab", element: <QaEvalLab /> },
-    { path: "/pipeline-lab", element: <PipelineLab /> },
-    { path: "/ccda-lab", element: <CcdaPipelineLab /> },
-    { path: "/ground-truth-review", element: <GroundTruthReview /> },
-    { path: "/ground-truth-review/:runId", element: <GroundTruthReview /> },
+    { path: "/marketplace/settings", element: <DataSharing /> },
+    // Clinical Insights folds into Caspian workflows, but keep these pages
+    // reachable for the alternate-view links until the migration completes.
+    { path: "/clinical-insights/labs", element: <LabExplainer /> },
   ];
 
   return (
@@ -241,8 +205,7 @@ function AppShellRoutes() {
           element={<Suspense fallback={<PageFallback />}><UsingAtlasRoutes /></Suspense>}
         />
         {/* Legacy redirects — see .claude/handoff/atlas/README.md §Routing */}
-        <Route path="/data-aggregator" element={<Navigate to="/patient-record" replace />} />
-        <Route path="/data-aggregator/*" element={<Navigate to="/patient-record" replace />} />
+        {/* Tier A: fully-replaced products */}
         <Route path="/preop" element={<Navigate to="/caspian" replace />} />
         <Route path="/preop/*" element={<Navigate to="/caspian" replace />} />
         <Route path="/trials" element={<Navigate to="/workspaces/trial-finder" replace />} />
@@ -255,6 +218,54 @@ function AppShellRoutes() {
         <Route path="/grants" element={<Navigate to="/workspaces" replace />} />
         <Route path="/research-opportunities" element={<Navigate to="/workspaces" replace />} />
         <Route path="/payer-check" element={<Navigate to="/workspaces" replace />} />
+        {/* Tier B: Patient Record absorbs the former Data Aggregator */}
+        <Route path="/data-aggregator" element={<Navigate to="/patient-record" replace />} />
+        <Route path="/data-aggregator/*" element={<Navigate to="/patient-record" replace />} />
+        <Route path="/charts" element={<Navigate to="/patient-record" replace />} />
+        <Route path="/record" element={<Navigate to="/patient-record" replace />} />
+        <Route path="/aggregate" element={<Navigate to="/patient-record/methodology" replace />} />
+        <Route path="/aggregate/methodology" element={<Navigate to="/patient-record/methodology" replace />} />
+        <Route path="/aggregate/sources" element={<Navigate to="/patient-record/sources" replace />} />
+        <Route path="/aggregate/workspaces" element={<Navigate to="/patient-record/workspaces" replace />} />
+        <Route path="/aggregate/cleaning" element={<Navigate to="/patient-record/cleaning" replace />} />
+        <Route path="/aggregate/harmonize" element={<Navigate to="/patient-record/harmonize" replace />} />
+        <Route path="/aggregate/context" element={<Navigate to="/patient-record/context" replace />} />
+        <Route path="/aggregate/publish" element={<Navigate to="/patient-record/publish" replace />} />
+        {/* Tier C: Explorer becomes FHIR Charts */}
+        <Route path="/explorer" element={<Navigate to="/fhir-charts" replace />} />
+        <Route path="/explorer/timeline" element={<Navigate to="/fhir-charts/timeline" replace />} />
+        <Route path="/explorer/labs" element={<Navigate to="/fhir-charts/labs" replace />} />
+        <Route path="/explorer/history" element={<Navigate to="/fhir-charts/history" replace />} />
+        <Route path="/explorer/care-journey" element={<Navigate to="/fhir-charts/care-journey" replace />} />
+        <Route path="/explorer/corpus" element={<Navigate to="/fhir-charts/corpus" replace />} />
+        <Route path="/explorer/safety" element={<Navigate to="/fhir-charts/safety" replace />} />
+        <Route path="/explorer/immunizations" element={<Navigate to="/fhir-charts/immunizations" replace />} />
+        <Route path="/explorer/conditions" element={<Navigate to="/fhir-charts/conditions" replace />} />
+        <Route path="/explorer/procedures" element={<Navigate to="/fhir-charts/procedures" replace />} />
+        <Route path="/explorer/clearance" element={<Navigate to="/fhir-charts/clearance" replace />} />
+        <Route path="/explorer/anesthesia" element={<Navigate to="/fhir-charts/anesthesia" replace />} />
+        <Route path="/explorer/distributions" element={<Navigate to="/fhir-charts/distributions" replace />} />
+        <Route path="/explorer/interactions" element={<Navigate to="/fhir-charts/interactions" replace />} />
+        <Route path="/explorer/assistant" element={<Navigate to="/fhir-charts/assistant" replace />} />
+        <Route path="/explorer/patient-data" element={<Navigate to="/fhir-charts/patient-data" replace />} />
+        {/* Tier C: Clinical Insights folds into Caspian workflows */}
+        <Route path="/clinical-insights" element={<Navigate to="/caspian" replace />} />
+        <Route path="/clinical-insights/overview" element={<Navigate to="/caspian" replace />} />
+        <Route path="/clinical-insights/packages" element={<Navigate to="/caspian" replace />} />
+        <Route path="/clinical-insights/context-library" element={<Navigate to="/caspian" replace />} />
+        <Route path="/clinical-insights/favorites" element={<Navigate to="/caspian" replace />} />
+        <Route path="/clinical-insights/create" element={<Navigate to="/caspian" replace />} />
+        {/* Tier C: Analysis + pipeline tools fold into Learn */}
+        <Route path="/analysis" element={<Navigate to="/learn" replace />} />
+        <Route path="/analysis/fhir-primer" element={<Navigate to="/learn/fhir-primer" replace />} />
+        <Route path="/analysis/definitions" element={<Navigate to="/learn/definitions" replace />} />
+        <Route path="/analysis/coverage" element={<Navigate to="/learn/coverage" replace />} />
+        <Route path="/analysis/ccda-testing-lab" element={<Navigate to="/learn/ccda-lab" replace />} />
+        <Route path="/analysis/qa-eval-lab" element={<Navigate to="/learn/qa-eval-lab" replace />} />
+        <Route path="/pipeline-lab" element={<Navigate to="/learn/pipeline-lab" replace />} />
+        <Route path="/ccda-lab" element={<Navigate to="/learn/ccda-lab" replace />} />
+        <Route path="/ground-truth-review" element={<Navigate to="/learn/ground-truth-review" replace />} />
+        <Route path="/ground-truth-review/:runId" element={<Navigate to="/learn/ground-truth-review" replace />} />
         {/* Atlas IA routes */}
         {atlasRoutes.map((r) => (
           <Route
@@ -263,8 +274,8 @@ function AppShellRoutes() {
             element={<AppShellRoute element={r.element} fullBleed={r.fullBleed} />}
           />
         ))}
-        {/* Legacy routes — wrapped in AppShell, no longer in legacy Layout. */}
-        {legacyRoutes.map((r) => (
+        {/* Support routes outside the five-module IA */}
+        {supportRoutes.map((r) => (
           <Route
             key={r.path}
             path={r.path}

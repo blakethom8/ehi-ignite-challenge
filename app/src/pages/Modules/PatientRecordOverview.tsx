@@ -233,13 +233,13 @@ export function PatientRecordOverview() {
             </div>
 
             <div className="mt-4 flex flex-wrap gap-2">
-              <Link to={withPatient("/aggregate/sources", patientId)} className="inline-flex items-center gap-1 rounded-lg bg-[#5b76fe] px-3 py-2 text-sm font-semibold text-white">
+              <Link to={withPatient("/patient-record/sources", patientId)} className="inline-flex items-center gap-1 rounded-lg bg-[#5b76fe] px-3 py-2 text-sm font-semibold text-white">
                 Source Intake <ArrowRight size={14} />
               </Link>
-              <Link to={withPatient("/aggregate/harmonize", patientId)} className="inline-flex items-center gap-1 rounded-lg border border-[#dfe4ea] px-3 py-2 text-sm font-semibold text-[#555a6a] hover:border-[#5b76fe] hover:text-[#5b76fe]">
+              <Link to={withPatient("/patient-record/harmonize", patientId)} className="inline-flex items-center gap-1 rounded-lg border border-[#dfe4ea] px-3 py-2 text-sm font-semibold text-[#555a6a] hover:border-[#5b76fe] hover:text-[#5b76fe]">
                 Harmonized Record
               </Link>
-              <Link to={withPatient("/aggregate/publish", patientId)} className="inline-flex items-center gap-1 rounded-lg border border-[#dfe4ea] px-3 py-2 text-sm font-semibold text-[#555a6a] hover:border-[#5b76fe] hover:text-[#5b76fe]">
+              <Link to={withPatient("/patient-record/publish", patientId)} className="inline-flex items-center gap-1 rounded-lg border border-[#dfe4ea] px-3 py-2 text-sm font-semibold text-[#555a6a] hover:border-[#5b76fe] hover:text-[#5b76fe]">
                 Publish Chart
               </Link>
             </div>
@@ -294,25 +294,25 @@ export function PatientRecordOverview() {
               icon={BarChart3}
               title="Clinical Snapshot"
               body="Demographics, active problems, medications, allergies, labs, and provenance."
-              to={withPatient("/explorer", patientId)}
+              to={withPatient("/fhir-charts", patientId)}
             />
             <ChartLinkRow
               icon={CalendarDays}
               title="History"
               body="Longitudinal encounters, conditions, medications, procedures, and immunizations."
-              to={withPatient("/explorer/history", patientId)}
+              to={withPatient("/fhir-charts/history", patientId)}
             />
             <ChartLinkRow
               icon={Heart}
               title="Care Journey"
               body="Medication episodes, conditions, and care activity on one timeline."
-              to={withPatient("/explorer/care-journey", patientId)}
+              to={withPatient("/fhir-charts/care-journey", patientId)}
             />
             <ChartLinkRow
               icon={FileBarChart}
               title="Labs and Observations"
               body="Latest observations and raw patient data available to downstream modules."
-              to={withPatient("/explorer/patient-data", patientId)}
+              to={withPatient("/fhir-charts/patient-data", patientId)}
             />
             <ChartLinkRow
               icon={Share2}

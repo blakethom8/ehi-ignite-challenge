@@ -45,47 +45,55 @@ function FullscreenPageFallback() {
   );
 }
 
-const PlatformEntry = lazyNamed(() => import("./pages/PlatformEntry"), "PlatformEntry");
-const ExplorerOverview = lazyNamed(() => import("./pages/Explorer/Overview"), "ExplorerOverview");
-const ExplorerTimeline = lazyNamed(() => import("./pages/Explorer/Timeline"), "ExplorerTimeline");
-const ExplorerCorpus = lazyNamed(() => import("./pages/Explorer/Corpus"), "ExplorerCorpus");
-const ExplorerSafety = lazyNamed(() => import("./pages/Explorer/Safety"), "ExplorerSafety");
-const ExplorerImmunizations = lazyNamed(() => import("./pages/Explorer/Immunizations"), "ExplorerImmunizations");
-const ExplorerConditions = lazyNamed(() => import("./pages/Explorer/Conditions"), "ExplorerConditions");
-const ExplorerProcedures = lazyNamed(() => import("./pages/Explorer/Procedures"), "ExplorerProcedures");
-const ExplorerClearance = lazyNamed(() => import("./pages/Explorer/Clearance"), "ExplorerClearance");
-const ExplorerAnesthesia = lazyNamed(() => import("./pages/Explorer/Anesthesia"), "ExplorerAnesthesia");
-const ExplorerDistributions = lazyNamed(() => import("./pages/Explorer/Distributions"), "ExplorerDistributions");
-const ExplorerInteractions = lazyNamed(() => import("./pages/Explorer/Interactions"), "ExplorerInteractions");
-const ExplorerAssistant = lazyNamed(() => import("./pages/Explorer/Assistant"), "ExplorerAssistant");
-const ExplorerCareJourney = lazyNamed(() => import("./pages/Explorer/CareJourney"), "ExplorerCareJourney");
-const ExplorerPatientData = lazyNamed(() => import("./pages/Explorer/PatientData"), "ExplorerPatientData");
-const ExplorerHistory = lazyNamed(() => import("./pages/Explorer/History"), "ExplorerHistory");
-const ExplorerLabs = lazyNamed(() => import("./pages/Explorer/Labs"), "ExplorerLabs");
-const PatientJourney = lazyNamed(() => import("./pages/Journey/PatientJourney"), "PatientJourney");
-const PatientRecordOverview = lazyNamed(() => import("./pages/Modules/PatientRecordOverview"), "PatientRecordOverview");
-const DataSharing = lazyNamed(() => import("./pages/Modules/DataSharing"), "DataSharing");
-const PublishReadinessPage = lazyNamed(() => import("./pages/Modules/DataAggregator/PublishReadinessPage"), "PublishReadinessPage");
-const SourceIntakePage = lazyNamed(() => import("./pages/Modules/DataAggregator/SourceIntakePage"), "SourceIntakePage");
-const WorkspaceLibraryPage = lazyNamed(() => import("./pages/Modules/DataAggregator/WorkspaceLibraryPage"), "WorkspaceLibraryPage");
-const HarmonizeView = lazyNamed(() => import("./pages/Modules/HarmonizeView"), "HarmonizeView");
-const LabExplainer = lazyNamed(() => import("./pages/Modules/LabExplainer"), "LabExplainer");
-const CcdaPipelineLab = lazyNamed(() => import("./pages/Modules/CcdaPipelineLab"), "CcdaPipelineLab");
-const TrialFinder = lazyNamed(() => import("./pages/Modules/TrialFinder"), "TrialFinder");
-const PatientMemoryView = lazyNamed(() => import("./pages/Modules/PatientMemoryView"), "PatientMemoryView");
-const PatientContext = lazyNamed(() => import("./pages/Modules/PatientContext"), "PatientContext");
-const AggregationMethodology = lazyNamed(() => import("./pages/Modules/AggregationMethodology"), "AggregationMethodology");
-const AnalysisOverview = lazyNamed(() => import("./pages/Analysis/Overview"), "AnalysisOverview");
-const AnalysisDefinitions = lazyNamed(() => import("./pages/Analysis/Definitions"), "AnalysisDefinitions");
-const AnalysisCoverage = lazyNamed(() => import("./pages/Analysis/Coverage"), "AnalysisCoverage");
-const AnalysisFhirPrimer = lazyNamed(() => import("./pages/Analysis/FhirPrimer"), "AnalysisFhirPrimer");
-const QaEvalLab = lazyNamed(() => import("./pages/Analysis/QaEvalLab"), "QaEvalLab");
-const PipelineLab = lazyNamed(() => import("./pages/PipelineLab/Leaderboard"), "PipelineLab");
-const GroundTruthReview = lazyNamed(() => import("./pages/GroundTruthReview/ReferenceReview"), "GroundTruthReview");
-const UsingAtlasRoutes = lazyNamed(() => import("./pages/UsingAtlas/routes"), "UsingAtlasRoutes");
+// Atlas shell pages (the five top-level modules)
 const CaspianWorkspace = lazyNamed(() => import("./pages/Atlas/CaspianWorkspace"), "CaspianWorkspace");
 const PackageWorkspace = lazyNamed(() => import("./pages/Atlas/PackageWorkspace"), "PackageWorkspace");
-const MarketplaceIndex = lazyNamed(() => import("./pages/Atlas/MarketplaceIndex"), "MarketplaceIndex");
+const WorkspacesIndex = lazyNamed(() => import("./pages/Atlas/WorkspacesIndex"), "WorkspacesIndex");
+
+// Patient Record module — source-of-truth chart layer (absorbs Data Aggregator)
+const PatientRecordOverview = lazyNamed(() => import("./pages/PatientRecord/Overview"), "PatientRecordOverview");
+const PatientRecordHarmonize = lazyNamed(() => import("./pages/PatientRecord/Harmonize"), "HarmonizeView");
+const PatientRecordMethodology = lazyNamed(() => import("./pages/PatientRecord/Methodology"), "AggregationMethodology");
+const PatientRecordContext = lazyNamed(() => import("./pages/PatientRecord/Context"), "PatientContext");
+const PatientRecordPublish = lazyNamed(() => import("./pages/PatientRecord/aggregator/PublishReadinessPage"), "PublishReadinessPage");
+const PatientRecordSources = lazyNamed(() => import("./pages/PatientRecord/aggregator/SourceIntakePage"), "SourceIntakePage");
+const PatientRecordWorkspaces = lazyNamed(() => import("./pages/PatientRecord/aggregator/WorkspaceLibraryPage"), "WorkspaceLibraryPage");
+
+// FHIR Charts module — FHIR resource browser (former Explorer)
+const FhirChartsOverview = lazyNamed(() => import("./pages/FhirCharts/Overview"), "FhirChartsOverview");
+const FhirChartsTimeline = lazyNamed(() => import("./pages/FhirCharts/Timeline"), "FhirChartsTimeline");
+const FhirChartsCorpus = lazyNamed(() => import("./pages/FhirCharts/Corpus"), "FhirChartsCorpus");
+const FhirChartsSafety = lazyNamed(() => import("./pages/FhirCharts/Safety"), "FhirChartsSafety");
+const FhirChartsImmunizations = lazyNamed(() => import("./pages/FhirCharts/Immunizations"), "FhirChartsImmunizations");
+const FhirChartsConditions = lazyNamed(() => import("./pages/FhirCharts/Conditions"), "FhirChartsConditions");
+const FhirChartsProcedures = lazyNamed(() => import("./pages/FhirCharts/Procedures"), "FhirChartsProcedures");
+const FhirChartsClearance = lazyNamed(() => import("./pages/FhirCharts/Clearance"), "FhirChartsClearance");
+const FhirChartsAnesthesia = lazyNamed(() => import("./pages/FhirCharts/Anesthesia"), "FhirChartsAnesthesia");
+const FhirChartsDistributions = lazyNamed(() => import("./pages/FhirCharts/Distributions"), "FhirChartsDistributions");
+const FhirChartsInteractions = lazyNamed(() => import("./pages/FhirCharts/Interactions"), "FhirChartsInteractions");
+const FhirChartsAssistant = lazyNamed(() => import("./pages/FhirCharts/Assistant"), "FhirChartsAssistant");
+const FhirChartsCareJourney = lazyNamed(() => import("./pages/FhirCharts/CareJourney"), "FhirChartsCareJourney");
+const FhirChartsPatientData = lazyNamed(() => import("./pages/FhirCharts/PatientData"), "FhirChartsPatientData");
+const FhirChartsHistory = lazyNamed(() => import("./pages/FhirCharts/History"), "FhirChartsHistory");
+const FhirChartsLabs = lazyNamed(() => import("./pages/FhirCharts/Labs"), "FhirChartsLabs");
+const FhirChartsJourney = lazyNamed(() => import("./pages/FhirCharts/Journey"), "PatientJourney");
+
+// Internal Tools — runbooks, evals, labs, reviews (routed via /learn/*)
+const InternalToolsOverview = lazyNamed(() => import("./pages/InternalTools/Overview"), "InternalToolsOverview");
+const InternalToolsDefinitions = lazyNamed(() => import("./pages/InternalTools/Definitions"), "InternalToolsDefinitions");
+const InternalToolsCoverage = lazyNamed(() => import("./pages/InternalTools/Coverage"), "InternalToolsCoverage");
+const InternalToolsFhirPrimer = lazyNamed(() => import("./pages/InternalTools/FhirPrimer"), "InternalToolsFhirPrimer");
+const InternalToolsQaEvalLab = lazyNamed(() => import("./pages/InternalTools/QaEvalLab"), "QaEvalLab");
+const InternalToolsCcdaLab = lazyNamed(() => import("./pages/InternalTools/CcdaLab"), "CcdaPipelineLab");
+const InternalToolsPipelineLab = lazyNamed(() => import("./pages/InternalTools/PipelineLab"), "PipelineLab");
+const InternalToolsGroundTruth = lazyNamed(() => import("./pages/InternalTools/GroundTruthReview"), "GroundTruthReview");
+const InternalToolsLabExplainer = lazyNamed(() => import("./pages/InternalTools/LabExplainer"), "LabExplainer");
+const InternalToolsDataSharing = lazyNamed(() => import("./pages/InternalTools/DataSharing"), "DataSharing");
+const InternalToolsTrialFinder = lazyNamed(() => import("./pages/InternalTools/skills/TrialFinder"), "TrialFinder");
+const InternalToolsPatientMemory = lazyNamed(() => import("./pages/InternalTools/skills/PatientMemory"), "PatientMemoryView");
+
+// Atlas docs
+const UsingAtlasRoutes = lazyNamed(() => import("./pages/UsingAtlas/routes"), "UsingAtlasRoutes");
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -135,62 +143,53 @@ function AppShellRoutes() {
     { path: "/caspian/sessions/:sessionId", element: <CaspianWorkspace />, fullBleed: true },
 
     // Workspaces (marketplace packages)
-    { path: "/workspaces", element: <MarketplaceIndex /> },
+    { path: "/workspaces", element: <WorkspacesIndex /> },
     { path: "/workspaces/:packageId", element: <PackageWorkspace />, fullBleed: true },
     { path: "/workspaces/:packageId/sessions/:sessionId", element: <PackageWorkspace />, fullBleed: true },
 
-    // Patient Record — source-of-truth chart layer (folds in former Data Aggregator)
+    // Patient Record — source-of-truth chart layer (absorbs Data Aggregator)
     { path: "/patient-record", element: <PatientRecordOverview /> },
-    { path: "/patient-record/methodology", element: <AggregationMethodology /> },
-    { path: "/patient-record/sources", element: <SourceIntakePage /> },
-    { path: "/patient-record/harmonize", element: <HarmonizeView /> },
-    { path: "/patient-record/cleaning", element: <HarmonizeView /> },
-    { path: "/patient-record/workspaces", element: <WorkspaceLibraryPage /> },
-    { path: "/patient-record/publish", element: <PublishReadinessPage /> },
-    { path: "/patient-record/context", element: <PatientContext /> },
+    { path: "/patient-record/methodology", element: <PatientRecordMethodology /> },
+    { path: "/patient-record/sources", element: <PatientRecordSources /> },
+    { path: "/patient-record/harmonize", element: <PatientRecordHarmonize /> },
+    { path: "/patient-record/cleaning", element: <PatientRecordHarmonize /> },
+    { path: "/patient-record/workspaces", element: <PatientRecordWorkspaces /> },
+    { path: "/patient-record/publish", element: <PatientRecordPublish /> },
+    { path: "/patient-record/context", element: <PatientRecordContext /> },
 
-    // FHIR Charts — FHIR resource browser (former Explorer)
-    { path: "/fhir-charts", element: <ExplorerOverview /> },
-    { path: "/fhir-charts/timeline", element: <ExplorerTimeline /> },
-    { path: "/fhir-charts/labs", element: <ExplorerLabs /> },
-    { path: "/fhir-charts/history", element: <ExplorerHistory /> },
-    { path: "/fhir-charts/care-journey", element: <ExplorerCareJourney /> },
-    { path: "/fhir-charts/corpus", element: <ExplorerCorpus /> },
-    { path: "/fhir-charts/safety", element: <ExplorerSafety /> },
-    { path: "/fhir-charts/immunizations", element: <ExplorerImmunizations /> },
-    { path: "/fhir-charts/conditions", element: <ExplorerConditions /> },
-    { path: "/fhir-charts/procedures", element: <ExplorerProcedures /> },
-    { path: "/fhir-charts/clearance", element: <ExplorerClearance /> },
-    { path: "/fhir-charts/anesthesia", element: <ExplorerAnesthesia /> },
-    { path: "/fhir-charts/distributions", element: <ExplorerDistributions /> },
-    { path: "/fhir-charts/interactions", element: <ExplorerInteractions /> },
-    { path: "/fhir-charts/assistant", element: <ExplorerAssistant /> },
-    { path: "/fhir-charts/patient-data", element: <ExplorerPatientData /> },
+    // FHIR Charts — FHIR resource browser (former Explorer + Journey)
+    { path: "/fhir-charts", element: <FhirChartsOverview /> },
+    { path: "/fhir-charts/timeline", element: <FhirChartsTimeline /> },
+    { path: "/fhir-charts/labs", element: <FhirChartsLabs /> },
+    { path: "/fhir-charts/history", element: <FhirChartsHistory /> },
+    { path: "/fhir-charts/care-journey", element: <FhirChartsCareJourney /> },
+    { path: "/fhir-charts/journey", element: <FhirChartsJourney /> },
+    { path: "/fhir-charts/corpus", element: <FhirChartsCorpus /> },
+    { path: "/fhir-charts/safety", element: <FhirChartsSafety /> },
+    { path: "/fhir-charts/immunizations", element: <FhirChartsImmunizations /> },
+    { path: "/fhir-charts/conditions", element: <FhirChartsConditions /> },
+    { path: "/fhir-charts/procedures", element: <FhirChartsProcedures /> },
+    { path: "/fhir-charts/clearance", element: <FhirChartsClearance /> },
+    { path: "/fhir-charts/anesthesia", element: <FhirChartsAnesthesia /> },
+    { path: "/fhir-charts/distributions", element: <FhirChartsDistributions /> },
+    { path: "/fhir-charts/interactions", element: <FhirChartsInteractions /> },
+    { path: "/fhir-charts/assistant", element: <FhirChartsAssistant /> },
+    { path: "/fhir-charts/patient-data", element: <FhirChartsPatientData /> },
 
-    // Learn — internal section (runbooks, evals, methodology)
-    { path: "/learn", element: <AnalysisOverview /> },
-    { path: "/learn/fhir-primer", element: <AnalysisFhirPrimer /> },
-    { path: "/learn/definitions", element: <AnalysisDefinitions /> },
-    { path: "/learn/coverage", element: <AnalysisCoverage /> },
-    { path: "/learn/ccda-lab", element: <CcdaPipelineLab /> },
-    { path: "/learn/qa-eval-lab", element: <QaEvalLab /> },
-    { path: "/learn/pipeline-lab", element: <PipelineLab /> },
-    { path: "/learn/ground-truth-review", element: <GroundTruthReview /> },
-    { path: "/learn/ground-truth-review/:runId", element: <GroundTruthReview /> },
-  ];
-
-  // Routes that don't map into the five-module IA but are still reachable.
-  const supportRoutes: ShellRoute[] = [
-    { path: "/platform", element: <PlatformEntry /> },
-    { path: "/journey", element: <PatientJourney /> },
-    { path: "/skills/trial-finder", element: <TrialFinder /> },
-    { path: "/skills/patients/memory", element: <PatientMemoryView /> },
-    { path: "/sharing", element: <DataSharing /> },
-    { path: "/second-opinion", element: <DataSharing /> },
-    { path: "/marketplace/settings", element: <DataSharing /> },
-    // Clinical Insights folds into Caspian workflows, but keep these pages
-    // reachable for the alternate-view links until the migration completes.
-    { path: "/clinical-insights/labs", element: <LabExplainer /> },
+    // Learn — internal section (front door for InternalTools)
+    { path: "/learn", element: <InternalToolsOverview /> },
+    { path: "/learn/fhir-primer", element: <InternalToolsFhirPrimer /> },
+    { path: "/learn/definitions", element: <InternalToolsDefinitions /> },
+    { path: "/learn/coverage", element: <InternalToolsCoverage /> },
+    { path: "/learn/ccda-lab", element: <InternalToolsCcdaLab /> },
+    { path: "/learn/qa-eval-lab", element: <InternalToolsQaEvalLab /> },
+    { path: "/learn/pipeline-lab", element: <InternalToolsPipelineLab /> },
+    { path: "/learn/ground-truth-review", element: <InternalToolsGroundTruth /> },
+    { path: "/learn/ground-truth-review/:runId", element: <InternalToolsGroundTruth /> },
+    { path: "/learn/labs", element: <InternalToolsLabExplainer /> },
+    { path: "/learn/data-sharing", element: <InternalToolsDataSharing /> },
+    { path: "/learn/skills/trial-finder", element: <InternalToolsTrialFinder /> },
+    { path: "/learn/skills/patients/memory", element: <InternalToolsPatientMemory /> },
   ];
 
   return (
@@ -266,20 +265,21 @@ function AppShellRoutes() {
         <Route path="/ccda-lab" element={<Navigate to="/learn/ccda-lab" replace />} />
         <Route path="/ground-truth-review" element={<Navigate to="/learn/ground-truth-review" replace />} />
         <Route path="/ground-truth-review/:runId" element={<Navigate to="/learn/ground-truth-review" replace />} />
-        {/* Atlas IA routes */}
+        {/* Stragglers retired during the IA cleanup. */}
+        <Route path="/platform" element={<Navigate to="/" replace />} />
+        <Route path="/journey" element={<Navigate to="/fhir-charts/journey" replace />} />
+        <Route path="/sharing" element={<Navigate to="/learn/data-sharing" replace />} />
+        <Route path="/second-opinion" element={<Navigate to="/learn/data-sharing" replace />} />
+        <Route path="/marketplace/settings" element={<Navigate to="/workspaces" replace />} />
+        <Route path="/skills/trial-finder" element={<Navigate to="/learn/skills/trial-finder" replace />} />
+        <Route path="/skills/patients/memory" element={<Navigate to="/learn/skills/patients/memory" replace />} />
+        <Route path="/clinical-insights/labs" element={<Navigate to="/learn/labs" replace />} />
+        {/* Atlas IA routes — the five top-level modules */}
         {atlasRoutes.map((r) => (
           <Route
             key={r.path}
             path={r.path}
             element={<AppShellRoute element={r.element} fullBleed={r.fullBleed} />}
-          />
-        ))}
-        {/* Support routes outside the five-module IA */}
-        {supportRoutes.map((r) => (
-          <Route
-            key={r.path}
-            path={r.path}
-            element={<AppShellRoute element={r.element} />}
           />
         ))}
       </Routes>

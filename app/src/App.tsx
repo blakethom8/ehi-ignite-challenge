@@ -65,11 +65,6 @@ const ExplorerHistory = lazyNamed(() => import("./pages/Explorer/History"), "Exp
 const ExplorerLabs = lazyNamed(() => import("./pages/Explorer/Labs"), "ExplorerLabs");
 const PatientJourney = lazyNamed(() => import("./pages/Journey/PatientJourney"), "PatientJourney");
 const PatientRecordOverview = lazyNamed(() => import("./pages/Modules/PatientRecordOverview"), "PatientRecordOverview");
-const PreOpOverview = lazyNamed(() => import("./pages/Modules/PreOpOverview"), "PreOpOverview");
-const ClinicalTrials = lazyNamed(() => import("./pages/Modules/ClinicalTrials"), "ClinicalTrials");
-const MedicationAccess = lazyNamed(() => import("./pages/Modules/MedicationAccess"), "MedicationAccess");
-const Marketplace = lazyNamed(() => import("./pages/Modules/Marketplace"), "Marketplace");
-const MarketplaceConcept = lazyNamed(() => import("./pages/Modules/MarketplaceConcept"), "MarketplaceConcept");
 const DataSharing = lazyNamed(() => import("./pages/Modules/DataSharing"), "DataSharing");
 const PublishReadinessPage = lazyNamed(() => import("./pages/Modules/DataAggregator/PublishReadinessPage"), "PublishReadinessPage");
 const SourceIntakePage = lazyNamed(() => import("./pages/Modules/DataAggregator/SourceIntakePage"), "SourceIntakePage");
@@ -90,7 +85,6 @@ const QaEvalLab = lazyNamed(() => import("./pages/Analysis/QaEvalLab"), "QaEvalL
 const PipelineLab = lazyNamed(() => import("./pages/PipelineLab/Leaderboard"), "PipelineLab");
 const GroundTruthReview = lazyNamed(() => import("./pages/GroundTruthReview/ReferenceReview"), "GroundTruthReview");
 const UsingAtlasRoutes = lazyNamed(() => import("./pages/UsingAtlas/routes"), "UsingAtlasRoutes");
-const TrialFinderWorkspace = lazyNamed(() => import("./pages/AIWorkspace/TrialFinderWorkspace"), "TrialFinderWorkspace");
 const CaspianWorkspace = lazyNamed(() => import("./pages/Atlas/CaspianWorkspace"), "CaspianWorkspace");
 const PackageWorkspace = lazyNamed(() => import("./pages/Atlas/PackageWorkspace"), "PackageWorkspace");
 const MarketplaceIndex = lazyNamed(() => import("./pages/Atlas/MarketplaceIndex"), "MarketplaceIndex");
@@ -133,7 +127,6 @@ function AppShellRoute({
 function AppShellRoutes() {
   const location = useLocation();
   const isFullscreenWorkspace =
-    location.pathname.startsWith("/ai-workspace") ||
     location.pathname.startsWith("/caspian") ||
     location.pathname.startsWith("/workspaces/");
 
@@ -202,11 +195,7 @@ function AppShellRoutes() {
     { path: "/clinical-insights/favorites", element: <ClinicalInsights /> },
     { path: "/clinical-insights/create", element: <ClinicalInsights /> },
     { path: "/clinical-insights/labs", element: <LabExplainer /> },
-    { path: "/marketplace", element: <Marketplace /> },
-    { path: "/marketplace/overview", element: <Marketplace /> },
-    { path: "/marketplace/workspace", element: <Marketplace /> },
     { path: "/marketplace/settings", element: <DataSharing /> },
-    { path: "/marketplace/publish", element: <MarketplaceConcept /> },
     { path: "/explorer", element: <ExplorerOverview /> },
     { path: "/explorer/timeline", element: <ExplorerTimeline /> },
     { path: "/explorer/labs", element: <ExplorerLabs /> },
@@ -223,18 +212,9 @@ function AppShellRoutes() {
     { path: "/explorer/interactions", element: <ExplorerInteractions /> },
     { path: "/explorer/assistant", element: <ExplorerAssistant /> },
     { path: "/explorer/patient-data", element: <ExplorerPatientData /> },
-    { path: "/preop", element: <PreOpOverview /> },
-    { path: "/preop/clearance", element: <ExplorerClearance /> },
-    { path: "/preop/medication-holds", element: <ExplorerSafety /> },
-    { path: "/preop/anesthesia-handoff", element: <ExplorerAnesthesia /> },
     { path: "/journey", element: <PatientJourney /> },
-    { path: "/trials", element: <ClinicalTrials /> },
     { path: "/skills/trial-finder", element: <TrialFinder /> },
     { path: "/skills/patients/memory", element: <PatientMemoryView /> },
-    { path: "/medication-access", element: <MedicationAccess /> },
-    { path: "/grants", element: <MarketplaceConcept /> },
-    { path: "/research-opportunities", element: <MarketplaceConcept /> },
-    { path: "/payer-check", element: <MarketplaceConcept /> },
     { path: "/sharing", element: <DataSharing /> },
     { path: "/second-opinion", element: <DataSharing /> },
     { path: "/analysis", element: <AnalysisOverview /> },
@@ -263,6 +243,18 @@ function AppShellRoutes() {
         {/* Legacy redirects — see .claude/handoff/atlas/README.md §Routing */}
         <Route path="/data-aggregator" element={<Navigate to="/patient-record" replace />} />
         <Route path="/data-aggregator/*" element={<Navigate to="/patient-record" replace />} />
+        <Route path="/preop" element={<Navigate to="/caspian" replace />} />
+        <Route path="/preop/*" element={<Navigate to="/caspian" replace />} />
+        <Route path="/trials" element={<Navigate to="/workspaces/trial-finder" replace />} />
+        <Route path="/ai-workspace/trial-finder" element={<Navigate to="/workspaces/trial-finder" replace />} />
+        <Route path="/medication-access" element={<Navigate to="/workspaces/med-access" replace />} />
+        <Route path="/marketplace" element={<Navigate to="/workspaces" replace />} />
+        <Route path="/marketplace/overview" element={<Navigate to="/workspaces" replace />} />
+        <Route path="/marketplace/workspace" element={<Navigate to="/workspaces" replace />} />
+        <Route path="/marketplace/publish" element={<Navigate to="/workspaces" replace />} />
+        <Route path="/grants" element={<Navigate to="/workspaces" replace />} />
+        <Route path="/research-opportunities" element={<Navigate to="/workspaces" replace />} />
+        <Route path="/payer-check" element={<Navigate to="/workspaces" replace />} />
         {/* Atlas IA routes */}
         {atlasRoutes.map((r) => (
           <Route
@@ -279,15 +271,6 @@ function AppShellRoutes() {
             element={<AppShellRoute element={r.element} />}
           />
         ))}
-        {/* Legacy fullscreen workspace */}
-        <Route
-          path="/ai-workspace/trial-finder"
-          element={
-            <Suspense fallback={<FullscreenPageFallback />}>
-              <TrialFinderWorkspace />
-            </Suspense>
-          }
-        />
       </Routes>
       {!isFullscreenWorkspace && <ChatWidget />}
     </>

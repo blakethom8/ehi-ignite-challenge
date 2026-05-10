@@ -25,27 +25,41 @@ const DEFAULT_SIZES: PaneSizes = {
   filesH: 50,
 };
 
-const PANES_STORAGE_KEY = "atlas:panes";
-const SIZES_STORAGE_KEY = "atlas:sizes";
+const LEGACY_PANES_STORAGE_KEY = "atlas:panes";
+const LEGACY_SIZES_STORAGE_KEY = "atlas:sizes";
+const PANES_STORAGE_PREFIX = "atlas:panes:";
+const SIZES_STORAGE_PREFIX = "atlas:sizes:";
+const RIGHT_FOCUS_STORAGE_PREFIX = "atlas:right-focus:";
 
-function loadJson<T>(key: string, fallback: T): T {
+function loadJson<T>(keys: string[], fallback: T): T {
   if (typeof window === "undefined") return fallback;
   try {
-    const raw = window.localStorage.getItem(key);
-    if (!raw) return fallback;
-    return { ...fallback, ...(JSON.parse(raw) as Partial<T>) };
+    for (const key of keys) {
+      const raw = window.localStorage.getItem(key);
+      if (!raw) continue;
+      return { ...fallback, ...(JSON.parse(raw) as Partial<T>) };
+    }
+    return fallback;
   } catch {
     return fallback;
   }
 }
 
 export function useWorkspaceState(workspaceId: WorkspaceId) {
+  const panesStorageKey = `${PANES_STORAGE_PREFIX}${workspaceId}`;
+  const sizesStorageKey = `${SIZES_STORAGE_PREFIX}${workspaceId}`;
+  const rightFocusStorageKey = `${RIGHT_FOCUS_STORAGE_PREFIX}${workspaceId}`;
   const [panes, setPanes] = useState<PaneVisibility>(() =>
-    loadJson<PaneVisibility>(PANES_STORAGE_KEY, DEFAULT_PANES),
+    loadJson<PaneVisibility>([panesStorageKey, LEGACY_PANES_STORAGE_KEY], DEFAULT_PANES),
   );
   const [sizes, setSizes] = useState<PaneSizes>(() =>
-    loadJson<PaneSizes>(SIZES_STORAGE_KEY, DEFAULT_SIZES),
+    loadJson<PaneSizes>([sizesStorageKey, LEGACY_SIZES_STORAGE_KEY], DEFAULT_SIZES),
   );
+  const [rightPaneFocus, setRightPaneFocus] = useState<"files" | "inspector">(() => {
+    if (typeof window === "undefined") return "files";
+    const raw = window.localStorage.getItem(rightFocusStorageKey);
+    return raw === "inspector" ? "inspector" : "files";
+  });
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [chats, setChats] = useState<Record<WorkspaceId, ChatMessage[]>>(() => INITIAL_CHAT);
   const [tabsByWs, setTabsByWs] = useState<Record<WorkspaceId, WorkbenchTab[]>>(() => INITIAL_TABS);
@@ -56,12 +70,32 @@ export function useWorkspaceState(workspaceId: WorkspaceId) {
   const [citationId, setCitationId] = useState<string | null>(null);
 
   useEffect(() => {
-    window.localStorage.setItem(PANES_STORAGE_KEY, JSON.stringify(panes));
-  }, [panes]);
+    window.localStorage.setItem(panesStorageKey, JSON.stringify(panes));
+  }, [panes, panesStorageKey]);
 
   useEffect(() => {
-    window.localStorage.setItem(SIZES_STORAGE_KEY, JSON.stringify(sizes));
-  }, [sizes]);
+    window.localStorage.setItem(sizesStorageKey, JSON.stringify(sizes));
+  }, [sizes, sizesStorageKey]);
+
+  useEffect(() => {
+    window.localStorage.setItem(rightFocusStorageKey, rightPaneFocus);
+  }, [rightPaneFocus, rightFocusStorageKey]);
+
+  const showPane = useCallback((pane: keyof PaneVisibility) => {
+    if (pane === "files" || pane === "inspector") {
+      setRightPaneFocus(pane);
+    }
+    setPanes((current) => (current[pane] ? current : { ...current, [pane]: true }));
+  }, []);
+
+  const togglePane = useCallback((pane: keyof PaneVisibility) => {
+    if (pane === "files" || pane === "inspector") {
+      setRightPaneFocus(pane);
+      setPanes((current) => ({ ...current, [pane]: !current[pane] }));
+      return;
+    }
+    setPanes((current) => ({ ...current, [pane]: !current[pane] }));
+  }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -76,19 +110,16 @@ export function useWorkspaceState(workspaceId: WorkspaceId) {
       };
       if (map[key]) {
         e.preventDefault();
-        setPanes((p) => ({ ...p, [map[key]]: !p[map[key]] }));
+        togglePane(map[key]);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
-
-  const togglePane = useCallback((pane: keyof PaneVisibility) => {
-    setPanes((p) => ({ ...p, [pane]: !p[pane] }));
-  }, []);
+  }, [togglePane]);
 
   const handleCitation = useCallback((id: string) => {
     setCitationId(id);
+    setRightPaneFocus("inspector");
     setPanes((p) => (p.inspector ? p : { ...p, inspector: true }));
   }, []);
 
@@ -182,6 +213,7 @@ export function useWorkspaceState(workspaceId: WorkspaceId) {
   return {
     panes,
     setPanes,
+    showPane,
     togglePane,
     sizes,
     setSizes,
@@ -192,6 +224,7 @@ export function useWorkspaceState(workspaceId: WorkspaceId) {
     activeTabId: activeTabByWs[workspaceId] ?? null,
     citationId,
     setCitationId,
+    rightPaneFocus,
     handleCitation,
     handleOpenFile,
     handleAction,

@@ -106,20 +106,20 @@ export function Titlebar({
       )}
       <button
         onClick={onCommand}
-        className="grid h-[26px] w-[26px] place-items-center rounded-[5px] text-white/65 hover:bg-white/8 hover:text-white"
+        className="grid h-[26px] w-[26px] flex-[0_0_auto] place-items-center rounded-[5px] text-white/65 hover:bg-white/8 hover:text-white"
         title="Command palette ⌘K"
       >
         <Command className="h-3.5 w-3.5" strokeWidth={1.5} />
       </button>
       <button
-        className="grid h-[26px] w-[26px] place-items-center rounded-[5px] text-white/65 hover:bg-white/8 hover:text-white"
+        className="grid h-[26px] w-[26px] flex-[0_0_auto] place-items-center rounded-[5px] text-white/65 hover:bg-white/8 hover:text-white"
         title="Notifications"
       >
         <Bell className="h-3.5 w-3.5" strokeWidth={1.5} />
       </button>
       {showPaneToggles && (
         <div
-          className="flex gap-0.5 rounded-md p-0.5"
+          className="flex flex-[0_0_auto] gap-0.5 rounded-md p-0.5"
           style={{
             background: "rgba(255,255,255,0.06)",
             border: "1px solid rgba(255,255,255,0.08)",
@@ -132,7 +132,7 @@ export function Titlebar({
                 key={p}
                 onClick={() => onTogglePane(p)}
                 title={PANE_TITLES[p]}
-                className={`grid h-[22px] w-6 place-items-center rounded text-[11px] font-semibold tracking-wider ${
+                className={`grid h-[22px] w-6 flex-[0_0_auto] place-items-center rounded text-[11px] font-semibold tracking-wider ${
                   on
                     ? ""
                     : "text-white/55 hover:text-white"

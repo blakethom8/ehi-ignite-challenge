@@ -854,7 +854,7 @@ export function FhirChartsHistory() {
             </p>
           </div>
           <Link
-            to={`/explorer/care-journey?patient=${patientId}`}
+            to={`/fhir-charts/care-journey?patient=${patientId}`}
             className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#95ded1] bg-white px-4 py-2 text-sm font-semibold text-[#087d75] hover:bg-[#e7fbf6]"
           >
             Visual care journey

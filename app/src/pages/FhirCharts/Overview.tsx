@@ -1,10 +1,10 @@
 import { useSearchParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { AlertTriangle, Building2, User, ChevronDown, ChevronRight, Clock, Database, Stethoscope } from "lucide-react";
+import { AlertTriangle, ArrowRight, Building2, User, ChevronDown, ChevronRight, Clock, Database, Stethoscope } from "lucide-react";
 import type { ReactNode } from "react";
 import { api } from "../../api/client";
-import type { PatientOverview, KeyLabsResponse, LabValue, LabHistoryPoint, LabAlertFlag, TimelineMonth, TimelineResponse } from "../../types";
+import type { PatientListItem, PatientOverview, KeyLabsResponse, LabValue, LabHistoryPoint, LabAlertFlag, TimelineMonth, TimelineResponse } from "../../types";
 import { formatDisplayNumber } from "../../utils/format";
 
 // ── helpers ────────────────────────────────────────────────────────────────
@@ -27,6 +27,27 @@ const TIER_STYLES: Record<string, string> = {
   complex:       "bg-[#ffc6c6] text-[#600000]",
   highly_complex:"bg-[#ffc6c6] text-[#600000]",
 };
+
+function patientScenario(patient: PatientListItem): string {
+  if (patient.complexity_score >= 80 || patient.active_med_count >= 10) {
+    return "High-risk prepared review environment";
+  }
+  if (patient.encounter_count >= 35) {
+    return "Longitudinal multi-encounter chart";
+  }
+  if (patient.active_condition_count >= 6) {
+    return "Chronic disease management baseline";
+  }
+  return "Prepared FHIR chart baseline";
+}
+
+function patientSummaryLine(patient: PatientListItem): string {
+  return [
+    `${patient.age_years.toFixed(0)} ${patient.gender}`,
+    `${patient.total_resources.toLocaleString()} resources`,
+    `${patient.encounter_count.toLocaleString()} encounters`,
+  ].join(" · ");
+}
 
 // ── section prefs hook ─────────────────────────────────────────────────────
 
@@ -453,7 +474,7 @@ function CareActivityStrip({ timeline }: { timeline: TimelineResponse | undefine
           </p>
         </div>
         <Link
-          to={`/explorer/timeline?patient=${timeline.patient_id}`}
+          to={`/fhir-charts/timeline?patient=${timeline.patient_id}`}
           className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#5b76fe] hover:underline"
         >
           Open encounter timeline
@@ -775,7 +796,7 @@ function OverviewContent({
           </div>
           <div className="flex items-center gap-2">
             <Link
-              to={`/explorer/patient-data?patient=${patientId}`}
+              to={`/fhir-charts/patient-data?patient=${patientId}`}
               className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1 rounded-full border border-[#e9eaef] text-[#555a6a] hover:border-[#5b76fe] hover:text-[#5b76fe] transition-colors"
             >
               <Database size={12} />
@@ -1061,6 +1082,10 @@ function OverviewContent({
 export function FhirChartsOverview() {
   const [searchParams] = useSearchParams();
   const patientId = searchParams.get("patient");
+  const patientsQuery = useQuery({
+    queryKey: ["patients"],
+    queryFn: api.listPatients,
+  });
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["overview", patientId],
@@ -1081,44 +1106,133 @@ export function FhirChartsOverview() {
   });
 
   if (!patientId) {
+    const candidates = [...(patientsQuery.data ?? [])]
+      .sort((a, b) => b.complexity_score - a.complexity_score)
+      .slice(0, 3);
     return (
-      <div className="flex flex-col items-center justify-center h-full text-center p-8">
-        <div
-          className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4"
-          style={{ backgroundColor: "#eef1ff" }}
-        >
-          <User size={28} style={{ color: "#5b76fe" }} />
+      <main className="mx-auto max-w-7xl p-4 lg:p-6">
+        <div className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
+          <section className="rounded-2xl border border-[#dfe4ea] bg-white p-6 shadow-[rgb(224_226_232)_0px_0px_0px_1px] lg:p-7">
+            <div
+              className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl"
+              style={{ backgroundColor: "#eef1ff" }}
+            >
+              <User size={26} style={{ color: "#5b76fe" }} />
+            </div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#5b76fe]">
+              Demo A Patient Environment
+            </p>
+            <h1 className="mt-2 text-3xl font-semibold tracking-tight text-[#1c1c1e]">
+              Open a prepared chart, not a blank screen
+            </h1>
+            <p className="mt-3 max-w-3xl text-sm leading-6 text-[#667085]">
+              FHIR Charts should land as an already-prepared review environment. Pick one of the prepared patient charts below to open a summary-first workspace with longitudinal preview surfaces ready behind it.
+            </p>
+
+            <div className="mt-5 grid gap-3">
+              {patientsQuery.isLoading && (
+                <div className="rounded-2xl border border-[#e9eaef] bg-[#fafbff] p-4 text-sm text-[#667085]">
+                  Loading prepared patient environments...
+                </div>
+              )}
+              {!patientsQuery.isLoading && candidates.map((patient) => (
+                <Link
+                  key={patient.id}
+                  to={`/fhir-charts?patient=${encodeURIComponent(patient.id)}`}
+                  className="group rounded-2xl border border-[#dfe4ea] bg-[#fafbff] p-4 no-underline transition-colors hover:border-[#5b76fe] hover:bg-[#f5f7ff]"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-[#1c1c1e]">
+                        {patient.name}
+                      </p>
+                      <p className="mt-1 text-sm text-[#5b76fe]">
+                        {patientScenario(patient)}
+                      </p>
+                      <p className="mt-2 text-xs leading-5 text-[#667085]">
+                        {patientSummaryLine(patient)}
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-2 text-[11px]">
+                        <span className="rounded-full bg-white px-2 py-1 font-semibold text-[#475467]">
+                          {patient.complexity_tier.replace("_", " ")} tier
+                        </span>
+                        <span className="rounded-full bg-white px-2 py-1 font-semibold text-[#475467]">
+                          {patient.active_condition_count} active conditions
+                        </span>
+                        <span className="rounded-full bg-white px-2 py-1 font-semibold text-[#475467]">
+                          {patient.active_med_count} active meds
+                        </span>
+                      </div>
+                    </div>
+                    <span className="inline-flex items-center gap-1 text-sm font-semibold text-[#5b76fe]">
+                      Launch
+                      <ArrowRight size={14} className="transition-transform group-hover:translate-x-0.5" />
+                    </span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+
+            <div className="mt-5 rounded-xl border border-[#b2e8e0] bg-[#f0faf8] px-4 py-3">
+              <Link
+                to="/learn/fhir-primer"
+                className="text-sm font-semibold text-[#187574] hover:underline"
+              >
+                First time here? Open the FHIR primer →
+              </Link>
+            </div>
+          </section>
+
+          <div className="space-y-5">
+            <section className="rounded-2xl border border-[#dfe4ea] bg-white p-5 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#5b76fe]">
+                Default Prepared Views
+              </p>
+              <h2 className="mt-2 text-xl font-semibold text-[#1c1c1e]">
+                Summary first, preview-heavy review next
+              </h2>
+              <div className="mt-4 space-y-3">
+                {[
+                  ["Summary", "Open on the patient summary surface with demographics, complexity, labs, medications, and care network."],
+                  ["History", "Move next into longitudinal review where preview-oriented browsing becomes the default interaction pattern."],
+                  ["Patient Data", "Keep the structural resource distribution one click away for trust, provenance, and parser sanity checks."],
+                ].map(([title, body], index) => (
+                  <div key={title} className="rounded-xl bg-[#f7f9fc] px-3.5 py-3">
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white text-[11px] font-semibold text-[#5b76fe]">
+                        {index + 1}
+                      </span>
+                      <p className="text-sm font-semibold text-[#1c1c1e]">{title}</p>
+                    </div>
+                    <p className="mt-2 text-sm leading-6 text-[#667085]">{body}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="rounded-2xl border border-[#dfe4ea] bg-[#fafbff] p-5 shadow-[rgb(224_226_232)_0px_0px_0px_1px]">
+              <p className="text-sm font-semibold text-[#1c1c1e]">Prepared chart surface includes</p>
+              <ul className="mt-3 space-y-2 text-sm text-[#555a6a]">
+                {[
+                  "Demographics, complexity tier, and chart span",
+                  "Resource distribution and patient-data provenance",
+                  "Conditions, medications, allergies, immunizations, and labs",
+                ].map((item) => (
+                  <li key={item} className="flex items-start gap-2">
+                    <span className="mt-1 inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-[#5b76fe]" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-4 rounded-full border border-[#e9eaef] bg-white px-4 py-2 text-center">
+                <span className="text-xs text-[#8d92a3]">
+                  {(patientsQuery.data?.length ?? 1180).toLocaleString()} prepared patient charts available
+                </span>
+              </div>
+            </section>
+          </div>
         </div>
-
-        <h2 className="text-lg font-semibold text-[#1c1c1e] mb-2">Choose a patient to begin</h2>
-
-        <ul className="text-sm text-[#555a6a] max-w-xs space-y-1.5 text-left list-none">
-          {[
-            "Demographics, complexity tier, and data span",
-            "Full resource distribution across FHIR types",
-            "Conditions, medications, allergies, and immunizations",
-          ].map((b) => (
-            <li key={b} className="flex items-start gap-2">
-              <span className="mt-0.5 w-1.5 h-1.5 rounded-full bg-[#5b76fe] shrink-0 inline-block" />
-              <span>{b}</span>
-            </li>
-          ))}
-        </ul>
-
-        {/* Primer banner */}
-        <div className="mt-5 max-w-xs w-full rounded-xl border border-[#b2e8e0] bg-[#f0faf8] px-4 py-3 text-left">
-          <Link
-            to="/learn/fhir-primer"
-            className="text-sm text-[#187574] hover:underline"
-          >
-            First time here? Open the FHIR primer →
-          </Link>
-        </div>
-
-        <div className="mt-3 px-4 py-2 rounded-full bg-[#f5f6f8] border border-[#e9eaef]">
-          <span className="text-xs text-[#a5a8b5]">1,180 patients available</span>
-        </div>
-      </div>
+      </main>
     );
   }
 

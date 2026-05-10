@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ModuleBar } from "./ModuleBar";
 import { PlatformDrawer } from "./PlatformDrawer";
-import { Titlebar, type Crumb } from "./Titlebar";
+import type { Crumb } from "./Titlebar";
 import type {
   ModuleId,
   PaneVisibility,
@@ -107,7 +107,6 @@ export function AppShell({
     if (w === "caspian") navigate("/caspian");
     else navigate(`/workspaces/${w}`);
   };
-
   return (
     <div
       className="flex h-screen min-h-0 flex-col"
@@ -120,17 +119,12 @@ export function AppShell({
         onSwitchWorkspace={handleSwitchWorkspace}
         onOpenDrawer={() => setDrawerOpen(true)}
         user={DEFAULT_USER}
+        crumbs={showTitlebar ? resolvedCrumbs : undefined}
+        panes={panes ?? DEFAULT_PANES}
+        onTogglePane={onTogglePane}
+        onRunWorkflow={onRunWorkflow}
+        showPaneToggles={showPaneToggles}
       />
-      {showTitlebar && (
-        <Titlebar
-          crumbs={resolvedCrumbs}
-          panes={panes ?? DEFAULT_PANES}
-          onTogglePane={onTogglePane ?? (() => undefined)}
-          onRunWorkflow={onRunWorkflow}
-          showRunWorkflow={Boolean(onRunWorkflow)}
-          showPaneToggles={showPaneToggles}
-        />
-      )}
       <main
         className="flex min-h-0 flex-1 flex-col overflow-auto"
         style={{ background: "var(--bg-app)", color: "var(--ink-1)" }}

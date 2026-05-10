@@ -709,7 +709,7 @@ function ReviewQueuePanel({
                           Open Source Intake on this file, repair or extract it, then re-run harmonization before publishing.
                         </p>
                         <Link
-                          to={`/aggregate/sources${patientId ? `?patient=${encodeURIComponent(patientId)}${item.source_id ? `&source=${encodeURIComponent(item.source_id)}` : ""}` : item.source_id ? `?source=${encodeURIComponent(item.source_id)}` : ""}`}
+                          to={`/patient-record/sources${patientId ? `?patient=${encodeURIComponent(patientId)}${item.source_id ? `&source=${encodeURIComponent(item.source_id)}` : ""}` : item.source_id ? `?source=${encodeURIComponent(item.source_id)}` : ""}`}
                           className="mt-2 inline-flex w-full items-center justify-center rounded-lg border border-[#dfe4ea] bg-white px-3 py-2 text-sm font-semibold text-[#555a6a] hover:border-[#5b76fe] hover:text-[#5b76fe]"
                         >
                           Fix in Source Intake
@@ -2972,7 +2972,7 @@ export function HarmonizeView() {
               </a>
             )}
             <Link
-              to={`/aggregate/sources${patientId ? `?patient=${encodeURIComponent(patientId)}` : ""}`}
+              to={`/patient-record/sources${patientId ? `?patient=${encodeURIComponent(patientId)}` : ""}`}
               className="inline-flex items-center gap-2 rounded-lg border border-[#dfe4ea] bg-white px-3 py-2 text-sm font-semibold text-[#555a6a] hover:border-[#5b76fe] hover:text-[#5b76fe]"
             >
               <FileUp size={14} />
@@ -3079,7 +3079,7 @@ export function HarmonizeView() {
             </div>
             <div className="flex shrink-0 flex-wrap gap-2">
               <Link
-                to={`/aggregate/sources${patientId ? `?patient=${encodeURIComponent(patientId)}` : ""}`}
+                to={`/patient-record/sources${patientId ? `?patient=${encodeURIComponent(patientId)}` : ""}`}
                 className="inline-flex items-center gap-2 rounded-lg bg-[#5b76fe] px-4 py-2 text-sm font-semibold text-white hover:bg-[#4760e8]"
               >
                 <FileUp size={14} />

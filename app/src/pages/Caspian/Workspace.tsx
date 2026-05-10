@@ -1,33 +1,53 @@
-import { useRef, useState } from "react";
+import { useMemo, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { AppShell } from "../../components/atlas/AppShell";
 import { WorkspaceFrame } from "../../components/atlas/WorkspaceFrame";
-import { WORKSPACES } from "../../components/atlas/data";
+import { SESSIONS, WORKSPACES } from "../../components/atlas/data";
 import type { PaneVisibility } from "../../components/atlas/types";
 
 export function CaspianWorkspace() {
+  const navigate = useNavigate();
+  const { sessionId } = useParams();
   const workspace = WORKSPACES["caspian"];
-  const controlsRef = useRef<{
+  const sessions = SESSIONS["caspian"];
+  const defaultSessionId = sessions[0]?.id ?? null;
+  const resolvedSessionId = sessionId ?? defaultSessionId;
+  const activeSession = useMemo(
+    () => sessions.find((session) => session.id === resolvedSessionId) ?? sessions[0] ?? null,
+    [resolvedSessionId, sessions],
+  );
+  const [paneControls, setPaneControls] = useState<{
     panes: PaneVisibility;
     togglePane: (p: keyof PaneVisibility) => void;
   } | null>(null);
-  const [, force] = useState(0);
 
   return (
     <AppShell
       contained={false}
       crumbs={[
         { label: "Caspian" },
-        { label: "Pre-op clearance — Hollister", active: true },
+        {
+          label: activeSession?.title ?? "Session",
+          active: true,
+        },
       ]}
       showPaneToggles
-      panes={controlsRef.current?.panes}
-      onTogglePane={(p) => {
-        controlsRef.current?.togglePane(p);
-        force((n) => n + 1);
-      }}
+      panes={paneControls?.panes}
+      onTogglePane={(p) => paneControls?.togglePane(p)}
       onRunWorkflow={() => undefined}
     >
-      <WorkspaceFrame workspace={workspace} controlsRef={controlsRef} />
+      <WorkspaceFrame
+        workspace={workspace}
+        activeSessionId={resolvedSessionId}
+        onSelectSession={(id) => {
+          if (id === "__home__") {
+            navigate("/caspian");
+            return;
+          }
+          navigate(`/caspian/sessions/${id}`);
+        }}
+        onControlsChange={setPaneControls}
+      />
     </AppShell>
   );
 }

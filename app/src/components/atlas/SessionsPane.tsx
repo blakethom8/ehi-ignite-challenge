@@ -11,7 +11,7 @@ const WORKFLOW_ICONS: Record<string, typeof Activity> = {
 
 type SessionsPaneProps = {
   workspace: Workspace;
-  activeSessionId: string | null;
+  activeSessionId: string | "__home__" | null;
   onSelectSession: (id: string | "__home__") => void;
 };
 

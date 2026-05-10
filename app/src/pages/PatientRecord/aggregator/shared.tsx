@@ -1477,7 +1477,7 @@ function SourceInventoryPage({
                     </span>
                   </div>
                   <Link
-                    to={`/charts?patient=${patientId}`}
+                    to={`/fhir-charts?patient=${patientId}`}
                     onClick={(event) => event.stopPropagation()}
                     className="inline-flex items-center justify-center gap-1 rounded-lg border border-[#dfe4ea] px-2.5 py-1.5 text-xs font-semibold text-[#667085] hover:border-[#5b76fe] hover:text-[#5b76fe]"
                   >
@@ -1675,15 +1675,15 @@ function ReadinessPage({
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Link to={`/aggregate/sources?patient=${patientId}`} className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#dfe4ea] bg-white px-3 py-2 text-sm font-semibold text-[#555a6a] hover:border-[#5b76fe] hover:text-[#5b76fe]">
+            <Link to={`/patient-record/sources?patient=${patientId}`} className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#dfe4ea] bg-white px-3 py-2 text-sm font-semibold text-[#555a6a] hover:border-[#5b76fe] hover:text-[#5b76fe]">
               <FileUp size={15} />
               Add sources
             </Link>
-            <Link to={`/aggregate/harmonize?patient=${patientId}`} className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#dfe4ea] bg-white px-3 py-2 text-sm font-semibold text-[#555a6a] hover:border-[#5b76fe] hover:text-[#5b76fe]">
+            <Link to={`/patient-record/harmonize?patient=${patientId}`} className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#dfe4ea] bg-white px-3 py-2 text-sm font-semibold text-[#555a6a] hover:border-[#5b76fe] hover:text-[#5b76fe]">
               <Play size={15} />
               Harmonized Record
             </Link>
-            <Link to={`/charts?patient=${patientId}`} className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#5b76fe] px-3 py-2 text-sm font-semibold text-white">
+            <Link to={`/fhir-charts?patient=${patientId}`} className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#5b76fe] px-3 py-2 text-sm font-semibold text-white">
               <Layers3 size={15} />
               Open FHIR Charts
             </Link>
@@ -1732,7 +1732,7 @@ function ReadinessPage({
             </div>
             <div className="flex flex-wrap gap-2">
               <Link
-                to={`/charts?patient=${patientId}`}
+                to={`/fhir-charts?patient=${patientId}`}
                 className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#5b76fe] px-3 py-2 text-sm font-semibold text-white"
               >
                 <Layers3 size={15} />
@@ -1914,7 +1914,7 @@ function ReadinessPage({
               </div>
             ))}
           </div>
-          <Link to={`/aggregate/context?patient=${patientId}`} className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-[#0f766e]">
+          <Link to={`/patient-record/context?patient=${patientId}`} className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-[#0f766e]">
             Review Patient Context
             <ArrowRight size={14} />
           </Link>
@@ -2124,7 +2124,7 @@ function WorkspaceLibrary({
       await queryClient.invalidateQueries({ queryKey: ["patients"] });
       setDraft(null);
       setActionError(null);
-      navigate(`/aggregate/sources?patient=${response.profile.id}`);
+      navigate(`/patient-record/sources?patient=${response.profile.id}`);
     },
     onError: (error) => setActionError(uploadErrorMessage(error)),
   });
@@ -2149,7 +2149,7 @@ function WorkspaceLibrary({
       await queryClient.invalidateQueries({ queryKey: ["patients"] });
       setDeletingId(null);
       if (currentPatientId === id) {
-        navigate("/aggregate/workspaces", { replace: true });
+        navigate("/patient-record/workspaces", { replace: true });
       }
     },
     onError: (error) => {
@@ -2258,7 +2258,7 @@ function WorkspaceLibrary({
                     <td className="px-4 py-4 align-top">
                       <div className="flex justify-end gap-2">
                         <Link
-                          to={`/aggregate/sources?patient=${workspace.id}`}
+                          to={`/patient-record/sources?patient=${workspace.id}`}
                           className="inline-flex items-center gap-1 rounded-lg bg-[#5b76fe] px-3 py-2 text-xs font-semibold text-white"
                         >
                           Open

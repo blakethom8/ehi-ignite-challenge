@@ -262,7 +262,7 @@ export function FhirChartsSafety() {
             </span>
           </div>
           <Link
-            to={`/explorer/interactions${patientId ? `?patient=${patientId}` : ""}`}
+            to={`/fhir-charts/interactions${patientId ? `?patient=${patientId}` : ""}`}
             className="shrink-0 text-xs font-semibold text-[#5b76fe] hover:text-[#3b56de] transition-colors whitespace-nowrap"
           >
             View Interactions →

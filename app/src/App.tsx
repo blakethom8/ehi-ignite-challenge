@@ -9,6 +9,8 @@ import { Landing } from "./pages/Landing";
 import { PlatformArchitecture } from "./pages/PlatformArchitecture";
 import { PatientRecordPool } from "./pages/PatientRecordPool";
 import { GuidedTour } from "./pages/GuidedTour";
+import { PatientRecordLayout } from "./pages/PatientRecord/PatientRecordLayout";
+import { FhirChartsLayout } from "./pages/FhirCharts/FhirChartsLayout";
 
 function lazyNamed<TModule extends Record<string, unknown>>(
   loader: () => Promise<TModule>,
@@ -58,7 +60,6 @@ const PatientRecordContext = lazyNamed(() => import("./pages/PatientRecord/Conte
 const PatientRecordPublish = lazyNamed(() => import("./pages/PatientRecord/aggregator/PublishReadinessPage"), "PublishReadinessPage");
 const PatientRecordSources = lazyNamed(() => import("./pages/PatientRecord/aggregator/SourceIntakePage"), "SourceIntakePage");
 const PatientRecordWorkspaces = lazyNamed(() => import("./pages/PatientRecord/aggregator/WorkspaceLibraryPage"), "WorkspaceLibraryPage");
-
 // FHIR Charts module — FHIR resource browser (former Explorer)
 const FhirChartsOverview = lazyNamed(() => import("./pages/FhirCharts/Overview"), "FhirChartsOverview");
 const FhirChartsTimeline = lazyNamed(() => import("./pages/FhirCharts/Timeline"), "FhirChartsTimeline");
@@ -118,14 +119,25 @@ function AppShellRoute({
   element: React.ReactNode;
   fullBleed?: boolean;
 }) {
+  const location = useLocation();
   if (fullBleed) {
     return (
       <Suspense fallback={<FullscreenPageFallback />}>{element}</Suspense>
     );
   }
+  const isPatientRecordRoute = location.pathname.startsWith("/patient-record");
+  const isFhirChartsRoute = location.pathname.startsWith("/fhir-charts");
   return (
     <AppShell>
-      <Suspense fallback={<PageFallback />}>{element}</Suspense>
+      <Suspense fallback={<PageFallback />}>
+        {isPatientRecordRoute ? (
+          <PatientRecordLayout>{element}</PatientRecordLayout>
+        ) : isFhirChartsRoute ? (
+          <FhirChartsLayout>{element}</FhirChartsLayout>
+        ) : (
+          element
+        )}
+      </Suspense>
     </AppShell>
   );
 }

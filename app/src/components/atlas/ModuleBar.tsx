@@ -5,11 +5,19 @@ import {
   HelpCircle,
   Menu,
   Pill,
+  Play,
   Search,
   Send,
   Telescope,
 } from "lucide-react";
-import type { ModuleId, RecentWorkspace, User, WorkspaceId } from "./types";
+import type { Crumb } from "./Titlebar";
+import type {
+  ModuleId,
+  PaneVisibility,
+  RecentWorkspace,
+  User,
+  WorkspaceId,
+} from "./types";
 
 const RECENT: RecentWorkspace[] = [
   { id: "trial-finder", label: "Trial Finder", vendor: "Helix Clinical", icon: "Telescope" },
@@ -38,6 +46,27 @@ type ModuleBarProps = {
   onSwitchWorkspace: (workspaceId: WorkspaceId) => void;
   onOpenDrawer: () => void;
   user: User;
+  crumbs?: Crumb[];
+  panes?: PaneVisibility;
+  onTogglePane?: (pane: keyof PaneVisibility) => void;
+  onRunWorkflow?: () => void;
+  showPaneToggles?: boolean;
+};
+
+const PANE_LABELS: Record<keyof PaneVisibility, string> = {
+  sessions: "S",
+  chat: "C",
+  workbench: "P",
+  files: "F",
+  inspector: "I",
+};
+
+const PANE_TITLES: Record<keyof PaneVisibility, string> = {
+  sessions: "Sessions (Alt+S)",
+  chat: "Chat (Alt+C)",
+  workbench: "Workbench (Alt+P)",
+  files: "Files (Alt+F)",
+  inspector: "Inspector (Alt+I)",
 };
 
 export function ModuleBar({
@@ -47,6 +76,11 @@ export function ModuleBar({
   onSwitchWorkspace,
   onOpenDrawer,
   user,
+  crumbs,
+  panes,
+  onTogglePane,
+  onRunWorkflow,
+  showPaneToggles = false,
 }: ModuleBarProps) {
   const [wsOpen, setWsOpen] = useState(false);
   const wsRef = useRef<HTMLDivElement>(null);
@@ -91,35 +125,78 @@ export function ModuleBar({
           EHI Ignite
         </span>
       </div>
+      {crumbs?.length ? (
+        <div className="ml-3 flex min-w-0 items-center gap-2 border-r border-white/10 pr-3.5">
+          {crumbs.map((crumb, index) => (
+            <div key={`${crumb.label}-${index}`} className="flex min-w-0 items-center gap-2">
+              {index > 0 && (
+                <span style={{ color: "rgba(255,255,255,0.35)" }}>/</span>
+              )}
+              <span
+                className={`truncate text-[12px] ${
+                  crumb.active ? "font-medium text-white" : ""
+                }`}
+                style={{
+                  color: crumb.active
+                    ? "#ffffff"
+                    : "rgba(255,255,255,0.68)",
+                }}
+              >
+                {crumb.label}
+              </span>
+            </div>
+          ))}
+        </div>
+      ) : null}
       <div className="ml-2 flex min-w-0 flex-[0_1_auto] gap-px overflow-hidden">
         {MODULES.map((m) => {
           const active = m.id === activeModule;
           if (m.hasMenu) {
             return (
               <div key={m.id} ref={wsRef} className="relative">
-                <button
-                  onClick={() => {
-                    onSelect(m.id);
-                    setWsOpen((o) => !o);
-                  }}
-                  className={`relative flex flex-[0_0_auto] cursor-pointer items-center gap-1 whitespace-nowrap rounded px-3 py-2 text-[12px] font-medium leading-none transition-colors ${
-                    active
-                      ? "bg-white/8 text-white"
-                      : "text-[rgba(229,233,240,0.62)] hover:bg-white/5 hover:text-white"
-                  }`}
-                >
-                  {m.label}
-                  <ChevronDown
-                    className="ml-0.5 h-2.5 w-2.5 opacity-60"
-                    strokeWidth={1.5}
-                  />
-                  {active && (
-                    <span
-                      className="absolute -bottom-2 left-2 right-2 h-0.5 rounded-t"
-                      style={{ background: "var(--action)" }}
+                <div className="relative flex flex-[0_0_auto] items-center">
+                  <button
+                    onClick={() => {
+                      setWsOpen(false);
+                      onSelect("workspaces");
+                    }}
+                    className={`relative flex cursor-pointer items-center whitespace-nowrap rounded-l px-3 py-2 text-[12px] font-medium leading-none transition-colors ${
+                      active
+                        ? "bg-white/8 text-white"
+                        : "text-[rgba(229,233,240,0.62)] hover:bg-white/5 hover:text-white"
+                    }`}
+                  >
+                    {m.label}
+                    {active && (
+                      <span
+                        className="absolute -bottom-2 left-2 right-0 h-0.5 rounded-t"
+                        style={{ background: "var(--action)" }}
+                      />
+                    )}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setWsOpen((o) => !o);
+                    }}
+                    aria-label="Open workspaces menu"
+                    className={`relative flex cursor-pointer items-center rounded-r px-1.5 py-2 text-[12px] font-medium leading-none transition-colors ${
+                      active
+                        ? "bg-white/8 text-white"
+                        : "text-[rgba(229,233,240,0.62)] hover:bg-white/5 hover:text-white"
+                    }`}
+                  >
+                    <ChevronDown
+                      className="h-2.5 w-2.5 opacity-60"
+                      strokeWidth={1.5}
                     />
-                  )}
-                </button>
+                    {active && (
+                      <span
+                        className="absolute -bottom-2 left-0 right-2 h-0.5 rounded-t"
+                        style={{ background: "var(--action)" }}
+                      />
+                    )}
+                  </button>
+                </div>
                 {wsOpen && (
                   <div
                     className="absolute left-0 top-[calc(100%+6px)] z-[100] min-w-[280px] rounded-lg p-1.5"
@@ -170,7 +247,6 @@ export function ModuleBar({
                           key={w.id}
                           onClick={() => {
                             setWsOpen(false);
-                            onSelect("workspaces");
                             onSwitchWorkspace(w.id);
                           }}
                           className="flex w-full items-center gap-2.5 rounded-[5px] px-2.5 py-2 text-left transition-colors hover:bg-[var(--surface-2)]"
@@ -221,6 +297,60 @@ export function ModuleBar({
         })}
       </div>
       <div className="flex-1" />
+      {onRunWorkflow && (
+        <button
+          onClick={onRunWorkflow}
+          className="mr-2 inline-flex h-[26px] flex-[0_0_auto] items-center gap-1.5 whitespace-nowrap rounded-md border px-2.5 text-[12px] font-medium transition-colors hover:bg-white/5"
+          style={{
+            color: "rgba(255,255,255,0.85)",
+            borderColor: "rgba(255,255,255,0.15)",
+            background: "rgba(255,255,255,0.04)",
+          }}
+        >
+          <Play className="h-3 w-3" strokeWidth={1.5} />
+          Run workflow
+          <ChevronDown
+            className="h-2.5 w-2.5 opacity-60"
+            strokeWidth={1.5}
+          />
+        </button>
+      )}
+      {showPaneToggles && panes && onTogglePane && (
+        <div
+          className="mr-2 flex flex-[0_0_auto] gap-0.5 rounded-md p-0.5"
+          style={{
+            background: "rgba(255,255,255,0.06)",
+            border: "1px solid rgba(255,255,255,0.08)",
+          }}
+        >
+          {(Object.keys(PANE_LABELS) as (keyof PaneVisibility)[]).map((pane) => {
+            const on = panes[pane];
+            return (
+              <button
+                key={pane}
+                onClick={() => onTogglePane(pane)}
+                title={PANE_TITLES[pane]}
+                className={`grid h-[22px] w-6 flex-[0_0_auto] place-items-center rounded text-[11px] font-semibold tracking-wider ${
+                  on
+                    ? ""
+                    : "text-[rgba(229,233,240,0.55)] hover:text-white"
+                }`}
+                style={
+                  on
+                    ? {
+                        background: "rgba(255,255,255,0.92)",
+                        color: "var(--action)",
+                        boxShadow: "var(--shadow-1)",
+                      }
+                    : undefined
+                }
+              >
+                {PANE_LABELS[pane]}
+              </button>
+            );
+          })}
+        </div>
+      )}
       <div className="flex items-center gap-1">
         <button
           className="grid h-[26px] w-[26px] place-items-center rounded-[5px] text-white/70 hover:bg-white/8 hover:text-white"

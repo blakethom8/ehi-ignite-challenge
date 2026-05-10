@@ -1,4 +1,4 @@
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChatPane } from "./ChatPane";
 import { ContextStrip } from "./ContextStrip";
 import { FilesPane } from "./FilesPane";
@@ -27,25 +27,91 @@ type WorkspaceFrameProps = {
   workspace: Workspace;
   /** Forces showing the package home view instead of the active session. */
   showPluginHome?: boolean;
+  /** Optional route-driven active session id. */
+  activeSessionId?: string | "__home__" | null;
+  /** Optional route-driven session switcher. */
+  onSelectSession?: (id: string | "__home__") => void;
+  /** Optional route-driven run launcher. */
+  onStartRun?: () => void;
   /** Map external pane controls into the frame. */
-  controlsRef?: React.MutableRefObject<{
+  onControlsChange?: (controls: {
     panes: ReturnType<typeof useWorkspaceState>["panes"];
     togglePane: ReturnType<typeof useWorkspaceState>["togglePane"];
-  } | null>;
+  }) => void;
 };
 
 export function WorkspaceFrame({
   workspace,
   showPluginHome,
-  controlsRef,
+  activeSessionId,
+  onSelectSession,
+  onStartRun,
+  onControlsChange,
 }: WorkspaceFrameProps) {
   const state = useWorkspaceState(workspace.id);
   const stageRef = useRef<HTMLDivElement>(null);
   const rightStackRef = useRef<HTMLDivElement>(null);
+  const [stageWidth, setStageWidth] = useState(0);
 
-  if (controlsRef) {
-    controlsRef.current = { panes: state.panes, togglePane: state.togglePane };
-  }
+  useEffect(() => {
+    const node = stageRef.current;
+    if (!node) return;
+    const syncWidth = () => {
+      setStageWidth(node.getBoundingClientRect().width);
+    };
+    syncWidth();
+    const observer = new ResizeObserver(syncWidth);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
+  const responsivePanes = useMemo(() => {
+    const next = { ...state.panes };
+    if (!showPluginHome && stageWidth > 0) {
+      if (stageWidth < 1180) {
+        if (next.files || next.inspector) {
+          const preferred =
+            state.rightPaneFocus === "inspector" && next.inspector
+              ? "inspector"
+              : next.files
+                ? "files"
+                : "inspector";
+          next.files = preferred === "files" && next.files;
+          next.inspector = preferred === "inspector" && next.inspector;
+        }
+      }
+      if (stageWidth < 900 && next.chat && next.workbench) {
+        next.sessions = false;
+      }
+    }
+    return next;
+  }, [showPluginHome, stageWidth, state.panes, state.rightPaneFocus]);
+
+  const handlePaneControl = useCallback(
+    (pane: keyof typeof state.panes) => {
+      if (
+        (pane === "files" || pane === "inspector") &&
+        stageWidth > 0 &&
+        stageWidth < 1180 &&
+        state.panes.files &&
+        state.panes.inspector &&
+        state.panes[pane] &&
+        state.rightPaneFocus !== pane
+      ) {
+        state.showPane(pane);
+        return;
+      }
+      state.togglePane(pane);
+    },
+    [stageWidth, state],
+  );
+
+  useEffect(() => {
+    onControlsChange?.({
+      panes: responsivePanes,
+      togglePane: handlePaneControl,
+    });
+  }, [handlePaneControl, onControlsChange, responsivePanes]);
 
   const onDragStart = useCallback(
     (axis: "v" | "h", key: keyof PaneSizes) =>
@@ -89,8 +155,39 @@ export function WorkspaceFrame({
     [state],
   );
 
-  const showRightStack = state.panes.files || state.panes.inspector;
+  const showRightStack = responsivePanes.files || responsivePanes.inspector;
   const showActiveSession = !showPluginHome;
+  const resolvedSessionId =
+    activeSessionId ?? state.activeSessionId;
+  const handleSelectSession =
+    onSelectSession ??
+    ((id: string | "__home__") =>
+      state.setActiveSessionId(id === "__home__" ? null : id));
+  const handleStartRun = onStartRun ?? (() => state.setActiveSessionId(null));
+  const sessionsWidth =
+    stageWidth > 0
+      ? Math.min(
+          state.sizes.sessionsW,
+          Math.max(MIN_SIZES.sessionsW, Math.floor(stageWidth * 0.28)),
+        )
+      : state.sizes.sessionsW;
+  const chatWidth =
+    responsivePanes.chat && responsivePanes.workbench && stageWidth > 0
+      ? Math.min(
+          state.sizes.chatW,
+          Math.max(
+            MIN_SIZES.chatW,
+            Math.floor(stageWidth * (showRightStack ? 0.38 : 0.44)),
+          ),
+        )
+      : state.sizes.chatW;
+  const rightWidth =
+    showRightStack && stageWidth > 0
+      ? Math.min(
+          state.sizes.rightW,
+          Math.max(220, Math.floor(stageWidth * 0.28)),
+        )
+      : state.sizes.rightW;
 
   return (
     <div
@@ -103,21 +200,19 @@ export function WorkspaceFrame({
         className="flex min-h-0 flex-1 overflow-hidden"
         style={{ background: "var(--bg-app)" }}
       >
-        {state.panes.sessions && (
+        {responsivePanes.sessions && (
           <>
             <div
               style={{
-                width: state.sizes.sessionsW,
+                width: sessionsWidth,
                 flex: "0 0 auto",
                 minWidth: MIN_SIZES.sessionsW,
               }}
             >
               <SessionsPane
                 workspace={workspace}
-                activeSessionId={
-                  showPluginHome ? "__home__" : state.activeSessionId
-                }
-                onSelectSession={(id) => state.setActiveSessionId(id === "__home__" ? null : id)}
+                activeSessionId={showPluginHome ? "__home__" : resolvedSessionId}
+                onSelectSession={handleSelectSession}
               />
             </div>
             <div
@@ -128,11 +223,11 @@ export function WorkspaceFrame({
         )}
         {showActiveSession ? (
           <>
-            {state.panes.chat && (
+            {responsivePanes.chat && (
               <div
                 style={{
-                  width: state.sizes.chatW,
-                  flex: state.panes.workbench ? "0 0 auto" : "1 1 auto",
+                  width: chatWidth,
+                  flex: responsivePanes.workbench ? "0 0 auto" : "1 1 auto",
                   minWidth: MIN_SIZES.chatW,
                 }}
                 className="min-h-0"
@@ -147,13 +242,13 @@ export function WorkspaceFrame({
                 />
               </div>
             )}
-            {state.panes.chat && state.panes.workbench && (
+            {responsivePanes.chat && responsivePanes.workbench && (
               <div
                 className="atlas-resizer-v"
                 onMouseDown={onDragStart("v", "chatW")}
               />
             )}
-            {state.panes.workbench && (
+            {responsivePanes.workbench && (
               <div className="min-h-0 flex-1">
                 <WorkbenchPane
                   workspace={workspace}
@@ -166,7 +261,7 @@ export function WorkspaceFrame({
                 />
               </div>
             )}
-            {showRightStack && (state.panes.chat || state.panes.workbench) && (
+            {showRightStack && (responsivePanes.chat || responsivePanes.workbench) && (
               <div
                 className="atlas-resizer-v"
                 onMouseDown={onDragStart("v", "rightW")}
@@ -177,31 +272,31 @@ export function WorkspaceFrame({
                 ref={rightStackRef}
                 className="min-h-0"
                 style={{
-                  width: state.sizes.rightW,
+                  width: rightWidth,
                   flex: "0 0 auto",
                   minWidth: MIN_SIZES.rightW,
                   display: "grid",
                   gridTemplateRows:
-                    state.panes.files && state.panes.inspector
+                    responsivePanes.files && responsivePanes.inspector
                       ? `${state.sizes.filesH}% 5px ${100 - state.sizes.filesH}%`
                       : "1fr",
                   borderLeft: "1px solid var(--line-1)",
                   background: "var(--surface-1)",
                 }}
               >
-                {state.panes.files && (
-                  <FilesPane
-                    workspaceId={workspace.id}
-                    onOpen={state.handleOpenFile}
-                  />
+                {responsivePanes.files && (
+                <FilesPane
+                  workspaceId={workspace.id}
+                  onOpen={state.handleOpenFile}
+                />
                 )}
-                {state.panes.files && state.panes.inspector && (
+                {responsivePanes.files && responsivePanes.inspector && (
                   <div
                     className="atlas-resizer-h"
                     onMouseDown={onDragStart("h", "filesH")}
                   />
                 )}
-                {state.panes.inspector && (
+                {responsivePanes.inspector && (
                   <InspectorPane citationId={state.citationId} />
                 )}
               </div>
@@ -210,7 +305,7 @@ export function WorkspaceFrame({
         ) : (
           <PluginHome
             workspace={workspace}
-            onStartRun={() => state.setActiveSessionId(null)}
+            onStartRun={handleStartRun}
           />
         )}
       </div>

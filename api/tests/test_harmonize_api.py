@@ -34,6 +34,12 @@ _DEMO_AVAILABLE = (_BLAKE_DIR / "cedars-healthskillz-download" / "health-records
 class HarmonizeAPITests(unittest.TestCase):
     def setUp(self) -> None:
         self.client = TestClient(app)
+        login = self.client.post(
+            "/api/auth/login",
+            json={"email": "clinician@atlas.local", "password": "atlas-demo-password"},
+        )
+        if login.status_code != 200:
+            raise RuntimeError(f"Failed to bootstrap authenticated test client: {login.text}")
 
     def test_collections_lists_blake_real(self) -> None:
         r = self.client.get("/api/harmonize/collections")
@@ -244,6 +250,12 @@ class UploadCollectionDiscoveryTests(unittest.TestCase):
         # Bust caches so discovery reads from the new root.
         harmonize_service._cached_load.cache_clear()
         self.client = TestClient(app)
+        login = self.client.post(
+            "/api/auth/login",
+            json={"email": "clinician@atlas.local", "password": "atlas-demo-password"},
+        )
+        if login.status_code != 200:
+            raise RuntimeError(f"Failed to bootstrap authenticated test client: {login.text}")
 
     def tearDown(self) -> None:
         from api.core import harmonize_service

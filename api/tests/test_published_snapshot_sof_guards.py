@@ -32,13 +32,14 @@ def test_active_published_care_journey_skips_global_sof(monkeypatch) -> None:
     monkeypatch.setattr(patients_router, "load_active_published_run", lambda _patient_id: {"run_id": "active"})
     monkeypatch.setattr(patients_router, "_patient_fhir_uuid", lambda _patient_id: "global-sof-patient")
     monkeypatch.setattr(patients_router, "_sof_db_path", lambda: SimpleNamespace(exists=lambda: True))
+    monkeypatch.setattr(patients_router, "_authorized_patient_id", lambda _request, patient_id: patient_id)
 
     def fail_connect(*_args, **_kwargs):
         raise AssertionError("global SOF should not be queried for active published snapshots")
 
     monkeypatch.setattr(sqlite3, "connect", fail_connect)
 
-    response = patients_router.get_care_journey("synthea-id-with-active-snapshot")
+    response = patients_router.get_care_journey("synthea-id-with-active-snapshot", SimpleNamespace())
 
     assert [item.type_text for item in response.encounters] == ["Published encounter"]
 

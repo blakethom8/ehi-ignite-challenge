@@ -104,29 +104,6 @@ export function PatientRecordPool() {
 
   const patients = queriedPatients;
 
-  if (!isUnlocked) {
-    return (
-      <div className="min-h-screen bg-[#f5f6f8] text-[#1c1c1e]">
-        <StartStateCard
-          icon={UserRound}
-          eyebrow="Patient Access"
-          title="Choose a demo patient before browsing patient environments."
-          body="This pool should not expose patient environments by default. Choose a demo patient first so the application can open with an explicit chart context and consistent module state."
-          bullets={[
-            "Lock patient-specific surfaces until access is explicit.",
-            "Treat demo access as a thin session posture, not a separate product mode.",
-            "Keep the pool focused on controlled patient selection, not accidental data exposure.",
-          ]}
-          aside={
-            <DemoPatientPicker
-              destination={(demoPatientId) => `/patient-record?patient=${encodeURIComponent(demoPatientId)}`}
-              title="Continue with demo patient"
-            />
-          }
-        />
-      </div>
-    );
-  }
 
   const cohortStats = useMemo(() => {
     const patientCount = patients.length;
@@ -215,6 +192,31 @@ export function PatientRecordPool() {
     { title: "Caspian", to: patientUrl("/caspian", selectedPatient), icon: Stethoscope },
     { title: "Medication Access", to: patientUrl("/medication-access", selectedPatient), icon: Pill },
   ];
+
+
+  if (!isUnlocked) {
+    return (
+      <div className="min-h-screen bg-[#f5f6f8] text-[#1c1c1e]">
+        <StartStateCard
+          icon={UserRound}
+          eyebrow="Patient Access"
+          title="Choose a demo patient before browsing patient environments."
+          body="This pool should not expose patient environments by default. Choose a demo patient first so the application can open with an explicit chart context and consistent module state."
+          bullets={[
+            "Lock patient-specific surfaces until access is explicit.",
+            "Treat demo access as a thin session posture, not a separate product mode.",
+            "Keep the pool focused on controlled patient selection, not accidental data exposure.",
+          ]}
+          aside={
+            <DemoPatientPicker
+              destination={(demoPatientId) => `/patient-record?patient=${encodeURIComponent(demoPatientId)}`}
+              title="Continue with demo patient"
+            />
+          }
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#f5f6f8] text-[#1c1c1e]">

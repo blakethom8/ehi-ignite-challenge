@@ -376,7 +376,7 @@ function renderInline(
   activeCitationId: string | null,
 ): React.ReactNode[] {
   const parts: React.ReactNode[] = [];
-  const regex = /\[(c_\d+|[a-z0-9_.\-]+\.(?:md|json|txt|csv))\]/gi;
+  const regex = /\[(c_\d+|[a-z0-9_.-]+\.(?:md|json|txt|csv))\]/gi;
   let last = 0;
   let m: RegExpExecArray | null;
   let i = 0;

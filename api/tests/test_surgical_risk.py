@@ -11,6 +11,12 @@ class SurgicalRiskApiTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.client = TestClient(app)
+        login = cls.client.post(
+            "/api/auth/login",
+            json={"email": "clinician@atlas.local", "password": "atlas-demo-password"},
+        )
+        if login.status_code != 200:
+            raise RuntimeError(f"Failed to bootstrap authenticated test client: {login.text}")
 
     def test_showcase_patient_has_deterministic_high_risk_score(self) -> None:
         response = self.client.get(

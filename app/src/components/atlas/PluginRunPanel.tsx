@@ -321,6 +321,8 @@ function WorkbenchBody({
   canvas: Record<string, unknown>;
   runId: string;
 }) {
+  // Provide a virtual "manifest" canvas key for json.viewer of the manifest tab.
+  const fullCanvas = useMemo(() => ({ ...canvas, manifest }), [canvas, manifest]);
   const tab = manifest.ui.workbenchTabs.find((t) => t.id === activeTab);
   if (!tab) {
     return (
@@ -335,8 +337,6 @@ function WorkbenchBody({
       </div>
     );
   }
-  // Provide a virtual "manifest" canvas key for json.viewer of the manifest tab.
-  const fullCanvas = useMemo(() => ({ ...canvas, manifest }), [canvas, manifest]);
   return <Renderer runId={runId} canvas={fullCanvas} tabId={tab.id} />;
 }
 

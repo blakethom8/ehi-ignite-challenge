@@ -16,7 +16,7 @@ const PLUGIN_ICONS: Record<string, typeof Telescope> = {
 };
 
 export function PluginsIndex() {
-  const { isUnlocked } = useAccessContext();
+  const { activePatientId, isUnlocked } = useAccessContext();
   const { data: manifests, error, isError, isLoading, refetch } = useInstalledManifests();
 
   if (!isUnlocked) {
@@ -103,7 +103,7 @@ export function PluginsIndex() {
           return (
             <Link
               key={m.id}
-              to={`/workspaces/${m.id}`}
+              to={activePatientId ? `/workspaces/${m.id}?patient=${encodeURIComponent(activePatientId)}` : `/workspaces/${m.id}`}
               className="group flex flex-col gap-2 rounded-md border p-4 transition-colors hover:border-[var(--action-line)]"
               style={{ background: "var(--surface-1)", borderColor: "var(--line-1)" }}
             >

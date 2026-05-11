@@ -11,6 +11,12 @@ from api.main import app
 class CanonicalAPITests(unittest.TestCase):
     def setUp(self) -> None:
         self.client = TestClient(app)
+        login = self.client.post(
+            "/api/auth/login",
+            json={"email": "clinician@atlas.local", "password": "atlas-demo-password"},
+        )
+        if login.status_code != 200:
+            raise RuntimeError(f"Failed to bootstrap authenticated test client: {login.text}")
 
     def _sample_patient_id(self) -> str:
         files = list_patient_files()

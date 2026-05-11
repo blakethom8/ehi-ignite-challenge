@@ -24,17 +24,17 @@ export function PluginsIndex() {
       <StartStateCard
         icon={Boxes}
         eyebrow="Plugins"
-        title="Choose access before opening the plugin marketplace."
-        body="Plugins work on a selected patient and may connect to outside services. Choose access first so the marketplace opens with the right chart in view."
+        title="Start a sample or account workspace before opening plugins."
+        body="Plugins work on a selected chart and may connect to outside services. Start with a sample chart or account session first so the marketplace opens with the right record in view."
         bullets={[
-          "Choose a patient first, then decide which workflow helps next.",
+          "Choose a chart first, then decide which workflow helps next.",
           "Keep outside-service actions visible before you start a run.",
           "Avoid opening workflow tools before there is a chart in context.",
         ]}
         aside={
           <DemoPatientPicker
             destination={(patientId) => `/workspaces?patient=${encodeURIComponent(patientId)}`}
-            title="Open plugins with a demo patient"
+            title="Open plugins with a sample chart"
           />
         }
       />
@@ -56,7 +56,7 @@ export function PluginsIndex() {
         bullets={
           unauthorized
             ? [
-                "Re-enter with a demo patient or sign in again.",
+                "Re-enter with a sample chart or sign in again.",
                 "Open plugins only after the patient and session are active.",
               ]
             : [

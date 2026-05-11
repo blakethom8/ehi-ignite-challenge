@@ -33,17 +33,17 @@ export function CaspianWorkspace() {
         <StartStateCard
           icon={ShieldCheck}
           eyebrow="Caspian"
-          title="Choose a patient before opening Caspian."
-          body="Caspian works best when it opens with a chart already selected. Pick a patient first so you can review the record, ask focused questions, and inspect supporting evidence in one place."
+          title="Choose a sample chart before opening Caspian."
+          body="Caspian works best when it opens with a chart already selected. Pick a sample chart first so you can review the record, ask focused questions, and inspect supporting evidence in one place."
           bullets={[
-            "Start with one patient so the conversation stays grounded in a single chart.",
+            "Start with one chart so the conversation stays grounded in a single record.",
             "Keep answers, citations, and trace tied to the same review session.",
             "Avoid opening the full workspace before there is a chart to review.",
           ]}
           aside={
             <DemoPatientPicker
               destination={(demoPatientId) => `/caspian?patient=${encodeURIComponent(demoPatientId)}`}
-              title="Open Caspian with a demo patient"
+              title="Open Caspian with a sample chart"
             />
           }
         />

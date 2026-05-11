@@ -11,8 +11,8 @@ type DemoPatientPickerProps = {
 
 export function DemoPatientPicker({
   destination,
-  title = "Continue with a demo patient",
-  body = "Use an explicit demo patient to unlock the product without exposing non-demo chart data.",
+  title = "Continue with a sample chart",
+  body = "Open a prepared synthetic record. No real patient data is used.",
 }: DemoPatientPickerProps) {
   const navigate = useNavigate();
   const { availableDemoPatients, enterDemoPatient, activePatientId } = useAccessContext();
@@ -47,7 +47,7 @@ export function DemoPatientPicker({
                 setError(
                   cause instanceof Error && cause.message.trim()
                     ? cause.message
-                    : "Could not open the demo patient. Try again.",
+                    : "Could not open the sample chart. Try again.",
                 );
               } finally {
                 setPendingPatientId(null);
@@ -65,7 +65,7 @@ export function DemoPatientPicker({
                 <div className="mt-1 text-xs text-[#667085]">{patient.description}</div>
                 <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-[#f7f8fb] px-2 py-1 text-[11px] font-medium text-[#52627f]">
                   <Activity size={12} />
-                  Demo access
+                  Sample chart
                 </div>
               </div>
               <span className="inline-flex items-center gap-1 text-sm font-semibold text-[#3657ff]">

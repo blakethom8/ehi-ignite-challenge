@@ -93,7 +93,7 @@ export function ModuleBar({
     if (!activePatientId) return null;
     return {
       label: activePatientName ?? activePatientId,
-      subtitle: isDemo ? "Demo patient environment" : "Active patient context",
+      subtitle: isDemo ? "Synthetic sample chart" : "Active chart context",
     };
   }, [activePatientId, activePatientName, isDemo]);
 
@@ -396,7 +396,7 @@ export function ModuleBar({
           <Link
             to={isUnlocked ? withPatientContext("/records-pool", activePatientId) : "/"}
             className="grid h-[26px] w-[26px] place-items-center rounded-[5px] text-white/70 hover:bg-white/8 hover:text-white"
-            title={isUnlocked ? "Patient environments" : "Choose access mode"}
+            title={isUnlocked ? "Health-record workspaces" : "Choose a sample or account"}
           >
             <Search className="h-[13px] w-[13px]" strokeWidth={1.5} />
           </Link>

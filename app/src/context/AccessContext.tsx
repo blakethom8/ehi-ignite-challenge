@@ -50,7 +50,7 @@ function mockDemoOptions(): DemoPatientOption[] {
   return mockPatients.map((patient) => ({
     id: patient.id,
     name: patient.name,
-    description: "Frontend mock-mode demo patient.",
+    description: "Frontend mock sample chart.",
   }));
 }
 
@@ -69,9 +69,9 @@ function mockSessionFromStorage(): AccessState {
       user: mode === "authenticated"
         ? {
             id: "mock-user",
-            email: "clinician@atlas.local",
-            display_name: "Atlas Clinician",
-            role: "clinician",
+            email: "account@example.com",
+            display_name: "Atlas Account",
+            role: "coordinator",
           }
         : null,
       activePatientId: patientId,

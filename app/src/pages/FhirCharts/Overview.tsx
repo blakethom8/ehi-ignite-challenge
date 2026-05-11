@@ -1087,17 +1087,17 @@ export function FhirChartsOverview() {
       <StartStateCard
         icon={Database}
         eyebrow="FHIR Charts"
-        title="Choose a patient before opening chart review."
-        body="FHIR Charts should begin on a prepared summary view, not a partially loaded clinical surface. Select a demo patient first so the review experience opens with clear signal and a simple path into history, labs, safety, and chart-grounded Q&A."
+        title="Choose a sample chart before opening chart review."
+        body="FHIR Charts begins on a prepared summary view, not a partially loaded surface. Select a synthetic sample chart first so the review experience opens with clear signal and a simple path into history, labs, safety, and chart-grounded Q&A."
         bullets={[
           "Start on a summary-first chart surface.",
           "Move into deeper preview-heavy views only after the patient context is established.",
-          "Keep chart-specific data locked until demo access is explicit.",
+          "Keep chart-specific data closed until a sample or account is active.",
         ]}
         aside={
           <DemoPatientPicker
             destination={(demoPatientId) => `/fhir-charts?patient=${encodeURIComponent(demoPatientId)}`}
-            title="Open FHIR Charts in demo mode"
+            title="Open FHIR Charts with a sample chart"
           />
         }
       />

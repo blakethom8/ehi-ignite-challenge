@@ -6,7 +6,7 @@ export interface AuthUser {
   id: string;
   email: string;
   display_name: string;
-  role: "clinician" | "attending" | "coordinator" | "admin";
+  role: "consumer" | "clinician" | "attending" | "coordinator" | "admin";
 }
 
 export interface DemoPatientOption {

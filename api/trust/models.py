@@ -52,7 +52,7 @@ ModelPresetId = Literal[
 
 TrustPostureKind = Literal["consented-external", "internal-cohort"]
 
-ApproverRole = Literal["clinician", "attending", "coordinator", "admin"]
+ApproverRole = Literal["consumer", "clinician", "attending", "coordinator", "admin"]
 
 OutboundActionKind = Literal[
     "send-packet",

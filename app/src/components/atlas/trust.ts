@@ -236,7 +236,7 @@ export type OutboundActionKind =
 export type UserIdentity = {
   id: string;
   name: string;
-  role: "clinician" | "attending" | "coordinator" | "admin";
+  role: "consumer" | "clinician" | "attending" | "coordinator" | "admin";
 };
 
 /**

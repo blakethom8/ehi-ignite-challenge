@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import unittest
+import uuid
 
 from fastapi.testclient import TestClient
 
+from api.core import auth as auth_core
 from api.main import app
 
 
@@ -37,6 +39,58 @@ class AuthApiTests(unittest.TestCase):
         session = client.get("/api/auth/session")
         self.assertEqual(session.status_code, 200)
         self.assertEqual(session.json()["mode"], "authenticated")
+
+    def test_signup_creates_consumer_session_and_hashes_password(self) -> None:
+        client = TestClient(app)
+        email = f"new-consumer-{uuid.uuid4().hex}@example.com"
+        password = "correct-horse-battery"
+        signup = client.post(
+            "/api/auth/signup",
+            json={"email": email.upper(), "password": password, "display_name": "  New Consumer  "},
+        )
+        self.assertEqual(signup.status_code, 200)
+        self.assertIn(auth_core.SESSION_COOKIE_NAME, signup.cookies)
+        body = signup.json()
+        self.assertEqual(body["mode"], "authenticated")
+        self.assertEqual(body["user"]["email"], email)
+        self.assertEqual(body["user"]["display_name"], "New Consumer")
+        self.assertEqual(body["user"]["role"], "consumer")
+
+        session = client.get("/api/auth/session")
+        self.assertEqual(session.status_code, 200)
+        self.assertEqual(session.json()["mode"], "authenticated")
+        self.assertEqual(session.json()["user"]["email"], email)
+
+        session_id = auth_core._unsign_cookie_value(signup.cookies.get(auth_core.SESSION_COOKIE_NAME))
+        self.assertIsNotNone(session_id)
+        principal = auth_core._lookup_session(session_id or "")
+        self.assertIsNotNone(principal)
+        self.assertEqual(principal.to_user_identity().role, "consumer")
+
+        with auth_core._connect() as conn:
+            row = conn.execute(
+                "SELECT password_hash FROM users WHERE email = ?",
+                (email,),
+            ).fetchone()
+        self.assertIsNotNone(row)
+        self.assertNotEqual(row["password_hash"], password)
+        self.assertTrue(row["password_hash"].startswith("scrypt$"))
+
+    def test_signup_rejects_duplicate_normalized_email(self) -> None:
+        client = TestClient(app)
+        email = f"duplicate-consumer-{uuid.uuid4().hex}@example.com"
+        first = client.post(
+            "/api/auth/signup",
+            json={"email": email, "password": "first-password", "display_name": "Duplicate Consumer"},
+        )
+        self.assertEqual(first.status_code, 200)
+
+        duplicate = client.post(
+            "/api/auth/signup",
+            json={"email": email.upper(), "password": "second-password", "display_name": "Duplicate Consumer"},
+        )
+        self.assertEqual(duplicate.status_code, 409)
+        self.assertEqual(duplicate.json()["detail"], "An account already exists for this email.")
 
     def test_demo_session_can_access_demo_patient(self) -> None:
         client = TestClient(app)

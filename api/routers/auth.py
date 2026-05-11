@@ -9,6 +9,7 @@ from api.auth_models import (
     AuthLoginRequest,
     AuthPatientSelectionRequest,
     AuthSessionResponse,
+    AuthSignupRequest,
 )
 from api.core.auth import (
     begin_demo_session,
@@ -20,6 +21,7 @@ from api.core.auth import (
     revoke_session,
     select_patient,
     set_session_cookie,
+    signup_user,
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -41,6 +43,16 @@ def login(payload: AuthLoginRequest, request: Request, response: Response) -> Au
     if existing is not None:
         revoke_session(existing)
     session = login_user(payload.email, payload.password, request)
+    set_session_cookie(response, session.session_id)
+    return session.to_response()
+
+
+@router.post("/signup", response_model=AuthSessionResponse)
+def signup(payload: AuthSignupRequest, request: Request, response: Response) -> AuthSessionResponse:
+    existing = current_session(request)
+    if existing is not None:
+        revoke_session(existing)
+    session = signup_user(payload.email, payload.password, payload.display_name, request)
     set_session_cookie(response, session.session_id)
     return session.to_response()
 

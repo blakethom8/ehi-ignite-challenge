@@ -68,7 +68,7 @@ export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorB
               Retry view
             </button>
             <a
-              href="/explorer"
+              href="/fhir-charts"
               className="inline-flex items-center gap-2 rounded-md border border-[#d9dce7] bg-white px-4 py-2 text-sm font-medium text-[#1c1c1e] transition-colors hover:bg-[#f5f6f8]"
             >
               <Home size={16} />

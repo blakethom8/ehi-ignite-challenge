@@ -120,7 +120,7 @@ export function ThePipeline() {
           </span>
         </p>
         <p className="mb-6 text-[15px] leading-[1.65] text-[#4a5168]">
-          The pipeline produces. Applications — FHIR Charts, Clinical Insights, Bundle Export,
+          The pipeline produces. Applications — FHIR Charts, Caspian, Bundle Export,
           Marketplace skills — consume the bundle. That separation is the interoperability boundary.
         </p>
         <PipelineDiagram />
@@ -289,7 +289,7 @@ export function ThePipeline() {
                 body: "Visualizes the bundle as clinical charts — timelines, safety panels, medication histories. Familiar to anyone who has used a chart system.",
               },
               {
-                label: "Clinical Insights",
+                label: "Caspian",
                 body: "Atlas's internal agent harness. Full bundle access, cited Q&A, and evidence packets assembled from validated facts. Reasoning over the bundle, not over raw source text.",
               },
               {

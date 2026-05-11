@@ -35,6 +35,8 @@ from api.routers import ground_truth_review
 from api.routers import pipeline_lab
 from api.routers import ccda_lab
 from api.routers import skills as skills_router
+from api.plugins.routers import plugins as plugins_router
+from api.plugins import runtime as plugin_runtime
 
 _ENVIRONMENT = os.getenv("ENVIRONMENT", "development").strip().lower()
 _IS_PRODUCTION = _ENVIRONMENT in {"prod", "production"}
@@ -70,6 +72,13 @@ def _materialize_sof_db() -> None:
     # rebuild cost on the first page load after deploy.
     warm_patient_indexes()
     patients.list_patients()
+    # Cache verified plugin manifests in memory so /api/plugins/installed
+    # serves without re-verifying signatures on every request.
+    try:
+        plugin_runtime.reload_manifests()
+    except Exception:
+        # Don't crash the API if a manifest is malformed — just log.
+        pass
 
 app.add_middleware(
     TrustedHostMiddleware,
@@ -115,6 +124,7 @@ app.include_router(ground_truth_review.router, prefix="/api")
 app.include_router(pipeline_lab.router, prefix="/api")
 app.include_router(ccda_lab.router, prefix="/api")
 app.include_router(skills_router.router, prefix="/api")
+app.include_router(plugins_router.router, prefix="/api")
 
 
 @app.get("/api/health")

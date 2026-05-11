@@ -1,0 +1,20 @@
+[
+  {
+    "id": "helix-clinical",
+    "name": "Helix Clinical",
+    "keyFingerprint": "ed25519:/vXMmX24BUwK",
+    "publicKey": "/vXMmX24BUwKACNZLOSNmdjmI3UiwMolhoyeqZC032s="
+  },
+  {
+    "id": "rxbridge",
+    "name": "RxBridge",
+    "keyFingerprint": "ed25519:UbFdvPNhSyBH",
+    "publicKey": "UbFdvPNhSyBHVU/H2cT0AZjgXh+wVvnNTw3TP98ReUk="
+  },
+  {
+    "id": "confermd",
+    "name": "ConferMD",
+    "keyFingerprint": "ed25519:Ae2VW6oI7g1l",
+    "publicKey": "Ae2VW6oI7g1ldCjZSJxLXBVnnMxFGzVzEEeGsAToyT4="
+  }
+]

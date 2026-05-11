@@ -1,0 +1,20 @@
+{
+  "programs": [
+    {
+      "id": "bms-bridges",
+      "manufacturer": "BMS3B",
+      "drug": "apixaban",
+      "incomeBandMax": 400,
+      "diagnosisFilter": ["atrial fibrillation", "DVT", "PE"],
+      "enrollmentEndpoint": "https://pap.bms3b.com/api/enroll"
+    },
+    {
+      "id": "lilly-cares",
+      "manufacturer": "Eli Lilly",
+      "drug": "various",
+      "incomeBandMax": 300,
+      "diagnosisFilter": ["diabetes"],
+      "enrollmentEndpoint": "https://pap.lilly.com/api/enroll"
+    }
+  ]
+}

@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Guided Workspace Cowork Blend</title>
+  <link rel="stylesheet" href="./atlas-wireframes.css">
+</head>
+<body class="wireframe-page">
+  <div class="window">
+    <div class="titlebar">
+      <div class="traffic"><span></span><span></span><span></span></div>
+      <div class="titlebar-center">
+        <div class="crumbs">
+          <strong>Atlas</strong>
+          <span>/</span>
+          <span>Marketplace workspace</span>
+          <span>/</span>
+          <span>Trial Finder</span>
+        </div>
+      </div>
+      <div class="titlebar-actions">
+        <button class="icon-btn active" title="Current package workspace" aria-label="Current package workspace">Pkg</button>
+        <button class="icon-btn active" title="Toggle preview pane" aria-label="Toggle preview pane">Prev</button>
+        <button class="icon-btn" title="Toggle working folder pane" aria-label="Toggle working folder pane">Files</button>
+        <button class="icon-btn" title="Toggle context pane" aria-label="Toggle context pane">Ctx</button>
+      </div>
+    </div>
+
+    <div class="page-note">
+      <strong>Variant C · Marketplace family</strong>
+      Trial Finder marketplace workspace. This keeps the friendlier cowork framing, but grounds the module in a
+      clearer package identity, denser preview pane, and more rigorous workspace objects.
+    </div>
+    <div class="workspace-banner">
+      <span class="pill warn">Marketplace package</span>
+      <span class="pill blue">Trial Finder</span>
+      <span class="pill neutral">Action-oriented workspace</span>
+      <span class="pill neutral">Consented external tools</span>
+    </div>
+
+    <main class="shell shell-grid guided">
+      <aside class="sessions">
+        <div class="pane-head">
+          <div>
+            <strong>Trial Finder package</strong>
+            <span class="pane-subtitle">Marketplace workspace for candidate search, review, packet building, and export</span>
+          </div>
+          <div class="toggle-row">
+            <button class="icon-btn" title="Collapse package pane" aria-label="Collapse package pane">-</button>
+            <button class="icon-btn" title="Hide package pane" aria-label="Hide package pane">x</button>
+          </div>
+        </div>
+
+        <p class="section-label">Workspace actions</p>
+        <div class="session-list">
+          <div class="session-item active"><strong>Shortlist candidate trials</strong><span>Open the patient context and assemble first-pass candidate fits</span></div>
+          <div class="session-item"><strong>Review eligibility fit</strong><span>Compare inclusion and exclusion signals against the selected shortlist</span></div>
+          <div class="session-item"><strong>Draft outreach packet</strong><span>Prepare a reusable artifact after approval</span></div>
+          <div class="session-item"><strong>Package settings</strong><span>Adjust policy, export rules, and allowed tools for Trial Finder</span></div>
+        </div>
+
+        <div class="split-label">
+          <p class="section-label">Recent work</p>
+          <span class="pill warn">Package context</span>
+        </div>
+        <div class="session-list">
+          <div class="session-item active">
+            <strong>Trial shortlist for surgery clearance patient</strong>
+            <span>External registry allowed after approval</span>
+          </div>
+          <div class="session-item">
+            <strong>Medication access board</strong>
+            <span>Affordability artifact · no outbound action taken</span>
+          </div>
+        </div>
+      </aside>
+
+      <section class="chat-pane">
+        <div class="pane-head">
+          <div>
+            <strong>Guided workspace thread</strong>
+            <span class="pane-subtitle">Friendlier guidance on the left, denser package work surfaces on the right</span>
+          </div>
+          <span class="pill warn">Consented external</span>
+        </div>
+
+        <div class="chat-scroll">
+          <div class="chat-block user">
+            <div class="bubble">
+              Build a short list of candidate trials, but keep the working folder, run state, and preview open so I
+              can steer the run like a guided workspace instead of a coding console.
+            </div>
+          </div>
+
+          <div class="chat-block assistant">
+            <div class="bubble assistant-text">
+              The run is set up in guided mode. Run state, working folder, and context stay visible on the right,
+              while the center preview pane holds the candidate board and packet tabs. The experience is friendlier
+              than a developer IDE, but still grounded in real files, tabs, and explicit boundaries.
+            </div>
+            <div class="action-row">
+              <span class="action-chip">Open candidate board</span>
+              <span class="action-chip">Review package manifest</span>
+              <span class="action-chip">Pause before outreach</span>
+            </div>
+          </div>
+
+          <div class="chat-block assistant">
+            <div class="bubble assistant-text">
+              The working folder is not represented as oversized cards. It uses compact rows that can still show file
+              provenance, last update state, and what the agent touched.
+            </div>
+          </div>
+        </div>
+
+        <div class="composer">
+          <div class="composer-controls">
+            <button class="mini-btn">+</button>
+            <button class="mini-btn">Ask</button>
+          </div>
+          <div class="input-surface">Guide the run, approve a step, or open another tab...</div>
+          <div class="composer-controls">
+            <span class="pill blue">Trial Finder</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="preview-pane">
+        <div class="pane-head">
+          <div>
+            <strong>Workspace preview</strong>
+            <span class="pane-subtitle">Trial Finder board, packet, files, and settings all share one workbench surface</span>
+          </div>
+          <div class="toggle-row">
+            <button class="icon-btn" title="Collapse preview pane" aria-label="Collapse preview pane">-</button>
+            <button class="icon-btn" title="Hide preview pane" aria-label="Hide preview pane">x</button>
+          </div>
+        </div>
+
+        <div class="tabs">
+          <div class="tab active">Candidate board <span class="close">x</span></div>
+          <div class="tab">packet-outline.md <span class="close">x</span></div>
+          <div class="tab">trial-finder.json <span class="close">x</span></div>
+        </div>
+
+        <div class="preview-scroll">
+          <div class="preview-board">
+            <h1>Candidate board</h1>
+            <p>
+              This pane represents the lightweight application surface for the workspace package. It stays in the same
+              preview container as files and settings tabs, which keeps the shell unified.
+            </p>
+
+            <table class="review-table">
+              <thead>
+                <tr>
+                  <th>Trial</th>
+                  <th>Fit</th>
+                  <th>Risk</th>
+                  <th>Next step</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>NCT-0421187</td>
+                  <td>High clinical fit</td>
+                  <td>Travel burden moderate</td>
+                  <td>Open packet task</td>
+                </tr>
+                <tr>
+                  <td>NCT-0387714</td>
+                  <td>Requires biomarker verification</td>
+                  <td>Exclusion criteria uncertain</td>
+                  <td>Pause for review</td>
+                </tr>
+                <tr>
+                  <td>NCT-0294512</td>
+                  <td>Low operational fit</td>
+                  <td>Site responsiveness unknown</td>
+                  <td>Keep in backlog</td>
+                </tr>
+              </tbody>
+            </table>
+
+            <ul class="compact-list">
+              <li><span>Selected package</span><strong>Trial Finder</strong></li>
+              <li><span>Boundary</span><strong>External search after approval</strong></li>
+              <li><span>Primary artifact</span><strong>ranked-shortlist.md</strong></li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <aside class="context-pane">
+        <div class="pane-head">
+          <div>
+            <strong>Run state</strong>
+            <span class="pane-subtitle">Trial Finder objects, working folder state, and allowed tools</span>
+          </div>
+          <button class="icon-btn" title="Hide run state pane" aria-label="Hide run state pane">x</button>
+        </div>
+
+        <div class="stack-card">
+          <h4>Run checklist</h4>
+          <ul class="checklist">
+            <li><span class="check">1</span><span>Assemble patient anchors from the harmonized chart workspace</span></li>
+            <li><span class="check">2</span><span>Search candidate registries and rank likely fits</span></li>
+            <li><span class="check">3</span><span>Pause before packet creation if evidence is incomplete</span></li>
+          </ul>
+        </div>
+
+        <div class="stack-card">
+          <h4>Working folder</h4>
+          <ul class="checklist">
+            <li><span class="check">.</span><span><span class="note-inline">ranked-shortlist.md</span> updated</span></li>
+            <li><span class="check">.</span><span><span class="note-inline">trial-finder.json</span> viewed</span></li>
+            <li><span class="check">.</span><span><span class="note-inline">packet-outline.md</span> drafted</span></li>
+          </ul>
+        </div>
+
+        <div class="stack-card">
+          <h4>Connected tools</h4>
+          <p>Connectors: web search, registry lookup, patient workspace evidence, artifact export.</p>
+        </div>
+      </aside>
+    </main>
+  </div>
+</body>
+</html>

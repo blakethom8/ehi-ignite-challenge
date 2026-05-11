@@ -21,7 +21,7 @@ const architectureSteps = [
     tone: "bg-[#eef1ff] text-[#5b76fe]",
   },
   {
-    title: "Data Aggregator",
+    title: "Patient Record",
     body: "Guides collection, tracks source status, and starts post-process cleaning.",
     icon: GitBranch,
     tone: "bg-[#eef1ff] text-[#5b76fe]",
@@ -42,12 +42,12 @@ const architectureSteps = [
 
 const useCaseGroups = [
   {
-    title: "Private Clinical Insights",
+    title: "Caspian",
     body: "Runs inside the patient workspace for chart understanding, pre-op support, Q&A, and caregiver views.",
     icon: Brain,
   },
   {
-    title: "Marketplace",
+    title: "Workspaces",
     body: "Uses chart facts for external opportunities like trial matching, medication access, grants, and research.",
     icon: Search,
   },
@@ -134,7 +134,7 @@ export function PlatformArchitecture() {
               <div className="space-y-3">
                 {[
                   "FHIR Chart keeps source links, conflicts, and review flags attached to facts.",
-                  "Private Clinical Insights stay inside the patient workspace.",
+                  "Caspian workspaces stay inside the patient boundary.",
                   "Marketplace and sharing workflows require a clear packet scope and consent boundary.",
                 ].map((item) => (
                   <div key={item} className="flex gap-3 rounded-xl border border-[#bdebdc] bg-white/75 p-4 text-sm leading-6 text-[#405c69]">

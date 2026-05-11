@@ -1,0 +1,254 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "med-access",
+  "version": "1.7.0",
+  "vendor": {
+    "id": "rxbridge",
+    "name": "RxBridge",
+    "keyFingerprint": "ed25519:UbFdvPNhSyBH"
+  },
+  "displayName": "Medication Access",
+  "subtitle": "Patient assistance + prior-auth concierge",
+  "description": "Identifies medication-access barriers, matches the patient to manufacturer assistance programs, and prepares + files prior-auth packets with payer portals. Every outbound submission is gated by per-run consent + per-action clinician approval.",
+  "icon": "Pill",
+  "color": "#0f766e",
+  "trust": {
+    "posture": "consented-external",
+    "boundaryLabel": "Consented external \u00b7 assistance program",
+    "requiresPerRunConsent": true
+  },
+  "anchor": {
+    "scope": [
+      "medications.active",
+      "medications.history",
+      "diagnoses.active",
+      "allergies",
+      "demographics.age-band",
+      "demographics.geography"
+    ],
+    "redactionPreset": "minimal",
+    "ttlSeconds": 3600
+  },
+  "connectors": [
+    {
+      "id": "surescripts-formulary",
+      "label": "Surescripts Formulary",
+      "endpointPattern": "https://formulary.surescripts.net/api/**",
+      "auth": "none"
+    },
+    {
+      "id": "manufacturer-pap-api",
+      "label": "Manufacturer PAP",
+      "endpointPattern": "https://pap.{vendor}.com/api/**",
+      "auth": "vendor-token"
+    },
+    {
+      "id": "payer-portal-edi",
+      "label": "Payer Portal",
+      "endpointPattern": "https://payer-portal.example.com/edi/**",
+      "auth": "user-delegated"
+    }
+  ],
+  "permissions": [
+    {
+      "kind": "read-anchor",
+      "scope": [
+        "medications.active",
+        "medications.history",
+        "diagnoses.active",
+        "allergies"
+      ]
+    },
+    {
+      "kind": "call-external",
+      "connector": "surescripts-formulary"
+    },
+    {
+      "kind": "call-external",
+      "connector": "manufacturer-pap-api"
+    },
+    {
+      "kind": "call-external",
+      "connector": "payer-portal-edi"
+    },
+    {
+      "kind": "send-outbound",
+      "channel": "pap-enrollment"
+    },
+    {
+      "kind": "send-outbound",
+      "channel": "pa-submission"
+    }
+  ],
+  "workflows": [
+    {
+      "id": "identify-barriers",
+      "title": "Identify access barriers",
+      "description": "Pull active meds + diagnoses and surface formulary, PA, and cost barriers.",
+      "tags": [
+        "analysis"
+      ],
+      "needs": [
+        "medications.active",
+        "diagnoses.active"
+      ],
+      "produces": [
+        "barriers-list"
+      ]
+    },
+    {
+      "id": "match-pap",
+      "title": "Match patient assistance programs",
+      "description": "Find manufacturer assistance programs the patient qualifies for.",
+      "tags": [
+        "external"
+      ],
+      "needs": [
+        "barriers-list"
+      ],
+      "produces": [
+        "pap-matches"
+      ]
+    },
+    {
+      "id": "file-pa",
+      "title": "File prior authorization",
+      "description": "Compose and submit the PA packet to the payer portal.",
+      "tags": [
+        "external"
+      ],
+      "needs": [
+        "barriers-list"
+      ],
+      "produces": [
+        "pa-packet",
+        "pa-submission-receipt"
+      ]
+    },
+    {
+      "id": "appeal-denial",
+      "title": "Appeal a denial",
+      "description": "Compose an appeal packet for a denied PA.",
+      "tags": [
+        "external"
+      ],
+      "needs": [
+        "pa-submission-receipt"
+      ],
+      "produces": [
+        "appeal-packet"
+      ]
+    }
+  ],
+  "tools": [
+    {
+      "id": "med.lookup_formulary",
+      "label": "Look up formulary",
+      "category": "external",
+      "permission": "call-external"
+    },
+    {
+      "id": "med.identify_barriers",
+      "label": "Identify barriers",
+      "category": "patient",
+      "permission": "read-anchor"
+    },
+    {
+      "id": "pap.match",
+      "label": "Match PAP",
+      "category": "external",
+      "permission": "call-external"
+    },
+    {
+      "id": "pap.enroll",
+      "label": "Enroll in PAP",
+      "category": "outbound",
+      "permission": "send-outbound"
+    },
+    {
+      "id": "pa.compose",
+      "label": "Compose PA packet",
+      "category": "artifact",
+      "permission": "read-anchor"
+    },
+    {
+      "id": "pa.submit",
+      "label": "Submit PA",
+      "category": "outbound",
+      "permission": "send-outbound"
+    }
+  ],
+  "ui": {
+    "homeSections": [
+      "hero",
+      "permissions-ledger",
+      "workflows",
+      "recent-runs",
+      "about"
+    ],
+    "workbenchTabs": [
+      {
+        "id": "barriers",
+        "label": "Barriers",
+        "kind": "barriers-list",
+        "renderer": "list.barriers"
+      },
+      {
+        "id": "pa-form",
+        "label": "PA form preview",
+        "kind": "pa-form",
+        "renderer": "form.pa"
+      },
+      {
+        "id": "pap-matcher",
+        "label": "Manufacturer programs",
+        "kind": "manufacturer-program-matcher",
+        "renderer": "matcher.manufacturer"
+      },
+      {
+        "id": "status",
+        "label": "Submission status",
+        "kind": "network-status-board",
+        "renderer": "board.network-status"
+      }
+    ],
+    "files": [
+      {
+        "group": "working",
+        "name": "pa-packet.md",
+        "icon": "FileText",
+        "dirty": true
+      },
+      {
+        "group": "working",
+        "name": "barriers.json",
+        "icon": "Braces"
+      },
+      {
+        "group": "working",
+        "name": "pap-matches.md",
+        "icon": "FileText"
+      },
+      {
+        "group": "anchors",
+        "name": "active-meds.md",
+        "icon": "FileText"
+      },
+      {
+        "group": "anchors",
+        "name": "diagnoses.md",
+        "icon": "FileText"
+      }
+    ],
+    "agent": {
+      "avatarInitials": "Mx",
+      "avatarColor": "var(--mod-meds)",
+      "modelPreset": "marketplace-act"
+    }
+  },
+  "exports": [
+    "markdown",
+    "json"
+  ],
+  "signature": "ed25519:if4leOTL1dYMxhq7oHFUlhE+/7BSWZW74EEaue7qtEE58wf3NlCwzCwGZ1PtZfm/PAdTF19rIuckgcHm7vpbDw"
+}

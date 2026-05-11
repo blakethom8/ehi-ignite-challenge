@@ -7,6 +7,7 @@ This folder contains design system documentation used as reference for UI genera
 | File | Description |
 |------|-------------|
 | `DESIGN.md` | Miro-inspired design system — colors, typography, components, layout principles |
+| `agentic-shell-spec/` | 2026 redesign package for the shared agentic shell, workspace model, and wireframes |
 
 ## Usage
 

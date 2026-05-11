@@ -1,20 +1,33 @@
 import { Eye, GitBranch, Pin, Quote } from "lucide-react";
+import type { TraceDetail } from "../../types";
 import { CITATIONS, type Citation } from "./data";
 
 type InspectorPaneProps = {
   citationId: string | null;
   activeTab?: Tab;
   onTabChange?: (tab: Tab) => void;
+  citations?: Record<string, Citation>;
+  trace?: TraceDetail | null;
+  traceByCitationId?: Record<string, TraceDetail | null>;
+  contextItems?: InspectorContextItem[];
 };
 
 type Tab = "evidence" | "trace" | "context";
+export type InspectorContextItem = { label: string; value: string };
 
 export function InspectorPane({
   citationId,
   activeTab = "evidence",
   onTabChange,
+  citations,
+  trace,
+  traceByCitationId,
+  contextItems,
 }: InspectorPaneProps) {
-  const cite = citationId ? CITATIONS[citationId] : null;
+  const cite = citationId ? (citations?.[citationId] ?? CITATIONS[citationId] ?? null) : null;
+  const selectedTrace = citationId
+    ? (traceByCitationId?.[citationId] ?? trace ?? null)
+    : (trace ?? null);
   return (
     <div
       className="grid h-full min-h-0 grid-rows-[auto_1fr] overflow-hidden"
@@ -48,8 +61,8 @@ export function InspectorPane({
       </div>
       <div className="overflow-y-auto px-3.5 pb-5 pt-3.5">
         {activeTab === "evidence" && (cite ? <EvidenceView cite={cite} /> : <Empty />)}
-        {activeTab === "trace" && <TraceView />}
-        {activeTab === "context" && <ContextView />}
+        {activeTab === "trace" && <TraceView trace={selectedTrace} />}
+        {activeTab === "context" && <ContextView items={contextItems} />}
       </div>
     </div>
   );
@@ -234,18 +247,42 @@ function Label({ children }: { children: React.ReactNode }) {
   );
 }
 
-function TraceView() {
-  const calls = [
-    { tool: "fhir.search", arg: "MedicationStatement?patient=8.4127.881&status=active", t: "00:24" },
-    { tool: "fhir.read", arg: "Observation/obs-21477", t: "00:48" },
-    { tool: "workspace.pin", arg: "citation:c_1042", t: "01:02" },
-    { tool: "artifact.draft", arg: "pre-op-packet-v2.md", t: "01:18" },
-    { tool: "approval.request", arg: "anticoag-hold-1", t: "01:30" },
-  ];
+function TraceView({ trace }: { trace: TraceDetail | null }) {
+  if (!trace) {
+    return (
+      <div className="grid h-full place-items-center px-5 text-center">
+        <div>
+          <div
+            className="mx-auto mb-2.5 grid h-8 w-8 place-items-center rounded-md"
+            style={{ background: "var(--surface-2)", color: "var(--ink-4)" }}
+          >
+            <GitBranch className="h-4 w-4" strokeWidth={1.5} />
+          </div>
+          <div className="mb-1 text-[12.5px] font-semibold" style={{ color: "var(--ink-2)" }}>
+            No live trace selected
+          </div>
+          <div className="mx-auto max-w-[220px] text-[11.5px] leading-[1.5]" style={{ color: "var(--ink-4)" }}>
+            Ask Caspian a question or open a citation from a live response to inspect its tool activity here.
+          </div>
+        </div>
+      </div>
+    );
+  }
   return (
     <div>
+      <div
+        className="mb-3 rounded-md border px-3 py-2 text-[11.5px]"
+        style={{ background: "var(--surface-0)", borderColor: "var(--line-1)", color: "var(--ink-3)" }}
+      >
+        <div className="font-semibold text-[var(--ink-1)]">Trace {trace.trace_id}</div>
+        <div className="mt-1 flex flex-wrap gap-3">
+          <span>mode: {trace.mode_used ?? "—"}</span>
+          <span>model: {trace.model_used ?? "—"}</span>
+          {trace.duration_ms != null && <span>{(trace.duration_ms / 1000).toFixed(1)}s</span>}
+        </div>
+      </div>
       <Label>Recent tool calls</Label>
-      {calls.map((c, i) => (
+      {trace.tool_calls.map((call, i) => (
         <div
           key={i}
           className="mt-1.5 flex items-center gap-2.5 rounded-md border px-3 py-1.5 text-[11.5px]"
@@ -257,28 +294,46 @@ function TraceView() {
         >
           <GitBranch className="h-3 w-3" strokeWidth={1.5} style={{ color: "var(--ink-4)" }} />
           <span style={{ color: "var(--ink-2)", fontFamily: "var(--font-mono)" }}>
-            {c.tool}
+            {call.tool_name}
           </span>
           <span style={{ color: "var(--ink-4)" }}>→</span>
           <span
             className="flex-1 truncate"
             style={{ color: "var(--action)", fontFamily: "var(--font-mono)" }}
           >
-            {c.arg}
+            {call.input_summary || call.output_summary || "tool call"}
           </span>
-          <span
-            className="text-[10.5px]"
-            style={{ color: "var(--ink-4)", fontFamily: "var(--font-mono)" }}
-          >
-            {c.t}
-          </span>
+          {call.duration_ms != null && (
+            <span
+              className="text-[10.5px]"
+              style={{ color: "var(--ink-4)", fontFamily: "var(--font-mono)" }}
+            >
+              {call.duration_ms.toFixed(0)}ms
+            </span>
+          )}
         </div>
       ))}
     </div>
   );
 }
 
-function ContextView() {
+function ContextView({ items }: { items?: InspectorContextItem[] }) {
+  if (items && items.length > 0) {
+    return (
+      <div>
+        <Label>Session context</Label>
+        <div className="grid gap-1 text-[11.5px]" style={{ fontFamily: "var(--font-mono)", color: "var(--ink-3)" }}>
+          {items.map((item) => (
+            <div key={item.label} className="flex justify-between gap-3 rounded-md border px-3 py-2" style={{ background: "var(--surface-0)", borderColor: "var(--line-1)" }}>
+              <span>{item.label}</span>
+              <span style={{ color: "var(--ink-1)" }}>{item.value}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   const pinned = [
     { type: "artifact", label: "pre-op-packet-v2.md" },
     { type: "citation", label: "c_1042 · apixaban" },

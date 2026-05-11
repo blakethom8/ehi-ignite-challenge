@@ -1,4 +1,5 @@
 export type ModuleId =
+  | "home"
   | "patient-record"
   | "fhir-charts"
   | "caspian"

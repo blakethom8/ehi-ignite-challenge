@@ -15,6 +15,10 @@ import {
   UserRound,
 } from "lucide-react";
 import { api } from "../api/client";
+import { mockPatients } from "../api/mockData";
+import { DemoPatientPicker } from "../components/atlas/DemoPatientPicker";
+import { StartStateCard } from "../components/atlas/StartStateCard";
+import { useAccessContext } from "../context/AccessContext";
 import type { PatientListItem } from "../types";
 
 type SortKey =
@@ -87,15 +91,46 @@ function SortButton({
 }
 
 export function PatientRecordPool() {
+  const { isDemo, isUnlocked, mode } = useAccessContext();
   const [search, setSearch] = useState("");
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("complexity_score");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 
-  const { data: patients = [], isLoading } = useQuery<PatientListItem[]>({
+  const { data: queriedPatients = [], isLoading } = useQuery<PatientListItem[]>({
     queryKey: ["patients", "records-pool"],
     queryFn: api.listPatients,
+    enabled: mode === "authenticated",
   });
+
+  const patients = useMemo(
+    () => (isDemo ? mockPatients : queriedPatients),
+    [isDemo, queriedPatients],
+  );
+
+  if (!isUnlocked) {
+    return (
+      <div className="min-h-screen bg-[#f5f6f8] text-[#1c1c1e]">
+        <StartStateCard
+          icon={UserRound}
+          eyebrow="Patient Access"
+          title="Choose a demo patient before browsing patient environments."
+          body="This pool should not expose patient environments by default. For the prototype, continue with an explicit demo patient first, then switch between demo environments from inside the app."
+          bullets={[
+            "Lock patient-specific surfaces until access is explicit.",
+            "Use demo mode as the safe first-time entry path.",
+            "Keep the pool focused on controlled patient selection, not accidental data exposure.",
+          ]}
+          aside={
+            <DemoPatientPicker
+              destination={(demoPatientId) => `/patient-record?patient=${encodeURIComponent(demoPatientId)}`}
+              title="Continue with demo patient"
+            />
+          }
+        />
+      </div>
+    );
+  }
 
   const cohortStats = useMemo(() => {
     const patientCount = patients.length;

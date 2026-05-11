@@ -44,9 +44,16 @@ const PLUGIN_ICONS: Record<string, typeof Telescope> = {
 type PluginHomeProps = {
   manifest: PluginManifest;
   onStartRun: (workflowId?: string) => void;
+  canStartRun?: boolean;
+  startHint?: string;
 };
 
-export function PluginHome({ manifest, onStartRun }: PluginHomeProps) {
+export function PluginHome({
+  manifest,
+  onStartRun,
+  canStartRun = true,
+  startHint,
+}: PluginHomeProps) {
   const Icon = PLUGIN_ICONS[manifest.icon] ?? Boxes;
   const sections = manifest.ui.homeSections;
   const runsQuery = useRunsForPlugin(sections.includes("recent-runs") ? manifest.id : undefined);
@@ -91,8 +98,12 @@ export function PluginHome({ manifest, onStartRun }: PluginHomeProps) {
             <div className="flex flex-col gap-2">
               <button
                 onClick={() => onStartRun()}
+                disabled={!canStartRun}
                 className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-4 py-2 text-[12.5px] font-medium text-white"
-                style={{ background: "var(--action)" }}
+                style={{
+                  background: canStartRun ? "var(--action)" : "var(--ink-5)",
+                  cursor: canStartRun ? "pointer" : "not-allowed",
+                }}
               >
                 <Play className="h-3 w-3" strokeWidth={1.5} />
                 Start new run
@@ -104,17 +115,33 @@ export function PluginHome({ manifest, onStartRun }: PluginHomeProps) {
                 <Settings className="h-3 w-3" strokeWidth={1.5} />
                 Configure
               </button>
+              {!canStartRun && startHint && (
+                <div className="max-w-[220px] text-[11px] leading-[1.45]" style={{ color: "var(--ink-3)" }}>
+                  {startHint}
+                </div>
+              )}
             </div>
           </header>
         )}
 
         {sections.includes("permissions-ledger") && <PermissionsLedger manifest={manifest} />}
-        {sections.includes("workflows") && <WorkflowGrid manifest={manifest} onStartRun={onStartRun} />}
+        {sections.includes("workflows") && (
+          <WorkflowGrid
+            manifest={manifest}
+            onStartRun={onStartRun}
+            canStartRun={canStartRun}
+            startHint={startHint}
+          />
+        )}
         {sections.includes("recent-runs") && (
           <RecentRunsTable
             runs={(runsQuery.data ?? []) as RunRow[]}
             loading={runsQuery.isLoading}
-            onOpen={(workflowId) => onStartRun(workflowId)}
+            onOpen={(workflowId) => {
+              if (!canStartRun) return;
+              onStartRun(workflowId);
+            }}
+            canStartRun={canStartRun}
           />
         )}
         {sections.includes("about") && <AboutSection manifest={manifest} />}
@@ -192,9 +219,13 @@ function PermissionsLedger({ manifest }: { manifest: PluginManifest }) {
 function WorkflowGrid({
   manifest,
   onStartRun,
+  canStartRun,
+  startHint,
 }: {
   manifest: PluginManifest;
   onStartRun: (workflowId: string) => void;
+  canStartRun: boolean;
+  startHint?: string;
 }) {
   return (
     <Section
@@ -206,8 +237,14 @@ function WorkflowGrid({
           <button
             key={w.id}
             onClick={() => onStartRun(w.id)}
+            disabled={!canStartRun}
             className="flex flex-col gap-2 rounded-md border p-4 text-left transition-colors hover:border-[var(--action-line)] hover:shadow-[0_1px_0_var(--action-tint)]"
-            style={{ background: "var(--surface-1)", borderColor: "var(--line-1)" }}
+            style={{
+              background: "var(--surface-1)",
+              borderColor: "var(--line-1)",
+              cursor: canStartRun ? "pointer" : "not-allowed",
+              opacity: canStartRun ? 1 : 0.7,
+            }}
           >
             <div className="flex items-center gap-2" style={{ color: "var(--ink-2)" }}>
               <Workflow className="h-3.5 w-3.5" strokeWidth={1.5} />
@@ -241,6 +278,11 @@ function WorkflowGrid({
           </button>
         ))}
       </div>
+      {!canStartRun && startHint && (
+        <div className="mt-3 text-[11.5px]" style={{ color: "var(--ink-3)" }}>
+          {startHint}
+        </div>
+      )}
     </Section>
   );
 }
@@ -259,10 +301,12 @@ function RecentRunsTable({
   runs,
   loading,
   onOpen,
+  canStartRun,
 }: {
   runs: RunRow[];
   loading: boolean;
   onOpen: (workflowId?: string) => void;
+  canStartRun: boolean;
 }) {
   return (
     <Section title="Recent runs" note="Re-enter a session or audit a completed run.">
@@ -289,9 +333,18 @@ function RecentRunsTable({
         {runs.map((r) => (
           <div
             key={r.id}
-            onClick={() => onOpen(r.workflowId ?? undefined)}
-            className="grid cursor-pointer items-center gap-3 border-t px-3.5 py-2.5 text-[12px] transition-colors hover:bg-[var(--surface-2)]"
-            style={{ borderColor: "var(--line-1)", color: "var(--ink-2)", gridTemplateColumns: "110px 1.4fr 1fr 140px 110px 28px" }}
+            onClick={() => {
+              if (!canStartRun) return;
+              onOpen(r.workflowId ?? undefined);
+            }}
+            className="grid items-center gap-3 border-t px-3.5 py-2.5 text-[12px] transition-colors hover:bg-[var(--surface-2)]"
+            style={{
+              borderColor: "var(--line-1)",
+              color: "var(--ink-2)",
+              gridTemplateColumns: "110px 1.4fr 1fr 140px 110px 28px",
+              cursor: canStartRun ? "pointer" : "not-allowed",
+              opacity: canStartRun ? 1 : 0.7,
+            }}
           >
             <div style={{ fontFamily: "var(--font-mono)", color: "var(--ink-1)", fontSize: 11.5 }}>{r.id}</div>
             <div>{r.title ?? "—"}</div>

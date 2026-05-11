@@ -1,0 +1,185 @@
+import type { ReactNode } from "react";
+import { useEffect } from "react";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { AccessProvider } from "../../context/AccessContext";
+import { CaspianWorkspace } from "./Workspace";
+
+const workspaceFrameSpy = vi.fn();
+const togglePaneSpy = vi.fn();
+const setInspectorTabSpy = vi.fn();
+const focusCitationSpy = vi.fn();
+
+vi.mock("../../components/atlas/AppShell", () => ({
+  AppShell: ({ children }: { children: ReactNode }) => <div data-testid="app-shell">{children}</div>,
+}));
+
+vi.mock("../../components/atlas/WorkspaceFrame", () => ({
+  WorkspaceFrame: (props: {
+    onControlsChange?: (controls: {
+      panes: { inspector: boolean };
+      togglePane: (pane: string) => void;
+      focusCitation: (id: string) => void;
+      activeCitationId: string | null;
+      setInspectorTab: (tab: string) => void;
+    }) => void;
+    surface?: { chatPane?: ReactNode; inspector?: { citations?: Record<string, { title: string }> } };
+    activeSessionId: string;
+  }) => {
+    workspaceFrameSpy(props);
+
+    useEffect(() => {
+      props.onControlsChange?.({
+        panes: { inspector: true },
+        togglePane: togglePaneSpy,
+        focusCitation: focusCitationSpy,
+        activeCitationId: null,
+        setInspectorTab: setInspectorTabSpy,
+      });
+    }, [props.onControlsChange]);
+
+    return (
+      <div data-testid="workspace-frame">
+        {props.surface?.chatPane}
+      </div>
+    );
+  },
+}));
+
+vi.mock("../../components/atlas/useCaspianAssistantSession", () => ({
+  useCaspianAssistantSession: () => ({
+    messages: [
+      {
+        id: "a_1",
+        role: "assistant",
+        content: "Apixaban is active and should be reviewed pre-op.",
+        confidence: "high",
+        engine: "anthropic-agent-sdk",
+        citations: [
+          {
+            id: "e_1",
+            source_type: "MedicationStatement",
+            resource_id: "med-1",
+            label: "Apixaban 5 mg BID",
+            detail: "Active medication documented in the chart.",
+            event_date: "2025-04-02",
+          },
+        ],
+        followUps: [],
+        trace: {
+          trace_id: "trace_live_2",
+          duration_ms: 830,
+          input_tokens: 210,
+          output_tokens: 90,
+          total_cost_usd: 0.006,
+          tool_calls: [
+            {
+              tool_name: "query_chart_evidence",
+              input_summary: "Query: active meds",
+              output_summary: "2 facts, 1 citation",
+              duration_ms: 110,
+              error: null,
+            },
+          ],
+          system_prompt_preview: "",
+          retrieved_facts: [],
+          model_used: "claude-sonnet-4-5",
+          mode_used: "anthropic",
+          max_tokens_used: 2000,
+          context_token_estimate: 500,
+          history_turns_sent: 0,
+        },
+        createdAt: "2026-05-10T20:10:00Z",
+      },
+    ],
+    isPending: false,
+    isError: false,
+    error: null,
+    submitQuestion: vi.fn(),
+    resetConversation: vi.fn(),
+    inspector: {
+      citations: {
+        e_1: {
+          id: "e_1",
+          type: "MedicationStatement",
+          title: "Apixaban 5 mg BID",
+          snippet: "Active medication documented in the chart.",
+          source: "med-1",
+          encounter: "Observed 2025-04-02",
+          author: "MedicationStatement",
+          date: "2025-04-02",
+          related: [],
+        },
+      },
+      traceByCitationId: {},
+      latestTrace: null,
+      contextItems: [{ label: "Patient", value: "patient-123" }],
+    },
+  }),
+}));
+
+describe("CaspianWorkspace", () => {
+  beforeEach(() => {
+    workspaceFrameSpy.mockReset();
+    togglePaneSpy.mockReset();
+    setInspectorTabSpy.mockReset();
+    focusCitationSpy.mockReset();
+  });
+
+  it("routes the canonical /caspian shell through WorkspaceFrame with a live assistant surface", () => {
+    render(
+      <MemoryRouter initialEntries={["/caspian/sessions/s2?patient=patient-123"]}>
+        <AccessProvider>
+          <Routes>
+            <Route path="/caspian/sessions/:sessionId" element={<CaspianWorkspace />} />
+          </Routes>
+        </AccessProvider>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByTestId("workspace-frame")).toBeInTheDocument();
+    const props = workspaceFrameSpy.mock.calls.at(-1)?.[0] as {
+      activeSessionId: string;
+      surface?: { chatPane?: ReactNode; inspector?: { citations?: Record<string, { title: string }> } };
+    };
+
+    expect(props.activeSessionId).toBe("s2");
+    expect(props.surface?.chatPane).toBeTruthy();
+    expect(props.surface?.inspector?.citations?.e_1?.title).toBe("Apixaban 5 mg BID");
+  });
+
+  it("shows a start state instead of the workspace shell when no patient is selected", () => {
+    render(
+      <MemoryRouter initialEntries={["/caspian"]}>
+        <AccessProvider>
+          <Routes>
+            <Route path="/caspian" element={<CaspianWorkspace />} />
+          </Routes>
+        </AccessProvider>
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByTestId("workspace-frame")).not.toBeInTheDocument();
+    expect(
+      screen.getByText("Choose a patient before opening the clinical workspace."),
+    ).toBeInTheDocument();
+  });
+
+  it("opens the trace tab without toggling the inspector closed when it is already visible", () => {
+    render(
+      <MemoryRouter initialEntries={["/caspian/sessions/s2?patient=patient-123"]}>
+        <AccessProvider>
+          <Routes>
+            <Route path="/caspian/sessions/:sessionId" element={<CaspianWorkspace />} />
+          </Routes>
+        </AccessProvider>
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByText("1 tool calls"));
+
+    expect(togglePaneSpy).not.toHaveBeenCalled();
+    expect(setInspectorTabSpy).toHaveBeenCalledWith("trace");
+  });
+});

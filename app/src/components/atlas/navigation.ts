@@ -1,6 +1,7 @@
 import type { ModuleId } from "./types";
 
 const MODULE_PATHS: { id: ModuleId; match: RegExp; href: string }[] = [
+  { id: "home", match: /^\/($|records-pool|platform)/, href: "/" },
   { id: "patient-record", match: /^\/(patient-record|record|aggregate|records-pool|charts)/, href: "/patient-record" },
   { id: "fhir-charts", match: /^\/(fhir-charts|explorer)/, href: "/fhir-charts" },
   { id: "caspian", match: /^\/caspian/, href: "/caspian" },
@@ -12,8 +13,8 @@ export function deriveActiveModule(pathname: string): ModuleId {
   for (const modulePath of MODULE_PATHS) {
     if (modulePath.match.test(pathname)) return modulePath.id;
   }
-  if (pathname === "/" || pathname === "/platform") return "patient-record";
-  return "patient-record";
+  if (pathname === "/" || pathname === "/platform") return "home";
+  return "home";
 }
 
 export function hrefForModule(moduleId: ModuleId): string | null {

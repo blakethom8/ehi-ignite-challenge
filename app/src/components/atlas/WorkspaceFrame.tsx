@@ -10,6 +10,9 @@ import { WorkbenchPane } from "./WorkbenchPane";
 import { useManifest } from "./manifests";
 import { useWorkspaceState } from "./useWorkspaceState";
 import type { PaneSizes, Workspace } from "./types";
+import type { Citation } from "./data";
+import type { TraceDetail } from "../../types";
+import type { InspectorContextItem } from "./InspectorPane";
 
 const MIN_SIZES: Record<keyof PaneSizes, number> = {
   sessionsW: 200,
@@ -40,6 +43,9 @@ type WorkspaceFrameProps = {
     panes: ReturnType<typeof useWorkspaceState>["panes"];
     togglePane: ReturnType<typeof useWorkspaceState>["togglePane"];
     openTab: ReturnType<typeof useWorkspaceState>["openTab"];
+    focusCitation: ReturnType<typeof useWorkspaceState>["handleCitation"];
+    activeCitationId: ReturnType<typeof useWorkspaceState>["citationId"];
+    setInspectorTab: ReturnType<typeof useWorkspaceState>["setInspectorTab"];
   }) => void;
   /** Optional live/runtime surface that replaces fixture-backed content within the shared shell. */
   surface?: {
@@ -52,8 +58,24 @@ type WorkspaceFrameProps = {
     runId?: string | null;
     getFileTab?: (fileId: string) => WorkbenchTab | null;
     getActionTab?: (target: string) => WorkbenchTab | null;
+    pluginHome?: {
+      canStartRun?: boolean;
+      startHint?: string;
+    };
+    inspector?: {
+      citations?: Record<string, Citation>;
+      trace?: TraceDetail | null;
+      traceByCitationId?: Record<string, TraceDetail | null>;
+      contextItems?: InspectorContextItem[];
+    };
   };
 };
+
+export type WorkspaceFrameControls = NonNullable<WorkspaceFrameProps["onControlsChange"]> extends (
+  controls: infer T,
+) => void
+  ? T
+  : never;
 
 export function WorkspaceFrame({
   workspace,
@@ -135,8 +157,11 @@ export function WorkspaceFrame({
       panes: responsivePanes,
       togglePane: handlePaneControl,
       openTab: state.openTab,
+      focusCitation: state.handleCitation,
+      activeCitationId: state.citationId,
+      setInspectorTab: state.setInspectorTab,
     });
-  }, [handlePaneControl, onControlsChange, responsivePanes, state.openTab]);
+  }, [handlePaneControl, onControlsChange, responsivePanes, state.citationId, state.handleCitation, state.openTab, state.setInspectorTab]);
 
   const onDragStart = useCallback(
     (axis: "v" | "h", key: keyof PaneSizes) =>
@@ -339,6 +364,10 @@ export function WorkspaceFrame({
                     citationId={state.citationId}
                     activeTab={state.inspectorTab}
                     onTabChange={state.setInspectorTab}
+                    citations={surface?.inspector?.citations}
+                    trace={surface?.inspector?.trace}
+                    traceByCitationId={surface?.inspector?.traceByCitationId}
+                    contextItems={surface?.inspector?.contextItems}
                   />
                 )}
               </div>
@@ -349,6 +378,8 @@ export function WorkspaceFrame({
             <PluginHome
               manifest={manifestQuery.data}
               onStartRun={(workflowId) => handleStartRun(workflowId)}
+              canStartRun={surface?.pluginHome?.canStartRun}
+              startHint={surface?.pluginHome?.startHint}
             />
           ) : (
             <div

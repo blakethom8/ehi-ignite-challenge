@@ -1,0 +1,43 @@
+Goal: Wire the current `/caspian` workspace to the live provider-assistant runtime so Caspian becomes the real first-party clinical workspace inside the shared Atlas shell, not a fixture-backed chat demo.
+
+Current state:
+1. The backend assistant path works: `POST /api/assistant/chat` in `api/routers/assistant.py`, with mode selection in `api/core/provider_assistant_service.py`.
+2. The current `/caspian` route is not wired to it:
+   - `app/src/pages/Caspian/Workspace.tsx` mounts `WorkspaceFrame`
+   - `WorkspaceFrame` falls back to generic `ChatPane`
+   - `app/src/components/atlas/useWorkspaceState.ts` fabricates Caspian replies in `handleSend`
+   - `app/src/components/atlas/data.ts` still seeds Caspian fixture chat
+3. The older live assistant UI still exists in:
+   - `app/src/context/ChatContext.tsx`
+   - `app/src/api/client.ts` (`chatProviderAssistant`)
+   - `app/src/pages/FhirCharts/Assistant.tsx`
+
+Success means:
+1. Sending a message from `/caspian` calls the real provider-assistant backend instead of generating fixture text locally.
+2. Caspian stays inside the shared five-pane Atlas shell: sessions, chat, workbench, files, inspector.
+3. Assistant responses preserve the important runtime payloads already supported by the backend contract: answer text, citations, follow-ups where appropriate, and trace/tool transparency if available.
+4. Citation chips in Caspian open the inspector and load the correct evidence.
+5. Caspian uses real assistant state for active sessions instead of static seeded chat.
+6. Plugin runtime behavior is not regressed or blurred together with Caspian-specific logic.
+7. Tests prove the Caspian workspace is actually wired to the assistant API and that shell interactions still work.
+
+Primary tasks:
+1. Trace the current Caspian route, shell state, chat flow, and inspector behavior end to end.
+2. Choose the cleanest integration point:
+   - adapt the existing `useChatForPatient` / `ChatContext` flow into the Atlas shell, or
+   - create a Caspian-specific hook/surface that wraps the same backend contract.
+3. Replace fixture-backed Caspian send/reply behavior with real request/response handling against `/api/assistant/chat`.
+4. Map assistant responses into the shell chat/workbench/inspector contract.
+5. Make citations and trace transparency usable from the shared shell.
+6. Remove or isolate Caspian fixture behavior that hides whether the assistant is live.
+7. Add or update tests for chat flow, citation-to-inspector behavior, and any new wiring/state adapters.
+
+Constraints:
+1. Keep Caspian first-party and distinct from plugins.
+2. Do not bypass the shared workspace shell.
+3. Do not solve this by restoring the older standalone assistant route as the primary UX.
+4. Reuse the existing backend assistant contract where clean.
+5. Keep plugin/runtime abstractions separate unless a shared abstraction is truly sound.
+
+Definition of done:
+The canonical Caspian route at `/caspian` is the live assistant experience, backed by the real provider-assistant runtime, inside the shared Atlas workspace shell, with citations and core shell interactions working and covered by tests.

@@ -69,6 +69,15 @@ async function main() {
     });
     const page = await context.newPage();
 
+    await page.goto(BASE_URL, { waitUntil: "domcontentloaded" });
+    await page.getByText("Choose demo patient").waitFor();
+    await page.evaluate(() => {
+      window.localStorage.setItem(
+        "atlas:access",
+        JSON.stringify({ mode: "demo", activePatientId: "demo-high-risk" }),
+      );
+    });
+
     await page.goto(`${BASE_URL}/caspian`, { waitUntil: "domcontentloaded" });
     await page.getByText("WORKBENCH").waitFor();
     await page.getByText("FILES").waitFor();

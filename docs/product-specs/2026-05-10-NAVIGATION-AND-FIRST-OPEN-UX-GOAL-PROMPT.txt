@@ -1,0 +1,48 @@
+Goal: Review and redesign the app's navigation and first-open experience so a first-time user can move through the product cleanly, understand where they are, and only see patient data after login or explicit demo-patient selection.
+
+Current concerns:
+1. Top-bar navigation is partially broken or inconsistent when moving between modules.
+2. The "start" state for modules is not coherent: users can land in dense workspace views before they have context.
+3. We need a simple first-time-user flow, where pages open in a clear, low-complexity state and users can expand into deeper functionality only when needed.
+4. Patient data should not load by default on app entry. The app should stay in a gated state until the user is authenticated or chooses the demo patient.
+
+This review should answer:
+1. What should the global top navigation include, and what should happen when each item is clicked?
+2. Which routes should open to a lightweight overview/start page versus a live workspace or dense module view?
+3. What is the right default experience for first-time users entering:
+   - the app root
+   - Caspian
+   - plugin/workspace modules
+   - exploration or chart-review areas
+4. Where should we use starter pages, empty states, or guided entry points instead of dropping users directly into complex panes?
+5. How should login, patient selection, and demo-patient access gate the rest of the experience?
+6. What should happen if a user clicks into a module without an active patient context?
+
+Success means:
+1. Every top-level navigation path is defined, intentional, and works reliably.
+2. Each major module has a clear first-open state designed for orientation, not expert-only density.
+3. The app root behaves like a controlled entry point, not an accidental data surface.
+4. Real patient data is withheld until login or explicit demo-patient selection.
+5. The navigation model and first-open pages feel coherent across the full app, not designed route by route in isolation.
+
+Primary tasks:
+1. Audit the current global navigation, routing, and cross-module entry points.
+2. Identify broken links, confusing transitions, duplicate concepts, and places where the UI opens too deep by default.
+3. Define the intended information architecture for top-level modules and sub-routes.
+4. Propose the ideal first-open page or start state for each major area.
+5. Define the gating model for:
+   - signed-out users
+   - authenticated users without a selected patient
+   - demo-patient users
+   - users already inside an active patient context
+6. Recommend UX patterns for progressive disclosure so complexity appears only after clear user intent.
+7. Translate the review into implementation guidance for route behavior, shell defaults, and page-level start states.
+
+Constraints:
+1. Optimize for first-time-user clarity first, expert speed second.
+2. Keep the architecture coherent across Caspian, Explorer, and plugin/workspace flows.
+3. Do not assume the current landing/start pages are correct.
+4. Do not expose real patient context before authentication or demo selection.
+
+Definition of done:
+We have a clear recommendation for the full navigation model, the first page/state that should open for each major module, and the gating rules for when patient data may appear.

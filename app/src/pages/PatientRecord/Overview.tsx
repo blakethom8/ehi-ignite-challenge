@@ -18,6 +18,8 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { api } from "../../api/client";
+import { DemoPatientPicker } from "../../components/atlas/DemoPatientPicker";
+import { StartStateCard } from "../../components/atlas/StartStateCard";
 import type { CanonicalSourceSummary } from "../../types";
 
 function withPatient(path: string, patientId: string | null): string {
@@ -107,6 +109,28 @@ function SourceRow({ source }: { source: CanonicalSourceSummary }) {
 export function PatientRecordOverview() {
   const [searchParams] = useSearchParams();
   const patientId = searchParams.get("patient");
+
+  if (!patientId) {
+    return (
+      <StartStateCard
+        icon={Database}
+        eyebrow="Patient Record"
+        title="Start with a patient environment before opening the record pipeline."
+        body="Patient Record should open as a guided operations surface: intake, harmonization, publish, and context capture. Select a demo patient first so the module can load a coherent chart posture instead of scattered empty states."
+        bullets={[
+          "Review what sources exist and which ones still need preparation.",
+          "Open harmonization and publish steps with one consistent patient context.",
+          "Keep the first page simple before expanding into deeper record operations.",
+        ]}
+        aside={
+          <DemoPatientPicker
+            destination={(demoPatientId) => `/patient-record?patient=${encodeURIComponent(demoPatientId)}`}
+            title="Open Patient Record in demo mode"
+          />
+        }
+      />
+    );
+  }
 
   const overviewQ = useQuery({
     queryKey: ["overview", patientId],

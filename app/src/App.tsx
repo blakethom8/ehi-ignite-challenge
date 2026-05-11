@@ -1,9 +1,10 @@
-import { Suspense, lazy, type ComponentType } from "react";
-import { BrowserRouter, Navigate, Route, Routes, useLocation, useParams } from "react-router-dom";
+import { Suspense, lazy, useEffect, type ComponentType } from "react";
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { AppShell } from "./components/atlas/AppShell";
 import { ChatProvider } from "./context/ChatContext";
+import { AccessProvider, useAccessContext } from "./context/AccessContext";
 import { ChatWidget } from "./components/ChatWidget";
 import { Landing } from "./pages/Landing";
 import { PlatformArchitecture } from "./pages/PlatformArchitecture";
@@ -121,24 +122,65 @@ function AppShellRoute({
   fullBleed?: boolean;
 }) {
   const location = useLocation();
-  if (fullBleed) {
-    return (
-      <Suspense fallback={<FullscreenPageFallback />}>{element}</Suspense>
-    );
-  }
+  const navigate = useNavigate();
+  const { activePatientId, isUnlocked, setActivePatient } = useAccessContext();
+  const routeKey = `${location.pathname}${location.search}`;
+  const stripPatient = shouldStripPatient(location.pathname, location.search, isUnlocked);
+  const hydratePatient = shouldHydratePatient(
+    location.pathname,
+    location.search,
+    isUnlocked,
+    activePatientId,
+  );
   const isPatientRecordRoute = location.pathname.startsWith("/patient-record");
   const isFhirChartsRoute = location.pathname.startsWith("/fhir-charts");
+
+  useEffect(() => {
+    if (!isUnlocked) return;
+    const params = new URLSearchParams(location.search);
+    const patientId = params.get("patient");
+    if (!patientId || patientId === activePatientId) return;
+    setActivePatient(patientId);
+  }, [activePatientId, isUnlocked, location.search, setActivePatient]);
+
+  useEffect(() => {
+    if (fullBleed || !hydratePatient) return;
+    const params = new URLSearchParams(location.search);
+    params.set("patient", activePatientId as string);
+    navigate({ pathname: location.pathname, search: `?${params.toString()}` }, { replace: true });
+  }, [activePatientId, fullBleed, hydratePatient, location.pathname, location.search, navigate]);
+
+  if (stripPatient) {
+    return <Navigate replace to={location.pathname} />;
+  }
+
+  if (fullBleed) {
+    if (hydratePatient) {
+      const params = new URLSearchParams(location.search);
+      params.set("patient", activePatientId as string);
+      return <Navigate replace to={`${location.pathname}?${params.toString()}`} />;
+    }
+    return (
+      <Suspense key={routeKey} fallback={<FullscreenPageFallback />}>
+        {element}
+      </Suspense>
+    );
+  }
+
+  const routeContent = (
+    <Suspense key={routeKey} fallback={<PageFallback />}>
+      {element}
+    </Suspense>
+  );
   return (
     <AppShell>
-      <Suspense fallback={<PageFallback />}>
-        {isPatientRecordRoute ? (
-          <PatientRecordLayout>{element}</PatientRecordLayout>
-        ) : isFhirChartsRoute ? (
-          <FhirChartsLayout>{element}</FhirChartsLayout>
-        ) : (
-          element
-        )}
-      </Suspense>
+      {isPatientRecordRoute ? (
+        <PatientRecordLayout key={routeKey}>{routeContent}</PatientRecordLayout>
+      ) : isFhirChartsRoute ? (
+        <FhirChartsLayout key={routeKey}>{routeContent}</FhirChartsLayout>
+      ) : (
+        routeContent
+      )}
     </AppShell>
   );
 }
@@ -306,14 +348,49 @@ function LegacyGroundTruthReviewRedirect() {
   return <Navigate to={buildGroundTruthReviewPath(runId)} replace />;
 }
 
+function shouldHydratePatient(
+  pathname: string,
+  search: string,
+  isUnlocked: boolean,
+  activePatientId: string | null,
+): boolean {
+  if (!isUnlocked || !activePatientId) return false;
+  if (
+    !pathname.startsWith("/patient-record") &&
+    !pathname.startsWith("/fhir-charts") &&
+    !pathname.startsWith("/caspian") &&
+    !pathname.startsWith("/workspaces")
+  ) {
+    return false;
+  }
+  const params = new URLSearchParams(search);
+  return !params.has("patient");
+}
+
+function shouldStripPatient(pathname: string, search: string, isUnlocked: boolean): boolean {
+  if (isUnlocked) return false;
+  if (
+    !pathname.startsWith("/patient-record") &&
+    !pathname.startsWith("/fhir-charts") &&
+    !pathname.startsWith("/caspian") &&
+    !pathname.startsWith("/workspaces")
+  ) {
+    return false;
+  }
+  const params = new URLSearchParams(search);
+  return params.has("patient");
+}
+
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <AppErrorBoundary>
-          <ChatProvider>
-            <AppShellRoutes />
-          </ChatProvider>
+          <AccessProvider>
+            <ChatProvider>
+              <AppShellRoutes />
+            </ChatProvider>
+          </AccessProvider>
         </AppErrorBoundary>
       </BrowserRouter>
     </QueryClientProvider>

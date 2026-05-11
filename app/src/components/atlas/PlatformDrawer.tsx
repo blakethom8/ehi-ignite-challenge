@@ -1,17 +1,16 @@
 import { useEffect } from "react";
 import {
-  Boxes,
-  CreditCard,
   FileText,
   HelpCircle,
   LogOut,
   MessageSquareText,
-  Settings,
-  ShieldCheck,
+  Route,
   UserRound,
   X,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import type { User } from "./types";
+import { useAccessContext } from "../../context/AccessContext";
 
 type PlatformDrawerProps = {
   open: boolean;
@@ -20,6 +19,9 @@ type PlatformDrawerProps = {
 };
 
 export function PlatformDrawer({ open, onClose, user }: PlatformDrawerProps) {
+  const navigate = useNavigate();
+  const { clearAccess } = useAccessContext();
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -98,20 +100,66 @@ export function PlatformDrawer({ open, onClose, user }: PlatformDrawerProps) {
           </div>
         </div>
         <DrawerSection>
-          <DrawerItem icon={<Settings className="h-3.5 w-3.5" strokeWidth={1.5} />}>Settings</DrawerItem>
-          <DrawerItem icon={<UserRound className="h-3.5 w-3.5" strokeWidth={1.5} />}>Account</DrawerItem>
-          <DrawerItem icon={<CreditCard className="h-3.5 w-3.5" strokeWidth={1.5} />}>Billing &amp; usage</DrawerItem>
-          <DrawerItem icon={<Boxes className="h-3.5 w-3.5" strokeWidth={1.5} />}>Organization</DrawerItem>
-          <DrawerItem icon={<ShieldCheck className="h-3.5 w-3.5" strokeWidth={1.5} />}>Permissions &amp; audit</DrawerItem>
+          <DrawerItem
+            icon={<UserRound className="h-3.5 w-3.5" strokeWidth={1.5} />}
+            onClick={() => {
+              onClose();
+              navigate("/");
+            }}
+          >
+            Home
+          </DrawerItem>
+          <DrawerItem
+            icon={<Route className="h-3.5 w-3.5" strokeWidth={1.5} />}
+            onClick={() => {
+              onClose();
+              navigate("/guided-tour");
+            }}
+          >
+            Guided tour
+          </DrawerItem>
+          <DrawerItem
+            icon={<FileText className="h-3.5 w-3.5" strokeWidth={1.5} />}
+            onClick={() => {
+              onClose();
+              navigate("/architecture");
+            }}
+          >
+            Platform architecture
+          </DrawerItem>
         </DrawerSection>
         <div
           className="mx-3.5 my-1.5 h-px"
           style={{ background: "var(--line-1)" }}
         />
         <DrawerSection>
-          <DrawerItem icon={<HelpCircle className="h-3.5 w-3.5" strokeWidth={1.5} />}>Help &amp; support</DrawerItem>
-          <DrawerItem icon={<FileText className="h-3.5 w-3.5" strokeWidth={1.5} />}>What&apos;s new</DrawerItem>
-          <DrawerItem icon={<MessageSquareText className="h-3.5 w-3.5" strokeWidth={1.5} />}>Send feedback</DrawerItem>
+          <DrawerItem
+            icon={<HelpCircle className="h-3.5 w-3.5" strokeWidth={1.5} />}
+            onClick={() => {
+              onClose();
+              navigate("/using-atlas");
+            }}
+          >
+            Getting started
+          </DrawerItem>
+          <DrawerItem
+            icon={<FileText className="h-3.5 w-3.5" strokeWidth={1.5} />}
+            onClick={() => {
+              onClose();
+              navigate("/learn/fhir-primer");
+            }}
+          >
+            FHIR primer
+          </DrawerItem>
+          <DrawerItem
+            icon={<MessageSquareText className="h-3.5 w-3.5" strokeWidth={1.5} />}
+            onClick={() => {
+              onClose();
+              navigate("/learn");
+            }}
+          >
+            Internal tools
+          </DrawerItem>
         </DrawerSection>
         <div className="flex-1" />
         <div
@@ -121,8 +169,13 @@ export function PlatformDrawer({ open, onClose, user }: PlatformDrawerProps) {
           <DrawerItem
             icon={<LogOut className="h-3.5 w-3.5" strokeWidth={1.5} />}
             muted
+            onClick={() => {
+              clearAccess();
+              onClose();
+              navigate("/");
+            }}
           >
-            Sign out
+            Exit demo / sign out
           </DrawerItem>
         </div>
       </aside>
@@ -142,13 +195,16 @@ function DrawerItem({
   icon,
   children,
   muted = false,
+  onClick,
 }: {
   icon: React.ReactNode;
   children: React.ReactNode;
   muted?: boolean;
+  onClick?: () => void;
 }) {
   return (
     <button
+      onClick={onClick}
       className="flex w-full cursor-pointer items-center gap-2.5 rounded-[5px] px-2.5 py-2 text-[12.5px] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--ink-1)]"
       style={{ color: muted ? "var(--ink-3)" : "var(--ink-2)" }}
     >

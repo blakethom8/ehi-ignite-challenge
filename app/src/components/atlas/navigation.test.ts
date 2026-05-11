@@ -3,6 +3,7 @@ import { deriveActiveModule, hrefForModule } from "./navigation";
 
 describe("atlas module navigation", () => {
   it("classifies legacy aliases under their current top-level module", () => {
+    expect(deriveActiveModule("/records-pool")).toBe("home");
     expect(deriveActiveModule("/aggregate/context")).toBe("patient-record");
     expect(deriveActiveModule("/explorer/assistant")).toBe("fhir-charts");
     expect(deriveActiveModule("/marketplace")).toBe("workspaces");
@@ -10,6 +11,7 @@ describe("atlas module navigation", () => {
   });
 
   it("resolves canonical module hrefs", () => {
+    expect(hrefForModule("home")).toBe("/");
     expect(hrefForModule("patient-record")).toBe("/patient-record");
     expect(hrefForModule("fhir-charts")).toBe("/fhir-charts");
     expect(hrefForModule("caspian")).toBe("/caspian");

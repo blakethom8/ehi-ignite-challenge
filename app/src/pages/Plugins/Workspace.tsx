@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { useMatch, useNavigate, useParams } from "react-router-dom";
+import { useMatch, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { AppShell } from "../../components/atlas/AppShell";
 import { PluginRunChatPane } from "../../components/atlas/PluginRunChatPane";
-import { WorkspaceFrame } from "../../components/atlas/WorkspaceFrame";
+import { WorkspaceFrame, type WorkspaceFrameControls } from "../../components/atlas/WorkspaceFrame";
 import { useManifest, useRunsForPlugin } from "../../components/atlas/manifests";
 import {
   buildPluginRunWorkspaceSurface,
@@ -10,9 +10,8 @@ import {
 } from "../../components/atlas/pluginRunWorkspace";
 import { usePluginRun } from "../../components/atlas/usePluginRun";
 import { pluginsApi } from "../../api/plugins";
-import type { WorkbenchTab } from "../../components/atlas/data";
 import { WORKSPACES } from "../../components/atlas/data";
-import type { PaneVisibility, WorkspaceId } from "../../components/atlas/types";
+import type { WorkspaceId } from "../../components/atlas/types";
 
 /**
  * Plugin workspace route container.
@@ -23,19 +22,17 @@ import type { PaneVisibility, WorkspaceId } from "../../components/atlas/types";
  */
 export function PluginWorkspace() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { pluginId = "trial-finder", sessionId } = useParams();
   const sessionRouteMatch = useMatch("/workspaces/:pluginId/sessions/:sessionId");
   const effectiveSessionId = sessionRouteMatch?.params.sessionId ?? sessionId;
   const workspace = WORKSPACES[pluginId as WorkspaceId] ?? WORKSPACES["trial-finder"];
   const manifestQuery = useManifest(pluginId);
   const runsQuery = useRunsForPlugin(pluginId);
-  const [paneControls, setPaneControls] = useState<{
-    panes: PaneVisibility;
-    togglePane: (p: keyof PaneVisibility) => void;
-    openTab: (tab: WorkbenchTab) => void;
-  } | null>(null);
+  const [paneControls, setPaneControls] = useState<WorkspaceFrameControls | null>(null);
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
+  const patientId = searchParams.get("patient");
 
   const isLiveRun = Boolean(effectiveSessionId && effectiveSessionId.startsWith("r_"));
   const liveRunBundle = usePluginRun(isLiveRun ? (effectiveSessionId as string) : null);
@@ -48,6 +45,10 @@ export function PluginWorkspace() {
   // navigate to its live route.
   const onStartRun = async (workflowId?: string) => {
     if (!manifestQuery.data || starting) return;
+    if (!patientId) {
+      setStartError("Select a patient before starting a plugin run.");
+      return;
+    }
     setStarting(true);
     setStartError(null);
     try {
@@ -157,6 +158,12 @@ export function PluginWorkspace() {
                     liveSurface?.fileTabs[fileId] ??
                     liveScaffold?.fileTabs[fileId] ??
                     null,
+                  pluginHome: {
+                    canStartRun: Boolean(patientId),
+                    startHint: patientId
+                      ? undefined
+                      : "Select a demo patient or enter with an active patient context before starting a plugin run.",
+                  },
                 }
               : undefined
           }

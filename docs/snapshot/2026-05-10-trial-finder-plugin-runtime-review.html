@@ -1,0 +1,599 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trial Finder Plugin Runtime Review · 2026-05-10</title>
+<style>
+  :root {
+    --ink: #1d2433;
+    --ink-soft: #45506a;
+    --muted: #6d7692;
+    --rule: #e6ebf4;
+    --rule-strong: #c7d1e4;
+    --bg: #f5f7fb;
+    --paper: #ffffff;
+    --accent: #5b76fe;
+    --accent-soft: #eef2ff;
+    --warn: #9a5a00;
+    --warn-soft: #fff5e8;
+    --good: #0b7a43;
+    --good-soft: #ebfaf1;
+    --danger: #b42318;
+    --danger-soft: #fff0ef;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background:
+      radial-gradient(circle at top right, rgba(91, 118, 254, 0.08), transparent 28%),
+      linear-gradient(180deg, #f9fbff 0%, var(--bg) 100%);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  main {
+    max-width: 980px;
+    margin: 0 auto;
+    min-height: 100vh;
+    padding: 52px 28px 96px;
+  }
+  .paper {
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    border-radius: 18px;
+    box-shadow: 0 18px 60px rgba(31, 41, 55, 0.06);
+    overflow: hidden;
+  }
+  header.doc {
+    padding: 38px 40px 28px;
+    border-bottom: 1px solid var(--rule);
+    background:
+      linear-gradient(135deg, rgba(91, 118, 254, 0.1), rgba(91, 118, 254, 0.02)),
+      linear-gradient(180deg, #ffffff 0%, #fbfcff 100%);
+  }
+  .eyebrow {
+    margin: 0 0 8px;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  h1 {
+    margin: 0 0 12px;
+    font-size: 34px;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+  }
+  .meta {
+    color: var(--muted);
+    font-size: 14px;
+  }
+  .lede {
+    margin: 18px 0 0;
+    max-width: 72ch;
+    color: var(--ink-soft);
+    font-size: 17px;
+  }
+  .content {
+    padding: 12px 40px 44px;
+  }
+  h2 {
+    margin: 36px 0 14px;
+    font-size: 24px;
+    line-height: 1.25;
+    letter-spacing: -0.01em;
+  }
+  h3 {
+    margin: 24px 0 8px;
+    font-size: 17px;
+    line-height: 1.35;
+  }
+  p { margin: 0 0 14px; }
+  ul, ol { margin: 0 0 16px; padding-left: 22px; }
+  li { margin-bottom: 7px; }
+  strong { font-weight: 650; }
+  code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.88em;
+    padding: 2px 5px;
+    border-radius: 4px;
+    background: #f3f6fc;
+    border: 1px solid var(--rule);
+    color: #30415f;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  hr {
+    border: none;
+    border-top: 1px solid var(--rule);
+    margin: 34px 0;
+  }
+  .pill-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 18px 0 0;
+  }
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+  }
+  .summary-box {
+    margin: 18px 0 8px;
+    padding: 16px 18px;
+    border: 1px solid var(--rule);
+    border-radius: 12px;
+    background: #fbfcff;
+  }
+  .grid {
+    display: grid;
+    gap: 14px;
+  }
+  .grid.two {
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  }
+  .grid.three {
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  }
+  .card {
+    border: 1px solid var(--rule);
+    border-radius: 12px;
+    padding: 15px 16px;
+    background: #fff;
+  }
+  .card h3 {
+    margin-top: 0;
+  }
+  .step-list {
+    counter-reset: flow;
+    list-style: none;
+    padding: 0;
+    margin: 18px 0 0;
+  }
+  .step-list li {
+    counter-increment: flow;
+    margin: 0 0 14px;
+    padding: 15px 16px 15px 58px;
+    border: 1px solid var(--rule);
+    border-radius: 12px;
+    position: relative;
+    background: #fff;
+  }
+  .step-list li::before {
+    content: counter(flow);
+    position: absolute;
+    left: 16px;
+    top: 14px;
+    width: 28px;
+    height: 28px;
+    border-radius: 999px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    display: grid;
+    place-items: center;
+  }
+  .callout {
+    padding: 14px 16px;
+    border-radius: 12px;
+    border: 1px solid var(--rule);
+    margin: 18px 0;
+  }
+  .callout.warn {
+    background: var(--warn-soft);
+    border-color: rgba(154, 90, 0, 0.22);
+  }
+  .callout.good {
+    background: var(--good-soft);
+    border-color: rgba(11, 122, 67, 0.2);
+  }
+  .callout.danger {
+    background: var(--danger-soft);
+    border-color: rgba(180, 35, 24, 0.18);
+  }
+  .callout strong {
+    display: block;
+    margin-bottom: 4px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0 22px;
+    font-size: 14px;
+  }
+  th, td {
+    text-align: left;
+    vertical-align: top;
+    padding: 11px 12px;
+    border-bottom: 1px solid var(--rule);
+  }
+  th {
+    background: #f8faff;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--rule-strong);
+  }
+  .small {
+    color: var(--muted);
+    font-size: 13px;
+  }
+  .decision-list {
+    display: grid;
+    gap: 12px;
+    margin-top: 16px;
+  }
+  .decision {
+    border-left: 4px solid var(--accent);
+    padding: 12px 14px;
+    background: #fbfcff;
+    border-radius: 0 10px 10px 0;
+  }
+  @media (max-width: 760px) {
+    main { padding: 18px 14px 32px; }
+    header.doc, .content { padding-left: 18px; padding-right: 18px; }
+    h1 { font-size: 28px; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <article class="paper">
+    <header class="doc">
+      <div class="eyebrow">Architecture Review · Plugin Runtime</div>
+      <h1>Trial Finder End-to-End Review</h1>
+      <div class="meta">Snapshot date: 2026-05-10 · Scope: how one installed plugin is rendered, executed, and governed in the current Atlas shell.</div>
+      <p class="lede">
+        This report traces <strong>Trial Finder</strong> from manifest to UI to backend run execution, then calls out the
+        architecture changes worth considering before we lean on this runtime as a production-grade extensibility surface.
+      </p>
+      <div class="pill-row">
+        <span class="pill">One Vite app</span>
+        <span class="pill">Manifest-driven UI</span>
+        <span class="pill">FastAPI runtime</span>
+        <span class="pill">Consent + approval gates</span>
+        <span class="pill">SQLite-backed run state</span>
+      </div>
+    </header>
+
+    <div class="content">
+      <section>
+        <h2>Executive Read</h2>
+        <div class="summary-box">
+          <p>
+            The current implementation is <strong>not</strong> a separate plugin frontend runtime. Plugins do not ship their own React/Vite bundles.
+            Instead, the main application reads a signed-ish manifest, renders known home/workbench surfaces from that manifest, and calls a
+            FastAPI plugin runtime for all live state changes.
+          </p>
+          <p>
+            For <code>trial-finder</code>, the manifest declares the trust posture, anchor scope, connectors, workflows, tools, tabs, and files.
+            The frontend turns that into a shared workspace shell. The backend creates a run, compiles an anchor package, enforces consent and
+            outbound approval, executes tools, stores run canvas state, and emits events. The frontend then projects that runtime state back into
+            tabs, files, and workbench renderers.
+          </p>
+        </div>
+        <div class="callout good">
+          <strong>What is working well in the current design</strong>
+          The trust-sensitive behavior lives on the server. The frontend is primarily a projection layer, and the same five-pane shell can host both Caspian and plugin sessions without splitting the UX into two apps.
+        </div>
+      </section>
+
+      <section>
+        <h2>What Trial Finder Declares</h2>
+        <p>
+          The source of truth is the manifest at
+          <a href="../../data/plugins/trial-finder/2.4.1/manifest.json">data/plugins/trial-finder/2.4.1/manifest.json</a>.
+          It declares:
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Area</th>
+              <th>What it says</th>
+              <th>Why it matters</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Trust posture</td>
+              <td><code>consented-external</code> with <code>requiresPerRunConsent: true</code></td>
+              <td>The run cannot proceed like an internal assistant. Consent is a first-class runtime state.</td>
+            </tr>
+            <tr>
+              <td>Anchor scope</td>
+              <td>Age band, sex, geography, active diagnoses, biomarkers, recent labs, performance status</td>
+              <td>The plugin does not get raw chart access. It gets a scoped patient anchor package.</td>
+            </tr>
+            <tr>
+              <td>Connectors</td>
+              <td><code>clinicaltrials-gov</code>, <code>nci-trial-connect</code></td>
+              <td>External calls are supposed to be limited to connectors declared up front.</td>
+            </tr>
+            <tr>
+              <td>Tools</td>
+              <td><code>trial.search</code>, <code>trial.fetch_detail</code>, <code>trial.score_fit</code>, <code>packet.draft</code>, <code>packet.send</code></td>
+              <td>These become the runtime capabilities exposed through the operator pane.</td>
+            </tr>
+            <tr>
+              <td>Workbench tabs</td>
+              <td>Candidate board, ranked shortlist, manifest</td>
+              <td>The frontend uses these to seed known tabs in the shared shell.</td>
+            </tr>
+            <tr>
+              <td>Files</td>
+              <td>Working docs plus anchor-derived docs like <code>diagnoses.md</code> and <code>biomarkers.csv</code></td>
+              <td>These are virtual workspace files, not a plugin-owned filesystem.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>End-to-End Flow</h2>
+        <ol class="step-list">
+          <li>
+            <strong>The plugin home page is rendered from the manifest.</strong><br>
+            <code>PluginHome.tsx</code> reads <code>manifest.ui.homeSections</code>, <code>manifest.workflows</code>, and permissions metadata to build the home view with no plugin business logic in the component itself.
+          </li>
+          <li>
+            <strong>Starting a run calls the backend runtime, not a client-side session builder.</strong><br>
+            In <code>Workspace.tsx</code>, clicking a workflow triggers <code>pluginsApi.startRun()</code>, which posts to <code>/api/plugins/runs</code>.
+          </li>
+          <li>
+            <strong>The backend creates a durable run record and anchor package.</strong><br>
+            <code>runtime.py</code> loads the manifest, creates a run id, compiles the anchor package, stores the run in SQLite, and emits <code>run.started</code>. For Trial Finder, the initial state is <code>awaiting-consent</code>.
+          </li>
+          <li>
+            <strong>The live route re-enters the shared workspace shell.</strong><br>
+            The frontend route <code>/workspaces/trial-finder/sessions/r_*</code> is recognized as a live run and rendered through <code>WorkspaceFrame</code>, not a separate plugin panel.
+          </li>
+          <li>
+            <strong>Live state is polled from FastAPI.</strong><br>
+            <code>usePluginRun.ts</code> polls run status, event history, and approvals every two seconds, then builds a canvas map from persisted run canvas plus <code>tool.result</code> events.
+          </li>
+          <li>
+            <strong>The operator flow sits in a plugin-specific chat pane.</strong><br>
+            <code>PluginRunChatPane.tsx</code> shows the consent card, tool buttons, approval card, revoke action, and event trace. It is specialized UI inside the shared chat column.
+          </li>
+          <li>
+            <strong>Server-side permission checks decide whether a tool can run.</strong><br>
+            <code>dispatch_tool()</code> enforces read-anchor scope, connector declarations, and outbound approval requirements before calling the actual tool implementation.
+          </li>
+          <li>
+            <strong>Tool results are persisted back into the run canvas.</strong><br>
+            Non-outbound tools write their result to the run canvas and emit <code>tool.result</code>. Outbound tools first create an approval request, then on approval also write provenance and a final result payload.
+          </li>
+          <li>
+            <strong>The frontend turns runtime state back into tabs and files.</strong><br>
+            <code>pluginRunWorkspace.ts</code> projects the live run canvas into workbench tabs, file-tree nodes, artifact tabs, and anchor-derived previews like <code>diagnoses.md</code>.
+          </li>
+          <li>
+            <strong>Renderers are still app-owned, not vendor-owned.</strong><br>
+            The manifest can request <code>trial.board</code> or <code>markdown.doc</code>, but those renderer keys resolve through the central renderer registry already compiled into the main React app.
+          </li>
+        </ol>
+      </section>
+
+      <section>
+        <h2>Current Architecture, Plainly</h2>
+        <div class="grid two">
+          <div class="card">
+            <h3>What is dynamic today</h3>
+            <ul>
+              <li>Manifest content: workflows, permissions, declared connectors, tabs, files, home sections.</li>
+              <li>Runtime state: runs, approvals, events, canvas payloads, provenance rows.</li>
+              <li>Artifact emergence: outbound or draft tools can create new artifact tabs during a run.</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h3>What is still app-coded today</h3>
+            <ul>
+              <li>Renderer implementations and registry keys.</li>
+              <li>Plugin operator recipes in <code>PluginRunChatPane.tsx</code>.</li>
+              <li>Canvas projection logic in <code>pluginRunWorkspace.ts</code> for each known plugin id.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="callout warn">
+          <strong>The key architectural reality</strong>
+          This is a manifest-driven plugin experience, but it is not yet a fully generic plugin platform. The platform still contains
+          plugin-specific frontend projection logic and built-in renderer ownership.
+        </div>
+      </section>
+
+      <section>
+        <h2>Code Map</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Layer</th>
+              <th>Primary file</th>
+              <th>Responsibility</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Manifest contract</td>
+              <td><code>data/plugins/trial-finder/2.4.1/manifest.json</code></td>
+              <td>Declares trust, scope, tools, UI metadata, files, and workflows.</td>
+            </tr>
+            <tr>
+              <td>Home UI</td>
+              <td><code>app/src/components/atlas/PluginHome.tsx</code></td>
+              <td>Pure manifest-driven plugin home screen.</td>
+            </tr>
+            <tr>
+              <td>Workspace route</td>
+              <td><code>app/src/pages/Plugins/Workspace.tsx</code></td>
+              <td>Starts runs and mounts the shared workspace shell for live sessions.</td>
+            </tr>
+            <tr>
+              <td>Live state hook</td>
+              <td><code>app/src/components/atlas/usePluginRun.ts</code></td>
+              <td>Polls backend state and folds events into canvas state.</td>
+            </tr>
+            <tr>
+              <td>Operator pane</td>
+              <td><code>app/src/components/atlas/PluginRunChatPane.tsx</code></td>
+              <td>Consent, tool execution, approvals, revoke, event trace.</td>
+            </tr>
+            <tr>
+              <td>Workspace projection</td>
+              <td><code>app/src/components/atlas/pluginRunWorkspace.ts</code></td>
+              <td>Turns manifest + runtime canvas into files, tabs, sessions, and workbench payloads.</td>
+            </tr>
+            <tr>
+              <td>Frontend API client</td>
+              <td><code>app/src/api/plugins.ts</code></td>
+              <td>Typed client for plugin runtime endpoints.</td>
+            </tr>
+            <tr>
+              <td>HTTP router</td>
+              <td><code>api/plugins/routers/plugins.py</code></td>
+              <td>Exposes installed-manifest, run, consent, tool, approval, event, and provenance endpoints.</td>
+            </tr>
+            <tr>
+              <td>Runtime lifecycle</td>
+              <td><code>api/plugins/runtime.py</code></td>
+              <td>Creates runs, manages consent, approvals, canvas persistence, and event emission.</td>
+            </tr>
+            <tr>
+              <td>Tool enforcement</td>
+              <td><code>api/plugins/tools.py</code></td>
+              <td>Checks permissions and executes tool handlers.</td>
+            </tr>
+            <tr>
+              <td>Renderer registry</td>
+              <td><code>app/src/components/atlas/renderers/index.ts</code></td>
+              <td>Maps manifest renderer ids to built-in React components.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>Things To Consider In Production</h2>
+        <p>
+          The list below is intentionally opinionated. These are the architecture changes most likely to matter if this plugin surface moves from
+          compelling demo/runtime into a trustworthy production capability.
+        </p>
+
+        <div class="decision-list">
+          <div class="decision">
+            <strong>1. Replace trusted request bodies with real auth and server-side identity.</strong><br>
+            The router currently trusts a <code>user</code> payload from the caller. That is fine for v1 local demos and not acceptable once approvals or outbound actions carry real clinical authority.
+          </div>
+          <div class="decision">
+            <strong>2. Move live run state from polling to event streaming.</strong><br>
+            <code>usePluginRun.ts</code> polls every two seconds. That is serviceable now, but approval-heavy or long-running workflows will want server-sent events or websockets plus explicit state transitions.
+          </div>
+          <div class="decision">
+            <strong>3. Separate plugin runtime execution from the API web process.</strong><br>
+            Tool execution is in-process today. If third-party plugins become real, we should think in terms of worker isolation, job queues, timeouts, memory budgets, and an execution boundary stronger than Python function dispatch.
+          </div>
+          <div class="decision">
+            <strong>4. Shrink the amount of plugin-specific projection logic in the frontend.</strong><br>
+            <code>pluginRunWorkspace.ts</code> contains per-plugin branches that synthesize derived files and tabs. That scales poorly if the plugin count grows. The platform should gradually move toward a typed artifact schema and manifest-declared view bindings.
+          </div>
+          <div class="decision">
+            <strong>5. Treat artifacts as first-class runtime objects, not just canvas payloads.</strong><br>
+            Right now artifact tabs are inferred from canvas values. A cleaner production model would give artifacts stable ids, lifecycle states, MIME/content types, provenance links, and access-control metadata.
+          </div>
+          <div class="decision">
+            <strong>6. Upgrade run storage beyond local SQLite assumptions.</strong><br>
+            SQLite is fine for this stage. Production likely wants a multi-user persistence story, row-level auditability, migration discipline, backup strategy, and a clean model for concurrent approvals and run updates.
+          </div>
+          <div class="decision">
+            <strong>7. Formalize connector secret management and outbound policy.</strong><br>
+            Connector declarations are present, which is good. Production also needs secret injection, request signing, destination allowlists, rate limits, and clear observability for every external call path.
+          </div>
+          <div class="decision">
+            <strong>8. Tighten manifest lifecycle management.</strong><br>
+            The manifest contract is already strong. The next jump is install-time verification, version pinning, upgrade rules, deprecation strategy, and a proper registry/distribution story rather than repo-local bundles only.
+          </div>
+          <div class="decision">
+            <strong>9. Make approvals and provenance independently queryable audit objects.</strong><br>
+            The basics exist. Production review, compliance, and incident response will want filtered audit search, export, immutable provenance retention, and a durable linkage between approval text, payload preview, outbound endpoint, and final artifact.
+          </div>
+          <div class="decision">
+            <strong>10. Add plugin capability classes, not just individual tool permissions.</strong><br>
+            The current permission model is clean and understandable. Over time, it will likely need richer policy dimensions: sensitivity tier, PHI class, outbound destination class, clinician role restrictions, and patient-consent provenance.
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Architecture Changes Worth Prioritizing First</h2>
+        <div class="grid three">
+          <div class="card">
+            <h3>Near term</h3>
+            <p><strong>Auth, approval identity, and audit hardening.</strong> If there is one thing to stop treating as demo-only, it is caller identity for consent and outbound approval decisions.</p>
+          </div>
+          <div class="card">
+            <h3>Next platform step</h3>
+            <p><strong>Artifact model and event transport.</strong> A generic artifact contract plus streaming state would remove a lot of frontend glue and make runs feel like a real runtime, not a polling dashboard.</p>
+          </div>
+          <div class="card">
+            <h3>Before ecosystem scale</h3>
+            <p><strong>Execution isolation and manifest/registry lifecycle.</strong> Once plugins are not all authored by us, the process boundary and installation model become central, not optional.</p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Bottom Line</h2>
+        <p>
+          The current system is a strong architectural middle ground: <strong>one shared app shell, manifest-driven plugin UX, and backend-enforced trust boundaries</strong>.
+          That is the right shape for where the product is today.
+        </p>
+        <p>
+          The main production question is not whether the shell model works. It does. The question is how fast we want to move from
+          <em>three built-in plugins with some platform branches</em> to <em>a genuinely extensible runtime with cleaner contracts, stronger isolation, and harder guarantees</em>.
+        </p>
+        <div class="callout danger">
+          <strong>If we do nothing else before production</strong>
+          Eliminate client-supplied authority for consent and approval actions, and stop assuming the web process is the right place to execute third-party plugin behavior.
+        </div>
+      </section>
+
+      <hr>
+
+      <section>
+        <h2>Primary Source Files Reviewed</h2>
+        <p class="small">
+          <code>data/plugins/trial-finder/2.4.1/manifest.json</code> ·
+          <code>app/src/pages/Plugins/Workspace.tsx</code> ·
+          <code>app/src/components/atlas/PluginHome.tsx</code> ·
+          <code>app/src/components/atlas/PluginRunChatPane.tsx</code> ·
+          <code>app/src/components/atlas/usePluginRun.ts</code> ·
+          <code>app/src/components/atlas/pluginRunWorkspace.ts</code> ·
+          <code>app/src/components/atlas/renderers/index.ts</code> ·
+          <code>app/src/api/plugins.ts</code> ·
+          <code>api/plugins/routers/plugins.py</code> ·
+          <code>api/plugins/runtime.py</code> ·
+          <code>api/plugins/tools.py</code> ·
+          <code>docs/product-specs/PLUGIN-RUNTIME.md</code>
+        </p>
+      </section>
+    </div>
+  </article>
+</main>
+</body>
+</html>

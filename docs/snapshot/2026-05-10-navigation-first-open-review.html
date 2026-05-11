@@ -1,0 +1,415 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Navigation and First-Open UX Review</title>
+    <style>
+      :root {
+        --bg: #f3f6fb;
+        --panel: #ffffff;
+        --ink: #162033;
+        --muted: #5f6f89;
+        --line: #dbe4f0;
+        --blue: #4d68ff;
+        --blue-soft: #eef2ff;
+        --green-soft: #edf9f3;
+        --amber-soft: #fff6e6;
+        --red-soft: #fff1f2;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: linear-gradient(180deg, #f8fbff 0%, var(--bg) 100%);
+        color: var(--ink);
+      }
+      .wrap {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 32px 20px 64px;
+      }
+      .hero, .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 24px;
+        box-shadow: 0 16px 40px rgba(32, 52, 89, 0.06);
+      }
+      .hero {
+        padding: 28px;
+        background:
+          radial-gradient(circle at top left, rgba(77, 104, 255, 0.10), transparent 32%),
+          radial-gradient(circle at top right, rgba(70, 170, 220, 0.10), transparent 28%),
+          #fff;
+      }
+      .eyebrow {
+        display: inline-block;
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: var(--blue-soft);
+        color: var(--blue);
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      h1, h2, h3 { margin: 0; }
+      h1 {
+        margin-top: 14px;
+        font-size: 40px;
+        line-height: 1;
+        letter-spacing: -0.05em;
+      }
+      h2 {
+        font-size: 24px;
+        letter-spacing: -0.03em;
+      }
+      h3 {
+        font-size: 18px;
+        letter-spacing: -0.02em;
+      }
+      p, li {
+        color: var(--muted);
+        font-size: 15px;
+        line-height: 1.65;
+      }
+      section { margin-top: 18px; }
+      .panel { padding: 22px; }
+      .grid-2 {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 18px;
+      }
+      .grid-3 {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 14px;
+      }
+      .callout {
+        border-radius: 16px;
+        padding: 14px 16px;
+        border: 1px solid var(--line);
+      }
+      .blue { background: var(--blue-soft); }
+      .green { background: var(--green-soft); }
+      .amber { background: var(--amber-soft); }
+      .red { background: var(--red-soft); }
+      .tag {
+        display: inline-block;
+        margin-right: 8px;
+        margin-bottom: 8px;
+        padding: 4px 8px;
+        border-radius: 999px;
+        background: #f5f7fb;
+        border: 1px solid var(--line);
+        color: #52627f;
+        font-size: 12px;
+        font-weight: 600;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 12px;
+      }
+      th, td {
+        border-top: 1px solid var(--line);
+        padding: 12px 10px;
+        text-align: left;
+        vertical-align: top;
+        font-size: 14px;
+      }
+      th {
+        color: #3b4c68;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+      code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        background: #f5f7fb;
+        border: 1px solid var(--line);
+        padding: 2px 6px;
+        border-radius: 8px;
+        color: #2d4268;
+        font-size: 12px;
+      }
+      @media (max-width: 900px) {
+        .grid-2, .grid-3 { grid-template-columns: 1fr; }
+        h1 { font-size: 32px; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <section class="hero">
+        <div class="eyebrow">Review Snapshot · 2026-05-10</div>
+        <h1>Navigation and First-Open UX Review</h1>
+        <p>
+          This review covers the current app navigation, the first page users hit in each major module,
+          and the gating rules needed so patient data does not appear before login or explicit demo-patient selection.
+        </p>
+        <div class="callout amber">
+          <strong>Bottom line:</strong>
+          The app currently behaves like a set of connected surfaces for an already-in-context internal user,
+          not like a controlled first-time-user product. The biggest problems are inconsistent start pages,
+          dropped patient context during top-bar navigation, and the lack of a true access gate before chart data flows.
+        </div>
+      </section>
+
+      <section class="grid-2">
+        <div class="panel">
+          <h2>What Is Working</h2>
+          <p>The app has a coherent five-module frame and several module-local overviews already exist.</p>
+          <span class="tag">Landing</span>
+          <span class="tag">Patient Record Overview</span>
+          <span class="tag">FHIR Charts Overview</span>
+          <span class="tag">Plugins Index</span>
+          <span class="tag">Caspian Shell</span>
+          <p>
+            The module-local sidebars in Patient Record and FHIR Charts already preserve patient context via
+            <code>?patient=</code>, which is the right behavior inside a module.
+          </p>
+        </div>
+        <div class="panel">
+          <h2>What Is Broken</h2>
+          <ul>
+            <li>Top-bar module switching does not preserve patient context.</li>
+            <li>Some top-bar affordances are nonfunctional placeholders: search, help, and drawer actions.</li>
+            <li>Module entry points are inconsistent: some open an overview, some open a live shell, some open internal tools.</li>
+            <li>The app root still acts like a marketing/overview page, not a controlled access gate.</li>
+            <li>There is no real auth gate; demo/mock access is implicit rather than explicit.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Evidence From Current Code</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Area</th>
+              <th>Observed Behavior</th>
+              <th>Code Evidence</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Global module switch</td>
+              <td>App shell navigates to canonical module routes without preserving the current patient query string.</td>
+              <td><code>app/src/components/atlas/AppShell.tsx</code> and <code>app/src/components/atlas/navigation.ts</code></td>
+            </tr>
+            <tr>
+              <td>Top bar links</td>
+              <td>Module links use canonical hrefs like <code>/patient-record</code>, <code>/fhir-charts</code>, <code>/caspian</code>, and <code>/workspaces</code> with no access or patient-context layer.</td>
+              <td><code>app/src/components/atlas/ModuleBar.tsx</code></td>
+            </tr>
+            <tr>
+              <td>Drawer actions</td>
+              <td>Settings, account, billing, organization, help, and sign out render as buttons but do not navigate anywhere.</td>
+              <td><code>app/src/components/atlas/PlatformDrawer.tsx</code></td>
+            </tr>
+            <tr>
+              <td>App root</td>
+              <td>Landing drives users directly to <code>/patient-record</code> or the records pool instead of a gated start flow.</td>
+              <td><code>app/src/pages/Landing.tsx</code></td>
+            </tr>
+            <tr>
+              <td>Caspian first open</td>
+              <td><code>/caspian</code> mounts the full workspace shell immediately; when no patient is present, the chat pane warns after the shell already opens.</td>
+              <td><code>app/src/pages/Caspian/Workspace.tsx</code> and <code>app/src/components/atlas/CaspianChatPane.tsx</code></td>
+            </tr>
+            <tr>
+              <td>Plugins first open</td>
+              <td><code>/workspaces</code> opens a marketplace index, but individual plugin homes can start runs without a clear patient-access gate in the route layer.</td>
+              <td><code>app/src/pages/Plugins/Index.tsx</code> and <code>app/src/pages/Plugins/Workspace.tsx</code></td>
+            </tr>
+            <tr>
+              <td>Mock/demo access</td>
+              <td>Frontend mock data and dev fallback make demo data available implicitly instead of through a deliberate demo mode.</td>
+              <td><code>app/src/api/client.ts</code> and <code>app/src/api/mockData.ts</code></td>
+            </tr>
+            <tr>
+              <td>Internal module exposure</td>
+              <td><code>Learn</code> is treated as a first-class top nav module even though it primarily hosts internal tools and reference material.</td>
+              <td><code>app/src/App.tsx</code> and <code>app/src/components/atlas/ModuleBar.tsx</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="grid-2">
+        <div class="panel">
+          <h2>Primary Findings</h2>
+          <div class="callout red">
+            <strong>1. Context is fragile.</strong>
+            The current design depends on <code>?patient=</code> in many local links, but the global shell does not honor that contract.
+          </div>
+          <div class="callout amber" style="margin-top: 12px;">
+            <strong>2. Start states are inconsistent.</strong>
+            Patient Record and FHIR Charts open overview pages, Caspian opens a live workspace, Plugins opens a marketplace, and Learn opens internal tools.
+          </div>
+          <div class="callout blue" style="margin-top: 12px;">
+            <strong>3. Orientation happens too late.</strong>
+            In several flows the user first sees a dense shell, then sees a no-patient warning inside it.
+          </div>
+        </div>
+        <div class="panel">
+          <h2>Design Principle Going Forward</h2>
+          <p>
+            The correct model is:
+            <strong>access gate first, module start page second, dense workspace third.</strong>
+          </p>
+          <ul>
+            <li>Users should never fall into a deep workspace before choosing how they are entering.</li>
+            <li>Patient context should be a first-class global state, not a fragile URL convention.</li>
+            <li>Demo mode should be explicit and visible.</li>
+            <li>Internal tools should not compete with clinician-facing modules in the top bar.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Recommended Global Navigation Model</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Top-Level Item</th>
+              <th>Role</th>
+              <th>Recommended First Open</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Home</td>
+              <td>Access gate and orientation</td>
+              <td>Login or “Use demo patient” choice, then a simple module chooser</td>
+            </tr>
+            <tr>
+              <td>Patient Record</td>
+              <td>Record assembly and publishing</td>
+              <td>Module start page if no patient; chart overview if patient selected</td>
+            </tr>
+            <tr>
+              <td>Chart Review</td>
+              <td>Prepared clinical views</td>
+              <td>Module start page if no patient; summary view if patient selected</td>
+            </tr>
+            <tr>
+              <td>Caspian</td>
+              <td>Private clinical reasoning workspace</td>
+              <td>Workspace start page with patient requirement, not an auto-open live session shell</td>
+            </tr>
+            <tr>
+              <td>Plugins</td>
+              <td>Consented external tools</td>
+              <td>Marketplace index if no patient; plugin home with disabled “Start run” until patient exists</td>
+            </tr>
+            <tr>
+              <td>Learn</td>
+              <td>Internal docs and evaluation tools</td>
+              <td>Remove from primary clinician nav; move to menu or admin/internal mode</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="panel">
+        <h2>Recommended First-Open States</h2>
+        <div class="grid-3">
+          <div class="callout green">
+            <h3>App Root</h3>
+            <p>Show a controlled entry page with two primary actions: <strong>Sign in</strong> and <strong>Continue with demo patient</strong>.</p>
+          </div>
+          <div class="callout green">
+            <h3>Patient Record</h3>
+            <p>If no patient is active, show a start page explaining intake, harmonization, and publishing with a patient-selection CTA.</p>
+          </div>
+          <div class="callout green">
+            <h3>Chart Review</h3>
+            <p>If no patient is active, show a chart-review start page rather than partial empty widgets and disconnected “no patient selected” states.</p>
+          </div>
+          <div class="callout green">
+            <h3>Caspian</h3>
+            <p>Open a Caspian start surface first: what it does, what it requires, and a clear button to choose a patient before opening the full shell.</p>
+          </div>
+          <div class="callout green">
+            <h3>Plugins</h3>
+            <p>Marketplace can remain open without a patient, but starting a plugin run should require active patient context and explain why.</p>
+          </div>
+          <div class="callout green">
+            <h3>Internal Tools</h3>
+            <p>Keep internal tools behind a separate navigation layer. They should not be mistaken for the normal first-time-user experience.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Access and Gating Rules</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>User State</th>
+              <th>What They Can See</th>
+              <th>What Must Be Blocked</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Signed out</td>
+              <td>Home gate, product framing, sign-in CTA, demo-patient CTA</td>
+              <td>Patient pool, real patient charts, live Caspian patient sessions</td>
+            </tr>
+            <tr>
+              <td>Demo mode</td>
+              <td>Demo patient surfaces with a visible “Demo” banner and explicit patient badge</td>
+              <td>Any ambiguity about whether the user is viewing real or demo data</td>
+            </tr>
+            <tr>
+              <td>Authenticated, no patient selected</td>
+              <td>Module start pages, marketplace browsing, patient selector</td>
+              <td>Chart-specific data views and run start actions that require a patient</td>
+            </tr>
+            <tr>
+              <td>Authenticated, patient selected</td>
+              <td>All module overviews, chart review pages, Caspian, plugins with proper trust gating</td>
+              <td>Silent patient-context loss when moving between modules</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="panel">
+        <h2>Implementation Guidance</h2>
+        <ol>
+          <li>Create a global patient-context store. Stop treating <code>?patient=</code> as the primary cross-module state mechanism.</li>
+          <li>Add an access-gate route layer ahead of module roots. Root routes should decide between login, demo mode, patient selection, and module content.</li>
+          <li>Introduce module start pages for <code>/patient-record</code>, <code>/fhir-charts</code>, and <code>/caspian</code> when there is no active patient.</li>
+          <li>Preserve active patient context when top-bar navigation or workspace switching occurs.</li>
+          <li>Make demo mode explicit in UI and routing, rather than relying on API fallback behavior.</li>
+          <li>Move <code>Learn</code> out of the primary clinician navigation or clearly label it as internal.</li>
+          <li>Replace placeholder top-bar actions with real routes or hide them until implemented.</li>
+        </ol>
+      </section>
+
+      <section class="panel">
+        <h2>Recommended Delivery Sequence</h2>
+        <ol>
+          <li>Fix top-bar patient-context preservation first. This is the most immediate broken-navigation issue.</li>
+          <li>Introduce an explicit access gate and demo mode entry at the app root.</li>
+          <li>Add module start pages for Patient Record, Chart Review, and Caspian.</li>
+          <li>Move internal-only surfaces out of the primary nav.</li>
+          <li>Add regression tests for module switching, no-patient entry states, and demo-vs-real gating.</li>
+        </ol>
+      </section>
+
+      <section class="panel">
+        <h2>Definition of Done for the Redesign</h2>
+        <p>
+          The redesign is successful when a first-time user can enter the app, choose either
+          authenticated or demo mode, understand each module before entering it, and move between modules
+          without losing patient context or landing in dense workspaces prematurely.
+        </p>
+      </section>
+    </div>
+  </body>
+</html>

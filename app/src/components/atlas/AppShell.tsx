@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { ModuleBar } from "./ModuleBar";
 import { deriveActiveModule, hrefForModule } from "./navigation";
 import { PlatformDrawer } from "./PlatformDrawer";
@@ -10,6 +10,7 @@ import type {
   User,
   WorkspaceId,
 } from "./types";
+import { useAccessContext } from "../../context/AccessContext";
 
 const DEFAULT_USER: User = {
   initials: "RP",
@@ -51,9 +52,11 @@ export function AppShell({
   showPaneToggles = false,
   contained = true,
 }: AppShellProps) {
-  const navigate = useNavigate();
   const location = useLocation();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const { activePatientId, mode } = useAccessContext();
   const [workspaceId, setWorkspaceId] = useState<WorkspaceId>(() => {
     // Migration: the slug "clinical-insights" was renamed to "caspian" in
     // Phase 6 of the Atlas IA refactor. If a user had the old slug stored,
@@ -84,13 +87,19 @@ export function AppShell({
 
   const handleSelectModule = (m: ModuleId) => {
     const target = hrefForModule(m);
-    if (target) navigate(target);
+    if (target) {
+      navigate(withPatientContext(target, searchParams.get("patient") ?? activePatientId, mode));
+    }
   };
 
   const handleSwitchWorkspace = (w: WorkspaceId) => {
     setWorkspaceId(w);
-    if (w === "caspian") navigate("/caspian");
-    else navigate(`/workspaces/${w}`);
+    const patientId = searchParams.get("patient") ?? activePatientId;
+    if (w === "caspian") {
+      navigate(withPatientContext("/caspian", patientId, mode));
+      return;
+    }
+    navigate(withPatientContext(`/workspaces/${w}`, patientId, mode));
   };
   return (
     <div
@@ -127,6 +136,13 @@ export function AppShell({
       />
     </div>
   );
+}
+
+function withPatientContext(path: string, patientId: string | null, mode: "locked" | "demo" | "authenticated") {
+  if (!patientId || path === "/" || mode === "locked") return path;
+  const url = new URL(path, "http://atlas.local");
+  url.searchParams.set("patient", patientId);
+  return `${url.pathname}${url.search}`;
 }
 
 function humanize(slug: string): string {

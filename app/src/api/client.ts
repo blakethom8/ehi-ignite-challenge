@@ -55,6 +55,9 @@ import type {
   AggregationUploadPayload,
   AggregationUploadResponse,
   CanonicalPatientSummary,
+  GuestHarmonizationDeleteResponse,
+  GuestHarmonizationOutputPackage,
+  GuestHarmonizationRunResponse,
   GroundTruthReviewFactLocationResponse,
   GroundTruthReviewPublishResponse,
   GroundTruthReviewPdfPagesResponse,
@@ -270,6 +273,32 @@ export const api = {
 
   deleteAggregationFile: (patientId: string, fileId: string): Promise<AggregationDeleteResponse> =>
     http.delete<AggregationDeleteResponse>(`/aggregation/uploads/${patientId}/${fileId}`).then((r) => r.data),
+
+  /** Guest temporary harmonization */
+  createGuestHarmonizationRun: (): Promise<GuestHarmonizationRunResponse> =>
+    http.post<GuestHarmonizationRunResponse>("/guest-harmonization/runs").then((r) => r.data),
+
+  getGuestHarmonizationRun: (runId: string): Promise<GuestHarmonizationRunResponse> =>
+    http.get<GuestHarmonizationRunResponse>(`/guest-harmonization/runs/${encodeURIComponent(runId)}`).then((r) => r.data),
+
+  uploadGuestHarmonizationFile: (runId: string, file: File): Promise<GuestHarmonizationRunResponse> => {
+    const form = new FormData();
+    form.append("file", file);
+    return http.post<GuestHarmonizationRunResponse>(
+      `/guest-harmonization/runs/${encodeURIComponent(runId)}/uploads`,
+      form,
+      { headers: { "Content-Type": "multipart/form-data" } },
+    ).then((r) => r.data);
+  },
+
+  processGuestHarmonizationRun: (runId: string): Promise<GuestHarmonizationRunResponse> =>
+    http.post<GuestHarmonizationRunResponse>(`/guest-harmonization/runs/${encodeURIComponent(runId)}/process`).then((r) => r.data),
+
+  getGuestHarmonizationOutput: (runId: string): Promise<GuestHarmonizationOutputPackage> =>
+    http.get<GuestHarmonizationOutputPackage>(`/guest-harmonization/runs/${encodeURIComponent(runId)}/output`).then((r) => r.data),
+
+  deleteGuestHarmonizationRun: (runId: string): Promise<GuestHarmonizationDeleteResponse> =>
+    http.delete<GuestHarmonizationDeleteResponse>(`/guest-harmonization/runs/${encodeURIComponent(runId)}`).then((r) => r.data),
 
   getAggregationUploadPreview: (patientId: string, fileId: string): Promise<AggregationPreparedPreviewResponse> =>
     getOrMock(

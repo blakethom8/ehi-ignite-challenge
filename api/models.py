@@ -1082,6 +1082,45 @@ class AggregationDeleteResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Guest harmonization
+# ---------------------------------------------------------------------------
+
+class GuestHarmonizationUploadedFile(BaseModel):
+    file_id: str
+    file_name: str
+    content_type: str
+    size_bytes: int
+    uploaded_at: datetime
+    storage_path: str
+    status: Literal["uploaded"] = "uploaded"
+
+
+class GuestHarmonizationOutput(BaseModel):
+    output_id: str
+    file_name: str
+    content_type: str
+    size_bytes: int
+    created_at: datetime
+    storage_path: str
+
+
+class GuestHarmonizationRunResponse(BaseModel):
+    run_id: str
+    mode: Literal["guest"] = "guest"
+    created_at: datetime
+    expires_at: datetime
+    uploaded_files: list[GuestHarmonizationUploadedFile] = Field(default_factory=list)
+    outputs: list[GuestHarmonizationOutput] = Field(default_factory=list)
+    status: Literal["ready", "processing", "completed", "expired", "failed"]
+    disclosure: str
+
+
+class GuestHarmonizationDeleteResponse(BaseModel):
+    deleted: bool
+    run_id: str
+
+
+# ---------------------------------------------------------------------------
 # Harmonize endpoints (cross-source merge + Provenance)
 # ---------------------------------------------------------------------------
 

@@ -31,6 +31,7 @@ from api.routers import classifications
 from api.routers import patient_context
 from api.routers import aggregation
 from api.routers import harmonize
+from api.routers import guest_harmonization
 from api.routers import canonical
 from api.routers import cursor_internal_tools
 from api.routers import ground_truth_review
@@ -122,6 +123,7 @@ app.include_router(classifications.router, prefix="/api")
 app.include_router(patient_context.router, prefix="/api")
 app.include_router(aggregation.router, prefix="/api")
 app.include_router(harmonize.router, prefix="/api")
+app.include_router(guest_harmonization.router, prefix="/api")
 app.include_router(canonical.router, prefix="/api")
 app.include_router(cursor_internal_tools.router, prefix="/api")
 app.include_router(ground_truth_review.router, prefix="/api")

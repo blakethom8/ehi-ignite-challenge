@@ -7,6 +7,7 @@ import { ChatProvider } from "./context/ChatContext";
 import { AccessProvider, useAccessContext } from "./context/AccessContext";
 import { ChatWidget } from "./components/ChatWidget";
 import { Landing } from "./pages/Landing";
+import { GuestHarmonization } from "./pages/GuestHarmonization";
 import { PlatformArchitecture } from "./pages/PlatformArchitecture";
 import { PatientRecordPool } from "./pages/PatientRecordPool";
 import { PatientRecordLayout } from "./pages/PatientRecord/PatientRecordLayout";
@@ -254,6 +255,7 @@ function AppShellRoutes() {
     <>
       <Routes>
         <Route path="/" element={<Landing />} />
+        <Route path="/guest-harmonization" element={<GuestHarmonization />} />
         <Route path="/architecture" element={<PlatformArchitecture />} />
         <Route path="/records-pool" element={<PatientRecordPool />} />
         <Route path="/guided-tour" element={<Navigate to="/using-atlas" replace />} />

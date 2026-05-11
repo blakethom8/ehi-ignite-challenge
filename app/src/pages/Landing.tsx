@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, Boxes, Database, FileSearch, ShieldCheck } from "lucide-react";
+import { ArrowRight, Boxes, Database, FileSearch, ShieldCheck, Upload, type LucideIcon } from "lucide-react";
 import { DemoPatientPicker } from "../components/atlas/DemoPatientPicker";
 import { useAccessContext } from "../context/AccessContext";
 
@@ -102,14 +102,14 @@ export function Landing() {
                 Continue with {isDemo ? "demo" : "active"} patient
                 <ArrowRight size={16} />
               </Link>
-            ) : (
-              <a
-                href="#demo-access"
+              ) : (
+              <Link
+                to="/guest-harmonization"
                 className="inline-flex items-center gap-2 rounded-2xl bg-[#4d68ff] px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(77,104,255,0.22)] transition-colors hover:bg-[#3c57ef]"
               >
-                Choose demo patient
+                Try with my files
                 <ArrowRight size={16} />
-              </a>
+              </Link>
             )}
           </div>
         </div>
@@ -122,13 +122,13 @@ export function Landing() {
             <div className="grid gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:items-end">
               <div className="max-w-4xl">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#4d68ff]">
-                  Application overview
+                  Health-record workspace
                 </p>
                 <h1 className="mt-5 text-5xl font-semibold leading-[0.94] tracking-[-0.05em] text-[#171b24] sm:text-6xl lg:text-[88px]">
-                  Turn fragmented records into chart-ready clinical work.
+                  Bring scattered health records into one reviewable workspace.
                 </h1>
                 <p className="mt-6 max-w-3xl text-lg leading-8 text-[#5f6f89]">
-                  The platform assembles scattered patient data into a prepared chart layer, then opens focused clinical surfaces for review, workflows, decision support, and consented downstream collaboration.
+                  Explore synthetic sample records, run a temporary harmonization with your own files, or sign in to save private record workspaces.
                 </p>
                 <div className="mt-8 flex flex-wrap gap-3">
                   {isUnlocked && activePatientId ? (
@@ -153,12 +153,16 @@ export function Landing() {
                         href="#demo-access"
                         className="inline-flex items-center gap-2 rounded-2xl bg-[#4d68ff] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#3c57ef]"
                       >
-                        Continue with demo patient
+                        Explore sample demo
                         <ArrowRight size={16} />
                       </a>
-                      <span className="inline-flex items-center gap-2 rounded-2xl border border-[#d5deea] bg-[rgba(255,255,255,0.76)] px-5 py-3 text-sm font-semibold text-[#52627f]">
-                        Sign in available below
-                      </span>
+                      <Link
+                        to="/guest-harmonization"
+                        className="inline-flex items-center gap-2 rounded-2xl border border-[#d5deea] bg-[rgba(255,255,255,0.76)] px-5 py-3 text-sm font-semibold text-[#33415b] transition-colors hover:border-[#4d68ff] hover:text-[#3657ff]"
+                      >
+                        Try with my files
+                        <Upload size={16} />
+                      </Link>
                     </>
                   )}
                 </div>
@@ -175,7 +179,7 @@ export function Landing() {
                     </p>
                     <p className="mt-2 text-sm leading-6 text-[#3e4d68]">
                       {isDemo
-                        ? "Demo access posture is active. The shared shell now runs through a server-backed demo session."
+                        ? "Sample chart is active. The shared shell now runs through a server-backed sample session."
                         : user
                           ? `Signed in as ${user.display_name}. Select or switch patients without leaving the shell.`
                           : "Authenticated access is active."}
@@ -196,7 +200,7 @@ export function Landing() {
                         Access gate
                       </p>
                       <p className="mt-3 text-sm leading-6 text-[#3e4d68]">
-                        Patient-specific data stays locked until a clinician signs in or explicitly chooses a demo patient.
+                        Patient-specific data stays locked until you sign in, start a sample workspace, or create a temporary guest run.
                       </p>
                     </div>
                     <div className="rounded-[24px] border border-[rgba(77,104,255,0.14)] bg-[rgba(255,255,255,0.72)] p-5 backdrop-blur">
@@ -223,16 +227,38 @@ export function Landing() {
 
           <section className="mt-8" id="demo-access">
             {!isUnlocked && (
+              <>
+              <div className="mb-6 grid gap-4 lg:grid-cols-3">
+                <EntryCard
+                  title="Explore sample demo"
+                  body="Review prepared synthetic records through the patient chart and workflow surfaces."
+                  to="#sample-demo"
+                  icon={FileSearch}
+                  primary
+                />
+                <EntryCard
+                  title="Try with my files"
+                  body="Upload files into a temporary guest workspace and download a portable output."
+                  to="/guest-harmonization"
+                  icon={Upload}
+                />
+                <EntryCard
+                  title="Log in / Sign up"
+                  body="Use an account to save private record workspaces and return later."
+                  to="#account-access"
+                  icon={ShieldCheck}
+                />
+              </div>
               <div className="mb-6 grid gap-6 rounded-[30px] border border-[#cad6ff] bg-[rgba(255,255,255,0.78)] p-6 shadow-[0_22px_70px_rgba(77,104,255,0.08)] lg:grid-cols-[0.95fr_1.05fr]">
-                <form onSubmit={handleSignIn} className="rounded-[24px] border border-[#d8e0eb] bg-white/75 p-5">
+                <form id="account-access" onSubmit={handleSignIn} className="rounded-[24px] border border-[#d8e0eb] bg-white/75 p-5">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#4d68ff]">
                     Sign in
                   </p>
                   <h3 className="mt-2 text-xl font-semibold text-[#18202b]">
-                    Use a real application session
+                    Use your account
                   </h3>
                   <p className="mt-2 text-sm leading-6 text-[#62728d]">
-                    Patient data should not load until the backend trusts the session. For local development, the seeded clinician account is enabled by default.
+                    Account workspaces are for saved health records. Public account creation is still being wired, so local development uses the seeded account.
                   </p>
                   <label className="mt-4 block text-xs font-semibold uppercase tracking-[0.12em] text-[#7a88a3]">
                     Email
@@ -265,10 +291,11 @@ export function Landing() {
                     <ArrowRight size={16} />
                   </button>
                 </form>
-                <div>
+                <div id="sample-demo">
                   <DemoPatientPicker destination={(patientId) => `/patient-record?patient=${encodeURIComponent(patientId)}`} />
                 </div>
               </div>
+              </>
             )}
             <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
               <div className="max-w-2xl">
@@ -342,4 +369,41 @@ export function Landing() {
       </main>
     </div>
   );
+}
+
+function EntryCard({
+  title,
+  body,
+  to,
+  icon: Icon,
+  primary = false,
+}: {
+  title: string;
+  body: string;
+  to: string;
+  icon: LucideIcon;
+  primary?: boolean;
+}) {
+  const className = `block rounded-[24px] border p-5 transition-colors ${
+    primary
+      ? "border-[#cad6ff] bg-white shadow-[0_16px_40px_rgba(77,104,255,0.08)] hover:border-[#4d68ff]"
+      : "border-[#d8e0eb] bg-white/75 hover:border-[#4d68ff]"
+  }`;
+  const content = (
+    <>
+      <div className="flex h-11 w-11 items-center justify-center rounded-[14px] bg-[#eef2ff] text-[#4d68ff]">
+        <Icon size={20} />
+      </div>
+      <h3 className="mt-4 text-lg font-semibold text-[#18202b]">{title}</h3>
+      <p className="mt-2 text-sm leading-6 text-[#62728d]">{body}</p>
+      <span className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-[#3657ff]">
+        Continue
+        <ArrowRight size={15} />
+      </span>
+    </>
+  );
+  if (to.startsWith("#")) {
+    return <a href={to} className={className}>{content}</a>;
+  }
+  return <Link to={to} className={className}>{content}</Link>;
 }

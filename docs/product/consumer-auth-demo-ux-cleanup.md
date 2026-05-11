@@ -523,3 +523,77 @@ Suggested copy:
 ## Codex worker guidance
 
 Do not merge guest harmonization into existing demo patient code. Treat it as a separate mode with separate copy and separate storage. Do not promise persistence in guest mode.
+
+## Caspian / Plugins Access Rules Across Modes
+
+Caspian and Plugins should not be treated as globally locked behind account auth. They serve different purposes depending on the entry mode.
+
+### Prepared sample demo
+
+**Allowed:** Yes — showcase Caspian and selected Plugins against synthetic sample records.
+
+**Purpose:**
+
+- Demonstrate the product vision without forcing account creation.
+- Let reviewers see agent/plugin workflows in context.
+- Make the prepared sample patients feel like real workspaces.
+
+**Constraints:**
+
+- Synthetic/sample records only.
+- Read-only or simulated side effects.
+- No real outbound actions.
+- No durable user-owned writes.
+- No user uploads.
+- Plugin actions that would normally mutate/send/register should display demo-safe simulated outcomes or be explicitly disabled with clear copy.
+
+Suggested copy:
+
+> You’re viewing a synthetic sample workspace. Plugin actions are shown in demo-safe mode and do not affect real patient data.
+
+### Guest harmonization
+
+**Allowed:** Not initially, except possibly a narrow read-only summary of the temporary output.
+
+**Purpose:**
+
+- Keep guest mode focused: upload files, generate a portable harmonized output, inspect/download it.
+- Avoid introducing broad agent/plugin permissions before temporary-session boundaries are mature.
+
+**Constraints:**
+
+- No full Caspian workspace persistence.
+- No plugin run history persistence.
+- No real outbound actions.
+- No durable artifacts after TTL expiration.
+
+Future extension:
+
+- Add a lightweight “summarize my harmonized output” assistant panel once guest-run isolation and cleanup are solid.
+
+### Logged-in account workspace
+
+**Allowed:** Yes — full personal use once account/workspace ownership is enforced.
+
+**Purpose:**
+
+- Caspian and Plugins operate on saved user-owned workspaces.
+- Plugin runs, artifacts, conversations, exports, and history can persist.
+
+**Requirements before production use:**
+
+- Account signup/login.
+- User-owned workspace ACLs.
+- Per-user upload/profile ownership enforcement.
+- Durable plugin/Caspian run storage scoped by `user_id` and workspace id.
+- Delete/export controls.
+
+### Summary matrix
+
+| Mode | Caspian / Plugins | Data posture |
+|---|---|---|
+| Prepared sample demo | Yes, showcase/read-only/simulated | Synthetic fixtures only |
+| Guest harmonization | Not initially, or limited output summary | Temporary TTL guest run |
+| Logged-in account | Yes, full personal workspace use | Durable user-owned storage |
+
+Implementation note: do not remove Caspian/Plugins from prepared demo mode. The account gate applies to real/persistent/personal usage, not to synthetic showcase usage.

@@ -196,7 +196,7 @@ export function CaspianChatPane({
             <small className="ml-2 font-medium text-[var(--ink-4)]">{sessionTitle}</small>
           </div>
           <div className="text-[10.5px] text-[var(--ink-4)]">
-            {patientId ? `Patient ${patientId}` : "Select a patient to start a live chart-grounded session."}
+            {patientId ? `Patient ${patientId}` : "Choose a patient to start reviewing a chart in Caspian."}
           </div>
         </div>
         <div className="ml-auto">
@@ -220,7 +220,7 @@ export function CaspianChatPane({
             className="mb-4 rounded-[10px] border px-3.5 py-3 text-[12.5px]"
             style={{ background: "rgba(180,83,9,0.04)", borderColor: "rgba(180,83,9,0.24)", color: "var(--ink-1)" }}
           >
-            Caspian needs a `?patient=` query param to ask the live assistant. Open it from the patient pool or another patient-linked route.
+            Choose a patient before starting a Caspian conversation.
           </div>
         )}
         {Boolean(error) && (
@@ -234,9 +234,9 @@ export function CaspianChatPane({
         )}
         {messages.length === 0 && patientId && (
           <div className="mb-6 rounded-[10px] border px-4 py-4" style={{ background: "var(--surface-0)", borderColor: "var(--line-1)" }}>
-            <div className="mb-2 text-[12.5px] font-semibold text-[var(--ink-1)]">Start a chart-grounded review</div>
+            <div className="mb-2 text-[12.5px] font-semibold text-[var(--ink-1)]">Start a chart review</div>
             <div className="mb-3 text-[12px] leading-[1.55] text-[var(--ink-3)]">
-              Caspian now uses the live provider-assistant backend from this shell. Ask a direct chart question or start with one of these prompts.
+              Ask a direct question about the chart or begin with one of these prompts.
             </div>
             <div className="flex flex-wrap gap-1.5">
               {STARTER_PROMPTS.map((prompt) => (

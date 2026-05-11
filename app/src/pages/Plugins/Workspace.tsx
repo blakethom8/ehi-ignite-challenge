@@ -47,7 +47,7 @@ export function PluginWorkspace() {
   const onStartRun = async (workflowId?: string) => {
     if (!manifestQuery.data || starting) return;
     if (!patientId) {
-      setStartError("Select a patient before starting a plugin run.");
+      setStartError("Choose a patient before starting this workflow.");
       return;
     }
     setStarting(true);
@@ -166,7 +166,7 @@ export function PluginWorkspace() {
                     canStartRun: Boolean(patientId),
                     startHint: patientId
                       ? undefined
-                      : "Select a demo patient or enter with an active patient context before starting a plugin run.",
+                      : "Choose a patient before starting a workspace run.",
                   },
                 }
               : undefined

@@ -25,16 +25,16 @@ export function PluginsIndex() {
         icon={Boxes}
         eyebrow="Plugins"
         title="Choose access before opening the plugin marketplace."
-        body="Plugins operate on a patient anchor and can trigger consented external workflows. Enter with a signed-in or demo session first so the marketplace can load with a real patient context."
+        body="Plugins work on a selected patient and may connect to outside services. Choose access first so the marketplace opens with the right chart in view."
         bullets={[
-          "Choose access first, then review which plugins fit the current patient workflow.",
-          "Keep trust boundaries and approval posture visible before starting a run.",
-          "Avoid showing external workflow tools without an established chart context.",
+          "Choose a patient first, then decide which workflow helps next.",
+          "Keep outside-service actions visible before you start a run.",
+          "Avoid opening workflow tools before there is a chart in context.",
         ]}
         aside={
           <DemoPatientPicker
             destination={(patientId) => `/workspaces?patient=${encodeURIComponent(patientId)}`}
-            title="Open the marketplace in demo mode"
+            title="Open plugins with a demo patient"
           />
         }
       />
@@ -51,17 +51,17 @@ export function PluginsIndex() {
         body={
           unauthorized
             ? "The marketplace requires an active access session. Your session may have expired or the access state may not be established yet."
-            : "The plugin catalog could not be loaded from the backend. Stay on the core product surfaces until the plugin runtime is available again."
+            : "The plugin list could not be loaded right now. Return to the core app or try again in a moment."
         }
         bullets={
           unauthorized
             ? [
                 "Re-enter with a demo patient or sign in again.",
-                "Open plugins only after the patient anchor and session are active.",
+                "Open plugins only after the patient and session are active.",
               ]
             : [
-                "This is a backend availability problem, not an empty marketplace.",
-                "Prefer truthful error states over pretending no plugins exist.",
+                "This is a loading problem, not an empty marketplace.",
+                "Stay in the main app until plugin access is available again.",
               ]
         }
         actions={[
@@ -82,10 +82,10 @@ export function PluginsIndex() {
           Plugin marketplace
         </div>
         <h1 className="mt-2 text-[26px] font-semibold leading-[1.1] tracking-tight" style={{ color: "var(--ink-1)" }}>
-          Installable plugins
+          Plugin workflows
         </h1>
         <p className="mt-3 max-w-[70ch] text-[13.5px] leading-[1.55]" style={{ color: "var(--ink-2)" }}>
-          Plugins run inside the same shell as Caspian, but with their own context strip, permissions ledger, and approval gates. Each plugin operates against a consented patient anchor. Outbound actions never leave the workspace without an explicit clinician approval.
+          Use plugins when you need a focused workflow such as trial search, medication access, or a second opinion. Each one stays tied to the current patient, and anything sent outside Atlas still requires approval.
         </p>
       </div>
 
@@ -95,7 +95,7 @@ export function PluginsIndex() {
         )}
         {!isLoading && (manifests ?? []).length === 0 && (
           <div className="text-[13px]" style={{ color: "var(--ink-3)" }}>
-            No plugins are currently available in this environment.
+            No plugin workflows are available right now.
           </div>
         )}
         {(manifests ?? []).map((m) => {
@@ -135,7 +135,7 @@ export function PluginsIndex() {
               <div className="mt-1 flex items-center justify-between border-t pt-2.5 text-[11px]" style={{ borderColor: "var(--line-1)", color: "var(--ink-3)" }}>
                 <span>Boundary: {m.trust.boundaryLabel}</span>
                 <span className="font-medium transition-colors group-hover:text-[var(--action)]" style={{ color: "var(--ink-3)" }}>
-                  Open plugin home →
+                  Open workspace →
                 </span>
               </div>
             </Link>

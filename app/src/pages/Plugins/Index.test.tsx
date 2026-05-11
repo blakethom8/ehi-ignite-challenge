@@ -101,7 +101,7 @@ describe("PluginsIndex", () => {
     renderPluginsIndex();
 
     expect(
-      screen.getByText("No plugins are currently available in this environment."),
+      screen.getByText("No plugin workflows are available right now."),
     ).toBeInTheDocument();
     expect(
       screen.queryByText(/build_example_plugins|uv run python/i),

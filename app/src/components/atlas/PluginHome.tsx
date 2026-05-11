@@ -74,7 +74,7 @@ export function PluginHome({
             </div>
             <div className="min-w-0 flex-1">
               <div className="text-[10.5px] font-bold uppercase tracking-[0.12em]" style={{ color: "var(--ink-3)" }}>
-                PLUGIN · INSTALLED
+                WORKSPACE · READY
               </div>
               <div
                 className="mt-2 flex items-baseline gap-2.5 text-[26px] font-semibold leading-[1.1] tracking-tight"
@@ -106,7 +106,7 @@ export function PluginHome({
                 }}
               >
                 <Play className="h-3 w-3" strokeWidth={1.5} />
-                Start new run
+                Start run
               </button>
               <button
                 className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md border px-4 py-2 text-[12.5px] font-medium hover:bg-[var(--surface-2)]"
@@ -160,8 +160,8 @@ function PermissionsLedger({ manifest }: { manifest: PluginManifest }) {
       return {
         key: `read-${i}`,
         icon: Database,
-        label: "Reads patient anchors",
-        detail: `Scope: ${p.scope.join(", ")}. Redaction preset: ${manifest.anchor.redactionPreset}.`,
+        label: "Reads chart context",
+        detail: `Available data: ${p.scope.join(", ")}. Privacy preset: ${manifest.anchor.redactionPreset}.`,
         warn: false,
       };
     }
@@ -170,22 +170,22 @@ function PermissionsLedger({ manifest }: { manifest: PluginManifest }) {
       return {
         key: `ext-${i}`,
         icon: Globe,
-        label: `Calls ${c?.label ?? p.connector}`,
-        detail: `Endpoint pattern: ${c?.endpointPattern ?? "—"}. Auth: ${c?.auth ?? "—"}.`,
+        label: `Looks up ${c?.label ?? p.connector}`,
+        detail: `Connection: ${c?.auth ?? "—"}. Endpoint: ${c?.endpointPattern ?? "—"}.`,
         warn: false,
       };
     }
     return {
       key: `out-${i}`,
       icon: Send,
-      label: `Sends outbound · ${p.channel}`,
-      detail: "Gated by per-run consent + per-action approval. Every send writes a provenance row.",
+      label: `Sends approved updates · ${p.channel}`,
+      detail: "Nothing leaves Atlas until the clinician approves the action for this run.",
       warn: true,
     };
   });
 
   return (
-    <Section title="Permissions ledger" note="What this plugin is allowed to do, scoped to your workspace.">
+    <Section title="Access and send rules" note="What this workspace can read, look up, or send for the current patient.">
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
         {cards.map((c) => {
           const PIcon = c.icon;
@@ -229,8 +229,8 @@ function WorkflowGrid({
 }) {
   return (
     <Section
-      title="Workflows"
-      note="Pick a workflow to start a new run. The run becomes a session in this workspace."
+      title="Available workflows"
+      note="Pick a workflow to start a session in this workspace."
     >
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         {manifest.workflows.map((w) => (
@@ -327,7 +327,7 @@ function RecentRunsTable({
         )}
         {!loading && runs.length === 0 && (
           <div className="px-3.5 py-3 text-[12.5px]" style={{ color: "var(--ink-3)" }}>
-            No runs yet for this plugin. Start one from a workflow card.
+            No runs yet. Start one from a workflow above.
           </div>
         )}
         {runs.map((r) => (
@@ -363,15 +363,15 @@ function RecentRunsTable({
 
 function AboutSection({ manifest }: { manifest: PluginManifest }) {
   return (
-    <Section title="About this plugin">
+    <Section title="Workspace details">
       <div className="overflow-hidden rounded-md border" style={{ background: "var(--surface-1)", borderColor: "var(--line-1)" }}>
         <AboutRow label="Vendor" value={manifest.vendor.name} />
         <AboutRow label="Vendor key" value={manifest.vendor.keyFingerprint} mono />
         <AboutRow label="Version" value={`@${manifest.version}`} mono />
-        <AboutRow label="Anchor scope" value={manifest.anchor.scope.join(", ")} />
-        <AboutRow label="Redaction preset" value={manifest.anchor.redactionPreset} mono />
-        <AboutRow label="Anchor TTL" value={`${manifest.anchor.ttlSeconds}s`} />
-        <AboutRow label="Trust posture" value={`${manifest.trust.posture} · ${manifest.trust.boundaryLabel}`} />
+        <AboutRow label="Chart data available" value={manifest.anchor.scope.join(", ")} />
+        <AboutRow label="Privacy preset" value={manifest.anchor.redactionPreset} mono />
+        <AboutRow label="Session package TTL" value={`${manifest.anchor.ttlSeconds}s`} />
+        <AboutRow label="Boundary" value={manifest.trust.boundaryLabel} />
         <AboutRow label="Exports" value={manifest.exports.join(", ")} />
       </div>
     </Section>

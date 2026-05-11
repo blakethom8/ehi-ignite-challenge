@@ -203,7 +203,7 @@ describe("CaspianWorkspace", () => {
     await waitFor(() => {
       expect(screen.queryByTestId("workspace-frame")).not.toBeInTheDocument();
       expect(
-        screen.getByText("Choose a patient before opening the clinical workspace."),
+        screen.getByText("Choose a patient before opening Caspian."),
       ).toBeInTheDocument();
     });
   });

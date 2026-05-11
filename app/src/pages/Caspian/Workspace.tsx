@@ -33,17 +33,17 @@ export function CaspianWorkspace() {
         <StartStateCard
           icon={ShieldCheck}
           eyebrow="Caspian"
-          title="Choose a patient before opening the clinical workspace."
-          body="Caspian should start as a focused clinical reasoning workspace with the patient context already in place. Select a demo patient first so the shell opens with a grounded chart, evidence flow, and live assistant session."
+          title="Choose a patient before opening Caspian."
+          body="Caspian works best when it opens with a chart already selected. Pick a patient first so you can review the record, ask focused questions, and inspect supporting evidence in one place."
           bullets={[
-            "Open the workspace only after the patient context is explicit.",
-            "Keep citations, trace, and reasoning tied to one chart from the start.",
-            "Avoid dropping first-time users into a dense five-pane shell with no patient selected.",
+            "Start with one patient so the conversation stays grounded in a single chart.",
+            "Keep answers, citations, and trace tied to the same review session.",
+            "Avoid opening the full workspace before there is a chart to review.",
           ]}
           aside={
             <DemoPatientPicker
               destination={(demoPatientId) => `/caspian?patient=${encodeURIComponent(demoPatientId)}`}
-              title="Open Caspian in demo mode"
+              title="Open Caspian with a demo patient"
             />
           }
         />

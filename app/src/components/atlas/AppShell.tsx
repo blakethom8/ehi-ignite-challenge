@@ -114,7 +114,7 @@ export function AppShell({
   const shellUser = useMemo<User>(() => {
     if (!user) {
       return mode === "demo"
-        ? { initials: "DM", name: "Demo Session", org: "Atlas demo access" }
+        ? { initials: "DM", name: "Demo Access", org: "Atlas workspace" }
         : DEFAULT_USER;
     }
     return {

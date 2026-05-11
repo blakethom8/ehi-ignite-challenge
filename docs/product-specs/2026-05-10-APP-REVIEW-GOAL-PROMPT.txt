@@ -1,0 +1,43 @@
+Goal: Perform a deep, end-to-end review and hardening pass of the EHI Ignite application after the recent Atlas/Caspian refactors, with primary focus on navigation integrity, workspace-shell behavior, backend data flow, and the test strategy needed to make the system reliable.
+
+Success means:
+1. Every major user flow is mapped and reviewed across the current application shell, including Patient Record, FHIR Charts, Caspian, Workspaces/Plugins, preview/workbench surfaces, canvas/stateful run surfaces, files, and inspector/navigation interactions.
+2. Navigation, routing, pane behavior, and state persistence issues are identified, prioritized, and fixed or turned into a concrete punch list with clear file-level ownership.
+3. Backend data contracts and flow are traced from API routes through workspace state, app data, canvas data, preview/workbench artifacts, and tool-call surfaces, with special attention to places where refactors may have broken assumptions.
+4. The testing strategy is redesigned to match the current architecture, covering:
+   - route and navigation correctness
+   - workspace shell and pane interactions
+   - API/data-contract integrity
+   - canvas/workbench/app-state behavior
+   - tool-call behavior and agent-facing interfaces
+   - quality of final LLM outputs, including groundedness, citations, tool usage, and artifact interaction
+5. LLM evaluation is treated as a first-class test target, not just “did the model return a response.” The system should define and measure what matters:
+   - clinical relevancy to the user’s task
+   - factual grounding in the available chart / bundle / evidence context
+   - correctness and usefulness of tool calls
+   - ability to correctly reference and use preview-pane, canvas, file, and app data
+   - response quality, including clarity, prioritization, safety, and actionability
+   - observability, including traceability of inputs, tool usage, citations, intermediate logs, and run metadata
+   - latency and responsiveness, including time-to-first-response and total time-to-useful-answer
+   - consistency and regression detection across repeated or benchmarked prompts
+6. The output is not just bug fixes, but a durable verification framework: recommended test layers, missing coverage, concrete new tests to add, and a prioritized reliability plan for the application.
+7. The upstream data pipeline should be treated as a separate review stream unless a downstream issue clearly depends on malformed bundle output; the main objective here is to stabilize and validate everything downstream that consumes those bundles.
+
+Non-goals:
+- Do not boil the ocean on the raw ingestion/pipeline stack in this pass.
+- Do not redesign product scope unless a reliability issue forces an architectural decision.
+- Do not treat visual polish as primary unless it blocks navigation clarity or workflow correctness.
+
+Primary deliverables:
+- a full-system navigation and data-flow review
+- a prioritized defect and risk list
+- targeted fixes where confidence is high
+- a revamped test plan aligned to the new harness/workspace architecture
+- a definition of “good” for agentic output quality, tool use, preview/workbench interaction, canvas/app-state correctness, observability, and response timing
+
+Operating guidance:
+- Keep the review grounded in the current Atlas/Caspian harness architecture rather than the older route-per-module model.
+- Separate first-party Caspian review behavior from plugin/workspace behavior where trust posture, tools, approvals, or state models differ.
+- Treat preview/workbench surfaces, canvas objects, file references, and inspector/evidence flows as first-class parts of the application contract, not side features.
+- Prefer durable fixes and durable test coverage over one-off cleanup.
+- Escalate upstream pipeline issues only when they materially block downstream validation; otherwise log them into the separate pipeline review stream.

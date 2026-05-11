@@ -1,22 +1,254 @@
 @import "tailwindcss";
 
-@theme {
-  --color-primary: #5b76fe;
-  --color-primary-pressed: #2a41b6;
-  --color-near-black: #1c1c1e;
-  --color-slate: #555a6a;
-  --color-placeholder: #a5a8b5;
-  --color-border: #c7cad5;
-  --color-ring: rgb(224 226 232);
-  --color-success: #00b473;
+/* ============================================================
+   Atlas Agentic Workspaces — design tokens
+   Source: .claude/handoff/atlas/tokens/design-tokens.css
+   The chrome (module bar + titlebar) is constant across themes;
+   it is part of the brand, not a theme switch.
+   ============================================================ */
 
-  /* Clinical risk */
-  --color-risk-critical-bg: #ffc6c6;
-  --color-risk-critical-text: #600000;
-  --color-risk-warning-bg: #ffe6cd;
-  --color-risk-warning-text: #744000;
-  --color-risk-clear-bg: #c3faf5;
-  --color-risk-clear-text: #187574;
+:root {
+  /* ============== SURFACES — cool paper, never beige ============== */
+  --bg-app:          #eef2f6;
+  --bg-chrome:       #f4f7fb;
+  --surface-0:       #ffffff;
+  --surface-1:       #fafbfc;
+  --surface-2:       #f1f4f8;
+  --surface-3:       #e8edf3;
+  --surface-elevated:#ffffff;
+
+  /* ============== INK (text) ============== */
+  --ink-1: #0b1220;
+  --ink-2: #2b3648;
+  --ink-3: #5b6677;
+  --ink-4: #8b95a6;
+  --ink-5: #b6bfcc;
+
+  /* ============== LINES ============== */
+  --line-1: #dde3ea;
+  --line-2: #cdd5df;
+  --line-3: #aab3c0;
+
+  /* ============== ACTION — clinical blue ============== */
+  --action:        #1d4ed8;
+  --action-hover:  #1e40af;
+  --action-press:  #1e3a8a;
+  --action-tint:   #e8eefe;
+  --action-tint-2: #dbe5fd;
+  --action-line:   #b9c9f7;
+
+  /* ============== SEMANTIC ============== */
+  --critical:      #b91c1c;
+  --critical-tint: #fdecec;
+  --critical-line: #f4b4b4;
+  --caution:       #a85a07;
+  --caution-tint:  #fdf5e6;
+  --caution-line:  #f0d39a;
+  --clear:         #047857;
+  --clear-tint:    #e7f6ef;
+  --clear-line:    #a0d9bc;
+  --info:          #0e7490;
+  --info-tint:     #e6f5f7;
+
+  /* ============== MODULE IDENTITY ============== */
+  --mod-record: #475569;
+  --mod-preop:  #1d4ed8;
+  --mod-trials: #4338ca;
+  --mod-meds:   #0f766e;
+
+  /* ============== CHROME (dark titlebar + module bar) ============== */
+  /* Constant across light/dark mode — part of the brand, not a theme switch. */
+  --chrome-modulebar:    #0c1320;
+  --chrome-titlebar:     #0f172a;
+  --chrome-text:         rgba(229, 233, 240, 0.85);
+  --chrome-text-muted:   rgba(229, 233, 240, 0.62);
+  --chrome-hover-bg:     rgba(255, 255, 255, 0.05);
+  --chrome-active-bg:    rgba(255, 255, 255, 0.08);
+  --chrome-divider:      rgba(255, 255, 255, 0.06);
+
+  /* ============== TYPE ============== */
+  --font-sans:  "Inter Tight", -apple-system, "Segoe UI", sans-serif;
+  --font-serif: "Source Serif 4", "Iowan Old Style", Georgia, serif;
+  --font-mono:  "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  /* ============== SPACING (4px base) ============== */
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 20px;
+  --s6: 24px;
+  --s8: 32px;
+
+  /* ============== RADII ============== */
+  --r-1:    4px;
+  --r-2:    6px;
+  --r-3:    10px;
+  --r-pill: 999px;
+
+  /* ============== SHADOW ============== */
+  --shadow-1: 0 1px 2px  rgba(15, 23, 42, 0.04);
+  --shadow-2: 0 4px 14px rgba(15, 23, 42, 0.06);
+  --shadow-3: 0 18px 40px rgba(15, 23, 42, 0.10);
+
+  /* ============== MOTION ============== */
+  --motion-fast:  120ms ease-out;
+  --motion-modal: 160ms ease-out;
+}
+
+[data-theme="dark"] {
+  --bg-app:          #0c1014;
+  --bg-chrome:       #11161c;
+  --surface-0:       #161b22;
+  --surface-1:       #1a2029;
+  --surface-2:       #21283280;
+  --surface-3:       #2a3340;
+  --surface-elevated:#1a2029;
+
+  --ink-1: #e8edf3;
+  --ink-2: #c2cad6;
+  --ink-3: #8e98a7;
+  --ink-4: #6a7383;
+  --ink-5: #4a5260;
+
+  --line-1: #262d37;
+  --line-2: #2f3845;
+  --line-3: #3a4554;
+
+  --action:        #5b8af0;
+  --action-hover:  #7da4f5;
+  --action-press:  #4a78dc;
+  --action-tint:   rgba(91, 138, 240, 0.14);
+  --action-tint-2: rgba(91, 138, 240, 0.22);
+  --action-line:   rgba(91, 138, 240, 0.35);
+
+  --critical-tint: rgba(185, 28, 28, 0.14);
+  --caution-tint:  rgba(168, 90, 7, 0.16);
+  --clear-tint:    rgba(4, 120, 87, 0.16);
+  --info-tint:     rgba(14, 116, 144, 0.16);
+}
+
+/* Optional accent palette swaps (apply to <html data-accent="indigo|teal|graphite">) */
+[data-accent="indigo"] {
+  --action:        #4338ca;
+  --action-hover:  #3730a3;
+  --action-press:  #312e81;
+  --action-tint:   #ecebfe;
+  --action-tint-2: #dcdafe;
+  --action-line:   #c4c1f8;
+}
+[data-accent="teal"] {
+  --action:        #0f766e;
+  --action-hover:  #115e59;
+  --action-press:  #134e4a;
+  --action-tint:   #e3f6f3;
+  --action-tint-2: #cdeae6;
+  --action-line:   #9fd8d0;
+}
+[data-accent="graphite"] {
+  --action:        #334155;
+  --action-hover:  #1f2937;
+  --action-press:  #0f172a;
+  --action-tint:   #eaedf2;
+  --action-tint-2: #d8dde5;
+  --action-line:   #b9c0cb;
+}
+
+/* ============================================================
+   Tailwind v4 @theme — utility class generation
+   Atlas tokens are first-class; legacy aliases below remap
+   the previous Miro palette to the new clinical-blue tokens
+   so existing components rebrand without code changes.
+   ============================================================ */
+@theme {
+  /* --- Atlas color contract --- */
+  --color-app:        var(--bg-app);
+  --color-chrome:     var(--bg-chrome);
+  --color-surface-0:  var(--surface-0);
+  --color-surface-1:  var(--surface-1);
+  --color-surface-2:  var(--surface-2);
+  --color-surface-3:  var(--surface-3);
+
+  --color-ink-1: var(--ink-1);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-ink-4: var(--ink-4);
+  --color-ink-5: var(--ink-5);
+
+  --color-line-1: var(--line-1);
+  --color-line-2: var(--line-2);
+  --color-line-3: var(--line-3);
+
+  --color-action:        var(--action);
+  --color-action-hover:  var(--action-hover);
+  --color-action-press:  var(--action-press);
+  --color-action-tint:   var(--action-tint);
+  --color-action-tint-2: var(--action-tint-2);
+  --color-action-line:   var(--action-line);
+
+  --color-critical:      var(--critical);
+  --color-critical-tint: var(--critical-tint);
+  --color-critical-line: var(--critical-line);
+  --color-caution:       var(--caution);
+  --color-caution-tint:  var(--caution-tint);
+  --color-caution-line:  var(--caution-line);
+  --color-clear:         var(--clear);
+  --color-clear-tint:    var(--clear-tint);
+  --color-clear-line:    var(--clear-line);
+  --color-info:          var(--info);
+  --color-info-tint:     var(--info-tint);
+
+  --color-mod-record: var(--mod-record);
+  --color-mod-preop:  var(--mod-preop);
+  --color-mod-trials: var(--mod-trials);
+  --color-mod-meds:   var(--mod-meds);
+
+  --color-chrome-modulebar: var(--chrome-modulebar);
+  --color-chrome-titlebar:  var(--chrome-titlebar);
+
+  /* --- Legacy aliases (Miro palette -> Atlas clinical blue) ---
+     Existing components use bg-primary / text-near-black / text-slate /
+     bg-risk-* / text-risk-* / bg-success. Keep the class names valid;
+     remap the values so the rebrand lands without TSX edits. */
+  --color-primary:           var(--action);
+  --color-primary-pressed:   var(--action-press);
+  --color-near-black:        var(--ink-1);
+  --color-slate:             var(--ink-3);
+  --color-placeholder:       var(--ink-4);
+  --color-border:            var(--line-2);
+  --color-ring:              var(--line-1);
+  --color-success:           var(--clear);
+  --color-risk-critical-bg:   var(--critical-tint);
+  --color-risk-critical-text: var(--critical);
+  --color-risk-warning-bg:    var(--caution-tint);
+  --color-risk-warning-text:  var(--caution);
+  --color-risk-clear-bg:      var(--clear-tint);
+  --color-risk-clear-text:    var(--clear);
+
+  /* --- Type --- */
+  --font-sans:  var(--font-sans);
+  --font-serif: var(--font-serif);
+  --font-mono:  var(--font-mono);
+
+  /* --- Spacing — extend, don't replace --- */
+  --spacing-s1: var(--s1);
+  --spacing-s2: var(--s2);
+  --spacing-s3: var(--s3);
+  --spacing-s4: var(--s4);
+  --spacing-s5: var(--s5);
+  --spacing-s6: var(--s6);
+  --spacing-s8: var(--s8);
+
+  /* --- Radii --- */
+  --radius-r1:   var(--r-1);
+  --radius-r2:   var(--r-2);
+  --radius-r3:   var(--r-3);
+  --radius-pill: var(--r-pill);
+
+  /* --- Shadow --- */
+  --shadow-s1: var(--shadow-1);
+  --shadow-s2: var(--shadow-2);
+  --shadow-s3: var(--shadow-3);
 }
 
 *, *::before, *::after {
@@ -25,10 +257,13 @@
 
 body {
   margin: 0;
-  font-family: "Noto Sans", system-ui, sans-serif;
-  color: #1c1c1e;
-  background-color: #f5f6f8;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-1);
+  background-color: var(--bg-app);
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 #root {
@@ -47,14 +282,55 @@ body {
   -webkit-appearance: none;
 }
 .scroll-visible::-webkit-scrollbar-track {
-  background: #f1f2f4;
+  background: var(--surface-2);
   border-radius: 4px;
 }
 .scroll-visible::-webkit-scrollbar-thumb {
-  background: #c7cad5;
+  background: var(--line-2);
   border-radius: 4px;
-  border: 1px solid #f1f2f4;
+  border: 1px solid var(--surface-2);
 }
 .scroll-visible::-webkit-scrollbar-thumb:hover {
-  background: #a5a8b5;
+  background: var(--line-3);
 }
+
+/* Atlas: pane resizers (used by the workspace shell — Phase 3) */
+.atlas-resizer-v {
+  width: 5px;
+  cursor: col-resize;
+  background: transparent;
+  position: relative;
+  flex: 0 0 5px;
+  z-index: 5;
+}
+.atlas-resizer-v::after {
+  content: "";
+  position: absolute;
+  inset: 0 2px;
+  background: transparent;
+  transition: background var(--motion-fast);
+}
+.atlas-resizer-v:hover::after,
+.atlas-resizer-v.dragging::after {
+  background: var(--action-line);
+}
+.atlas-resizer-h {
+  height: 5px;
+  cursor: row-resize;
+  background: transparent;
+  position: relative;
+  z-index: 5;
+}
+.atlas-resizer-h::after {
+  content: "";
+  position: absolute;
+  inset: 2px 0;
+  background: transparent;
+  transition: background var(--motion-fast);
+}
+.atlas-resizer-h:hover::after,
+.atlas-resizer-h.dragging::after {
+  background: var(--action-line);
+}
+body.atlas-resizing-v { cursor: col-resize !important; user-select: none; }
+body.atlas-resizing-h { cursor: row-resize !important; user-select: none; }

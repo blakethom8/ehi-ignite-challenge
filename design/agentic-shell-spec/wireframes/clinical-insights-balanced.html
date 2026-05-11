@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Clinical Insights Balanced Shell</title>
+  <link rel="stylesheet" href="./atlas-wireframes.css">
+</head>
+<body class="wireframe-page">
+  <div class="window">
+    <div class="titlebar">
+      <div class="traffic"><span></span><span></span><span></span></div>
+      <div class="titlebar-center">
+        <div class="crumbs">
+          <strong>Atlas</strong>
+          <span>/</span>
+          <span>Clinical Insights</span>
+          <span>/</span>
+          <span>Demo Patient - Trial Match</span>
+        </div>
+      </div>
+      <div class="titlebar-actions">
+        <button class="icon-btn active" title="Toggle sessions pane" aria-label="Toggle sessions pane">S</button>
+        <button class="icon-btn active" title="Toggle preview pane" aria-label="Toggle preview pane">P</button>
+        <button class="icon-btn active" title="Toggle files pane" aria-label="Toggle files pane">F</button>
+        <button class="icon-btn" title="Toggle inspector pane" aria-label="Toggle inspector pane">I</button>
+      </div>
+    </div>
+
+    <div class="page-note">
+      <strong>Variant A · Clinical family</strong>
+      Balanced operator shell. The preview is a tabbed surface, the file pane is a real directory tree,
+      and pane toggle buttons are promoted into the top chrome.
+    </div>
+    <div class="workspace-banner">
+      <span class="pill teal">Clinical Insights</span>
+      <span class="pill blue">Private boundary</span>
+      <span class="pill neutral">Interpretation-first</span>
+      <span class="pill neutral">No default progress pane</span>
+    </div>
+
+    <main class="shell shell-grid balanced">
+      <aside class="rail">
+        <div class="rail-stack">
+          <div class="brand" title="Atlas">AT</div>
+          <div class="rail-btn active" title="Clinical Insights">Clinical</div>
+          <div class="rail-btn" title="Workspace Library">Library</div>
+          <div class="rail-btn" title="Patients">Patients</div>
+          <div class="rail-btn" title="Review and Trace">Review</div>
+          <div class="rail-btn" title="Settings">Settings</div>
+        </div>
+      </aside>
+
+      <aside class="sessions">
+        <div class="pane-head">
+          <div>
+            <strong>Sessions</strong>
+            <span class="pane-subtitle">Dense run rows and pinned workflow surfaces for Clinical Insights</span>
+          </div>
+          <div class="toggle-row">
+            <button class="icon-btn" title="Collapse sessions pane" aria-label="Collapse sessions pane">-</button>
+            <button class="icon-btn" title="Hide sessions pane" aria-label="Hide sessions pane">x</button>
+          </div>
+        </div>
+        <div class="session-list">
+          <div class="session-item active">
+            <strong>Pre-op review</strong>
+            <span>Run in progress · private boundary</span>
+          </div>
+          <div class="session-item">
+            <strong>Medication safety</strong>
+            <span>Saved artifact · 2 hours ago</span>
+          </div>
+          <div class="session-item">
+            <strong>Longitudinal synthesis</strong>
+            <span>Needs approval · 1 unresolved question</span>
+          </div>
+          <div class="session-item">
+            <strong>Specialist briefing</strong>
+            <span>Draft only · no packet exported</span>
+          </div>
+        </div>
+
+        <div class="split-label">
+          <p class="section-label">Workflow triggers</p>
+          <a class="section-link" href="#">Open catalog</a>
+        </div>
+        <div class="session-list">
+          <div class="session-item active">
+            <strong>Run pre-op review</strong>
+            <span>Uses pinned meds, recent labs, operative notes, and prior anesthesia context</span>
+            <div class="compact-actions">
+              <div class="compact-action">Pin surface</div>
+              <div class="compact-action">Start run</div>
+            </div>
+          </div>
+          <div class="session-item">
+            <strong>Build handoff packet</strong>
+            <span>Exports a concise artifact, not a page-specific report UI</span>
+          </div>
+        </div>
+      </aside>
+
+      <section class="chat-pane">
+        <div class="pane-head">
+          <div>
+            <strong>Clinical chat</strong>
+            <span class="pane-subtitle">Chat, approvals, and pinned context for the current workspace run</span>
+          </div>
+          <span class="pill teal">Private workspace</span>
+        </div>
+
+        <div class="chat-scroll">
+          <div class="meta-line">Run 5 commands, opened 2 citations, pinned 3 files</div>
+
+          <div class="chat-block user">
+            <div class="bubble">
+              Run the pre-op workflow, but hold if the anticoagulation guidance is ambiguous. Keep the
+              app preview and the brief visible while you work.
+            </div>
+          </div>
+
+          <div class="chat-block assistant">
+            <div class="bubble assistant-text">
+              I opened the app preview in the right pane and pinned the clearance brief, the
+              anticoagulation note, and the most recent CBC. If the recommendation depends on a missing
+              hold interval, I will stop and surface an approval card before drafting the artifact.
+            </div>
+            <div class="action-row">
+              <span class="action-chip">Open citation c_1042</span>
+              <span class="action-chip">Pin operative note</span>
+              <span class="action-chip">Compare last brief</span>
+            </div>
+          </div>
+
+          <div class="chat-block assistant">
+            <div class="bubble assistant-text">
+              The workspace now has four stable surfaces: chat, preview, files, and evidence. The
+              preview is carrying the clinical app, but I can also switch that same pane to
+              <span class="note-inline">pre-op-brief.md</span> or to workspace settings without opening a new page.
+            </div>
+          </div>
+        </div>
+
+        <div class="composer">
+          <div class="composer-controls">
+            <button class="mini-btn">+</button>
+            <button class="mini-btn">Ask</button>
+          </div>
+          <div class="input-surface">Write a message, pin an object, or open a pane...</div>
+          <div class="composer-controls">
+            <span class="pill blue">Model: clinical-high</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="preview-pane">
+        <div class="pane-head">
+          <div>
+            <strong>Workspace preview</strong>
+            <span class="pane-subtitle">App, notes, artifacts, and settings all open here as tabs</span>
+          </div>
+          <div class="toggle-row">
+            <button class="icon-btn" title="Collapse preview pane" aria-label="Collapse preview pane">-</button>
+            <button class="icon-btn" title="Hide preview pane" aria-label="Hide preview pane">x</button>
+          </div>
+        </div>
+
+        <div class="tabs">
+          <div class="tab active">App <span class="close">x</span></div>
+          <div class="tab">pre-op-brief.md <span class="close">x</span></div>
+          <div class="tab">anticoagulation-note.txt <span class="close">x</span></div>
+          <div class="tab">settings.json <span class="close">x</span></div>
+        </div>
+
+        <div class="preview-scroll">
+          <div class="preview-app">
+            <h1>Pre-op readiness workspace</h1>
+            <p>
+              The app surface is compact, information-dense, and intended to be worked alongside chat.
+              It is not a fluffy landing card. It is a small operating panel for the current workflow.
+            </p>
+
+            <div class="data-strip">
+              <div class="metric">
+                <div class="label">Status</div>
+                <div class="value">Needs review</div>
+              </div>
+              <div class="metric">
+                <div class="label">Pinned facts</div>
+                <div class="value">14</div>
+              </div>
+              <div class="metric">
+                <div class="label">Unresolved</div>
+                <div class="value">1</div>
+              </div>
+              <div class="metric">
+                <div class="label">Artifacts</div>
+                <div class="value">3</div>
+              </div>
+            </div>
+
+            <table class="review-table">
+              <thead>
+                <tr>
+                  <th>Domain</th>
+                  <th>Signal</th>
+                  <th>Evidence</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Anticoagulation</td>
+                  <td>Hold interval needs confirmation</td>
+                  <td>c_1042 · recent med list · surgical note</td>
+                </tr>
+                <tr>
+                  <td>Labs</td>
+                  <td>CBC acceptable, INR pending recheck</td>
+                  <td>latest CBC · prior trend · provider message</td>
+                </tr>
+                <tr>
+                  <td>Anesthesia</td>
+                  <td>No prior airway complication found</td>
+                  <td>historical anesthesia note · chart summary</td>
+                </tr>
+              </tbody>
+            </table>
+
+            <ul class="compact-list">
+              <li><span>Next action</span><strong>Pause for anticoagulation approval</strong></li>
+              <li><span>Export target</span><strong>pre-op-packet-v2.md</strong></li>
+              <li><span>Boundary</span><strong>Private only</strong></li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="status-bar">
+          <span>Shared preview pane: app, files, notes, and settings all open here as tabs</span>
+          <span>Workspace route stays stable</span>
+        </div>
+      </section>
+
+      <aside class="files-pane">
+        <div class="pane-head">
+          <div>
+            <strong>Workspace files</strong>
+            <span class="pane-subtitle">Directory-style assets, notes, and generated artifacts</span>
+          </div>
+          <div class="toggle-row">
+            <button class="icon-btn" title="Collapse files pane" aria-label="Collapse files pane">-</button>
+            <button class="icon-btn" title="Hide files pane" aria-label="Hide files pane">x</button>
+          </div>
+        </div>
+
+        <div class="filter-wrap">
+          <input class="filter-input" placeholder="Filter files... (?text to search contents)" aria-label="Filter files">
+        </div>
+
+        <div class="tree-scroll">
+          <p class="tree-group-title">Patient workspace</p>
+          <div class="tree-row"><span class="tree-icon">v</span><span class="tree-folder">context</span></div>
+          <div class="tree-row tree-indent-1 active"><span class="tree-icon">•</span><span class="tree-mono">pre-op-brief.md</span></div>
+          <div class="tree-row tree-indent-1"><span class="tree-icon">•</span><span class="tree-mono">anticoagulation-note.txt</span></div>
+          <div class="tree-row tree-indent-1"><span class="tree-icon">•</span><span class="tree-mono">recent-cbc.csv</span></div>
+          <div class="tree-row"><span class="tree-icon">v</span><span class="tree-folder">artifacts</span></div>
+          <div class="tree-row tree-indent-1"><span class="tree-icon">•</span><span class="tree-mono">pre-op-packet-v2.md</span></div>
+          <div class="tree-row tree-indent-1"><span class="tree-icon">•</span><span class="tree-mono">clearance-summary.json</span></div>
+          <div class="tree-row"><span class="tree-icon">v</span><span class="tree-folder">workflow</span></div>
+          <div class="tree-row tree-indent-1"><span class="tree-icon">•</span><span class="tree-mono">settings.json</span></div>
+          <div class="tree-row tree-indent-1"><span class="tree-icon">•</span><span class="tree-mono">workflow.md</span></div>
+
+          <p class="tree-group-title">Pinned objects</p>
+          <div class="tree-row dim"><span class="tree-icon">#</span><span class="tree-object">citation:c_1042</span></div>
+          <div class="tree-row dim"><span class="tree-icon">#</span><span class="tree-object">artifact:pre-op-brief-v2</span></div>
+          <div class="tree-row dim"><span class="tree-icon">#</span><span class="tree-object">task:approval-anticoag-1</span></div>
+        </div>
+      </aside>
+    </main>
+  </div>
+</body>
+</html>

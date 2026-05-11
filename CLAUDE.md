@@ -71,10 +71,15 @@ ehi-ignite-challenge/
 │
 ├── app/                                   ← React + Vite + TypeScript frontend (PRIMARY)
 │   ├── src/
-│   │   ├── pages/
-│   │   │   ├── Explorer/                  ← FHIR data exploration
-│   │   │   └── PatientJourney/            ← clinician-facing app
+│   │   ├── pages/                         ← organized by Atlas IA module
+│   │   │   ├── Caspian/                   ← /caspian (first-party agentic workspace)
+│   │   │   ├── Plugins/                   ← /workspaces/* (installable plugin packages)
+│   │   │   ├── PatientRecord/             ← /patient-record/* (chart + Data Aggregator)
+│   │   │   ├── FhirCharts/                ← /fhir-charts/* (FHIR resource browser)
+│   │   │   ├── InternalTools/             ← /learn/* (runbooks, evals, labs, skills)
+│   │   │   └── UsingAtlas/                ← /using-atlas/* (docs)
 │   │   ├── components/
+│   │   │   └── atlas/                     ← shared Atlas chrome + workspace shell ⭐
 │   │   ├── hooks/
 │   │   └── api/client.ts
 │   └── vite.config.ts
@@ -137,15 +142,12 @@ ehi-ignite-challenge/
 │   ├── FHIR-EXPLORER-DATA-REVIEW.md       ← original FHIR explorer purpose statement
 │   └── CONTEXT-PIPELINE.md                ← LLM context engineering (TODO)
 │
-├── design/                                ← design system reference
+├── design/                                ← Atlas Agentic Workspaces design system
 │   ├── README.md
-│   └── DESIGN.md                          ← Miro-inspired tokens, components, color roles
+│   ├── DESIGN.md                          ← token quick-reference; points to handoff/atlas/tokens/ ⭐
+│   └── agentic-shell-spec/                ← Atlas shell vision + wireframes ⭐
 │
-├── ideas/                                 ← product specs (read before building)
-│   ├── FEATURE-IDEAS.md
-│   ├── PATIENT-JOURNEY-APP.md             ← patient journey spec ⭐
-│   ├── FORMAT-AGNOSTIC-INGESTION.md       ← ingestion service spec ⭐
-│   └── PODCAST-INSIGHTS-FHIR-POSITIONING.md ← strategic positioning (on feature branch)
+├── docs/ideas/                            ← future-state product specs (FEATURE-IDEAS, etc.)
 │
 ├── research/                              ← committed research artifacts
 │   ├── SQL-ON-FHIR-REVIEW.md              ← SOF prototype review + run_sql tool surface addendum ⭐
@@ -162,10 +164,13 @@ ehi-ignite-challenge/
 │   ├── notes/                             ← josh-stack-deep-dive multi-session notes
 │   ├── scripts/, tests/, app/, docs/      ← Atlas-specific utility, tests, UI, design docs
 │
-├── archive/                               ← Frozen legacy code (do not extend)
+├── archive/                               ← Frozen legacy code + superseded docs (do not extend)
 │   ├── README.md                          ← what's here, why it's frozen
 │   ├── fhir-explorer-streamlit/           ← original Streamlit data-review tool
-│   └── patient-journey-streamlit/         ← original Streamlit clinician journey app
+│   ├── patient-journey-streamlit/         ← original Streamlit clinician journey app
+│   ├── ehi-atlas-5layer/                  ← early 5-layer harmonization scaffold (May 2026)
+│   ├── design-miro/                       ← pre-Atlas Miro-inspired design system
+│   └── ideas-pre-atlas/                   ← product specs for the pre-Atlas IA
 │
 ├── pyproject.toml                         ← UV root environment
 └── uv.lock
@@ -237,24 +242,35 @@ stats = compute_patient_stats(record)
 - See `deploy/` for configs, `docs/architecture/DEPLOYMENT.md` for full setup
 
 ### Design System
-- Miro-inspired (see `design/DESIGN.md`)
-- Primary color: Blue 450 (`#5b76fe`)
-- Display font: Roobert PRO Medium
-- Body font: Noto Sans
+- Atlas Agentic Workspaces (see `design/DESIGN.md` + `.claude/handoff/atlas/`)
+- Primary action color: clinical blue (`#1d4ed8`)
+- App surface: cool paper-white (`#eef2f6`)
+- Display font: Inter Tight (sans), Source Serif 4 (display)
+- Mono: IBM Plex Mono
 
 ---
 
-## Build Order
+## Current shape (Atlas Agentic Workspaces)
+
+The frontend is organized around five top-level modules — see the module bar in `app/src/components/atlas/ModuleBar.tsx`:
+
+| Module | Path | Purpose |
+|---|---|---|
+| **Patient Record** | `/patient-record/*` | Source-of-truth chart layer (absorbs former Data Aggregator) |
+| **FHIR Charts** | `/fhir-charts/*` | FHIR resource browser (former Explorer) |
+| **Caspian** | `/caspian` | First-party agentic clinical workspace |
+| **Workspaces** | `/workspaces/*` | Installable plugin packages (Trial Finder, Med Access, Site Coordination) |
+| **Learn** | `/learn/*` | Internal section — runbooks, evals, methodology, skills |
+
+**Trust posture distinction (architectural promise):** Caspian is a trusted clinical co-pilot with full chart access. Plugins are attested, sandboxed, consented services that read a signed anchor package — never the raw chart. See `docs/architecture/AGENTIC-HARNESS.md` for the contract.
+
+### Backend build order (still active)
 
 1. **FastAPI backend** — stand up `api/`, wire in shared parser from `lib/`, expose patient list + data endpoints
-2. **React shell** — routing, patient selector sidebar, layout
-3. **Explorer views** (React ports of the original Streamlit explorer in `archive/fhir-explorer-streamlit/`): Overview → Timeline → Encounter Hub → Field Profiler → Corpus
-4. **Patient Journey views**: Safety Panel → Medication Timeline → Conditions
-5. **Context engineering pipeline**: `temporal.py` → `batch_enrichment.py` → `context_builder.py`
-6. **NL Search**: streaming Claude Q&A with citations
-7. **Deployment**: Docker Compose → Hetzner
-
-**Current focus: Steps 1–3 (Explorer)**
+2. **Context engineering pipeline**: `temporal.py` → `batch_enrichment.py` → `context_builder.py`
+3. **NL Search**: streaming Claude Q&A with citations
+4. **Plugin runtime** (new): manifest verification + anchor compilation + consent gate (see AGENTIC-HARNESS.md §5)
+5. **Deployment**: Docker Compose → Hetzner
 
 ---
 
@@ -262,13 +278,17 @@ stats = compute_patient_stats(record)
 
 | Doc | What It Is |
 |---|---|
-| `docs/architecture/ATLAS-DATA-MODEL.md` | ⭐ **Read this first.** Architectural decisions for Atlas's data layer — FHIR R4 + USCDI as silver, bronze preserves native shape, LLM-authored mapping specs, hot path UI + cold path agent, Provenance graph as the wedge |
+| `.claude/handoff/atlas/README.md` | ⭐ **Read this first.** Atlas Agentic Workspaces handoff spec — IA, tokens, components, routing, voice & copy |
+| `docs/architecture/AGENTIC-HARNESS.md` | ⭐ Caspian vs. Plugins — what's shared (the harness) vs. what differs (trust posture, runtime, audit) |
+| `app/src/components/atlas/README.md` | Current shared-component inventory + conventions (read before touching workspace shell) |
+| `design/agentic-shell-spec/` | Agentic shell vision — north-star spec the redesign is built from |
+| `docs/architecture/ATLAS-DATA-MODEL.md` | Architectural decisions for Atlas's data layer — FHIR R4 + USCDI as silver, bronze preserves native shape, LLM-authored mapping specs, hot path UI + cold path agent, Provenance graph as the wedge |
 | `docs/architecture/PDF-PROCESSOR.md` | ⭐ PDF → FHIR pipeline decision record. Seven decisions, bake-off results, vision-wins evidence. Read before touching any extraction code. |
 | `docs/architecture/PIPELINE-LOG.md` | Running journal of pipeline experiments — bake-off result tables, prompt-tuning A/Bs, model-swap experiments. Append-only, newest at top. |
 | `docs/architecture/CONTEXT-ENGINEERING.md` | 5-layer LLM context pipeline design — read before building batch_enrichment or NL search |
 | `docs/architecture/DATA-DEFINITIONS.md` | Full data model reference — encounter types, medication records, observation fields |
-| `ideas/PATIENT-JOURNEY-APP.md` | Full product spec for the clinical journey app |
-| `docs/architecture/ECOSYSTEM-OVERVIEW.md` | Platform framing and complete directory layout |
+| `docs/architecture/ECOSYSTEM-OVERVIEW.md` | Platform framing and directory layout |
+| `archive/ideas-pre-atlas/` | Pre-Atlas product spec docs (PatientJourneyApp, FormatAgnosticIngestion, DataAggregatorWireframes) — historical record only |
 | `docs/architecture/DEPLOYMENT.md` | Hetzner + Docker Compose deployment guide |
 | `docs/architecture/tracing.md` | LLM observability — traces, spans, token/cost tracking, Langfuse |
 | `research/SQL-ON-FHIR-REVIEW.md` | SOF prototype "was it worth it" review **+ `run_sql` tool-surface addendum** (Phase 0) |
@@ -276,8 +296,8 @@ stats = compute_patient_stats(record)
 | `lib/sql_on_fhir/views/README.md` | Pure views, filtered subset views, enriched columns, derived tables/views — the four warehouse layers and how to extend each |
 | `lib/README.md` | Shared library code — what's where, import conventions |
 | `ehi-atlas/CLAUDE.md` | Atlas development zone — corpus bench, prototypes, notes, promotion path |
-| `archive/README.md` | Frozen legacy Streamlit shells — what they were, what replaced them |
-| `design/DESIGN.md` | Miro-inspired design tokens + component guide |
+| `archive/README.md` | Frozen legacy Streamlit shells + pre-Atlas design + ideas — what they were, what replaced them |
+| `design/DESIGN.md` | Atlas Agentic Workspaces design tokens — quick reference + pointers to the canonical sources |
 
 ### SQL-on-FHIR quick reference
 

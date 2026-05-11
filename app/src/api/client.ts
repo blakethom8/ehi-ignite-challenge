@@ -66,7 +66,19 @@ import type {
   PipelineEvaluationDetail,
   PipelineLabLeaderboardResponse,
 } from "../types";
-import { mockPatients } from "./mockData";
+import {
+  getMockAggregationSources,
+  getMockAggregationUploadJson,
+  getMockAggregationUploadPreview,
+  getMockCanonicalSummary,
+  getMockHarmonizeCollections,
+  getMockHarmonizeWorkspace,
+  getMockLatestHarmonizationRun,
+  getMockOverview,
+  getMockPatientContextStatus,
+  getMockPublishedChart,
+  mockPatients,
+} from "./mockData";
 
 const http = axios.create({
   baseURL: "/api",
@@ -95,11 +107,17 @@ export const api = {
 
   /** Full patient overview — loads and parses the FHIR bundle */
   getOverview: (patientId: string): Promise<PatientOverview> =>
-    http.get<PatientOverview>(`/patients/${patientId}/overview`).then((r) => r.data),
+    getOrMock(
+      http.get<PatientOverview>(`/patients/${patientId}/overview`).then((r) => r.data),
+      getMockOverview(patientId),
+    ),
 
   /** Canonical patient workspace summary — source-agnostic read facade */
   getCanonicalSummary: (patientId: string): Promise<CanonicalPatientSummary> =>
-    http.get<CanonicalPatientSummary>(`/canonical/${patientId}/summary`).then((r) => r.data),
+    getOrMock(
+      http.get<CanonicalPatientSummary>(`/canonical/${patientId}/summary`).then((r) => r.data),
+      getMockCanonicalSummary(patientId),
+    ),
 
   /** Encounter timeline */
   getTimeline: (patientId: string): Promise<TimelineResponse> =>
@@ -175,7 +193,10 @@ export const api = {
 
   /** Patient-facing guided context intake */
   getPatientContextStatus: (): Promise<PatientContextStatus> =>
-    http.get<PatientContextStatus>("/patient-context/status").then((r) => r.data),
+    getOrMock(
+      http.get<PatientContextStatus>("/patient-context/status").then((r) => r.data),
+      getMockPatientContextStatus(),
+    ),
 
   createPatientContextSession: (
     patientId: string,
@@ -210,7 +231,10 @@ export const api = {
     http.delete<AggregationDeleteResponse>(`/aggregation/profiles/${patientId}`).then((r) => r.data),
 
   getAggregationSources: (patientId: string): Promise<AggregationEnvironmentResponse> =>
-    http.get<AggregationEnvironmentResponse>(`/aggregation/sources/${patientId}`).then((r) => r.data),
+    getOrMock(
+      http.get<AggregationEnvironmentResponse>(`/aggregation/sources/${patientId}`).then((r) => r.data),
+      getMockAggregationSources(patientId),
+    ),
 
   getAggregationCleaningQueue: (patientId: string): Promise<AggregationCleaningQueueResponse> =>
     http.get<AggregationCleaningQueueResponse>(`/aggregation/cleaning-queue/${patientId}`).then((r) => r.data),
@@ -236,14 +260,20 @@ export const api = {
     http.delete<AggregationDeleteResponse>(`/aggregation/uploads/${patientId}/${fileId}`).then((r) => r.data),
 
   getAggregationUploadPreview: (patientId: string, fileId: string): Promise<AggregationPreparedPreviewResponse> =>
-    http
-      .get<AggregationPreparedPreviewResponse>(`/aggregation/uploads/${patientId}/${fileId}/preview`)
-      .then((r) => r.data),
+    getOrMock(
+      http
+        .get<AggregationPreparedPreviewResponse>(`/aggregation/uploads/${patientId}/${fileId}/preview`)
+        .then((r) => r.data),
+      getMockAggregationUploadPreview(patientId, fileId),
+    ),
 
   getAggregationUploadJson: (patientId: string, fileId: string): Promise<Record<string, unknown>> =>
-    http
-      .get<Record<string, unknown>>(`/aggregation/uploads/${patientId}/${fileId}/prepared-json`)
-      .then((r) => r.data),
+    getOrMock(
+      http
+        .get<Record<string, unknown>>(`/aggregation/uploads/${patientId}/${fileId}/prepared-json`)
+        .then((r) => r.data),
+      getMockAggregationUploadJson(patientId, fileId),
+    ),
 
   /** Assistant settings — available modes, models, current config */
   getAssistantSettings: (): Promise<AssistantSettings> =>
@@ -328,12 +358,18 @@ export const api = {
   // -------------------------------------------------------------------------
 
   getHarmonizeCollections: (): Promise<HarmonizeCollectionsResponse> =>
-    http.get<HarmonizeCollectionsResponse>("/harmonize/collections").then((r) => r.data),
+    getOrMock(
+      http.get<HarmonizeCollectionsResponse>("/harmonize/collections").then((r) => r.data),
+      getMockHarmonizeCollections(),
+    ),
 
   getHarmonizeWorkspace: (patientId: string): Promise<HarmonizeCollection> =>
-    http
-      .get<HarmonizeCollection>(`/harmonize/workspaces/${encodeURIComponent(patientId)}`)
-      .then((r) => r.data),
+    getOrMock(
+      http
+        .get<HarmonizeCollection>(`/harmonize/workspaces/${encodeURIComponent(patientId)}`)
+        .then((r) => r.data),
+      getMockHarmonizeWorkspace(patientId),
+    ),
 
   getHarmonizeSources: (collectionId: string): Promise<HarmonizeSourceManifestResponse> =>
     http
@@ -442,9 +478,12 @@ export const api = {
       .then((r) => r.data),
 
   getLatestHarmonizationRun: (collectionId: string): Promise<HarmonizeRunStateResponse> =>
-    http
-      .get<HarmonizeRunStateResponse>(`/harmonize/${collectionId}/runs/latest`)
-      .then((r) => r.data),
+    getOrMock(
+      http
+        .get<HarmonizeRunStateResponse>(`/harmonize/${collectionId}/runs/latest`)
+        .then((r) => r.data),
+      getMockLatestHarmonizationRun(collectionId),
+    ),
 
   resolveHarmonizationReviewItem: (
     collectionId: string,
@@ -456,9 +495,12 @@ export const api = {
       .then((r) => r.data),
 
   getPublishedChart: (collectionId: string): Promise<PublishedChartStateResponse> =>
-    http
-      .get<PublishedChartStateResponse>(`/harmonize/${collectionId}/published`)
-      .then((r) => r.data),
+    getOrMock(
+      http
+        .get<PublishedChartStateResponse>(`/harmonize/${collectionId}/published`)
+        .then((r) => r.data),
+      getMockPublishedChart(collectionId),
+    ),
 
   publishHarmonizationRun: (collectionId: string, runId: string): Promise<PublishedChartStateResponse> =>
     http

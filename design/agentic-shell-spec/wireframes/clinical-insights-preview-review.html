@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Clinical Insights Preview Review Shell</title>
+  <link rel="stylesheet" href="./atlas-wireframes.css">
+</head>
+<body class="wireframe-page">
+  <div class="window">
+    <div class="titlebar">
+      <div class="traffic"><span></span><span></span><span></span></div>
+      <div class="titlebar-center">
+        <div class="crumbs">
+          <strong>Atlas</strong>
+          <span>/</span>
+          <span>Clinical Insights</span>
+          <span>/</span>
+          <span>Artifact review mode</span>
+        </div>
+      </div>
+      <div class="titlebar-actions">
+        <button class="icon-btn" title="Toggle sessions pane" aria-label="Toggle sessions pane">S</button>
+        <button class="icon-btn active" title="Toggle preview pane" aria-label="Toggle preview pane">P</button>
+        <button class="icon-btn active" title="Toggle files pane" aria-label="Toggle files pane">F</button>
+        <button class="icon-btn active" title="Toggle inspector pane" aria-label="Toggle inspector pane">I</button>
+      </div>
+    </div>
+
+    <div class="page-note">
+      <strong>Variant B · Clinical review mode</strong>
+      Preview-heavy review shell. This version leans more developer-like: one tabbed preview surface,
+      real file tree on the right, and dense artifact review instead of marketing-like cards.
+    </div>
+    <div class="workspace-banner">
+      <span class="pill teal">Clinical Insights</span>
+      <span class="pill blue">Preview-first review</span>
+      <span class="pill neutral">Inspector on demand</span>
+      <span class="pill neutral">Hover S / P / F / I for pane labels</span>
+    </div>
+
+    <main class="shell shell-grid review">
+      <aside class="rail">
+        <div class="rail-stack">
+          <div class="brand">AT</div>
+          <div class="rail-btn active">Insights</div>
+          <div class="rail-btn">Review</div>
+          <div class="rail-btn">Packets</div>
+          <div class="rail-btn">Settings</div>
+        </div>
+      </aside>
+
+      <section class="chat-pane">
+        <div class="pane-head">
+          <div>
+            <strong>Review thread</strong>
+            <span class="pane-subtitle">Focused on one artifact while the shared workspace route stays unchanged</span>
+          </div>
+          <span class="pill blue">Review mode</span>
+        </div>
+
+        <div class="chat-scroll">
+          <div class="meta-line">Opened 4 files, compared 2 artifact versions, inspected 5 citations</div>
+
+          <div class="chat-block assistant">
+            <div class="bubble assistant-text">
+              I switched the preview pane from the app to <span class="note-inline">pre-op-packet-v2.md</span>.
+              The file tree is still visible on the right, so you can move between artifacts and source files
+              without leaving the shell or spawning separate pages.
+            </div>
+          </div>
+
+          <div class="chat-block user">
+            <div class="bubble">
+              Keep the markdown packet open, then show me the note and the settings file in the same preview pane
+              as tabs. I want the review experience to feel like one workspace, not many disconnected pages.
+            </div>
+          </div>
+
+          <div class="chat-block assistant">
+            <div class="bubble assistant-text">
+              Done. The current tab strip carries the app, the packet markdown, the operative note, and the
+              workspace settings. The next pane button can open evidence or logs, but the document review stays in
+              the same preview surface.
+            </div>
+            <div class="action-row">
+              <span class="action-chip">Open note tab</span>
+              <span class="action-chip">Show diff</span>
+              <span class="action-chip">Pin citation</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="composer">
+          <div class="composer-controls">
+            <button class="mini-btn">+</button>
+            <button class="mini-btn">Ask</button>
+          </div>
+          <div class="input-surface">Ask for another tab, diff, or file review...</div>
+          <div class="composer-controls">
+            <button class="mini-btn">Approve</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="preview-pane">
+        <div class="pane-head">
+          <div>
+            <strong>Preview pane</strong>
+            <span class="pane-subtitle">One preview surface for app, markdown, notes, settings, and diff tabs</span>
+          </div>
+          <div class="toggle-row">
+            <button class="icon-btn" title="Open diff view in preview" aria-label="Open diff view in preview">diff</button>
+            <button class="icon-btn" title="Hide preview pane" aria-label="Hide preview pane">x</button>
+          </div>
+        </div>
+
+        <div class="tabs">
+          <div class="tab">App <span class="close">x</span></div>
+          <div class="tab active">pre-op-packet-v2.md <span class="close">x</span></div>
+          <div class="tab">operative-note.txt <span class="close">x</span></div>
+          <div class="tab">settings.json <span class="close">x</span></div>
+        </div>
+
+        <div class="preview-scroll">
+          <div class="preview-doc">
+            <h1>Pre-op packet draft</h1>
+            <p>
+              This view demonstrates how the preview pane can carry rendered markdown, raw files, app surfaces,
+              and settings as tabs along one dense shared strip.
+            </p>
+
+            <h2>Current recommendation</h2>
+            <p>
+              Surgery can proceed after anticoagulation guidance is confirmed. The chart has acceptable recent CBC
+              evidence, but the hold interval depends on the final procedural timing and therefore still requires
+              clinician approval.
+            </p>
+
+            <table class="review-table">
+              <thead>
+                <tr>
+                  <th>Section</th>
+                  <th>Content</th>
+                  <th>Evidence</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Anticoagulation</td>
+                  <td>Pending confirmation of hold interval and restart plan</td>
+                  <td>c_1042, c_1078</td>
+                </tr>
+                <tr>
+                  <td>Recent labs</td>
+                  <td>CBC acceptable; INR refresh requested</td>
+                  <td>c_1091, c_1094</td>
+                </tr>
+                <tr>
+                  <td>Disposition</td>
+                  <td>Pause before final export</td>
+                  <td>task:approval-anticoag-1</td>
+                </tr>
+              </tbody>
+            </table>
+
+            <h2>Export notes</h2>
+            <p>
+              The export target remains <span class="note-inline">pre-op-packet-v2.md</span>. The same preview
+              shell could also render the raw markdown file, a diff, or a signed PDF preview without changing routes.
+            </p>
+          </div>
+        </div>
+
+        <div class="status-bar">
+          <span>Tabbed preview: App · Markdown · Source note · Settings</span>
+          <span>Developer-leaning review posture</span>
+        </div>
+      </section>
+
+      <aside class="files-pane">
+        <div class="pane-head">
+          <div>
+            <strong>Files</strong>
+            <span class="pane-subtitle">Open file tabs from a nested tree, not from card tiles</span>
+          </div>
+          <div class="toggle-row">
+            <button class="icon-btn">-</button>
+            <button class="icon-btn">x</button>
+          </div>
+        </div>
+
+        <div class="filter-wrap">
+          <input class="filter-input" placeholder="Filter files... (?text to search contents)" aria-label="Filter files">
+        </div>
+
+        <div class="tree-scroll">
+          <div class="tree-row"><span class="tree-icon">v</span><span class="tree-folder">workspace</span></div>
+          <div class="tree-row tree-indent-1"><span class="tree-icon">v</span><span class="tree-folder">artifacts</span></div>
+          <div class="tree-row tree-indent-2 active"><span class="tree-icon">•</span><span class="tree-mono">pre-op-packet-v2.md</span></div>
+          <div class="tree-row tree-indent-2"><span class="tree-icon">•</span><span class="tree-mono">pre-op-packet-v1.md</span></div>
+          <div class="tree-row tree-indent-1"><span class="tree-icon">v</span><span class="tree-folder">notes</span></div>
+          <div class="tree-row tree-indent-2"><span class="tree-icon">•</span><span class="tree-mono">operative-note.txt</span></div>
+          <div class="tree-row tree-indent-2"><span class="tree-icon">•</span><span class="tree-mono">clearance-call.md</span></div>
+          <div class="tree-row tree-indent-1"><span class="tree-icon">v</span><span class="tree-folder">config</span></div>
+          <div class="tree-row tree-indent-2"><span class="tree-icon">•</span><span class="tree-mono">settings.json</span></div>
+          <div class="tree-row tree-indent-2"><span class="tree-icon">•</span><span class="tree-mono">workspace.json</span></div>
+
+          <p class="tree-group-title">Review tools</p>
+          <div class="tree-row dim"><span class="tree-icon">#</span><span class="tree-object">logs</span></div>
+          <div class="tree-row dim"><span class="tree-icon">#</span><span class="tree-object">tool-trace</span></div>
+          <div class="tree-row dim"><span class="tree-icon">#</span><span class="tree-object">citation-map</span></div>
+        </div>
+      </aside>
+    </main>
+  </div>
+</body>
+</html>

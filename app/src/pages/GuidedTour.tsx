@@ -28,7 +28,7 @@ const tourSteps = [
   },
   {
     title: "Hand off to the real app",
-    body: "After the learning tour, users should jump into Data Aggregator, FHIR Charts, or the clinical app demo with context.",
+    body: "After the learning tour, users should jump into Patient Record, FHIR Charts, or the clinical app demo with context.",
     icon: Stethoscope,
   },
 ];
@@ -108,7 +108,7 @@ export function GuidedTour() {
               <div className="mt-5 space-y-3">
                 {[
                   "What the platform is and why the FHIR Chart matters.",
-                  "How Data Aggregator pulls and cleans records.",
+                  "How Patient Record pulls and cleans records.",
                   "How to tell private insights from external marketplace modules.",
                   "Where patient selection belongs in the real platform flow.",
                 ].map((item) => (
@@ -152,7 +152,7 @@ export function GuidedTour() {
                 <ArrowRight size={16} />
               </Link>
               <Link
-                to="/preop"
+                to="/caspian"
                 className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#dfe3eb] bg-white px-5 py-3 text-sm font-semibold text-[#526075] shadow-sm transition-colors hover:border-[#5b76fe] hover:text-[#5b76fe]"
               >
                 Open clinical app demo

@@ -1,202 +1,284 @@
 import { Link } from "react-router-dom";
 import {
   ArrowRight,
+  BookOpen,
   Boxes,
-  ClipboardCheck,
   Database,
-  FileText,
-  GitBranch,
+  FileSearch,
+  Lock,
+  Microscope,
+  ShieldCheck,
   Sparkles,
-  Trophy,
+  Stethoscope,
 } from "lucide-react";
 
-const platformCards = [
+const entryCards = [
   {
-    title: "Open the Platform",
-    body: "Start in the working app shell with Patient Record, FHIR Charts, Caspian, Marketplace, and Internal Tools.",
-    to: "/platform",
+    title: "Open workspace",
+    body: "Enter the live application shell starting from Patient Record, with FHIR Charts, Caspian, Workspaces, and Learn available from the top navigation.",
+    to: "/patient-record",
     action: "Enter platform",
-    icon: GitBranch,
-    primary: true,
+    icon: Stethoscope,
+    tone: "primary",
   },
   {
-    title: "Start Here: Guided Tour",
-    body: "Learn what the platform is supposed to show before jumping into the working app screens.",
-    to: "/guided-tour",
-    action: "Start learning",
-    icon: Sparkles,
-  },
-  {
-    title: "Pool of Patient Records",
-    body: "Browse synthetic patients and use one to walk through chart collection, cleaning, and downstream use cases.",
+    title: "Browse patient records",
+    body: "Review the synthetic patient pool and pick a prepared record to walk through intake, chart generation, and downstream use.",
     to: "/records-pool",
-    action: "Browse records",
+    action: "Open patient pool",
     icon: Database,
+    tone: "neutral",
+  },
+  {
+    title: "Read the product tour",
+    body: "See how the modules connect before jumping into the live shell, including trust boundaries, workflow posture, and platform intent.",
+    to: "/guided-tour",
+    action: "View guided tour",
+    icon: Sparkles,
+    tone: "neutral",
   },
 ];
 
-const contextCards = [
+const moduleCards = [
   {
-    title: "System Architecture",
-    body: "How scattered sources flow into Patient Record, FHIR Charts, private insights, marketplace modules, sharing, and internal tools.",
-    to: "/architecture",
-    action: "View architecture",
+    title: "Patient Record",
+    body: "Source intake, harmonization, publishing, and patient context in one operational pipeline.",
+    to: "/patient-record",
+    icon: FileSearch,
+  },
+  {
+    title: "FHIR Charts",
+    body: "Prepared chart surfaces for summary, history, safety, patient data, and chart-grounded review.",
+    to: "/fhir-charts",
+    icon: Database,
+  },
+  {
+    title: "Caspian",
+    body: "Private, first-party clinical workspace for workflow execution, review, and citation-backed reasoning.",
+    to: "/caspian",
+    icon: ShieldCheck,
+  },
+  {
+    title: "Workspaces",
+    body: "External packages and consented tools that operate from the chart without collapsing trust boundaries.",
+    to: "/workspaces",
+    icon: Boxes,
+  },
+];
+
+const trustCards = [
+  {
+    title: "Source-aware chart layer",
+    body: "Patient data is collected from scattered exports and normalized into a patient-owned chart with provenance preserved.",
+    icon: Database,
+  },
+  {
+    title: "Operational module shell",
+    body: "Modules open on top of the prepared chart, so the user experiences a working application rather than a set of disconnected demos.",
     icon: Boxes,
   },
   {
-    title: "Product Direction",
-    body: "The product direction is a patient-owned data layer with focused clinical and marketplace modules built on top.",
-    to: "/caspian",
-    action: "View modules",
-    icon: Sparkles,
+    title: "Clear trust boundaries",
+    body: "Private clinical workflows and consented external tools can share one platform while keeping their trust posture visible.",
+    icon: Lock,
+  },
+];
+
+const supportLinks = [
+  {
+    title: "FHIR primer",
+    body: "Plain-language orientation for the data model and chart layer.",
+    to: "/learn/fhir-primer",
+    icon: BookOpen,
   },
   {
-    title: "Data Lab",
-    body: "The internal explanation layer for FHIR quality, field coverage, trust boundaries, and module contracts.",
-    to: "/analysis",
-    action: "Open Data Lab",
-    icon: ClipboardCheck,
+    title: "System architecture",
+    body: "How records, charts, workspaces, and learning surfaces fit together.",
+    to: "/architecture",
+    icon: Boxes,
+  },
+  {
+    title: "Data lab",
+    body: "Coverage, trust, QA, and internal evaluation surfaces.",
+    to: "/learn",
+    icon: Microscope,
   },
 ];
 
 export function Landing() {
   return (
-    <div className="min-h-screen bg-[#f5f6f8] text-[#1c1c1e]">
-      <header className="border-b border-[#e1e4eb] bg-white px-6 py-4">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-6">
-          <Link to="/" className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#9aa1b2]">
+    <div className="min-h-screen bg-[linear-gradient(180deg,#f4f7fb_0%,#eef3f8_100%)] text-[#18202b]">
+      <header className="border-b border-[#dde5ef] bg-[rgba(255,255,255,0.9)] backdrop-blur">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-6 px-6 py-5">
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#7f8aa0]">
               EHI Exchange Platform
             </p>
-            <p className="text-base font-semibold text-[#1c1c1e]">Application overview</p>
-          </Link>
-          <Link
-            to="/platform"
-            className="hidden items-center gap-2 rounded-xl bg-[#5b76fe] px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#445ee8] sm:inline-flex"
-          >
-            Enter platform
-            <ArrowRight size={15} />
-          </Link>
+            <p className="mt-1 text-lg font-semibold text-[#18202b]">
+              Clinical workflow workspace
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <Link
+              to="/learn/fhir-primer"
+              className="hidden text-sm font-semibold text-[#52627f] transition-colors hover:text-[#3657ff] sm:inline-flex"
+            >
+              FHIR primer
+            </Link>
+            <Link
+              to="/patient-record"
+              className="inline-flex items-center gap-2 rounded-2xl bg-[#4d68ff] px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(77,104,255,0.22)] transition-colors hover:bg-[#3c57ef]"
+            >
+              Enter platform
+              <ArrowRight size={16} />
+            </Link>
+          </div>
         </div>
       </header>
 
       <main className="px-6 py-8">
         <section className="mx-auto max-w-7xl">
-          <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-end">
-            <div>
-              <p className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-[#5b76fe]">
-                EHI Ignite concept
+          <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+            <section className="rounded-[28px] border border-[#dbe4f0] bg-white px-8 py-8 shadow-[0_18px_50px_rgba(24,32,43,0.06)] lg:px-10 lg:py-10">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#4d68ff]">
+                Application Overview
               </p>
-              <h1 className="max-w-4xl text-4xl font-semibold tracking-tight text-[#18191f] lg:text-6xl">
-                Turn scattered patient records into useful clinical workflows.
+              <h1 className="mt-4 max-w-4xl text-4xl font-semibold tracking-tight text-[#171b24] lg:text-6xl">
+                Turn fragmented records into chart-ready clinical work.
               </h1>
-            </div>
-            <div className="max-w-2xl">
-              <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center">
-                <p className="text-sm font-semibold text-[#526075]">
-                  New to FHIR data format?
-                </p>
+              <p className="mt-5 max-w-3xl text-base leading-8 text-[#61728d]">
+                The platform assembles scattered patient data into a source-aware FHIR Chart, then opens focused application surfaces for review, workflows, decision support, and downstream collaboration.
+              </p>
+
+              <div className="mt-7 flex flex-wrap gap-3">
                 <Link
-                  to="/learn/fhir-primer"
-                  className="inline-flex w-fit items-center gap-1 text-sm font-semibold text-[#5b76fe] transition-all hover:gap-2 hover:text-[#445ee8]"
+                  to="/patient-record"
+                  className="inline-flex items-center gap-2 rounded-2xl bg-[#4d68ff] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#3c57ef]"
                 >
-                  Read the plain-language primer
-                  <ArrowRight size={14} />
+                  Enter platform
+                  <ArrowRight size={16} />
+                </Link>
+                <Link
+                  to="/records-pool"
+                  className="inline-flex items-center gap-2 rounded-2xl border border-[#d7dfeb] bg-[#f9fbff] px-5 py-3 text-sm font-semibold text-[#33415b] transition-colors hover:border-[#4d68ff] hover:text-[#3657ff]"
+                >
+                  Browse patient pool
                 </Link>
               </div>
-              <p className="text-base leading-7 text-[#63708a]">
-                The platform pulls patient data from many places, cleans it into a patient-owned FHIR Chart, then lets that chart power focused modules: pre-op review, clinical understanding, trial matching, medication access, sharing, and internal data review.
+            </section>
+
+            <section className="rounded-[28px] border border-[#dbe4f0] bg-[#f8fbff] p-6 shadow-[0_18px_50px_rgba(24,32,43,0.04)]">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#4d68ff]">
+                Platform Posture
               </p>
-            </div>
+              <div className="mt-4 space-y-4">
+                {trustCards.map((card) => {
+                  const Icon = card.icon;
+                  return (
+                    <div key={card.title} className="rounded-2xl border border-[#e2e8f1] bg-white p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#eef2ff] text-[#4d68ff]">
+                          <Icon size={18} />
+                        </div>
+                        <p className="text-base font-semibold text-[#18202b]">{card.title}</p>
+                      </div>
+                      <p className="mt-3 text-sm leading-6 text-[#62728d]">{card.body}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
           </div>
 
-          <div className="mt-8 grid gap-4 lg:grid-cols-3">
-            {platformCards.map((card) => {
+          <section className="mt-6 grid gap-4 xl:grid-cols-3">
+            {entryCards.map((card) => {
               const Icon = card.icon;
+              const primary = card.tone === "primary";
               return (
                 <Link
                   key={card.title}
                   to={card.to}
-                  className={`group rounded-[24px] border p-6 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${
-                    card.primary
-                      ? "border-[#cfd7ff] bg-[#f3f5ff]"
-                      : "border-[#e1e6ef] bg-white"
+                  className={`group rounded-[26px] border p-6 shadow-[0_10px_28px_rgba(24,32,43,0.05)] transition-all hover:-translate-y-0.5 ${
+                    primary
+                      ? "border-[#cad5ff] bg-[linear-gradient(180deg,#f5f7ff_0%,#eef2ff_100%)]"
+                      : "border-[#dee6f0] bg-white"
                   }`}
                 >
-                  <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-white text-[#5b76fe] shadow-sm">
+                  <div className={`flex h-12 w-12 items-center justify-center rounded-2xl ${primary ? "bg-white text-[#4d68ff]" : "bg-[#eef2ff] text-[#4d68ff]"}`}>
                     <Icon size={22} />
                   </div>
-                  <h2 className="text-xl font-semibold">{card.title}</h2>
-                  <p className="mt-2 min-h-[78px] text-sm leading-6 text-[#667289]">{card.body}</p>
-                  <span className="mt-5 inline-flex items-center gap-1 text-sm font-semibold text-[#5b76fe] transition-all group-hover:gap-2">
+                  <h2 className="mt-6 text-2xl font-semibold text-[#18202b]">{card.title}</h2>
+                  <p className="mt-3 min-h-[88px] text-sm leading-6 text-[#62728d]">{card.body}</p>
+                  <span className="mt-6 inline-flex items-center gap-1 text-sm font-semibold text-[#4d68ff] transition-all group-hover:gap-2">
                     {card.action}
                     <ArrowRight size={14} />
                   </span>
                 </Link>
               );
             })}
-          </div>
+          </section>
 
-          <div className="mt-6 grid gap-6 lg:grid-cols-[0.85fr_1.15fr]">
-            <section className="rounded-[24px] border border-[#e1e6ef] bg-white p-6 shadow-sm">
-              <div className="mb-5 flex items-center gap-2">
-                <Trophy size={18} className="text-[#5b76fe]" />
-                <h2 className="text-lg font-semibold">EHI Ignite Challenge</h2>
+          <section className="mt-6 rounded-[28px] border border-[#dbe4f0] bg-white p-6 shadow-[0_14px_36px_rgba(24,32,43,0.04)]">
+            <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#4d68ff]">
+                  Modules
+                </p>
+                <h2 className="mt-2 text-2xl font-semibold text-[#18202b]">
+                  Work from a prepared chart, not a collection of demos
+                </h2>
               </div>
-              <p className="text-sm leading-6 text-[#667289]">
-                This project is built for the EHI Ignite Challenge: transforming electronic health information into actionable insights. The pitch is not another patient portal or generic FHIR browser. It is a platform for turning raw, scattered records into the right workflow-specific actions.
+              <p className="max-w-2xl text-sm leading-6 text-[#62728d]">
+                Each module assumes the chart is already prepared and uses that shared layer differently: record operations, review surfaces, private workflows, and consented external tools.
               </p>
-              <div className="mt-5 grid gap-3 sm:grid-cols-3">
-                {[
-                  ["Problem", "Records are fragmented and hard to parse quickly."],
-                  ["Layer", "The FHIR Chart is the cleaned, source-aware patient record."],
-                  ["Value", "Modules turn chart facts into clinical and patient actions."],
-                ].map(([title, body]) => (
-                  <div key={title} className="rounded-2xl border border-[#e4e8f0] bg-[#fbfcff] p-4">
-                    <h3 className="text-sm font-semibold">{title}</h3>
-                    <p className="mt-1 text-xs leading-5 text-[#667289]">{body}</p>
-                  </div>
-                ))}
-              </div>
-            </section>
+            </div>
 
-            <section className="grid gap-4 sm:grid-cols-3">
-              {contextCards.map((card) => {
+            <div className="mt-6 grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
+              {moduleCards.map((card) => {
                 const Icon = card.icon;
                 return (
                   <Link
                     key={card.title}
                     to={card.to}
-                    className="group rounded-[24px] border border-[#e1e6ef] bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-[#cfd7ff] hover:shadow-md"
+                    className="group rounded-[24px] border border-[#e0e6ef] bg-[#fbfcff] p-5 transition-all hover:border-[#cad5ff] hover:bg-white"
                   >
-                    <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-[#eef1ff] text-[#5b76fe]">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#eef2ff] text-[#4d68ff]">
                       <Icon size={20} />
                     </div>
-                    <h2 className="font-semibold">{card.title}</h2>
-                    <p className="mt-2 min-h-[96px] text-sm leading-6 text-[#667289]">{card.body}</p>
-                    <span className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-[#5b76fe] transition-all group-hover:gap-2">
-                      {card.action}
+                    <h3 className="mt-4 text-lg font-semibold text-[#18202b]">{card.title}</h3>
+                    <p className="mt-2 min-h-[94px] text-sm leading-6 text-[#62728d]">{card.body}</p>
+                    <span className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-[#4d68ff] transition-all group-hover:gap-2">
+                      Open module
                       <ArrowRight size={14} />
                     </span>
                   </Link>
                 );
               })}
-            </section>
-          </div>
-
-          <div className="mt-6 rounded-[24px] border border-[#c9f0e7] bg-[#effbf8] p-6">
-            <div className="grid gap-4 lg:grid-cols-[0.75fr_1.25fr] lg:items-center">
-              <div>
-                <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-white text-[#008f7a] shadow-sm">
-                  <FileText size={20} />
-                </div>
-                <h2 className="text-xl font-semibold">Where formal walkthroughs should live</h2>
-              </div>
-              <p className="text-sm leading-6 text-[#486274]">
-                The home page should stay simple. More guided flows belong in separate walkthrough surfaces, especially the Pool of Patient Records, where a reviewer can select a synthetic patient and see how data collection, cleaning, FHIR Chart creation, and downstream modules fit together.
-              </p>
             </div>
-          </div>
+          </section>
+
+          <section className="mt-6 grid gap-4 lg:grid-cols-3">
+            {supportLinks.map((card) => {
+              const Icon = card.icon;
+              return (
+                <Link
+                  key={card.title}
+                  to={card.to}
+                  className="group rounded-[24px] border border-[#dde5ef] bg-[rgba(255,255,255,0.82)] p-5 transition-all hover:border-[#cad5ff] hover:bg-white"
+                >
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#f3f6fb] text-[#4d68ff]">
+                    <Icon size={20} />
+                  </div>
+                  <h3 className="mt-4 text-lg font-semibold text-[#18202b]">{card.title}</h3>
+                  <p className="mt-2 text-sm leading-6 text-[#62728d]">{card.body}</p>
+                  <span className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-[#4d68ff] transition-all group-hover:gap-2">
+                    Open
+                    <ArrowRight size={14} />
+                  </span>
+                </Link>
+              );
+            })}
+          </section>
         </section>
       </main>
     </div>

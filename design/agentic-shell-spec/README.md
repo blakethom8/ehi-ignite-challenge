@@ -92,6 +92,10 @@ Most of the rest of the frontend still reflects the earlier route-per-module
 product shape. This package is the bridge from that older structure to the new
 shared harness structure.
 
+Implementation guidance that translates this vision into concrete page / canvas /
+workbench build rules now lives in
+[`docs/architecture/HARNESS-SURFACES.md`](../../docs/architecture/HARNESS-SURFACES.md).
+
 ## Intended Outcome
 
 This spec should be strong enough to guide:

@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronDown,
   Compass,
+  Database,
   HelpCircle,
   Menu,
   Pill,
@@ -10,6 +11,8 @@ import {
   Send,
   Telescope,
 } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
+import { getMockBundleContext, mockPatients } from "../../api/mockData";
 import type { Crumb } from "./Titlebar";
 import type {
   ModuleId,
@@ -84,6 +87,8 @@ export function ModuleBar({
 }: ModuleBarProps) {
   const [wsOpen, setWsOpen] = useState(false);
   const wsRef = useRef<HTMLDivElement>(null);
+  const [searchParams] = useSearchParams();
+  const patientId = searchParams.get("patient");
 
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
@@ -94,6 +99,21 @@ export function ModuleBar({
     document.addEventListener("mousedown", onClick);
     return () => document.removeEventListener("mousedown", onClick);
   }, []);
+
+  const activeBundle = useMemo(() => {
+    if (!patientId) return null;
+    const mockPatient = mockPatients.find((patient) => patient.id === patientId) ?? null;
+    const bundle = getMockBundleContext(patientId);
+    const label = bundle?.label ?? mockPatient?.name ?? patientId;
+    const subtitle = bundle?.updated_at
+      ? `Updated ${new Date(`${bundle.updated_at}T00:00:00`).toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        })}`
+      : "Selected data space";
+    return { label, subtitle };
+  }, [patientId]);
 
   return (
     <div
@@ -296,6 +316,28 @@ export function ModuleBar({
           );
         })}
       </div>
+      {activeBundle ? (
+        <div
+          className="ml-3 hidden min-w-0 flex-[0_1_320px] items-center gap-2 rounded-md border px-2.5 py-1 lg:flex"
+          style={{
+            borderColor: "rgba(255,255,255,0.1)",
+            background: "rgba(255,255,255,0.05)",
+          }}
+          title={`${activeBundle.label} · ${activeBundle.subtitle}`}
+        >
+          <div className="grid h-6 w-6 shrink-0 place-items-center rounded-[6px] bg-white/10 text-white/80">
+            <Database className="h-3.5 w-3.5" strokeWidth={1.5} />
+          </div>
+          <div className="min-w-0">
+            <div className="truncate text-[12px] font-semibold text-white">
+              {activeBundle.label}
+            </div>
+            <div className="truncate text-[10.5px] text-white/58">
+              {activeBundle.subtitle}
+            </div>
+          </div>
+        </div>
+      ) : null}
       <div className="flex-1" />
       {onRunWorkflow && (
         <button

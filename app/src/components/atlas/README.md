@@ -6,6 +6,7 @@ primitives for the EHI Ignite redesign.
 > Spec: [`.claude/handoff/atlas/README.md`](../../../../.claude/handoff/atlas/README.md)
 > Tokens: [`.claude/handoff/atlas/tokens/design-tokens.css`](../../../../.claude/handoff/atlas/tokens/design-tokens.css) (mirrored into `app/src/index.css`)
 > Design: [`design/agentic-shell-spec/`](../../../../design/agentic-shell-spec/)
+> Build guide: [`docs/architecture/HARNESS-SURFACES.md`](../../../../docs/architecture/HARNESS-SURFACES.md)
 
 ## When to use
 

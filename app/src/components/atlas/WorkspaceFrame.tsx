@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChatPane } from "./ChatPane";
 import { ContextStrip } from "./ContextStrip";
+import type { FileTreeNode, Session, WorkbenchTab, Workflow } from "./data";
 import { FilesPane } from "./FilesPane";
 import { InspectorPane } from "./InspectorPane";
 import { PluginHome } from "./PluginHome";
@@ -38,7 +39,20 @@ type WorkspaceFrameProps = {
   onControlsChange?: (controls: {
     panes: ReturnType<typeof useWorkspaceState>["panes"];
     togglePane: ReturnType<typeof useWorkspaceState>["togglePane"];
+    openTab: ReturnType<typeof useWorkspaceState>["openTab"];
   }) => void;
+  /** Optional live/runtime surface that replaces fixture-backed content within the shared shell. */
+  surface?: {
+    chatPane?: ReactNode;
+    sessions?: Session[];
+    workflows?: Workflow[];
+    filesTree?: FileTreeNode[];
+    seedTabs?: WorkbenchTab[];
+    canvas?: Record<string, unknown>;
+    runId?: string | null;
+    getFileTab?: (fileId: string) => WorkbenchTab | null;
+    getActionTab?: (target: string) => WorkbenchTab | null;
+  };
 };
 
 export function WorkspaceFrame({
@@ -48,8 +62,15 @@ export function WorkspaceFrame({
   onSelectSession,
   onStartRun,
   onControlsChange,
+  surface,
 }: WorkspaceFrameProps) {
-  const state = useWorkspaceState(workspace.id);
+  const state = useWorkspaceState(workspace.id, {
+    seedTabs: surface?.seedTabs,
+    canvas: surface?.canvas,
+    filesTree: surface?.filesTree,
+    getFileTab: surface?.getFileTab,
+    getActionTab: surface?.getActionTab,
+  });
   const isPlugin = workspace.family === "plugin";
   const manifestQuery = useManifest(isPlugin ? workspace.id : undefined);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -113,8 +134,9 @@ export function WorkspaceFrame({
     onControlsChange?.({
       panes: responsivePanes,
       togglePane: handlePaneControl,
+      openTab: state.openTab,
     });
-  }, [handlePaneControl, onControlsChange, responsivePanes]);
+  }, [handlePaneControl, onControlsChange, responsivePanes, state.openTab]);
 
   const onDragStart = useCallback(
     (axis: "v" | "h", key: keyof PaneSizes) =>
@@ -162,6 +184,10 @@ export function WorkspaceFrame({
   const showActiveSession = !showPluginHome;
   const resolvedSessionId =
     activeSessionId ?? state.activeSessionId;
+  useEffect(() => {
+    if (activeSessionId === undefined) return;
+    state.setActiveSessionId(activeSessionId === "__home__" ? null : activeSessionId);
+  }, [activeSessionId, state.setActiveSessionId]);
   const handleSelectSession =
     onSelectSession ??
     ((id: string | "__home__") =>
@@ -214,6 +240,8 @@ export function WorkspaceFrame({
             >
               <SessionsPane
                 workspace={workspace}
+                sessions={surface?.sessions}
+                workflows={surface?.workflows}
                 activeSessionId={showPluginHome ? "__home__" : resolvedSessionId}
                 onSelectSession={handleSelectSession}
               />
@@ -235,14 +263,17 @@ export function WorkspaceFrame({
                 }}
                 className="min-h-0"
               >
-                <ChatPane
-                  workspace={workspace}
-                  messages={state.chats[workspace.id] ?? []}
-                  onSend={state.handleSend}
-                  onCitationClick={state.handleCitation}
-                  onAction={state.handleAction}
-                  activeCitationId={state.citationId}
-                />
+                {surface?.chatPane ?? (
+                  <ChatPane
+                    workspace={workspace}
+                    messages={state.chats[workspace.id] ?? []}
+                    onSend={state.handleSend}
+                    onCitationClick={state.handleCitation}
+                    onReferenceClick={state.handleReference}
+                    onAction={state.handleAction}
+                    activeCitationId={state.citationId}
+                  />
+                )}
               </div>
             )}
             {responsivePanes.chat && responsivePanes.workbench && (
@@ -261,7 +292,8 @@ export function WorkspaceFrame({
                   onCloseTab={state.handleCloseTab}
                   onCitationClick={state.handleCitation}
                   activeCitationId={state.citationId}
-                  canvas={state.fixtureCanvas}
+                  runId={surface?.runId ?? null}
+                  canvas={state.canvas}
                 />
               </div>
             )}
@@ -293,6 +325,7 @@ export function WorkspaceFrame({
                   workspaceId={workspace.id}
                   onOpen={state.handleOpenFile}
                   activeFileId={state.activeFileId}
+                  tree={surface?.filesTree}
                 />
                 )}
                 {responsivePanes.files && responsivePanes.inspector && (
@@ -302,7 +335,11 @@ export function WorkspaceFrame({
                   />
                 )}
                 {responsivePanes.inspector && (
-                  <InspectorPane citationId={state.citationId} />
+                  <InspectorPane
+                    citationId={state.citationId}
+                    activeTab={state.inspectorTab}
+                    onTabChange={state.setInspectorTab}
+                  />
                 )}
               </div>
             )}

@@ -1,5 +1,5 @@
 import { Activity, ChevronDown, Home, MessageSquareText, Pin, Plus, Search, Telescope, Workflow } from "lucide-react";
-import { SESSIONS, WORKFLOWS, type Session } from "./data";
+import { SESSIONS, WORKFLOWS, type Session, type Workflow as WorkspaceWorkflow } from "./data";
 import type { Workspace, WorkspaceId } from "./types";
 import { Link } from "react-router-dom";
 
@@ -13,11 +13,19 @@ type SessionsPaneProps = {
   workspace: Workspace;
   activeSessionId: string | "__home__" | null;
   onSelectSession: (id: string | "__home__") => void;
+  sessions?: Session[];
+  workflows?: WorkspaceWorkflow[];
 };
 
-export function SessionsPane({ workspace, activeSessionId, onSelectSession }: SessionsPaneProps) {
-  const sessions = SESSIONS[workspace.id as WorkspaceId] ?? [];
-  const workflows = WORKFLOWS[workspace.id as WorkspaceId] ?? [];
+export function SessionsPane({
+  workspace,
+  activeSessionId,
+  onSelectSession,
+  sessions: sessionsOverride,
+  workflows: workflowsOverride,
+}: SessionsPaneProps) {
+  const sessions = sessionsOverride ?? SESSIONS[workspace.id as WorkspaceId] ?? [];
+  const workflows = workflowsOverride ?? WORKFLOWS[workspace.id as WorkspaceId] ?? [];
 
   return (
     <div

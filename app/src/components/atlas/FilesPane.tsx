@@ -13,10 +13,11 @@ type FilesPaneProps = {
   workspaceId: WorkspaceId;
   onOpen: (node: FileNode | { kind: "citation"; id: string }) => void;
   activeFileId?: string | null;
+  tree?: FileTreeNode[];
 };
 
-export function FilesPane({ workspaceId, onOpen, activeFileId }: FilesPaneProps) {
-  const tree = FILE_TREES[workspaceId] ?? [];
+export function FilesPane({ workspaceId, onOpen, activeFileId, tree: treeOverride }: FilesPaneProps) {
+  const tree = treeOverride ?? FILE_TREES[workspaceId] ?? [];
   const [filter, setFilter] = useState("");
   const [expanded, setExpanded] = useState<Record<string, boolean>>(() => {
     const e: Record<string, boolean> = {};

@@ -48,4 +48,32 @@ describe("useWorkspaceState", () => {
 
     expect(result.current.activeTabId).toBe("tab_anti");
   });
+
+  it("persists the active session, tab, file, citation, and inspector tab across remounts", () => {
+    const first = renderHook(() => useWorkspaceState("trial-finder"));
+
+    act(() => {
+      first.result.current.setActiveSessionId("r_live123");
+      first.result.current.handleSelectTab("tab_man");
+      first.result.current.handleOpenFile({
+        type: "file",
+        id: "f_geo",
+        name: "geography.json",
+        ext: "json",
+        icon: "Braces",
+      });
+      first.result.current.handleCitation("c_1042");
+      first.result.current.setInspectorTab("context");
+    });
+
+    first.unmount();
+
+    const second = renderHook(() => useWorkspaceState("trial-finder"));
+
+    expect(second.result.current.activeSessionId).toBe("r_live123");
+    expect(second.result.current.activeTabId).toBe("tab_geo");
+    expect(second.result.current.activeFileId).toBe("f_geo");
+    expect(second.result.current.citationId).toBe("c_1042");
+    expect(second.result.current.inspectorTab).toBe("context");
+  });
 });

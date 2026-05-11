@@ -47,8 +47,11 @@ export type PluginRunStateBundle = {
   deny: (approvalId: string, user?: UserIdentity) => Promise<unknown>;
 };
 
-function buildCanvas(events: RunEvent[]): Record<string, unknown> {
-  const canvas: Record<string, unknown> = {};
+export function buildCanvas(
+  runCanvas: Record<string, unknown> | undefined,
+  events: RunEvent[],
+): Record<string, unknown> {
+  const canvas: Record<string, unknown> = { ...(runCanvas ?? {}) };
   for (const e of events) {
     if (e.kind === "tool.result") {
       const payload = e.payload as { toolId?: string; result?: Record<string, unknown> };
@@ -124,7 +127,10 @@ export function usePluginRun(runId: string | null): PluginRunStateBundle {
 
   const events = eventsQuery.data ?? [];
   const approvals = approvalsQuery.data ?? [];
-  const canvas = useMemo(() => buildCanvas(events), [events]);
+  const canvas = useMemo(
+    () => buildCanvas(runQuery.data?.canvas, events),
+    [events, runQuery.data?.canvas],
+  );
   const pendingApproval = approvals.find((a) => a.status === "pending");
 
   return {

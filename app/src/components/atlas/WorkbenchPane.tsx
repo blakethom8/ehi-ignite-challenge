@@ -176,7 +176,7 @@ export function WorkbenchPane({
             className="h-1.5 w-1.5 rounded-full"
             style={{ background: "var(--action)" }}
           />
-          run/preop-2 · running
+          {runId ?? `workspace/${workspace.id}`} · {workspace.runState ?? "idle"}
         </span>
         <span className="inline-flex items-center gap-1.5">
           <Sparkles className="h-2.5 w-2.5" strokeWidth={1.5} />

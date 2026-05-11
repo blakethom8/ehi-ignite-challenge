@@ -1,15 +1,19 @@
-import { useState } from "react";
 import { Eye, GitBranch, Pin, Quote } from "lucide-react";
 import { CITATIONS, type Citation } from "./data";
 
 type InspectorPaneProps = {
   citationId: string | null;
+  activeTab?: Tab;
+  onTabChange?: (tab: Tab) => void;
 };
 
 type Tab = "evidence" | "trace" | "context";
 
-export function InspectorPane({ citationId }: InspectorPaneProps) {
-  const [tab, setTab] = useState<Tab>("evidence");
+export function InspectorPane({
+  citationId,
+  activeTab = "evidence",
+  onTabChange,
+}: InspectorPaneProps) {
   const cite = citationId ? CITATIONS[citationId] : null;
   return (
     <div
@@ -31,21 +35,21 @@ export function InspectorPane({ citationId }: InspectorPaneProps) {
         </span>
         <div className="flex-1" />
         <div className="flex gap-1">
-          <ITab active={tab === "evidence"} onClick={() => setTab("evidence")}>
+          <ITab active={activeTab === "evidence"} onClick={() => onTabChange?.("evidence")}>
             Evidence
           </ITab>
-          <ITab active={tab === "trace"} onClick={() => setTab("trace")}>
+          <ITab active={activeTab === "trace"} onClick={() => onTabChange?.("trace")}>
             Trace
           </ITab>
-          <ITab active={tab === "context"} onClick={() => setTab("context")}>
+          <ITab active={activeTab === "context"} onClick={() => onTabChange?.("context")}>
             Context
           </ITab>
         </div>
       </div>
       <div className="overflow-y-auto px-3.5 pb-5 pt-3.5">
-        {tab === "evidence" && (cite ? <EvidenceView cite={cite} /> : <Empty />)}
-        {tab === "trace" && <TraceView />}
-        {tab === "context" && <ContextView />}
+        {activeTab === "evidence" && (cite ? <EvidenceView cite={cite} /> : <Empty />)}
+        {activeTab === "trace" && <TraceView />}
+        {activeTab === "context" && <ContextView />}
       </div>
     </div>
   );

@@ -1,10 +1,16 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMatch, useNavigate, useParams } from "react-router-dom";
 import { AppShell } from "../../components/atlas/AppShell";
-import { PluginRunPanel } from "../../components/atlas/PluginRunPanel";
+import { PluginRunChatPane } from "../../components/atlas/PluginRunChatPane";
 import { WorkspaceFrame } from "../../components/atlas/WorkspaceFrame";
-import { useManifest } from "../../components/atlas/manifests";
+import { useManifest, useRunsForPlugin } from "../../components/atlas/manifests";
+import {
+  buildPluginRunWorkspaceSurface,
+  buildPluginWorkspaceScaffold,
+} from "../../components/atlas/pluginRunWorkspace";
+import { usePluginRun } from "../../components/atlas/usePluginRun";
 import { pluginsApi } from "../../api/plugins";
+import type { WorkbenchTab } from "../../components/atlas/data";
 import { WORKSPACES } from "../../components/atlas/data";
 import type { PaneVisibility, WorkspaceId } from "../../components/atlas/types";
 
@@ -12,8 +18,8 @@ import type { PaneVisibility, WorkspaceId } from "../../components/atlas/types";
  * Plugin workspace route container.
  *
  * /workspaces/:pluginId               → PluginHome via WorkspaceFrame
- * /workspaces/:pluginId/sessions/r_*  → live PluginRunPanel against the backend
- * /workspaces/:pluginId/sessions/X    → legacy WorkspaceFrame (fixture sessions)
+ * /workspaces/:pluginId/sessions/r_*  → live backend run inside WorkspaceFrame
+ * /workspaces/:pluginId/sessions/X    → fixture/demo session inside WorkspaceFrame
  */
 export function PluginWorkspace() {
   const navigate = useNavigate();
@@ -22,14 +28,17 @@ export function PluginWorkspace() {
   const effectiveSessionId = sessionRouteMatch?.params.sessionId ?? sessionId;
   const workspace = WORKSPACES[pluginId as WorkspaceId] ?? WORKSPACES["trial-finder"];
   const manifestQuery = useManifest(pluginId);
+  const runsQuery = useRunsForPlugin(pluginId);
   const [paneControls, setPaneControls] = useState<{
     panes: PaneVisibility;
     togglePane: (p: keyof PaneVisibility) => void;
+    openTab: (tab: WorkbenchTab) => void;
   } | null>(null);
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
 
   const isLiveRun = Boolean(effectiveSessionId && effectiveSessionId.startsWith("r_"));
+  const liveRunBundle = usePluginRun(isLiveRun ? (effectiveSessionId as string) : null);
   const openPluginPath = (path: string) => {
     window.location.assign(path);
   };
@@ -64,12 +73,34 @@ export function PluginWorkspace() {
     }
   }, [manifestQuery]);
 
+  const liveSurface = useMemo(() => {
+    if (!isLiveRun || !manifestQuery.data || !liveRunBundle.run) return null;
+    return buildPluginRunWorkspaceSurface({
+      manifest: manifestQuery.data,
+      run: liveRunBundle.run,
+      runs: runsQuery.data ?? [],
+      events: liveRunBundle.events,
+      approvals: liveRunBundle.approvals,
+      canvas: liveRunBundle.canvas,
+    });
+  }, [isLiveRun, liveRunBundle.approvals, liveRunBundle.canvas, liveRunBundle.events, liveRunBundle.run, manifestQuery.data, runsQuery.data]);
+
+  const liveScaffold = useMemo(
+    () =>
+      isLiveRun && manifestQuery.data
+        ? buildPluginWorkspaceScaffold(manifestQuery.data)
+        : null,
+    [isLiveRun, manifestQuery.data],
+  );
+
+  const resolvedWorkspace = liveSurface?.workspace ?? workspace;
+
   return (
     <AppShell
       contained={false}
       crumbs={[
         { label: "Workspaces" },
-        { label: manifestQuery.data?.displayName ?? workspace.title },
+        { label: manifestQuery.data?.displayName ?? resolvedWorkspace.title },
         effectiveSessionId
           ? { label: isLiveRun ? `Run ${effectiveSessionId}` : effectiveSessionId, active: true }
           : { label: "Plugin home", active: true },
@@ -79,40 +110,58 @@ export function PluginWorkspace() {
       onTogglePane={(p) => paneControls?.togglePane(p)}
       onRunWorkflow={() => undefined}
     >
-      {isLiveRun && manifestQuery.data ? (
-        <PluginRunPanel
-          manifest={manifestQuery.data}
-          runId={effectiveSessionId as string}
-          onRevoke={() => undefined}
+      <>
+        {startError && (
+          <div
+            className="absolute left-1/2 top-16 z-50 -translate-x-1/2 rounded border px-3 py-2 text-[12px]"
+            style={{ background: "rgba(220,38,38,0.08)", borderColor: "rgba(220,38,38,0.4)", color: "var(--ink-1)" }}
+          >
+            Failed to start run: {startError}
+          </div>
+        )}
+        <WorkspaceFrame
+          workspace={resolvedWorkspace}
+          activeSessionId={effectiveSessionId ?? "__home__"}
+          onSelectSession={(id) => {
+            if (id === "__home__") {
+              navigate(`/workspaces/${workspace.id}`);
+              return;
+            }
+            openPluginPath(`/workspaces/${workspace.id}/sessions/${id}`);
+          }}
+          showPluginHome={!effectiveSessionId}
+          onStartRun={(workflowId) => {
+            void onStartRun(workflowId);
+          }}
+          onControlsChange={setPaneControls}
+          surface={
+            manifestQuery.data && (liveSurface || liveScaffold)
+              ? {
+                  chatPane: (
+                    <PluginRunChatPane
+                      manifest={manifestQuery.data}
+                      runId={effectiveSessionId as string}
+                      bundle={liveRunBundle}
+                      onOpenArtifact={(tab) => {
+                        paneControls?.togglePane("workbench");
+                        paneControls?.openTab(tab);
+                      }}
+                    />
+                  ),
+                  sessions: liveSurface?.sessions,
+                  filesTree: liveSurface?.filesTree ?? liveScaffold?.filesTree,
+                  seedTabs: liveSurface?.tabs ?? liveScaffold?.tabs,
+                  canvas: liveSurface?.canvas ?? liveScaffold?.canvas,
+                  runId: effectiveSessionId as string,
+                  getFileTab: (fileId) =>
+                    liveSurface?.fileTabs[fileId] ??
+                    liveScaffold?.fileTabs[fileId] ??
+                    null,
+                }
+              : undefined
+          }
         />
-      ) : (
-        <>
-          {startError && (
-            <div
-              className="absolute left-1/2 top-16 z-50 -translate-x-1/2 rounded border px-3 py-2 text-[12px]"
-              style={{ background: "rgba(220,38,38,0.08)", borderColor: "rgba(220,38,38,0.4)", color: "var(--ink-1)" }}
-            >
-              Failed to start run: {startError}
-            </div>
-          )}
-          <WorkspaceFrame
-            workspace={workspace}
-            activeSessionId={effectiveSessionId ?? "__home__"}
-            onSelectSession={(id) => {
-              if (id === "__home__") {
-                navigate(`/workspaces/${workspace.id}`);
-                return;
-              }
-              openPluginPath(`/workspaces/${workspace.id}/sessions/${id}`);
-            }}
-            showPluginHome={!effectiveSessionId}
-            onStartRun={(workflowId) => {
-              void onStartRun(workflowId);
-            }}
-            onControlsChange={setPaneControls}
-          />
-        </>
-      )}
+      </>
     </AppShell>
   );
 }

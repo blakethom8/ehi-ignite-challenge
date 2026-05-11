@@ -30,6 +30,7 @@ type ChatPaneProps = {
   messages: ChatMessage[];
   onSend: (text: string) => void;
   onCitationClick: (id: string) => void;
+  onReferenceClick: (id: string) => void;
   onAction: (target: string) => void;
   activeCitationId: string | null;
 };
@@ -39,6 +40,7 @@ export function ChatPane({
   messages,
   onSend,
   onCitationClick,
+  onReferenceClick,
   onAction,
   activeCitationId,
 }: ChatPaneProps) {
@@ -104,6 +106,7 @@ export function ChatPane({
             msg={m}
             workspace={workspace}
             onCitationClick={onCitationClick}
+            onReferenceClick={onReferenceClick}
             activeCitationId={activeCitationId}
             onAction={onAction}
           />
@@ -206,12 +209,14 @@ function Message({
   msg,
   workspace,
   onCitationClick,
+  onReferenceClick,
   activeCitationId,
   onAction,
 }: {
   msg: ChatMessage;
   workspace: Workspace;
   onCitationClick: (id: string) => void;
+  onReferenceClick: (id: string) => void;
   activeCitationId: string | null;
   onAction: (target: string) => void;
 }) {
@@ -283,7 +288,7 @@ function Message({
         >
           {msg.blocks.map((b, i) => (
             <p key={i} className="mb-2.5 last:mb-0">
-              {renderInline(b, onCitationClick, activeCitationId)}
+              {renderInline(b, onCitationClick, onReferenceClick, activeCitationId)}
             </p>
           ))}
         </div>
@@ -367,6 +372,7 @@ function ActionChip({ action, onClick }: { action: ChatAction; onClick: () => vo
 function renderInline(
   text: string,
   onCitationClick: (id: string) => void,
+  onReferenceClick: (id: string) => void,
   activeCitationId: string | null,
 ): React.ReactNode[] {
   const parts: React.ReactNode[] = [];
@@ -384,7 +390,7 @@ function renderInline(
         id={ref}
         active={activeCitationId === ref}
         kind={isCite ? "citation" : "file"}
-        onClick={() => onCitationClick(ref)}
+        onClick={() => (isCite ? onCitationClick(ref) : onReferenceClick(ref))}
       />,
     );
     last = m.index + m[0].length;

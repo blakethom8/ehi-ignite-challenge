@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, Compass, Database, HelpCircle, Menu, Pill, Play, Search, Send, Telescope } from "lucide-react";
 import { Link } from "react-router-dom";
-import { getMockBundleContext } from "../../api/mockData";
 import { hrefForModule } from "./navigation";
 import type { Crumb } from "./Titlebar";
 import type {
@@ -92,17 +91,11 @@ export function ModuleBar({
 
   const activeBundle = useMemo(() => {
     if (!activePatientId) return null;
-    const bundle = getMockBundleContext(activePatientId);
-    const label = bundle?.label ?? activePatientName ?? activePatientId;
-    const subtitle = bundle?.updated_at
-      ? `Updated ${new Date(`${bundle.updated_at}T00:00:00`).toLocaleDateString("en-US", {
-          month: "short",
-          day: "numeric",
-          year: "numeric",
-        })}`
-      : "Selected data space";
-    return { label, subtitle };
-  }, [activePatientId, activePatientName]);
+    return {
+      label: activePatientName ?? activePatientId,
+      subtitle: isDemo ? "Demo patient environment" : "Active patient context",
+    };
+  }, [activePatientId, activePatientName, isDemo]);
 
   const contextCrumbs = useMemo(() => {
     if (!crumbs?.length) return [];

@@ -111,10 +111,10 @@ export function PatientRecordPool() {
           icon={UserRound}
           eyebrow="Patient Access"
           title="Choose a demo patient before browsing patient environments."
-          body="This pool should not expose patient environments by default. For the prototype, continue with an explicit demo patient first, then switch between demo environments from inside the app."
+          body="This pool should not expose patient environments by default. Choose a demo patient first so the application can open with an explicit chart context and consistent module state."
           bullets={[
             "Lock patient-specific surfaces until access is explicit.",
-            "Use demo mode as the safe first-time entry path.",
+            "Treat demo access as a thin session posture, not a separate product mode.",
             "Keep the pool focused on controlled patient selection, not accidental data exposure.",
           ]}
           aside={
@@ -243,10 +243,10 @@ export function PatientRecordPool() {
                 Synthetic cohort review
               </p>
               <h1 className="text-3xl font-semibold tracking-tight text-[#18191f] lg:text-4xl">
-                Browse the Synthea patient pool before opening a workflow.
+                Choose a patient environment before opening a workflow.
               </h1>
               <p className="mt-3 text-sm leading-6 text-[#63708a]">
-                Use this internal view to sort the demo cohort, inspect basic chart density, and choose a record with enough signal for a walkthrough.
+                Compare available patient environments, inspect chart density, and open the right chart context before moving into Patient Record, FHIR Charts, Caspian, or Plugins.
               </p>
             </div>
             <label className="relative block w-full lg:w-[360px]">
@@ -373,7 +373,7 @@ export function PatientRecordPool() {
                   {selectedPatient ? patientLabel(selectedPatient) : "No patient selected"}
                 </h2>
                 <p className="mt-2 text-sm leading-6 text-[#667085]">
-                  Review the chart density before opening a clinical module. This selection is a demo context, not a patient-facing workflow step.
+                  Review the chart posture before opening a clinical module. This is an access and context step, not a patient-facing workflow.
                 </p>
 
                 <div className="mt-4 grid grid-cols-2 gap-2">
@@ -389,7 +389,7 @@ export function PatientRecordPool() {
               <div className="rounded-2xl border border-[#e1e6ef] bg-white p-5 shadow-sm">
                 <h2 className="text-base font-semibold text-[#101828]">Open selected context</h2>
                 <p className="mt-1 text-sm leading-6 text-[#667085]">
-                  Secondary shortcuts for demo review once a row has the right profile.
+                  Secondary shortcuts once this patient environment has the right profile.
                 </p>
                 <div className="mt-4 space-y-2">
                   {quietActions.map((action) => {

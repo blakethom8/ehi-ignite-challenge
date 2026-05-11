@@ -99,6 +99,5 @@ export function workspaceFromManifest(m: PluginManifest): Workspace {
     vendor: m.vendor.name,
     version: m.version,
     permissions: Array.from(new Set(permissionLabels)),
-    anchoredFrom: "Caspian · Hollister",
   };
 }

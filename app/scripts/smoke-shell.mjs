@@ -107,9 +107,6 @@ async function main() {
     });
     await page.reload({ waitUntil: "domcontentloaded" });
     await page.getByText("FILES").waitFor();
-    await page.getByRole("button", { name: "Medication safety review" }).click();
-    await page.waitForURL("**/caspian/sessions/s2");
-    await page.getByText("Medication safety review").waitFor();
     await page.getByText("anticoagulation-note.txt").last().click();
     await page.getByText("Anticoagulation note").waitFor();
 

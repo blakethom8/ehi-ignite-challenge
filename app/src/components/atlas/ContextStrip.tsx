@@ -1,6 +1,6 @@
 import { Database, Globe, Link2, Loader, Lock, Pause, Pin, Send, Telescope, UserRound } from "lucide-react";
-import { PATIENT } from "./data";
 import type { Workspace } from "./types";
+import { useAccessContext } from "../../context/AccessContext";
 
 const ICONS: Record<string, typeof Telescope> = {
   Telescope,
@@ -22,6 +22,9 @@ export function ContextStrip({ workspace }: ContextStripProps) {
 }
 
 function CaspianStrip() {
+  const { activePatientId, activePatientName, isDemo, mode, user } = useAccessContext();
+  const patientLabel = activePatientName ?? activePatientId ?? "No patient selected";
+
   return (
     <div
       className="flex h-10 items-center gap-2 overflow-hidden whitespace-nowrap border-b px-3.5 text-[12px]"
@@ -41,31 +44,25 @@ function CaspianStrip() {
         className="text-[13px] font-semibold tracking-tight"
         style={{ color: "var(--ink-1)" }}
       >
-        {PATIENT.name}
+        {patientLabel}
       </div>
-      <Sep />
-      <Mono>{PATIENT.mrn}</Mono>
-      <Sep />
-      <Meta>{PATIENT.ageSex}</Meta>
-      <Sep />
-      <span
-        className="inline-flex items-center gap-1.5 font-medium"
-        style={{ color: "var(--ink-2)" }}
-      >
-        <span className="h-1.5 w-1.5 rounded-full" style={{ background: "#b45309" }} />
-        {PATIENT.tier}
-      </span>
       <Sep />
       <Meta>
         <Database className="h-2.5 w-2.5" strokeWidth={1.5} />
-        {PATIENT.fhirCount}
+        Selected chart context
       </Meta>
-      <Sep />
-      <Meta>{PATIENT.encounters} encounters</Meta>
       <div className="flex-1" />
       <Pill>
         <Pin className="h-2.5 w-2.5" strokeWidth={1.5} />
         Pinned to session
+      </Pill>
+      <Pill tone={isDemo ? "warn" : undefined}>
+        <UserRound className="h-2.5 w-2.5" strokeWidth={1.5} />
+        {isDemo
+          ? "Demo access"
+          : mode === "authenticated"
+            ? `Signed in as ${user?.display_name ?? "Clinician"}`
+            : "Access required"}
       </Pill>
       <Pill tone="green">
         <Lock className="h-2.5 w-2.5" strokeWidth={1.5} />
@@ -76,8 +73,14 @@ function CaspianStrip() {
 }
 
 function PluginStrip({ workspace }: { workspace: Workspace }) {
+  const { activePatientId, activePatientName, isDemo } = useAccessContext();
   const Icon = ICONS[workspace.icon] ?? Telescope;
   const PermIcons = [Database, Globe, Send];
+  const anchorLabel = activePatientName ?? activePatientId ?? "No patient selected";
+  const hasRunState = Boolean(workspace.runState && workspace.runState !== "idle");
+  const hasRunStep = Boolean(workspace.runStep && workspace.runStep !== "—");
+  const hasRunElapsed = Boolean(workspace.runElapsed && workspace.runElapsed !== "—");
+
   return (
     <div
       className="flex h-10 items-center gap-2 overflow-hidden whitespace-nowrap border-b px-3.5 text-[12px]"
@@ -132,36 +135,48 @@ function PluginStrip({ workspace }: { workspace: Workspace }) {
         })}
       </div>
       <div className="flex-1" />
-      <div
-        className="inline-flex items-center gap-1.5 rounded border px-2.5 py-0.5"
-        style={{ background: "var(--surface-2)", borderColor: "var(--line-1)" }}
-      >
-        <RunDot state={workspace.runState ?? "idle"} />
-        <span
-          className="text-[10px] font-bold tracking-wider"
-          style={{ color: "var(--ink-1)" }}
+      {hasRunState && (
+        <div
+          className="inline-flex items-center gap-1.5 rounded border px-2.5 py-0.5"
+          style={{ background: "var(--surface-2)", borderColor: "var(--line-1)" }}
         >
-          {(workspace.runState ?? "idle").toUpperCase()}
-        </span>
-        <Sep />
-        <Meta>step {workspace.runStep}</Meta>
-        <Sep />
-        <Mono>{workspace.runElapsed}</Mono>
-      </div>
-      <button
-        className="inline-flex items-center gap-1 rounded border px-2.5 py-1 text-[11px] font-medium hover:bg-[var(--surface-2)]"
-        style={{
-          background: "var(--surface-1)",
-          borderColor: "var(--line-2)",
-          color: "var(--ink-1)",
-        }}
-      >
-        <Pause className="h-2.5 w-2.5" strokeWidth={1.5} />
-        Pause
-      </button>
+          <RunDot state={workspace.runState ?? "idle"} />
+          <span
+            className="text-[10px] font-bold tracking-wider"
+            style={{ color: "var(--ink-1)" }}
+          >
+            {(workspace.runState ?? "idle").toUpperCase()}
+          </span>
+          {hasRunStep && (
+            <>
+              <Sep />
+              <Meta>step {workspace.runStep}</Meta>
+            </>
+          )}
+          {hasRunElapsed && (
+            <>
+              <Sep />
+              <Mono>{workspace.runElapsed}</Mono>
+            </>
+          )}
+        </div>
+      )}
+      {hasRunState && workspace.runState === "running" && (
+        <button
+          className="inline-flex items-center gap-1 rounded border px-2.5 py-1 text-[11px] font-medium hover:bg-[var(--surface-2)]"
+          style={{
+            background: "var(--surface-1)",
+            borderColor: "var(--line-2)",
+            color: "var(--ink-1)",
+          }}
+        >
+          <Pause className="h-2.5 w-2.5" strokeWidth={1.5} />
+          Pause
+        </button>
+      )}
       <Pill tone="warn">
         <Link2 className="h-2.5 w-2.5" strokeWidth={1.5} />
-        {workspace.anchoredFrom}
+        {isDemo ? `Demo anchor · ${anchorLabel}` : `Patient anchor · ${anchorLabel}`}
       </Pill>
     </div>
   );

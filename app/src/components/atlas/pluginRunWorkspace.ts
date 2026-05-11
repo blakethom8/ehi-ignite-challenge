@@ -59,7 +59,7 @@ export function buildPluginRunWorkspaceSurface({
       lastRefresh: latestTimestamp(events),
       anchoredFrom: `Anchor · ${run.patientId}`,
     },
-    sessions: buildSessions(runs),
+    sessions: buildPluginRunSessions(runs),
     tabs,
     filesTree,
     canvas: projectedCanvas,
@@ -67,7 +67,7 @@ export function buildPluginRunWorkspaceSurface({
   };
 }
 
-function buildSessions(runs: PluginRun[]): Session[] {
+export function buildPluginRunSessions(runs: PluginRun[]): Session[] {
   return [...runs]
     .sort((a, b) => b.startedAt.localeCompare(a.startedAt))
     .map((run) => ({

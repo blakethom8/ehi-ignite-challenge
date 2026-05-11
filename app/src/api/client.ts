@@ -91,15 +91,7 @@ const useMockData = import.meta.env.VITE_USE_MOCK_DATA === "true";
 
 async function getOrMock<T>(request: Promise<T>, fallback: T): Promise<T> {
   if (useMockData) return fallback;
-  try {
-    return await request;
-  } catch (error) {
-    if (import.meta.env.DEV) {
-      console.warn("API unavailable; using frontend mock data for this request.", error);
-      return fallback;
-    }
-    throw error;
-  }
+  return request;
 }
 
 export const api = {

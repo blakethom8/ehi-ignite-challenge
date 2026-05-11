@@ -5,6 +5,7 @@ import { PluginRunChatPane } from "../../components/atlas/PluginRunChatPane";
 import { WorkspaceFrame, type WorkspaceFrameControls } from "../../components/atlas/WorkspaceFrame";
 import { useManifest, useRunsForPlugin } from "../../components/atlas/manifests";
 import {
+  buildPluginRunSessions,
   buildPluginRunWorkspaceSurface,
   buildPluginWorkspaceScaffold,
 } from "../../components/atlas/pluginRunWorkspace";
@@ -149,7 +150,10 @@ export function PluginWorkspace() {
                       }}
                     />
                   ),
-                  sessions: liveSurface?.sessions,
+                  sessions:
+                    !effectiveSessionId && runsQuery.data
+                      ? buildPluginRunSessions(runsQuery.data)
+                      : liveSurface?.sessions,
                   filesTree: liveSurface?.filesTree ?? liveScaffold?.filesTree,
                   seedTabs: liveSurface?.tabs ?? liveScaffold?.tabs,
                   canvas: liveSurface?.canvas ?? liveScaffold?.canvas,

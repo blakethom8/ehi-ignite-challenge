@@ -6,7 +6,7 @@ import { CaspianChatPane } from "../../components/atlas/CaspianChatPane";
 import { DemoPatientPicker } from "../../components/atlas/DemoPatientPicker";
 import { StartStateCard } from "../../components/atlas/StartStateCard";
 import { WorkspaceFrame, type WorkspaceFrameControls } from "../../components/atlas/WorkspaceFrame";
-import { SESSIONS, WORKSPACES } from "../../components/atlas/data";
+import { WORKSPACES, type Session } from "../../components/atlas/data";
 import { useCaspianAssistantSession } from "../../components/atlas/useCaspianAssistantSession";
 
 export function CaspianWorkspace() {
@@ -14,14 +14,10 @@ export function CaspianWorkspace() {
   const [searchParams] = useSearchParams();
   const { sessionId } = useParams();
   const workspace = WORKSPACES["caspian"];
-  const sessions = SESSIONS["caspian"];
-  const defaultSessionId = sessions[0]?.id ?? null;
-  const resolvedSessionId = sessionId ?? defaultSessionId;
+  const resolvedSessionId = sessionId ?? "current";
   const patientId = searchParams.get("patient");
-  const activeSession = useMemo(
-    () => sessions.find((session) => session.id === resolvedSessionId) ?? sessions[0] ?? null,
-    [resolvedSessionId, sessions],
-  );
+  const sessions = useMemo(() => buildCaspianSessions(resolvedSessionId), [resolvedSessionId]);
+  const activeSession = sessions[0] ?? null;
   const [paneControls, setPaneControls] = useState<WorkspaceFrameControls | null>(null);
   const assistant = useCaspianAssistantSession(patientId, resolvedSessionId);
 
@@ -82,6 +78,7 @@ export function CaspianWorkspace() {
         }}
         onControlsChange={setPaneControls}
         surface={{
+          sessions,
           chatPane: (
             <CaspianChatPane
               patientId={patientId}
@@ -114,4 +111,22 @@ export function CaspianWorkspace() {
       />
     </AppShell>
   );
+}
+
+function buildCaspianSessions(sessionId: string): Session[] {
+  return [
+    {
+      id: sessionId,
+      title: sessionId === "current" ? "Clinical review" : humanizeSessionId(sessionId),
+      state: "running",
+      meta: "active workspace session",
+      workflow: "preop",
+    },
+  ];
+}
+
+function humanizeSessionId(sessionId: string): string {
+  return sessionId
+    .replace(/[-_]+/g, " ")
+    .replace(/\b\w/g, (value) => value.toUpperCase());
 }

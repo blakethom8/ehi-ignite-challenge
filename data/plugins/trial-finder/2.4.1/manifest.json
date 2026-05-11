@@ -1,0 +1,220 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "trial-finder",
+  "version": "2.4.1",
+  "vendor": {
+    "id": "helix-clinical",
+    "name": "Helix Clinical",
+    "keyFingerprint": "ed25519:/vXMmX24BUwK"
+  },
+  "displayName": "Trial Finder",
+  "subtitle": "Clinical-trial discovery + outreach",
+  "description": "Pulls a consented patient anchor from Caspian and runs a clinical-trial discovery loop against external registries. Produces ranked candidate boards, eligibility checks, and outreach packets \u2014 every outbound action gated by per-run approval.",
+  "icon": "Telescope",
+  "color": "#4338ca",
+  "trust": {
+    "posture": "consented-external",
+    "boundaryLabel": "Consented external \u00b7 registry lookup",
+    "requiresPerRunConsent": true
+  },
+  "anchor": {
+    "scope": [
+      "demographics.age-band",
+      "demographics.sex",
+      "demographics.geography",
+      "diagnoses.active",
+      "biomarkers",
+      "labs.recent",
+      "performance-status"
+    ],
+    "redactionPreset": "de-id-v3",
+    "ttlSeconds": 3600
+  },
+  "connectors": [
+    {
+      "id": "clinicaltrials-gov",
+      "label": "ClinicalTrials.gov",
+      "endpointPattern": "https://clinicaltrials.gov/api/v2/**",
+      "auth": "none"
+    },
+    {
+      "id": "nci-trial-connect",
+      "label": "NCI Trial Connect",
+      "endpointPattern": "https://trialconnect.cancer.gov/api/**",
+      "auth": "vendor-token"
+    }
+  ],
+  "permissions": [
+    {
+      "kind": "read-anchor",
+      "scope": [
+        "diagnoses.active",
+        "biomarkers",
+        "labs.recent",
+        "performance-status"
+      ]
+    },
+    {
+      "kind": "call-external",
+      "connector": "clinicaltrials-gov"
+    },
+    {
+      "kind": "call-external",
+      "connector": "nci-trial-connect"
+    },
+    {
+      "kind": "send-outbound",
+      "channel": "site-packet"
+    }
+  ],
+  "workflows": [
+    {
+      "id": "shortlist",
+      "title": "Shortlist candidate trials",
+      "description": "Search registries against the patient anchors and rank likely fits.",
+      "tags": [
+        "external"
+      ],
+      "needs": [
+        "diagnoses.active",
+        "biomarkers"
+      ],
+      "produces": [
+        "candidate-board"
+      ]
+    },
+    {
+      "id": "review",
+      "title": "Review eligibility fit",
+      "description": "Compare inclusion/exclusion against shortlist.",
+      "tags": [
+        "review"
+      ],
+      "needs": [
+        "candidate-board"
+      ],
+      "produces": [
+        "eligibility-report"
+      ]
+    },
+    {
+      "id": "packet",
+      "title": "Draft outreach packet",
+      "description": "Prepare a redacted artifact for site contact.",
+      "tags": [
+        "export"
+      ],
+      "needs": [
+        "candidate-board"
+      ],
+      "produces": [
+        "outreach-packet"
+      ]
+    }
+  ],
+  "tools": [
+    {
+      "id": "trial.search",
+      "label": "Search trials",
+      "category": "clinical-trial",
+      "permission": "call-external"
+    },
+    {
+      "id": "trial.fetch_detail",
+      "label": "Fetch trial detail",
+      "category": "clinical-trial",
+      "permission": "call-external"
+    },
+    {
+      "id": "trial.score_fit",
+      "label": "Score patient fit",
+      "category": "clinical-trial",
+      "permission": "read-anchor"
+    },
+    {
+      "id": "packet.draft",
+      "label": "Draft outreach packet",
+      "category": "artifact",
+      "permission": "read-anchor"
+    },
+    {
+      "id": "packet.send",
+      "label": "Send packet",
+      "category": "outbound",
+      "permission": "send-outbound"
+    }
+  ],
+  "ui": {
+    "homeSections": [
+      "hero",
+      "permissions-ledger",
+      "workflows",
+      "recent-runs",
+      "about"
+    ],
+    "workbenchTabs": [
+      {
+        "id": "candidate-board",
+        "label": "Candidate board",
+        "kind": "trial-board",
+        "renderer": "trial.board"
+      },
+      {
+        "id": "shortlist",
+        "label": "ranked-shortlist.md",
+        "kind": "packet-outline",
+        "renderer": "markdown.doc"
+      },
+      {
+        "id": "manifest",
+        "label": "manifest.json",
+        "kind": "manifest-json",
+        "renderer": "json.viewer"
+      }
+    ],
+    "files": [
+      {
+        "group": "working",
+        "name": "ranked-shortlist.md",
+        "icon": "FileText",
+        "dirty": true
+      },
+      {
+        "group": "working",
+        "name": "candidate-board.json",
+        "icon": "Braces"
+      },
+      {
+        "group": "working",
+        "name": "packet-outline.md",
+        "icon": "FileText"
+      },
+      {
+        "group": "anchors",
+        "name": "diagnoses.md",
+        "icon": "FileText"
+      },
+      {
+        "group": "anchors",
+        "name": "biomarkers.csv",
+        "icon": "FileSpreadsheet"
+      },
+      {
+        "group": "anchors",
+        "name": "geography.json",
+        "icon": "Braces"
+      }
+    ],
+    "agent": {
+      "avatarInitials": "Tf",
+      "avatarColor": "var(--mod-trials)",
+      "modelPreset": "marketplace-act"
+    }
+  },
+  "exports": [
+    "markdown",
+    "json",
+    "shareable-bundle"
+  ],
+  "signature": "ed25519:M+SAZy8cM2Cy0DLm4kdjkHQ7S3skWrsKqqSKh3W9LMLt2kkc6YZg+zMfq8pLwSYvlw9T/1n1mmg1d5twNESVDw"
+}

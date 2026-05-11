@@ -1,0 +1,47 @@
+{
+  "studies": [
+    {
+      "nctId": "NCT-0421187",
+      "title": "Phase III ABL-tyrosine kinase inhibitor for post-imatinib intolerance",
+      "phase": "Phase III",
+      "site": "MSKCC",
+      "siteContact": "trials-msk@example.org",
+      "distanceMi": 38,
+      "fit": 0.92,
+      "biomarkerMatch": true,
+      "inclusion": [
+        "ECOG 0-1",
+        "BCR-ABL positive",
+        "Post-imatinib intolerance documented"
+      ],
+      "exclusion": [
+        "Prior allogeneic SCT",
+        "Active second malignancy"
+      ]
+    },
+    {
+      "nctId": "NCT-0387714",
+      "title": "Adaptive dosing of nilotinib in elderly CML",
+      "phase": "Phase II",
+      "site": "Cleveland Clinic",
+      "siteContact": "ccf-trials@example.org",
+      "distanceMi": 412,
+      "fit": 0.74,
+      "biomarkerMatch": null,
+      "inclusion": ["Age >= 65", "ECOG 0-2"],
+      "exclusion": ["Active hepatitis B"]
+    },
+    {
+      "nctId": "NCT-0498102",
+      "title": "Asciminib for CML-CP after failure of two prior TKIs",
+      "phase": "Phase III",
+      "site": "Dana-Farber",
+      "siteContact": "dfci-onco@example.org",
+      "distanceMi": 215,
+      "fit": 0.81,
+      "biomarkerMatch": true,
+      "inclusion": ["Failure of >=2 prior TKIs"],
+      "exclusion": ["QTc > 480ms"]
+    }
+  ]
+}

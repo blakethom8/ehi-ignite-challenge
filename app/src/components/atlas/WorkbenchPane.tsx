@@ -16,6 +16,7 @@ import {
   X,
 } from "lucide-react";
 import { PATIENT, type WorkbenchTab } from "./data";
+import { RENDERERS } from "./renderers";
 import type { Workspace } from "./types";
 
 const TAB_ICONS: Record<string, typeof FileText> = {
@@ -33,6 +34,10 @@ type WorkbenchPaneProps = {
   onCloseTab: (id: string) => void;
   onCitationClick: (id: string) => void;
   activeCitationId: string | null;
+  /** Active run id (plugin workspaces). */
+  runId?: string | null;
+  /** Canvas state for the active run, keyed by tool id / artifact id. */
+  canvas?: Record<string, unknown>;
 };
 
 export function WorkbenchPane({
@@ -43,6 +48,8 @@ export function WorkbenchPane({
   onCloseTab,
   onCitationClick,
   activeCitationId,
+  runId = null,
+  canvas = {},
 }: WorkbenchPaneProps) {
   const tab = tabs.find((t) => t.id === activeTabId) ?? null;
   return (
@@ -134,7 +141,21 @@ export function WorkbenchPane({
         style={{ background: "var(--surface-0)" }}
       >
         {tab ? (
-          renderTab(tab, onCitationClick, activeCitationId)
+          tab.renderer ? (
+            (() => {
+              const Renderer = RENDERERS[tab.renderer];
+              return (
+                <Renderer
+                  runId={runId}
+                  canvas={canvas}
+                  tabId={tab.id}
+                  onCitationClick={onCitationClick}
+                />
+              );
+            })()
+          ) : (
+            renderTab(tab, onCitationClick, activeCitationId)
+          )
         ) : (
           <div className="p-8 text-[13px]" style={{ color: "var(--ink-4)" }}>
             No tab open.

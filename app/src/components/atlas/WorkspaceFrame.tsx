@@ -6,6 +6,7 @@ import { InspectorPane } from "./InspectorPane";
 import { PluginHome } from "./PluginHome";
 import { SessionsPane } from "./SessionsPane";
 import { WorkbenchPane } from "./WorkbenchPane";
+import { useManifest } from "./manifests";
 import { useWorkspaceState } from "./useWorkspaceState";
 import type { PaneSizes, Workspace } from "./types";
 
@@ -32,7 +33,7 @@ type WorkspaceFrameProps = {
   /** Optional route-driven session switcher. */
   onSelectSession?: (id: string | "__home__") => void;
   /** Optional route-driven run launcher. */
-  onStartRun?: () => void;
+  onStartRun?: (workflowId?: string) => void;
   /** Map external pane controls into the frame. */
   onControlsChange?: (controls: {
     panes: ReturnType<typeof useWorkspaceState>["panes"];
@@ -49,6 +50,8 @@ export function WorkspaceFrame({
   onControlsChange,
 }: WorkspaceFrameProps) {
   const state = useWorkspaceState(workspace.id);
+  const isPlugin = workspace.family === "plugin";
+  const manifestQuery = useManifest(isPlugin ? workspace.id : undefined);
   const stageRef = useRef<HTMLDivElement>(null);
   const rightStackRef = useRef<HTMLDivElement>(null);
   const [stageWidth, setStageWidth] = useState(0);
@@ -303,10 +306,21 @@ export function WorkspaceFrame({
             )}
           </>
         ) : (
-          <PluginHome
-            workspace={workspace}
-            onStartRun={handleStartRun}
-          />
+          manifestQuery.data ? (
+            <PluginHome
+              manifest={manifestQuery.data}
+              onStartRun={(workflowId) => handleStartRun(workflowId)}
+            />
+          ) : (
+            <div
+              className="grid h-full place-items-center text-[12.5px]"
+              style={{ color: "var(--ink-3)" }}
+            >
+              {manifestQuery.isLoading
+                ? "Loading plugin manifest…"
+                : `Plugin not installed: ${workspace.id}`}
+            </div>
+          )
         )}
       </div>
     </div>

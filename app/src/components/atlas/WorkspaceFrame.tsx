@@ -261,6 +261,7 @@ export function WorkspaceFrame({
                   onCloseTab={state.handleCloseTab}
                   onCitationClick={state.handleCitation}
                   activeCitationId={state.citationId}
+                  canvas={state.fixtureCanvas}
                 />
               </div>
             )}
@@ -291,6 +292,7 @@ export function WorkspaceFrame({
                 <FilesPane
                   workspaceId={workspace.id}
                   onOpen={state.handleOpenFile}
+                  activeFileId={state.activeFileId}
                 />
                 )}
                 {responsivePanes.files && responsivePanes.inspector && (

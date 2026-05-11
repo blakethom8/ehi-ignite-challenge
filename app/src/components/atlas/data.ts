@@ -549,36 +549,214 @@ export type WorkbenchTab = {
 export const INITIAL_TABS: Record<WorkspaceId, WorkbenchTab[]> = {
   "caspian": [
     { id: "tab_brief", label: "pre-op-packet-v2.md", icon: "FileText", kind: "preop-brief", dirty: true },
+    { id: "tab_anti", label: "anticoagulation-note.txt", icon: "FileText", kind: "anticoag-note" },
     { id: "tab_diff", label: "v1 → v2 diff", icon: "GitCompare", kind: "diff" },
     { id: "tab_sum", label: "clearance-summary.json", icon: "Braces", kind: "summary-json" },
+    { id: "tab_labs", label: "recent-labs.csv", icon: "FileText", kind: "packet-outline", renderer: "markdown.doc" },
+    { id: "tab_history", label: "operative-history.md", icon: "FileText", kind: "packet-outline", renderer: "markdown.doc" },
+    { id: "tab_workflow", label: "workflow.md", icon: "FileText", kind: "packet-outline", renderer: "markdown.doc" },
+    { id: "tab_settings", label: "settings.json", icon: "Braces", kind: "manifest-json", renderer: "json.viewer" },
   ],
   "trial-finder": [
     { id: "tab_board", label: "candidate-board.json", icon: "Beaker", kind: "trial-board" },
     { id: "tab_short", label: "ranked-shortlist.md", icon: "FileText", kind: "packet-outline", dirty: true },
     { id: "tab_man", label: "manifest.json", icon: "Braces", kind: "manifest-json" },
+    { id: "tab_dx", label: "diagnoses.md", icon: "FileText", kind: "packet-outline", renderer: "markdown.doc" },
+    { id: "tab_bio", label: "biomarkers.csv", icon: "FileText", kind: "packet-outline", renderer: "markdown.doc" },
+    { id: "tab_geo", label: "geography.json", icon: "Braces", kind: "manifest-json", renderer: "json.viewer" },
   ],
-  "med-access": [],
-  "site-coord": [],
-  "second-opinion": [],
+  "med-access": [
+    { id: "tab_pa", label: "pa-packet.md", icon: "FileText", kind: "packet-outline", renderer: "markdown.doc", dirty: true },
+    { id: "tab_med_manifest", label: "manifest.json", icon: "Braces", kind: "manifest-json", renderer: "json.viewer" },
+  ],
+  "site-coord": [
+    { id: "tab_template", label: "outreach-template.md", icon: "FileText", kind: "packet-outline", renderer: "markdown.doc" },
+    { id: "tab_site_manifest", label: "manifest.json", icon: "Braces", kind: "manifest-json", renderer: "json.viewer" },
+  ],
+  "second-opinion": [
+    { id: "tab_referral", label: "referral-packet.md", icon: "FileText", kind: "packet-outline", renderer: "markdown.doc", dirty: true },
+    { id: "tab_redact", label: "redaction-preview.md", icon: "GitCompare", kind: "diff", renderer: "diff.unified" },
+    { id: "tab_second_manifest", label: "manifest.json", icon: "Braces", kind: "manifest-json", renderer: "json.viewer" },
+  ],
 };
 
-export const FILE_TO_TAB: Record<string, WorkbenchTab> = {
-  f_brief: { id: "tab_brief", label: "pre-op-packet-v2.md", icon: "FileText", kind: "preop-brief", dirty: true },
-  f_packetv2: { id: "tab_brief", label: "pre-op-packet-v2.md", icon: "FileText", kind: "preop-brief", dirty: true },
-  f_packetv1: { id: "tab_diff", label: "v1 → v2 diff", icon: "GitCompare", kind: "diff" },
-  f_anticoag: { id: "tab_anti", label: "anticoagulation-note.txt", icon: "FileText", kind: "anticoag-note" },
-  f_summary: { id: "tab_sum", label: "clearance-summary.json", icon: "Braces", kind: "summary-json" },
-  f_board: { id: "tab_board", label: "candidate-board.json", icon: "Beaker", kind: "trial-board" },
-  f_shortlist: { id: "tab_short", label: "ranked-shortlist.md", icon: "FileText", kind: "packet-outline", dirty: true },
-  f_packet: { id: "tab_short", label: "ranked-shortlist.md", icon: "FileText", kind: "packet-outline", dirty: true },
-  f_manifest: { id: "tab_man", label: "manifest.json", icon: "Braces", kind: "manifest-json" },
-  f_pkg: { id: "tab_man", label: "manifest.json", icon: "Braces", kind: "manifest-json" },
+export const FIXTURE_CANVAS: Record<WorkspaceId, Record<string, unknown>> = {
+  "caspian": {
+    tab_history: {
+      preview: [
+        "# Operative history",
+        "",
+        "- 2025-04-18: anesthesia consult cleared with no documented airway complication.",
+        "- 2025-05-06: repeat INR ordered ahead of the scheduled hernia repair.",
+        "- 2025-05-12: pre-op packet remains in review pending anticoagulation sign-off.",
+      ].join("\n"),
+    },
+    tab_workflow: {
+      preview: [
+        "# Workflow",
+        "",
+        "1. Confirm the apixaban hold interval with the attending.",
+        "2. Verify the morning-of INR once resulted.",
+        "3. Publish the clearance summary into the patient packet.",
+      ].join("\n"),
+    },
+    tab_labs: {
+      preview: [
+        "# Recent labs",
+        "",
+        "- 2025-04-22 CBC: Hgb 12.4 g/dL, WBC 6.8, platelets 218",
+        "- 2025-05-06 INR: pending repeat for operative clearance",
+        "- Trend: no active bleeding signal in the last two draws",
+      ].join("\n"),
+    },
+    tab_settings: {
+      workflow: "preop",
+      model_preset: "clinical-high",
+      artifact_target: "pre-op-packet-v2.md",
+      approver: "attending",
+    },
+  },
+  "trial-finder": {
+    tab_dx: {
+      preview: [
+        "# Diagnoses",
+        "",
+        "- Chronic myeloid leukemia, BCR-ABL positive",
+        "- Prior imatinib intolerance",
+        "- ECOG performance status 1",
+      ].join("\n"),
+    },
+    tab_bio: {
+      preview: [
+        "# Biomarkers",
+        "",
+        "- BCR-ABL+: confirmed",
+        "- ANC: adequate for screening",
+        "- Platelets: adequate for screening",
+      ].join("\n"),
+    },
+    tab_geo: {
+      radius_miles: 50,
+      caregiver_support: true,
+      preferred_sites: ["MSKCC", "NYU Langone"],
+    },
+  },
+  "med-access": {
+    tab_pa: {
+      preview: [
+        "# Prior authorization packet",
+        "",
+        "Medication: apixaban",
+        "Payer: Aetna Open Access PPO",
+        "Status: draft pending supporting clinical justification",
+      ].join("\n"),
+    },
+    tab_med_manifest: {
+      workspace: "med-access",
+      boundary: "Consented external",
+      outbound_channels: ["pa-submission", "pap-enrollment"],
+    },
+  },
+  "site-coord": {
+    tab_template: {
+      preview: [
+        "# Outreach template",
+        "",
+        "Subject: Records and scheduling follow-up",
+        "",
+        "- Confirm next site visit",
+        "- Request any missing outside records",
+        "- Re-check eligibility blockers before outreach",
+      ].join("\n"),
+    },
+    tab_site_manifest: {
+      workspace: "site-coord",
+      boundary: "Consented external",
+      cadence: "scheduled batch",
+    },
+  },
+  "second-opinion": {
+    tab_referral: {
+      preview: [
+        "# Referral packet",
+        "",
+        "Specialty: endocrinology",
+        "Summary: diabetes regimen complexity with perioperative implications",
+        "Status: packet drafted and awaiting redaction review",
+      ].join("\n"),
+    },
+    tab_redact: {
+      hunks: [
+        "--- referral-packet.md",
+        "+++ redaction-preview.md",
+        "@@",
+        "- Patient: M. Hollister, MRN 8.4127.881",
+        "+ Patient: De-identified clinical summary",
+        "- Home address: 123 Demo Lane",
+        "+ Home geography: within 20 miles of tertiary referral center",
+      ].join("\n"),
+    },
+    tab_second_manifest: {
+      workspace: "second-opinion",
+      boundary: "Consented external",
+      redaction_preset: "de-id-v3",
+    },
+  },
 };
 
-export const ACTION_TO_TAB: Record<string, WorkbenchTab> = {
-  "open-packet": FILE_TO_TAB.f_brief,
-  "open-anticoag": FILE_TO_TAB.f_anticoag,
-  "open-board": FILE_TO_TAB.f_board,
-  "open-shortlist": FILE_TO_TAB.f_shortlist,
-  "open-manifest": FILE_TO_TAB.f_manifest,
+export const FILE_TABS_BY_WORKSPACE: Record<WorkspaceId, Record<string, WorkbenchTab>> = {
+    "caspian": {
+      f_brief: { id: "tab_brief", label: "pre-op-packet-v2.md", icon: "FileText", kind: "preop-brief", dirty: true },
+      f_packetv2: { id: "tab_brief", label: "pre-op-packet-v2.md", icon: "FileText", kind: "preop-brief", dirty: true },
+      f_packetv1: { id: "tab_diff", label: "v1 → v2 diff", icon: "GitCompare", kind: "diff" },
+      f_anticoag: { id: "tab_anti", label: "anticoagulation-note.txt", icon: "FileText", kind: "anticoag-note" },
+      f_summary: { id: "tab_sum", label: "clearance-summary.json", icon: "Braces", kind: "summary-json" },
+      f_labs: { id: "tab_labs", label: "recent-labs.csv", icon: "FileText", kind: "packet-outline", renderer: "markdown.doc" },
+      f_history: { id: "tab_history", label: "operative-history.md", icon: "FileText", kind: "packet-outline", renderer: "markdown.doc" },
+      f_workflow: { id: "tab_workflow", label: "workflow.md", icon: "FileText", kind: "packet-outline", renderer: "markdown.doc" },
+      f_settings: { id: "tab_settings", label: "settings.json", icon: "Braces", kind: "manifest-json", renderer: "json.viewer" },
+  },
+  "trial-finder": {
+    f_board: { id: "tab_board", label: "candidate-board.json", icon: "Beaker", kind: "trial-board" },
+    f_shortlist: { id: "tab_short", label: "ranked-shortlist.md", icon: "FileText", kind: "packet-outline", dirty: true },
+    f_packet: { id: "tab_short", label: "ranked-shortlist.md", icon: "FileText", kind: "packet-outline", dirty: true },
+    f_manifest: { id: "tab_man", label: "manifest.json", icon: "Braces", kind: "manifest-json" },
+    f_pkg: { id: "tab_man", label: "manifest.json", icon: "Braces", kind: "manifest-json" },
+    f_dx: { id: "tab_dx", label: "diagnoses.md", icon: "FileText", kind: "packet-outline", renderer: "markdown.doc" },
+    f_bio: { id: "tab_bio", label: "biomarkers.csv", icon: "FileText", kind: "packet-outline", renderer: "markdown.doc" },
+    f_geo: { id: "tab_geo", label: "geography.json", icon: "Braces", kind: "manifest-json", renderer: "json.viewer" },
+  },
+  "med-access": {
+    f_pa: { id: "tab_pa", label: "pa-packet.md", icon: "FileText", kind: "packet-outline", renderer: "markdown.doc", dirty: true },
+    f_manifest: { id: "tab_med_manifest", label: "manifest.json", icon: "Braces", kind: "manifest-json", renderer: "json.viewer" },
+  },
+  "site-coord": {
+    f_template: { id: "tab_template", label: "outreach-template.md", icon: "FileText", kind: "packet-outline", renderer: "markdown.doc" },
+    f_manifest: { id: "tab_site_manifest", label: "manifest.json", icon: "Braces", kind: "manifest-json", renderer: "json.viewer" },
+  },
+  "second-opinion": {
+    f_referral: { id: "tab_referral", label: "referral-packet.md", icon: "FileText", kind: "packet-outline", renderer: "markdown.doc", dirty: true },
+    f_redact: { id: "tab_redact", label: "redaction-preview.md", icon: "GitCompare", kind: "diff", renderer: "diff.unified" },
+    f_manifest: { id: "tab_second_manifest", label: "manifest.json", icon: "Braces", kind: "manifest-json", renderer: "json.viewer" },
+  },
 };
+
+export function getFileTab(workspaceId: WorkspaceId, fileId: string): WorkbenchTab | null {
+  return FILE_TABS_BY_WORKSPACE[workspaceId][fileId] ?? null;
+}
+
+export const ACTION_TABS_BY_WORKSPACE: Partial<Record<WorkspaceId, Record<string, WorkbenchTab>>> = {
+  "caspian": {
+    "open-packet": FILE_TABS_BY_WORKSPACE["caspian"].f_brief,
+    "open-anticoag": FILE_TABS_BY_WORKSPACE["caspian"].f_anticoag,
+  },
+  "trial-finder": {
+    "open-board": FILE_TABS_BY_WORKSPACE["trial-finder"].f_board,
+    "open-shortlist": FILE_TABS_BY_WORKSPACE["trial-finder"].f_shortlist,
+    "open-manifest": FILE_TABS_BY_WORKSPACE["trial-finder"].f_manifest,
+  },
+};
+
+export function getActionTab(workspaceId: WorkspaceId, target: string): WorkbenchTab | null {
+  return ACTION_TABS_BY_WORKSPACE[workspaceId]?.[target] ?? null;
+}

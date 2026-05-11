@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import {
-  ACTION_TO_TAB,
-  FILE_TO_TAB,
+  FIXTURE_CANVAS,
   INITIAL_CHAT,
   INITIAL_TABS,
+  getActionTab,
+  getFileTab,
   type ChatMessage,
   type FileNode,
   type WorkbenchTab,
@@ -30,6 +31,11 @@ const LEGACY_SIZES_STORAGE_KEY = "atlas:sizes";
 const PANES_STORAGE_PREFIX = "atlas:panes:";
 const SIZES_STORAGE_PREFIX = "atlas:sizes:";
 const RIGHT_FOCUS_STORAGE_PREFIX = "atlas:right-focus:";
+const DEFAULT_ACTIVE_TAB_IDS = Object.fromEntries(
+  Object.entries(INITIAL_TABS).flatMap(([workspaceId, tabs]) =>
+    tabs[0] ? [[workspaceId, tabs[0].id]] : [],
+  ),
+) as Partial<Record<WorkspaceId, string>>;
 
 function loadJson<T>(keys: string[], fallback: T): T {
   if (typeof window === "undefined") return fallback;
@@ -63,10 +69,8 @@ export function useWorkspaceState(workspaceId: WorkspaceId) {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [chats, setChats] = useState<Record<WorkspaceId, ChatMessage[]>>(() => INITIAL_CHAT);
   const [tabsByWs, setTabsByWs] = useState<Record<WorkspaceId, WorkbenchTab[]>>(() => INITIAL_TABS);
-  const [activeTabByWs, setActiveTabByWs] = useState<Partial<Record<WorkspaceId, string>>>({
-    "caspian": "tab_brief",
-    "trial-finder": "tab_board",
-  });
+  const [activeTabByWs, setActiveTabByWs] = useState<Partial<Record<WorkspaceId, string>>>(DEFAULT_ACTIVE_TAB_IDS);
+  const [activeFileByWs, setActiveFileByWs] = useState<Partial<Record<WorkspaceId, string>>>({});
   const [citationId, setCitationId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -142,10 +146,11 @@ export function useWorkspaceState(workspaceId: WorkspaceId) {
         return;
       }
       const file = node as FileNode;
-      const tab = FILE_TO_TAB[file.id];
+      const tab = getFileTab(workspaceId, file.id);
+      setActiveFileByWs((prev) => ({ ...prev, [workspaceId]: file.id }));
       if (tab) openTab(tab);
     },
-    [handleCitation, openTab],
+    [handleCitation, openTab, workspaceId],
   );
 
   const handleAction = useCallback(
@@ -154,10 +159,10 @@ export function useWorkspaceState(workspaceId: WorkspaceId) {
         handleCitation(target.slice(5));
         return;
       }
-      const tab = ACTION_TO_TAB[target];
+      const tab = getActionTab(workspaceId, target);
       if (tab) openTab(tab);
     },
-    [handleCitation, openTab],
+    [handleCitation, openTab, workspaceId],
   );
 
   const handleSelectTab = useCallback(
@@ -170,16 +175,15 @@ export function useWorkspaceState(workspaceId: WorkspaceId) {
   const handleCloseTab = useCallback(
     (id: string) => {
       setTabsByWs((prev) => {
-        const ws = (prev[workspaceId] ?? []).filter((x) => x.id !== id);
-        return { ...prev, [workspaceId]: ws };
-      });
-      setActiveTabByWs((prev) => {
-        if (prev[workspaceId] !== id) return prev;
-        const remaining = (tabsByWs[workspaceId] ?? []).filter((x) => x.id !== id);
-        return { ...prev, [workspaceId]: remaining[0]?.id };
+        const remaining = (prev[workspaceId] ?? []).filter((tab) => tab.id !== id);
+        setActiveTabByWs((current) => {
+          if (current[workspaceId] !== id) return current;
+          return { ...current, [workspaceId]: remaining[0]?.id };
+        });
+        return { ...prev, [workspaceId]: remaining };
       });
     },
-    [tabsByWs, workspaceId],
+    [workspaceId],
   );
 
   const handleSend = useCallback(
@@ -222,9 +226,11 @@ export function useWorkspaceState(workspaceId: WorkspaceId) {
     chats,
     tabs: tabsByWs[workspaceId] ?? [],
     activeTabId: activeTabByWs[workspaceId] ?? null,
+    activeFileId: activeFileByWs[workspaceId] ?? null,
     citationId,
     setCitationId,
     rightPaneFocus,
+    fixtureCanvas: FIXTURE_CANVAS[workspaceId] ?? {},
     handleCitation,
     handleOpenFile,
     handleAction,

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ModuleBar } from "./ModuleBar";
+import { deriveActiveModule, hrefForModule } from "./navigation";
 import { PlatformDrawer } from "./PlatformDrawer";
 import type { Crumb } from "./Titlebar";
 import type {
@@ -15,14 +16,6 @@ const DEFAULT_USER: User = {
   name: "R. Patel",
   org: "Mercy Medical Group · Clinician",
 };
-
-const MODULE_PATHS: { id: ModuleId; match: RegExp; href: string }[] = [
-  { id: "patient-record", match: /^\/(patient-record|record|aggregate|records-pool|charts)/, href: "/patient-record" },
-  { id: "fhir-charts", match: /^\/(fhir-charts|explorer)/, href: "/fhir-charts" },
-  { id: "caspian", match: /^\/caspian/, href: "/caspian" },
-  { id: "workspaces", match: /^\/(workspaces|marketplace|trials|skills|medication-access|payer-check|second-opinion|grants|research-opportunities|sharing|ai-workspace)/, href: "/workspaces" },
-  { id: "learn", match: /^\/(learn|using-atlas|analysis|pipeline-lab|ccda-lab|ground-truth-review|architecture|guided-tour)/, href: "/learn" },
-];
 
 type AppShellProps = {
   children: React.ReactNode;
@@ -39,14 +32,6 @@ type AppShellProps = {
   /** Adds a max-width container around children (false for full-bleed workspaces). */
   contained?: boolean;
 };
-
-export function deriveActiveModule(pathname: string): ModuleId {
-  for (const m of MODULE_PATHS) {
-    if (m.match.test(pathname)) return m.id;
-  }
-  if (pathname === "/" || pathname === "/platform") return "patient-record";
-  return "patient-record";
-}
 
 const DEFAULT_PANES: PaneVisibility = {
   sessions: true,
@@ -98,8 +83,8 @@ export function AppShell({
   }, [crumbs, location.pathname]);
 
   const handleSelectModule = (m: ModuleId) => {
-    const target = MODULE_PATHS.find((p) => p.id === m);
-    if (target) navigate(target.href);
+    const target = hrefForModule(m);
+    if (target) navigate(target);
   };
 
   const handleSwitchWorkspace = (w: WorkspaceId) => {

@@ -388,18 +388,24 @@ def revoke_consent(
     _revoked_ids.add(run_id)
 
 
+def _update_canvas_value(
+    conn: sqlite3.Connection, run_id: str, key: str, value: Any
+) -> None:
+    row = conn.execute("SELECT canvas FROM runs WHERE id = ?", (run_id,)).fetchone()
+    canvas = json.loads(row[0] or "{}") if row else {}
+    canvas[key] = value
+    conn.execute(
+        "UPDATE runs SET canvas = ? WHERE id = ?",
+        (json.dumps(canvas, default=str), run_id),
+    )
+
+
 def run_canvas_update(
     run_id: str, key: str, value: Any, *, db_path: Path | None = None
 ) -> None:
     """Append a key/value into the run's canvas state."""
     with _lock, _conn(db_path) as conn:
-        row = conn.execute("SELECT canvas FROM runs WHERE id = ?", (run_id,)).fetchone()
-        canvas = json.loads(row[0] or "{}") if row else {}
-        canvas[key] = value
-        conn.execute(
-            "UPDATE runs SET canvas = ? WHERE id = ?",
-            (json.dumps(canvas, default=str), run_id),
-        )
+        _update_canvas_value(conn, run_id, key, value)
 
 
 def list_events(run_id: str, *, db_path: Path | None = None) -> list[dict]:
@@ -625,6 +631,7 @@ def approve_outbound(
             (_now_iso(), approver.id, approval_id),
         )
         _update_state(conn, run.id, "running")
+        _update_canvas_value(conn, run.id, appr["toolId"], result)
         _emit(conn, run.id, "approval.approved", {
             "approvalId": approval_id,
             "approverId": approver.id,
@@ -679,6 +686,7 @@ def call_tool(
     result = dispatch_tool(tool_id=tool_id, ctx=ctx, payload=payload)
 
     with _lock, _conn(db_path) as conn:
+        _update_canvas_value(conn, run.id, tool_id, result)
         _emit(conn, run.id, "tool.result", {
             "toolId": tool_id,
             "result": result,

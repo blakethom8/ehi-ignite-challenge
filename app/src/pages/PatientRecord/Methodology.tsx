@@ -79,8 +79,8 @@ const dataModes = [
 export function AggregationMethodology() {
   const [params] = useSearchParams();
   const patientId = params.get("patient");
-  const contextHref = patientId ? `/aggregate/context?patient=${patientId}` : "/aggregate/context";
-  const chartHref = patientId ? `/charts?patient=${patientId}` : "/charts";
+  const contextHref = patientId ? `/patient-record/context?patient=${patientId}` : "/patient-record/context";
+  const chartHref = patientId ? `/patient-record?patient=${patientId}` : "/patient-record";
 
   return (
     <main className="mx-auto max-w-7xl space-y-5 p-4 lg:p-6">

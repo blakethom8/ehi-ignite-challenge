@@ -8,7 +8,8 @@
  */
 
 // Shell ----------------------------------------------------------------
-export { AppShell, deriveActiveModule } from "./AppShell";
+export { AppShell } from "./AppShell";
+export { deriveActiveModule } from "./navigation";
 export { ModuleBar } from "./ModuleBar";
 export { PlatformDrawer } from "./PlatformDrawer";
 export { Titlebar, type Crumb } from "./Titlebar";

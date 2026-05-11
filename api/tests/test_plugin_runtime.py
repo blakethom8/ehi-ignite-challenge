@@ -94,6 +94,40 @@ def test_trial_finder_end_to_end(clinician):
     assert rows[0].action == "send-packet"
 
 
+def test_run_canvas_tracks_tool_results_and_approved_outbound(clinician):
+    run = rt.start_run(
+        plugin_id="trial-finder",
+        patient_id="8.4127.881",
+        workflow_id="packet",
+        title="Canvas contract",
+        user=clinician,
+    )
+    rt.grant_consent(run.id, approver=clinician)
+
+    draft = rt.call_tool(
+        run_id=run.id, tool_id="packet.draft", payload={"nctId": "NCT-0421187"}
+    )
+    run = rt.get_run(run.id)
+    assert run.canvas["packet.draft"] == draft
+
+    approval = rt.request_outbound_approval(
+        run_id=run.id,
+        tool_id="packet.send",
+        tool_payload={
+            "channel": "site-packet",
+            "site": "MSKCC",
+            "artifactId": draft["artifactId"],
+        },
+        action="send-packet",
+        description="Send packet",
+        payload_preview=draft["preview"],
+        destination="MSKCC",
+    )
+    outcome = rt.approve_outbound(approval_id=approval.approvalId, approver=clinician)
+    run = rt.get_run(run.id)
+    assert run.canvas["packet.send"] == outcome["result"]
+
+
 # ============================================================
 # Medication Access — outbound to a different channel
 # ============================================================

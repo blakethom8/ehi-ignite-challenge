@@ -2492,7 +2492,7 @@ export function PublishReadinessPage() {
     mutationFn: () => api.deleteAggregationProfile(patientId),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["patients"] });
-      navigate("/aggregate/sources", { replace: true });
+      navigate("/patient-record/sources", { replace: true });
     },
   });
   const publishMutation = useMutation({

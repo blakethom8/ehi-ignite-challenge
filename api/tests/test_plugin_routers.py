@@ -55,6 +55,18 @@ def test_start_run_then_grant_then_call_tool(client):
     assert res.status_code == 200
     assert any(s["nctId"] == "NCT-0421187" for s in res.json()["studies"])
 
+    run_res = client.get(f"/api/plugins/runs/{run['id']}")
+    assert run_res.status_code == 200
+    body = run_res.json()
+    assert body["canvas"]["trial.search"] == res.json()
+
+    events_res = client.get(f"/api/plugins/runs/{run['id']}/events")
+    assert events_res.status_code == 200
+    tool_events = [event for event in events_res.json() if event["kind"] == "tool.result"]
+    assert len(tool_events) == 1
+    assert tool_events[0]["payload"]["toolId"] == "trial.search"
+    assert tool_events[0]["payload"]["result"] == res.json()
+
 
 def test_undeclared_connector_returns_403(client):
     run = client.post(

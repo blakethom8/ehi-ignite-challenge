@@ -1,5 +1,5 @@
 import { Suspense, lazy, type ComponentType } from "react";
-import { BrowserRouter, Navigate, Routes, Route, useLocation } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useParams } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { AppShell } from "./components/atlas/AppShell";
@@ -11,6 +11,7 @@ import { PatientRecordPool } from "./pages/PatientRecordPool";
 import { GuidedTour } from "./pages/GuidedTour";
 import { PatientRecordLayout } from "./pages/PatientRecord/PatientRecordLayout";
 import { FhirChartsLayout } from "./pages/FhirCharts/FhirChartsLayout";
+import { buildGroundTruthReviewPath } from "./routing";
 
 function lazyNamed<TModule extends Record<string, unknown>>(
   loader: () => Promise<TModule>,
@@ -275,8 +276,8 @@ function AppShellRoutes() {
         <Route path="/analysis/qa-eval-lab" element={<Navigate to="/learn/qa-eval-lab" replace />} />
         <Route path="/pipeline-lab" element={<Navigate to="/learn/pipeline-lab" replace />} />
         <Route path="/ccda-lab" element={<Navigate to="/learn/ccda-lab" replace />} />
-        <Route path="/ground-truth-review" element={<Navigate to="/learn/ground-truth-review" replace />} />
-        <Route path="/ground-truth-review/:runId" element={<Navigate to="/learn/ground-truth-review" replace />} />
+        <Route path="/ground-truth-review" element={<Navigate to={buildGroundTruthReviewPath()} replace />} />
+        <Route path="/ground-truth-review/:runId" element={<LegacyGroundTruthReviewRedirect />} />
         {/* Stragglers retired during the IA cleanup. */}
         <Route path="/platform" element={<Navigate to="/" replace />} />
         <Route path="/journey" element={<Navigate to="/fhir-charts/journey" replace />} />
@@ -298,6 +299,11 @@ function AppShellRoutes() {
       {!isFullscreenWorkspace && <ChatWidget />}
     </>
   );
+}
+
+function LegacyGroundTruthReviewRedirect() {
+  const { runId } = useParams();
+  return <Navigate to={buildGroundTruthReviewPath(runId)} replace />;
 }
 
 export default function App() {

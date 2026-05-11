@@ -68,7 +68,7 @@ export function ChatWidget() {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Don't render on the full assistant page (avoid double UI)
-  const isAssistantPage = location.pathname === "/explorer/assistant";
+  const isAssistantPage = location.pathname === "/fhir-charts/assistant";
 
   const hasMessages = chat.messages.length > 0;
   const lastAssistantMsg = [...chat.messages].reverse().find((m) => m.role === "assistant");
@@ -92,7 +92,7 @@ export function ChatWidget() {
 
   function openFullView() {
     const params = new URLSearchParams(searchParams);
-    navigate(`/explorer/assistant?${params.toString()}`);
+    navigate(`/fhir-charts/assistant?${params.toString()}`);
   }
 
   // ── Closed state: floating bubble ──────────────────────────────────────

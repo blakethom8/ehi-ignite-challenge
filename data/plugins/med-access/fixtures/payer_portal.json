@@ -1,0 +1,8 @@
+{
+  "ack": {
+    "status": "received",
+    "submissionId": "PA-2026-04128",
+    "expectedAdjudicationDays": 5,
+    "endpoint": "https://payer-portal.example.com/edi/pa/submit"
+  }
+}

@@ -72,6 +72,25 @@ export const WORKSPACES: Record<WorkspaceId, Workspace> = {
     lastRefresh: "—",
     anchoredFrom: "Caspian · Hollister",
   },
+  "second-opinion": {
+    id: "second-opinion",
+    family: "plugin",
+    title: "Second Opinion",
+    subtitle: "Plugin",
+    icon: "UserRound",
+    color: "#0f766e",
+    tint: "rgba(15, 118, 110, 0.10)",
+    boundary: "Consented external · specialist network",
+    boundaryTone: "warn",
+    vendor: "ConferMD",
+    version: "0.9.0-beta",
+    permissions: ["read patient anchors", "external specialist network", "outbound referral"],
+    runState: "idle",
+    runStep: "—",
+    runElapsed: "0s",
+    lastRefresh: "—",
+    anchoredFrom: "Caspian · Hollister",
+  },
 };
 
 export const PATIENT = {
@@ -112,6 +131,10 @@ export const SESSIONS: Record<WorkspaceId, Session[]> = {
   "site-coord": [
     { id: "c1", title: "MSKCC follow-up loop", state: "draft", meta: "drafted · review queue" },
   ],
+  "second-opinion": [
+    { id: "o1", title: "Endocrinology second opinion — Hollister", state: "needs", meta: "attending review pending", workflow: "compose-packet" },
+    { id: "o2", title: "Cardiology referral — Hollister", state: "done", meta: "response received" },
+  ],
 };
 
 export type Workflow = {
@@ -139,6 +162,11 @@ export const WORKFLOWS: Record<WorkspaceId, Workflow[]> = {
   ],
   "site-coord": [
     { id: "followup", title: "Run follow-up loop", desc: "Confirm appointments, nudge for missing records, surface eligibility re-checks.", tags: ["scheduled"] },
+  ],
+  "second-opinion": [
+    { id: "compose-packet", title: "Compose referral packet", desc: "Assemble the clinical packet for an outside specialist.", tags: ["analysis"] },
+    { id: "route-packet", title: "Route packet to specialist", desc: "Send the composed packet into the consulting network.", tags: ["external"] },
+    { id: "track-response", title: "Track specialist response", desc: "Poll for the consulting opinion and surface it back.", tags: ["external"] },
   ],
 };
 
@@ -261,6 +289,26 @@ export const FILE_TREES: Record<WorkspaceId, FileTreeNode[]> = {
       expanded: true,
       children: [
         { type: "file", name: "outreach-template.md", id: "f_template", ext: "md", icon: "FileText" },
+      ],
+    },
+    {
+      type: "folder",
+      name: "package",
+      expanded: false,
+      children: [
+        { type: "file", name: "manifest.json", id: "f_manifest", ext: "json", icon: "Braces" },
+      ],
+    },
+  ],
+  "second-opinion": [
+    { type: "group", label: "Plugin workspace" },
+    {
+      type: "folder",
+      name: "working",
+      expanded: true,
+      children: [
+        { type: "file", name: "referral-packet.md", id: "f_referral", ext: "md", icon: "FileText", dirty: true },
+        { type: "file", name: "redaction-preview.md", id: "f_redact", ext: "md", icon: "FileText" },
       ],
     },
     {
@@ -457,6 +505,7 @@ export const INITIAL_CHAT: Record<WorkspaceId, ChatMessage[]> = {
   ],
   "med-access": [],
   "site-coord": [],
+  "second-opinion": [],
 };
 
 export type WorkbenchTab = {
@@ -470,7 +519,30 @@ export type WorkbenchTab = {
     | "diff"
     | "trial-board"
     | "packet-outline"
-    | "manifest-json";
+    | "manifest-json"
+    | "candidate-detail"
+    | "eligibility-form"
+    | "barriers-list"
+    | "pa-form"
+    | "manufacturer-program-matcher"
+    | "specialty-picker"
+    | "referral-packet"
+    | "network-status-board";
+  /** When set, WorkbenchPane mounts this renderer from the registry
+   *  instead of falling back to the legacy renderTab switch. */
+  renderer?:
+    | "trial.board"
+    | "trial.detail"
+    | "form.eligibility"
+    | "list.barriers"
+    | "form.pa"
+    | "matcher.manufacturer"
+    | "picker.specialty"
+    | "packet.referral"
+    | "board.network-status"
+    | "markdown.doc"
+    | "json.viewer"
+    | "diff.unified";
   dirty?: boolean;
 };
 
@@ -487,6 +559,7 @@ export const INITIAL_TABS: Record<WorkspaceId, WorkbenchTab[]> = {
   ],
   "med-access": [],
   "site-coord": [],
+  "second-opinion": [],
 };
 
 export const FILE_TO_TAB: Record<string, WorkbenchTab> = {

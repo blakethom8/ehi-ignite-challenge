@@ -266,15 +266,17 @@ approval data the card renders is different between families.
 
 - [x] **Frontend structure** — `pages/Caspian/` and `pages/Plugins/` separated; module bar + workspace shell distinguishes families visually.
 - [x] **Frontend marker** — `Workspace.family: "clinical" | "plugin"` drives context strip + boundary pill.
-- [ ] **Frontend trust types** — `AnchorPackage`, `PluginManifest`, `ProvenanceRecord` are not yet in code. (See §4.)
-- [ ] **Backend enforcement** — `api/` has no awareness of the distinction. All the differentiation in §3 is currently aspirational.
-- [ ] **Manifest loader** — no plugin manifest format defined; current fixture is hardcoded in `components/atlas/data.ts`.
-- [ ] **Anchor compiler** — no anchor package mechanism; plugins read whatever the fixture exposes.
-- [ ] **Consent gate** — `ApprovalCard` UI exists; the run-blocking semantics behind it don't.
-- [ ] **Provenance log** — not started.
+- [x] **Frontend trust types** — ✅ shipped. `app/src/components/atlas/trust.ts` declares `PluginManifest`, `AnchorPackage`, `ConsentToken`, `ProvenanceRecord`, `PluginApprovalRequest`. Mirror in `api/trust/models.py`.
+- [x] **Backend enforcement** — ✅ shipped. `api/plugins/tools.py` is the load-bearing gate (rule 1 + rule 2); `api/plugins/routers/plugins.py` exposes the HTTP surface.
+- [x] **Plugin manifest loader** — ✅ shipped. `api/plugins/manifest.py` parses + signature-verifies against the vendor allowlist at `data/plugins/vendors.json`. Frontend hook in `components/atlas/manifests.ts`.
+- [x] **Anchor compiler** — ✅ shipped. `api/plugins/anchors.py` compiles a redacted, scope-projected, Atlas-signed package per run; TTL-checked at every tool call.
+- [x] **Consent gate** — ✅ shipped. Per-run consent tokens (`api/plugins/consent.py`) + per-action `ApprovalCard` flow wired end-to-end through `PluginRunPanel`.
+- [x] **Provenance log** — ✅ shipped. Append-only signed SQLite log at `data/provenance.db`. Listed in the inspector + at `/api/plugins/runs/{id}/provenance`.
 
-The frontend redesign is what shipped. This document is the contract
-for what the runtime has to look like to honor the UI promise.
+The runtime now honors the UI promise. See
+`docs/product-specs/PLUGIN-RUNTIME.md` for the build spec; the
+acceptance pass against §11 is recorded in
+`docs/daily/2026-05-11-plugin-runtime.md`.
 
 ---
 

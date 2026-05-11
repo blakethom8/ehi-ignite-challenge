@@ -127,8 +127,8 @@ export function PatientRecordOverview() {
       <StartStateCard
         icon={Database}
         eyebrow="Patient Record"
-        title="Start with a patient environment before opening the record pipeline."
-        body="Patient Record should open as a guided operations surface: intake, harmonization, publish, and context capture. Select a demo patient first so the module can load a coherent chart posture instead of scattered empty states."
+        title="Start with a sample chart before opening the record pipeline."
+        body="Patient Record opens as a guided workspace for intake, harmonization, publish, and context capture. Select a synthetic sample chart first so the module can load with coherent chart context."
         bullets={[
           "Review what sources exist and which ones still need preparation.",
           "Open harmonization and publish steps with one consistent patient context.",
@@ -137,7 +137,7 @@ export function PatientRecordOverview() {
         aside={
           <DemoPatientPicker
             destination={(demoPatientId) => `/patient-record?patient=${encodeURIComponent(demoPatientId)}`}
-            title="Open Patient Record in demo mode"
+            title="Open Patient Record with a sample chart"
           />
         }
       />

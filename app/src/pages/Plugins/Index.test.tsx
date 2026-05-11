@@ -41,7 +41,7 @@ describe("PluginsIndex", () => {
     useInstalledManifestsMock.mockReset();
   });
 
-  it("shows an access gate before loading plugins when the session is locked", () => {
+  it("shows a sample-first start state before loading plugins when the session is locked", () => {
     useAccessContextMock.mockReturnValue({ isUnlocked: false });
     useInstalledManifestsMock.mockReturnValue({
       data: undefined,
@@ -54,7 +54,7 @@ describe("PluginsIndex", () => {
     renderPluginsIndex();
 
     expect(
-      screen.getByText("Choose access before opening the plugin marketplace."),
+      screen.getByText("Start a sample or account workspace before opening plugins."),
     ).toBeInTheDocument();
     expect(screen.getByTestId("demo-picker")).toBeInTheDocument();
   });

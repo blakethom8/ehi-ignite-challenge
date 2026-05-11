@@ -13,9 +13,9 @@ import type {
 import { useAccessContext } from "../../context/AccessContext";
 
 const DEFAULT_USER: User = {
-  initials: "RP",
-  name: "R. Patel",
-  org: "Mercy Medical Group · Clinician",
+  initials: "AT",
+  name: "Atlas",
+  org: "Health-record workspace",
 };
 
 function initialsFromName(name: string): string {
@@ -114,13 +114,13 @@ export function AppShell({
   const shellUser = useMemo<User>(() => {
     if (!user) {
       return mode === "demo"
-        ? { initials: "DM", name: "Demo Access", org: "Atlas workspace" }
+        ? { initials: "SP", name: "Sample chart", org: "Synthetic Atlas workspace" }
         : DEFAULT_USER;
     }
     return {
       initials: initialsFromName(user.display_name),
       name: user.display_name,
-      org: `${user.email} · ${user.role}`,
+      org: user.email,
     };
   }, [mode, user]);
   return (

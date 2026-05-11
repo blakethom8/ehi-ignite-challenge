@@ -115,7 +115,7 @@ export function PlatformDrawer({ open, onClose, user }: PlatformDrawerProps) {
               navigate("/records-pool");
             }}
           >
-            Switch patient
+            Switch chart
           </DrawerItem>
         </DrawerSection>
         <div
@@ -165,7 +165,7 @@ export function PlatformDrawer({ open, onClose, user }: PlatformDrawerProps) {
               navigate("/");
             }}
           >
-            Exit demo / sign out
+            Exit sample / sign out
           </DrawerItem>
         </div>
       </aside>

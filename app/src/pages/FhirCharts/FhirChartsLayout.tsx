@@ -213,12 +213,12 @@ export function FhirChartsLayout({ children }: FhirChartsLayoutProps) {
               <p className="mt-1 text-xs leading-5 text-[#667085]">
                 {patientId
                   ? `${activeItem.description} for the selected prepared chart.`
-                  : "Pick a demo environment or a patient to open the prepared chart surfaces."}
+                  : "Pick a sample chart or account workspace to open the prepared chart surfaces."}
               </p>
               {!patientId && (
                 <div className="mt-3 flex items-center gap-2 rounded-lg bg-white px-2.5 py-2 text-xs text-[#5b76fe]">
                   <Activity size={14} />
-                  Demo environments can launch directly into this workspace.
+                  Sample charts can launch directly into this workspace.
                 </div>
               )}
             </div>

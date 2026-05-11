@@ -200,17 +200,17 @@ export function PatientRecordPool() {
         <StartStateCard
           icon={UserRound}
           eyebrow="Patient Access"
-          title="Choose a demo patient before browsing patient environments."
-          body="This pool should not expose patient environments by default. Choose a demo patient first so the application can open with an explicit chart context and consistent module state."
+          title="Start with a sample chart before browsing records."
+          body="This pool does not expose patient-specific surfaces by default. Choose a synthetic sample chart first so the application opens with explicit chart context and consistent module state."
           bullets={[
-            "Lock patient-specific surfaces until access is explicit.",
-            "Treat demo access as a thin session posture, not a separate product mode.",
-            "Keep the pool focused on controlled patient selection, not accidental data exposure.",
+            "Keep patient-specific surfaces closed until a sample or account is active.",
+            "Treat sample charts as prepared records, not a separate product mode.",
+            "Keep the pool focused on controlled chart selection, not accidental data exposure.",
           ]}
           aside={
             <DemoPatientPicker
               destination={(demoPatientId) => `/patient-record?patient=${encodeURIComponent(demoPatientId)}`}
-              title="Continue with demo patient"
+              title="Continue with a sample chart"
             />
           }
         />
@@ -245,10 +245,10 @@ export function PatientRecordPool() {
                 Synthetic cohort review
               </p>
               <h1 className="text-3xl font-semibold tracking-tight text-[#18191f] lg:text-4xl">
-                Choose a patient environment before opening a workflow.
+                Choose a health-record workspace before opening a workflow.
               </h1>
               <p className="mt-3 text-sm leading-6 text-[#63708a]">
-                Compare available patient environments, inspect chart density, and open the right chart context before moving into Patient Record, FHIR Charts, Caspian, or Plugins.
+                Compare available workspaces, inspect chart density, and open the right chart context before moving into Patient Record, FHIR Charts, Caspian, or Plugins.
               </p>
             </div>
             <label className="relative block w-full lg:w-[360px]">
@@ -391,7 +391,7 @@ export function PatientRecordPool() {
               <div className="rounded-2xl border border-[#e1e6ef] bg-white p-5 shadow-sm">
                 <h2 className="text-base font-semibold text-[#101828]">Open selected context</h2>
                 <p className="mt-1 text-sm leading-6 text-[#667085]">
-                  Secondary shortcuts once this patient environment has the right profile.
+                  Secondary shortcuts once this health-record workspace has the right profile.
                 </p>
                 <div className="mt-4 space-y-2">
                   {quietActions.map((action) => {

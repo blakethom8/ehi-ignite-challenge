@@ -289,6 +289,20 @@ export type PluginApprovalRequest = {
 export type ApprovalRequest = CaspianApprovalRequest | PluginApprovalRequest;
 
 // ============================================================
+// Consent token (returned by /api/plugins/runs/{id}/consent)
+// ============================================================
+
+export type ConsentToken = {
+  pluginId: PluginId;
+  runId: string;
+  scope: AnchorScopeField[];
+  issuedAt: string;
+  expiresAt: string;
+  approverId: string;
+  signature: string;
+};
+
+// ============================================================
 // Run state machine (frontend view)
 // ============================================================
 

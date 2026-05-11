@@ -22,7 +22,6 @@ import {
   Settings,
   Stethoscope,
   Telescope,
-  Tag,
   UserRound,
   Users2,
   Workflow,

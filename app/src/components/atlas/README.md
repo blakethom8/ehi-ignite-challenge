@@ -70,7 +70,30 @@ The product distinguishes two workspace families:
 | Symbol | Role |
 |---|---|
 | `useWorkspaceState(workspaceId)` | The workspace's reducer-style hook. Pane visibility, pane sizes, chat messages, workbench tabs, citation selection, file→tab routing. Persists pane state to localStorage. |
-| `WORKSPACES`, `PATIENT`, `SESSIONS`, `WORKFLOWS`, `FILE_TREES`, `CITATIONS`, `INITIAL_CHAT`, `INITIAL_TABS` | Demo seed data mirroring the prototype's `data.js`. Replace with real backend wiring as the workspace API lands. |
+| `useInstalledManifests()`, `useManifest(id)`, `useRunsForPlugin(id)` | React Query hooks in `manifests.ts` that fetch verified manifests + runs from the plugin runtime (`/api/plugins/*`). The frontend never re-derives trust state. |
+| `usePluginRun(runId)` | Live-run hook in `usePluginRun.ts`: polls the run, events, and approvals; exposes mutations for consent, tool calls, and approval decisions. Canvas state is folded from `tool.result` events. |
+| `WORKSPACES`, `PATIENT`, `SESSIONS`, `WORKFLOWS`, `FILE_TREES`, `CITATIONS`, `INITIAL_CHAT`, `INITIAL_TABS` | Demo seed data mirroring the prototype's `data.js`. The plugin shell no longer reads these — see `manifests.ts` + `usePluginRun.ts` for the live path. |
+
+### Renderer registry (`renderers/`)
+
+Plugin workbench tabs mount through a renderer registry keyed by the
+manifest's `ui.workbenchTabs[].renderer` value:
+
+```
+renderers/
+  index.ts                            // RENDERERS: WorkbenchRenderer -> Component
+  types.ts                            // RendererProps { runId, canvas, tabId }
+  shared/                             // markdown.doc, json.viewer, diff.unified, board.network-status
+  trial-finder/                       // trial.board, trial.detail, form.eligibility
+  med-access/                         // list.barriers, form.pa, matcher.manufacturer
+  second-opinion/                     // packet.referral, picker.specialty
+```
+
+Per `docs/architecture/HARNESS-SURFACES.md` §6.3 + §8: plugin-specific
+renderers live in plugin-cohesive folders and are **pure projections**
+of the run's canvas state. They never fetch, mutate, or derive — domain
+logic lives in `api/plugins/tools.py`. Adding a new renderer = drop a
+file in the right folder, register the key, done.
 
 ## Conventions
 

@@ -17,7 +17,7 @@ from typing import Literal
 
 from fastapi import Depends, HTTPException, Request, Response, status
 
-from api.auth_models import AuthSessionResponse, AuthUserResponse, DemoPatientOption
+from api.auth_models import AuthRole, AuthSessionResponse, AuthUserResponse, DemoPatientOption
 from api.core.aggregation import list_upload_workspaces
 from api.core.loader import path_from_patient_id
 from api.trust.models import UserIdentity
@@ -71,7 +71,7 @@ class SessionPrincipal:
     user_id: str | None
     email: str | None
     display_name: str | None
-    role: Literal["clinician", "attending", "coordinator", "admin"]
+    role: AuthRole
     active_patient_id: str | None
     active_patient_name: str | None
     expires_at: datetime
@@ -511,6 +511,63 @@ def login_user(email: str, password: str, request: Request) -> SessionPrincipal:
         request=request,
     )
     audit_event(event_type="auth.login_succeeded", session=principal, payload={"email": row["email"]})
+    return principal
+
+
+def signup_user(email: str, password: str, display_name: str, request: Request) -> SessionPrincipal:
+    init_auth_store()
+    normalized_email = email.strip().lower()
+    normalized_name = display_name.strip()
+    if not normalized_email or not normalized_name:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Email and display name are required.",
+        )
+
+    user_id = f"user_{uuid.uuid4().hex[:12]}"
+    now = _now().isoformat()
+    with _connect() as conn:
+        existing = conn.execute(
+            "SELECT id FROM users WHERE email = ? AND status = 'active'",
+            (normalized_email,),
+        ).fetchone()
+        if existing is not None:
+            audit_event(event_type="auth.signup_conflict", payload={"email": normalized_email})
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="An account already exists for this email.",
+            )
+        try:
+            conn.execute(
+                """
+                INSERT INTO users (id, email, display_name, role, password_hash, status, created_at)
+                VALUES (?, ?, ?, 'consumer', ?, 'active', ?)
+                """,
+                (
+                    user_id,
+                    normalized_email,
+                    normalized_name,
+                    _hash_password(password),
+                    now,
+                ),
+            )
+            conn.commit()
+        except sqlite3.IntegrityError as exc:
+            conn.rollback()
+            audit_event(event_type="auth.signup_conflict", payload={"email": normalized_email})
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="An account already exists for this email.",
+            ) from exc
+
+    principal = _create_session(
+        mode="authenticated",
+        user_id=user_id,
+        active_patient_id=None,
+        active_patient_name=None,
+        request=request,
+    )
+    audit_event(event_type="auth.signup_succeeded", session=principal, payload={"email": normalized_email})
     return principal
 
 

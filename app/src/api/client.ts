@@ -101,6 +101,11 @@ export const api = {
   login: (email: string, password: string): Promise<AuthSessionResponse> =>
     http.post<AuthSessionResponse>("/auth/login", { email, password }).then((r) => r.data),
 
+  signup: (email: string, password: string, displayName: string): Promise<AuthSessionResponse> =>
+    http
+      .post<AuthSessionResponse>("/auth/signup", { email, password, display_name: displayName })
+      .then((r) => r.data),
+
   logout: (): Promise<AuthSessionResponse> =>
     http.post<AuthSessionResponse>("/auth/logout").then((r) => r.data),
 

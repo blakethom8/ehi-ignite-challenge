@@ -33,7 +33,7 @@ type WorkspaceFrameProps = {
   /** Optional route-driven session switcher. */
   onSelectSession?: (id: string | "__home__") => void;
   /** Optional route-driven run launcher. */
-  onStartRun?: () => void;
+  onStartRun?: (workflowId?: string) => void;
   /** Map external pane controls into the frame. */
   onControlsChange?: (controls: {
     panes: ReturnType<typeof useWorkspaceState>["panes"];
@@ -309,7 +309,7 @@ export function WorkspaceFrame({
           manifestQuery.data ? (
             <PluginHome
               manifest={manifestQuery.data}
-              onStartRun={() => handleStartRun()}
+              onStartRun={(workflowId) => handleStartRun(workflowId)}
             />
           ) : (
             <div

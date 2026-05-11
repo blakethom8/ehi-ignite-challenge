@@ -25,6 +25,7 @@ data/traces.db
 data/traces.db-*
 data/atlas-signing.key
 data/atlas-session.key
+data/atlas-guest-harmonization.key
 data/auth.db
 data/auth.db-*
 data/provenance.db
@@ -33,6 +34,7 @@ data/runs.db
 data/runs.db-*
 data/aggregation-uploads/
 data/aggregation-profiles/
+data/guest-harmonization/
 data/patient-context/
 data/harmonization-runs/
 data/harmonize-demo/

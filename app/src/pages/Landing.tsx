@@ -7,6 +7,7 @@ import {
   FileSearch,
   Pill,
   SearchCheck,
+  Upload,
   ShieldCheck,
   Stethoscope,
 } from "lucide-react";
@@ -187,6 +188,13 @@ export function Landing() {
                     <ArrowRight size={16} />
                   </a>
                   <Link
+                    to="/guest-harmonization"
+                    className="inline-flex items-center gap-2 rounded-2xl border border-[#d5deea] bg-[rgba(255,255,255,0.76)] px-5 py-3 text-sm font-semibold text-[#33415b] transition-colors hover:border-[#4d68ff] hover:text-[#3657ff]"
+                  >
+                    Try with my files
+                    <Upload size={16} />
+                  </Link>
+                  <Link
                     to="/account"
                     className="inline-flex items-center gap-2 rounded-2xl border border-[#d5deea] bg-[rgba(255,255,255,0.76)] px-5 py-3 text-sm font-semibold text-[#33415b] transition-colors hover:border-[#4d68ff] hover:text-[#3657ff]"
                   >
@@ -239,10 +247,10 @@ export function Landing() {
                     </div>
                     <div className="rounded-[24px] border border-[rgba(77,104,255,0.14)] bg-[rgba(255,255,255,0.72)] p-5 backdrop-blur">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7a88a3]">
-                        Account access
+                        Your files
                       </p>
                       <p className="mt-3 text-sm leading-6 text-[#3e4d68]">
-                        Log in separately when you already have a saved account.
+                        Run a temporary guest harmonization, or log in when you already have a saved account.
                       </p>
                     </div>
                   </>
@@ -265,6 +273,39 @@ export function Landing() {
                 <p className="max-w-2xl text-sm leading-7 text-[#62728d]">
                   These are synthetic records. No real patient data is used.
                 </p>
+              </div>
+
+              <div className="mt-6 grid gap-4 lg:grid-cols-3">
+                <a
+                  href="#demo-workspaces"
+                  className="rounded-[24px] border border-[#cad6ff] bg-white/80 p-5 text-left shadow-[0_16px_42px_rgba(32,52,89,0.05)] transition-colors hover:border-[#4d68ff]"
+                >
+                  <div className="flex h-11 w-11 items-center justify-center rounded-[14px] bg-[#eef2ff] text-[#4d68ff]">
+                    <FileSearch size={20} />
+                  </div>
+                  <h3 className="mt-4 text-lg font-semibold text-[#18202b]">Explore sample demo</h3>
+                  <p className="mt-2 text-sm leading-6 text-[#62728d]">Review prepared synthetic records through the chart, Caspian, and plugin surfaces.</p>
+                </a>
+                <Link
+                  to="/guest-harmonization"
+                  className="rounded-[24px] border border-[#d8e0eb] bg-white/75 p-5 text-left transition-colors hover:border-[#4d68ff]"
+                >
+                  <div className="flex h-11 w-11 items-center justify-center rounded-[14px] bg-[#eef2ff] text-[#4d68ff]">
+                    <Upload size={20} />
+                  </div>
+                  <h3 className="mt-4 text-lg font-semibold text-[#18202b]">Try with my files</h3>
+                  <p className="mt-2 text-sm leading-6 text-[#62728d]">Upload files into a temporary guest workspace and download a portable harmonized output.</p>
+                </Link>
+                <Link
+                  to="/account"
+                  className="rounded-[24px] border border-[#d8e0eb] bg-white/75 p-5 text-left transition-colors hover:border-[#4d68ff]"
+                >
+                  <div className="flex h-11 w-11 items-center justify-center rounded-[14px] bg-[#eef2ff] text-[#4d68ff]">
+                    <ShieldCheck size={20} />
+                  </div>
+                  <h3 className="mt-4 text-lg font-semibold text-[#18202b]">Log in / Sign up</h3>
+                  <p className="mt-2 text-sm leading-6 text-[#62728d]">Use an account for saved private workspaces once account access is enabled.</p>
+                </Link>
               </div>
 
               {demoError && (

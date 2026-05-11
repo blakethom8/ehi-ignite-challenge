@@ -947,6 +947,55 @@ export interface AggregationDeleteResponse {
   file_id: string;
 }
 
+// ---------------------------------------------------------------------------
+// Guest harmonization
+// ---------------------------------------------------------------------------
+
+export interface GuestHarmonizationUploadedFile {
+  file_id: string;
+  file_name: string;
+  content_type: string;
+  size_bytes: number;
+  uploaded_at: string;
+  storage_path: string;
+  status: "uploaded";
+}
+
+export interface GuestHarmonizationOutput {
+  output_id: string;
+  file_name: string;
+  content_type: string;
+  size_bytes: number;
+  created_at: string;
+  storage_path: string;
+}
+
+export interface GuestHarmonizationRunResponse {
+  run_id: string;
+  mode: "guest";
+  created_at: string;
+  expires_at: string;
+  uploaded_files: GuestHarmonizationUploadedFile[];
+  outputs: GuestHarmonizationOutput[];
+  status: "ready" | "processing" | "completed" | "expired" | "failed";
+  disclosure: string;
+}
+
+export interface GuestHarmonizationDeleteResponse {
+  deleted: boolean;
+  run_id: string;
+}
+
+export interface GuestHarmonizationOutputPackage {
+  schema_version: "atlas.harmonized_record.v1";
+  created_at: string;
+  source_files: Array<Record<string, unknown>>;
+  patient: Record<string, unknown>;
+  facts: Array<Record<string, unknown>>;
+  provenance: Array<Record<string, unknown>>;
+  quality_issues: Array<Record<string, unknown>>;
+}
+
 // Patient classifications
 
 export interface ClassificationBestExample {

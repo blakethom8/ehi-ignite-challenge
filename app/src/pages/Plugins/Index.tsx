@@ -1,6 +1,10 @@
+import axios from "axios";
 import { Link } from "react-router-dom";
 import { Boxes, Pill, Send, Stethoscope, Telescope, UserRound } from "lucide-react";
+import { DemoPatientPicker } from "../../components/atlas/DemoPatientPicker";
 import { useInstalledManifests } from "../../components/atlas/manifests";
+import { StartStateCard } from "../../components/atlas/StartStateCard";
+import { useAccessContext } from "../../context/AccessContext";
 
 const PLUGIN_ICONS: Record<string, typeof Telescope> = {
   Telescope,
@@ -12,7 +16,63 @@ const PLUGIN_ICONS: Record<string, typeof Telescope> = {
 };
 
 export function PluginsIndex() {
-  const { data: manifests, isLoading } = useInstalledManifests();
+  const { isUnlocked } = useAccessContext();
+  const { data: manifests, error, isError, isLoading, refetch } = useInstalledManifests();
+
+  if (!isUnlocked) {
+    return (
+      <StartStateCard
+        icon={Boxes}
+        eyebrow="Plugins"
+        title="Choose access before opening the plugin marketplace."
+        body="Plugins operate on a patient anchor and can trigger consented external workflows. Enter with a signed-in or demo session first so the marketplace can load with a real patient context."
+        bullets={[
+          "Choose access first, then review which plugins fit the current patient workflow.",
+          "Keep trust boundaries and approval posture visible before starting a run.",
+          "Avoid showing external workflow tools without an established chart context.",
+        ]}
+        aside={
+          <DemoPatientPicker
+            destination={(patientId) => `/workspaces?patient=${encodeURIComponent(patientId)}`}
+            title="Open the marketplace in demo mode"
+          />
+        }
+      />
+    );
+  }
+
+  if (isError) {
+    const unauthorized = isUnauthorizedError(error);
+    return (
+      <StartStateCard
+        icon={Boxes}
+        eyebrow="Plugins"
+        title={unauthorized ? "Refresh access before opening plugin tools." : "Could not load the plugin marketplace."}
+        body={
+          unauthorized
+            ? "The marketplace requires an active access session. Your session may have expired or the access state may not be established yet."
+            : "The plugin catalog could not be loaded from the backend. Stay on the core product surfaces until the plugin runtime is available again."
+        }
+        bullets={
+          unauthorized
+            ? [
+                "Re-enter with a demo patient or sign in again.",
+                "Open plugins only after the patient anchor and session are active.",
+              ]
+            : [
+                "This is a backend availability problem, not an empty marketplace.",
+                "Prefer truthful error states over pretending no plugins exist.",
+              ]
+        }
+        actions={[
+          { label: unauthorized ? "Return to access gate" : "Try again", href: unauthorized ? "/" : undefined, onClick: unauthorized ? undefined : () => { void refetch(); } },
+          ...(unauthorized
+            ? [{ label: "Open core app", href: "/", tone: "secondary" as const }]
+            : []),
+        ]}
+      />
+    );
+  }
 
   return (
     <div className="mx-auto w-full max-w-[1100px] flex-1 px-10 py-9" style={{ background: "var(--bg-app)" }}>
@@ -35,7 +95,7 @@ export function PluginsIndex() {
         )}
         {!isLoading && (manifests ?? []).length === 0 && (
           <div className="text-[13px]" style={{ color: "var(--ink-3)" }}>
-            No plugins installed. Run `uv run python scripts/build_example_plugins.py` to seed the three examples.
+            No plugins are currently available in this environment.
           </div>
         )}
         {(manifests ?? []).map((m) => {
@@ -84,6 +144,13 @@ export function PluginsIndex() {
       </div>
     </div>
   );
+}
+
+function isUnauthorizedError(error: unknown): boolean {
+  if (axios.isAxiosError(error)) {
+    return error.response?.status === 401;
+  }
+  return false;
 }
 
 function tint(color: string, alpha: number): string {

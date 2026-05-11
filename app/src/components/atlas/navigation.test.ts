@@ -7,7 +7,9 @@ describe("atlas module navigation", () => {
     expect(deriveActiveModule("/aggregate/context")).toBe("patient-record");
     expect(deriveActiveModule("/explorer/assistant")).toBe("fhir-charts");
     expect(deriveActiveModule("/marketplace")).toBe("workspaces");
-    expect(deriveActiveModule("/ground-truth-review/demo-run")).toBe("learn");
+    expect(deriveActiveModule("/ground-truth-review/demo-run")).toBe("home");
+    expect(deriveActiveModule("/learn")).toBe("home");
+    expect(deriveActiveModule("/architecture")).toBe("home");
   });
 
   it("resolves canonical module hrefs", () => {

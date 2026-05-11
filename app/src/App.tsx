@@ -9,7 +9,6 @@ import { ChatWidget } from "./components/ChatWidget";
 import { Landing } from "./pages/Landing";
 import { PlatformArchitecture } from "./pages/PlatformArchitecture";
 import { PatientRecordPool } from "./pages/PatientRecordPool";
-import { GuidedTour } from "./pages/GuidedTour";
 import { PatientRecordLayout } from "./pages/PatientRecord/PatientRecordLayout";
 import { FhirChartsLayout } from "./pages/FhirCharts/FhirChartsLayout";
 import { buildGroundTruthReviewPath } from "./routing";
@@ -257,7 +256,7 @@ function AppShellRoutes() {
         <Route path="/" element={<Landing />} />
         <Route path="/architecture" element={<PlatformArchitecture />} />
         <Route path="/records-pool" element={<PatientRecordPool />} />
-        <Route path="/guided-tour" element={<GuidedTour />} />
+        <Route path="/guided-tour" element={<Navigate to="/using-atlas" replace />} />
         <Route
           path="/using-atlas/*"
           element={<Suspense fallback={<PageFallback />}><UsingAtlasRoutes /></Suspense>}

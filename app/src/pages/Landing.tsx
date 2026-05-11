@@ -92,7 +92,7 @@ export function Landing() {
               to="/using-atlas"
               className="hidden text-sm font-semibold text-[#52627f] transition-colors hover:text-[#3657ff] sm:inline-flex"
             >
-              Getting started
+              About Atlas
             </Link>
             {isUnlocked && activePatientId ? (
               <Link
@@ -282,7 +282,7 @@ export function Landing() {
               <p className="max-w-2xl text-sm leading-7 text-[#62728d]">
                 {isUnlocked
                   ? "These are the main components of the platform for the active patient context."
-                  : "These are the main components of the platform. Choose a demo patient first, then move between modules without losing context."}
+                  : "These are the main product surfaces. Access comes first; module navigation comes after the patient context is established."}
               </p>
             </div>
 
@@ -321,10 +321,16 @@ export function Landing() {
                         <p className="text-[12px] font-medium uppercase tracking-[0.16em] text-[#7887a1]">
                           {card.detail}
                         </p>
-                        <span className="inline-flex items-center gap-2 text-sm font-semibold text-[#3558ff] transition-all group-hover:gap-3">
-                          {isUnlocked ? "Open surface" : "Unlock with demo patient"}
-                          <ArrowRight size={15} />
-                        </span>
+                        {isUnlocked ? (
+                          <span className="inline-flex items-center gap-2 text-sm font-semibold text-[#3558ff] transition-all group-hover:gap-3">
+                            Open surface
+                            <ArrowRight size={15} />
+                          </span>
+                        ) : (
+                          <span className="text-sm font-semibold text-[#71829d]">
+                            Available after access
+                          </span>
+                        )}
                       </div>
                     </div>
                   </Link>

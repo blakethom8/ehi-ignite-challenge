@@ -4,7 +4,6 @@ import {
   HelpCircle,
   LogOut,
   MessageSquareText,
-  Route,
   UserRound,
   X,
 } from "lucide-react";
@@ -110,22 +109,13 @@ export function PlatformDrawer({ open, onClose, user }: PlatformDrawerProps) {
             Home
           </DrawerItem>
           <DrawerItem
-            icon={<Route className="h-3.5 w-3.5" strokeWidth={1.5} />}
-            onClick={() => {
-              onClose();
-              navigate("/guided-tour");
-            }}
-          >
-            Guided tour
-          </DrawerItem>
-          <DrawerItem
             icon={<FileText className="h-3.5 w-3.5" strokeWidth={1.5} />}
             onClick={() => {
               onClose();
-              navigate("/architecture");
+              navigate("/records-pool");
             }}
           >
-            Platform architecture
+            Switch patient
           </DrawerItem>
         </DrawerSection>
         <div
@@ -140,16 +130,16 @@ export function PlatformDrawer({ open, onClose, user }: PlatformDrawerProps) {
               navigate("/using-atlas");
             }}
           >
-            Getting started
+            About Atlas
           </DrawerItem>
           <DrawerItem
             icon={<FileText className="h-3.5 w-3.5" strokeWidth={1.5} />}
             onClick={() => {
               onClose();
-              navigate("/learn/fhir-primer");
+              navigate("/architecture");
             }}
           >
-            FHIR primer
+            System architecture
           </DrawerItem>
           <DrawerItem
             icon={<MessageSquareText className="h-3.5 w-3.5" strokeWidth={1.5} />}
@@ -158,7 +148,7 @@ export function PlatformDrawer({ open, onClose, user }: PlatformDrawerProps) {
               navigate("/learn");
             }}
           >
-            Internal tools
+            Technical labs
           </DrawerItem>
         </DrawerSection>
         <div className="flex-1" />

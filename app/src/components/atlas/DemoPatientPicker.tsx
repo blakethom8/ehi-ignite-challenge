@@ -1,4 +1,5 @@
 import { Activity, ArrowRight, ShieldCheck } from "lucide-react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAccessContext } from "../../context/AccessContext";
 
@@ -15,6 +16,8 @@ export function DemoPatientPicker({
 }: DemoPatientPickerProps) {
   const navigate = useNavigate();
   const { availableDemoPatients, enterDemoPatient, activePatientId } = useAccessContext();
+  const [pendingPatientId, setPendingPatientId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   return (
     <div>
@@ -23,19 +26,38 @@ export function DemoPatientPicker({
         {title}
       </div>
       <p className="mt-2 text-sm leading-6 text-[#667085]">{body}</p>
+      {error && (
+        <p className="mt-3 text-sm text-[#b42318]">{error}</p>
+      )}
       <div className="mt-4 space-y-3">
         {availableDemoPatients.map((patient) => (
           <button
             key={patient.id}
-            onClick={() => {
-              void enterDemoPatient(patient.id);
-              navigate(destination(patient.id));
+            type="button"
+            disabled={pendingPatientId !== null}
+            onClick={async (event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              setError(null);
+              setPendingPatientId(patient.id);
+              try {
+                await enterDemoPatient(patient.id);
+                navigate(destination(patient.id));
+              } catch (cause) {
+                setError(
+                  cause instanceof Error && cause.message.trim()
+                    ? cause.message
+                    : "Could not open the demo patient. Try again.",
+                );
+              } finally {
+                setPendingPatientId(null);
+              }
             }}
             className={`w-full rounded-2xl border px-4 py-3 text-left transition-colors ${
               activePatientId === patient.id
                 ? "border-[#4d68ff] bg-[#eef2ff]"
                 : "border-[#dfe4ea] bg-white hover:border-[#4d68ff]"
-            }`}
+            } disabled:cursor-not-allowed disabled:opacity-70`}
           >
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
@@ -47,7 +69,7 @@ export function DemoPatientPicker({
                 </div>
               </div>
               <span className="inline-flex items-center gap-1 text-sm font-semibold text-[#3657ff]">
-                Open
+                {pendingPatientId === patient.id ? "Opening..." : "Open"}
                 <ArrowRight size={14} />
               </span>
             </div>

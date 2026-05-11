@@ -44,7 +44,7 @@ export function PatientRecordLayout({ children }: PatientRecordLayoutProps) {
   const items = useMemo<PatientNavItem[]>(
     () => [
       {
-        label: "FHIR Chart",
+        label: "Prepared Chart",
         description: "Overview and chart posture",
         to: withPatient("/patient-record", patientId),
         icon: Database,

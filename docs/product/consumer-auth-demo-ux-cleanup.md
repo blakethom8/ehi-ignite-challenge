@@ -330,3 +330,196 @@ Do not:
 - Add a new auth provider or external dependency without explicit approval.
 - Store plaintext passwords.
 - Make demo users able to upload/delete source files.
+
+---
+
+# Addendum: Three-Mode Entry Model
+
+## Why this addendum exists
+
+The phrase “demo” is doing too much work. We need to separate three distinct user intents:
+
+1. “Show me a guided sample.”
+2. “Let me try the real harmonization pipeline with my own files without creating an account.”
+3. “Let me save my health-record workspace and come back later.”
+
+These should become three first-class product modes instead of one awkward demo/auth split.
+
+## Mode 1: Prepared Sample Demo
+
+**User promise:** Explore Atlas with synthetic sample records. No upload required.
+
+**Primary audience:** Judges, evaluators, first-time visitors, sales demos.
+
+**Data posture:**
+
+- Uses only synthetic/sample data bundled with the app.
+- Safe to persist as fixtures.
+- No user-provided data.
+
+**UX language:**
+
+- “Explore sample demo”
+- “Prepared sample chart”
+- “Synthetic records”
+
+**Avoid:**
+
+- “Demo access posture”
+- “Clinician mode”
+- “Unlock”
+
+## Mode 2: Guest Harmonization
+
+**User promise:** Upload your own health-record files, preview the harmonized structure, and download a portable output without creating an account.
+
+**Primary audience:** Users who want to test the pipeline before trusting us with an account; reviewers who want to see data harmonization work on non-sample files.
+
+**Data posture:**
+
+- Temporary server-side workspace scoped to a signed guest session/run id.
+- Files and derived outputs expire automatically.
+- User must download the output or create an account to save it.
+- Guest runs should never silently become durable account workspaces.
+
+**Recommended TTL:**
+
+- Default: 24 hours.
+- Configurable with env var, e.g. `GUEST_HARMONIZATION_TTL_HOURS`.
+- Lower TTL in production is acceptable if clearly disclosed.
+
+**Storage shape:**
+
+```txt
+data/guest-harmonization/{guest_run_id}/
+  manifest.json
+  uploads/
+  derived/
+  outputs/
+```
+
+**Manifest shape:**
+
+```json
+{
+  "run_id": "guest_...",
+  "mode": "guest",
+  "created_at": "...",
+  "expires_at": "...",
+  "uploaded_files": [],
+  "outputs": [],
+  "status": "ready|processing|completed|expired|failed"
+}
+```
+
+**Initial endpoints:**
+
+```http
+POST /api/guest-harmonization/runs
+GET  /api/guest-harmonization/runs/{run_id}
+POST /api/guest-harmonization/runs/{run_id}/uploads
+POST /api/guest-harmonization/runs/{run_id}/process
+GET  /api/guest-harmonization/runs/{run_id}/output
+DELETE /api/guest-harmonization/runs/{run_id}
+```
+
+For MVP, `process` may reuse existing upload preview/extraction/harmonization primitives and return a transparent “candidate structure” even if not all file types are deeply parsed.
+
+**Output contract:**
+
+Guest mode should produce a portable package:
+
+```json
+{
+  "schema_version": "atlas.harmonized_record.v1",
+  "created_at": "...",
+  "source_files": [],
+  "patient": {},
+  "facts": [],
+  "provenance": [],
+  "quality_issues": []
+}
+```
+
+The key product point is portability: the user can leave with a structured artifact.
+
+**Required user-facing disclosure:**
+
+> Guest uploads are processed in a temporary workspace and automatically deleted. Download your output or create an account to save your workspace.
+
+**Security/privacy requirements:**
+
+- Guest run ids must be unguessable.
+- Guest data must not be listed globally.
+- Guest data must not be accessible from another guest run id.
+- Guest uploads must have size/type limits.
+- Guest workspaces must have a cleanup path.
+- Guest mode must not share storage with persistent account workspaces unless explicitly converted.
+
+## Mode 3: Account Workspace
+
+**User promise:** Create an account to save private health-record workspaces, upload records, return later, and export portable structured outputs.
+
+**Data posture:**
+
+- Durable server-side workspace.
+- Must be scoped by `user_id`.
+- Requires ownership enforcement before production use.
+- User should eventually have delete/export controls.
+
+**UX language:**
+
+- “Log in / Sign up”
+- “Save my workspace”
+- “My records”
+- “Private account workspace”
+
+## Landing Page Target
+
+The landing page should expose three clear cards/CTAs:
+
+1. **Explore sample demo**
+   - Synthetic records, fastest guided path.
+
+2. **Try with my files**
+   - Temporary guest harmonization, downloadable output, no account.
+
+3. **Log in / Sign up**
+   - Persistent saved workspaces.
+
+Suggested copy:
+
+> Choose how you want to try Atlas.
+>
+> Explore synthetic sample records, run a temporary harmonization with your own files, or sign in to save private record workspaces.
+
+## Implementation sequencing
+
+### PR A: Landing model update
+
+- Update landing page from two-entry model to three-entry model.
+- Add “Try with my files” CTA.
+- If guest backend is not ready, route to an honest placeholder explaining temporary harmonization is being wired.
+
+### PR B: Guest harmonization backend MVP
+
+- Add temporary guest-run service and routes.
+- Store uploads/manifest/output under `data/guest-harmonization`.
+- Add TTL/expiration logic.
+- Add tests for create/upload/process/output/delete/expired access.
+
+### PR C: Guest harmonization UI
+
+- Add guest upload page.
+- Show temporary workspace disclosure.
+- Support download/export.
+- Add “Create account to save” CTA once signup/account flow exists.
+
+### PR D: Account workspace ownership
+
+- Add owner metadata/ACLs to persistent aggregation profiles/uploads.
+- Ensure account mode is truly private per user.
+
+## Codex worker guidance
+
+Do not merge guest harmonization into existing demo patient code. Treat it as a separate mode with separate copy and separate storage. Do not promise persistence in guest mode.

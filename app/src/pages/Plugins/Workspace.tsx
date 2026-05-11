@@ -38,7 +38,11 @@ export function PluginWorkspace() {
   const isLiveRun = Boolean(effectiveSessionId && effectiveSessionId.startsWith("r_"));
   const liveRunBundle = usePluginRun(isLiveRun ? (effectiveSessionId as string) : null);
   const openPluginPath = (path: string) => {
-    window.location.assign(path);
+    const next = new URL(path, window.location.origin);
+    if (patientId && !next.searchParams.has("patient")) {
+      next.searchParams.set("patient", patientId);
+    }
+    window.location.assign(`${next.pathname}${next.search}`);
   };
 
   // Auto-start a backend run when the user clicked "Start" from PluginHome.

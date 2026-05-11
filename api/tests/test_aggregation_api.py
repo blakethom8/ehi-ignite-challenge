@@ -22,6 +22,12 @@ class AggregationApiTests(unittest.TestCase):
             raise RuntimeError(f"No patient bundles found in {FHIR_DIR}")
         cls.patient_id = files[0].stem
         cls.client = TestClient(app)
+        login = cls.client.post(
+            "/api/auth/login",
+            json={"email": "clinician@atlas.local", "password": "atlas-demo-password"},
+        )
+        if login.status_code != 200:
+            raise RuntimeError(f"Failed to bootstrap authenticated test client: {login.text}")
 
     def test_source_inventory_returns_synthetic_environment(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

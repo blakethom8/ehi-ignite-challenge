@@ -110,6 +110,18 @@ export function PatientRecordOverview() {
   const [searchParams] = useSearchParams();
   const patientId = searchParams.get("patient");
 
+  const overviewQ = useQuery({
+    queryKey: ["overview", patientId],
+    queryFn: () => api.getOverview(patientId ?? ""),
+    enabled: !!patientId && !patientId.startsWith("workspace-"),
+  });
+
+  const canonicalQ = useQuery({
+    queryKey: ["canonical-summary", patientId],
+    queryFn: () => api.getCanonicalSummary(patientId ?? ""),
+    enabled: !!patientId,
+  });
+
   if (!patientId) {
     return (
       <StartStateCard
@@ -132,17 +144,6 @@ export function PatientRecordOverview() {
     );
   }
 
-  const overviewQ = useQuery({
-    queryKey: ["overview", patientId],
-    queryFn: () => api.getOverview(patientId!),
-    enabled: !!patientId && !patientId.startsWith("workspace-"),
-  });
-
-  const canonicalQ = useQuery({
-    queryKey: ["canonical-summary", patientId],
-    queryFn: () => api.getCanonicalSummary(patientId!),
-    enabled: !!patientId,
-  });
 
   const overview = overviewQ.data;
   const canonical = canonicalQ.data;

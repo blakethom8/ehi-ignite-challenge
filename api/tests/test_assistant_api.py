@@ -42,6 +42,12 @@ class ProviderAssistantApiTests(unittest.TestCase):
 
         cls.patient_id = files[0].stem
         cls.client = TestClient(app)
+        login = cls.client.post(
+            "/api/auth/login",
+            json={"email": "clinician@atlas.local", "password": "atlas-demo-password"},
+        )
+        if login.status_code != 200:
+            raise RuntimeError(f"Failed to bootstrap authenticated test client: {login.text}")
 
     def _payload(self, question: str = "Any active blood thinner risk?") -> dict[str, object]:
         return {

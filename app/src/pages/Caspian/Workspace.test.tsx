@@ -1,15 +1,29 @@
 import type { ReactNode } from "react";
 import { useEffect } from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AccessProvider } from "../../context/AccessContext";
+import type { AuthSessionResponse } from "../../types";
 import { CaspianWorkspace } from "./Workspace";
 
 const workspaceFrameSpy = vi.fn();
 const togglePaneSpy = vi.fn();
 const setInspectorTabSpy = vi.fn();
 const focusCitationSpy = vi.fn();
+const { getAuthSessionMock } = vi.hoisted(() => ({
+  getAuthSessionMock: vi.fn<() => Promise<AuthSessionResponse>>(),
+}));
+
+vi.mock("../../api/client", () => ({
+  api: {
+    getAuthSession: getAuthSessionMock,
+    login: vi.fn(),
+    logout: vi.fn(),
+    enterDemo: vi.fn(),
+    selectActivePatient: vi.fn(),
+  },
+}));
 
 vi.mock("../../components/atlas/AppShell", () => ({
   AppShell: ({ children }: { children: ReactNode }) => <div data-testid="app-shell">{children}</div>,
@@ -125,9 +139,22 @@ describe("CaspianWorkspace", () => {
     togglePaneSpy.mockReset();
     setInspectorTabSpy.mockReset();
     focusCitationSpy.mockReset();
+    getAuthSessionMock.mockResolvedValue({
+      mode: "authenticated",
+      user: {
+        id: "user_1",
+        email: "clinician@atlas.local",
+        display_name: "Atlas Clinician",
+        role: "clinician",
+      },
+      active_patient_id: "patient-123",
+      active_patient_name: "Patient 123",
+      expires_at: null,
+      available_demo_patients: [],
+    });
   });
 
-  it("routes the canonical /caspian shell through WorkspaceFrame with a live assistant surface", () => {
+  it("routes the canonical /caspian shell through WorkspaceFrame with a live assistant surface", async () => {
     render(
       <MemoryRouter initialEntries={["/caspian/sessions/s2?patient=patient-123"]}>
         <AccessProvider>
@@ -138,7 +165,7 @@ describe("CaspianWorkspace", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByTestId("workspace-frame")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId("workspace-frame")).toBeInTheDocument());
     const props = workspaceFrameSpy.mock.calls.at(-1)?.[0] as {
       activeSessionId: string;
       surface?: { chatPane?: ReactNode; inspector?: { citations?: Record<string, { title: string }> } };
@@ -149,7 +176,20 @@ describe("CaspianWorkspace", () => {
     expect(props.surface?.inspector?.citations?.e_1?.title).toBe("Apixaban 5 mg BID");
   });
 
-  it("shows a start state instead of the workspace shell when no patient is selected", () => {
+  it("shows a start state instead of the workspace shell when no patient is selected", async () => {
+    getAuthSessionMock.mockResolvedValueOnce({
+      mode: "authenticated",
+      user: {
+        id: "user_1",
+        email: "clinician@atlas.local",
+        display_name: "Atlas Clinician",
+        role: "clinician",
+      },
+      active_patient_id: null,
+      active_patient_name: null,
+      expires_at: null,
+      available_demo_patients: [],
+    });
     render(
       <MemoryRouter initialEntries={["/caspian"]}>
         <AccessProvider>
@@ -160,13 +200,15 @@ describe("CaspianWorkspace", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.queryByTestId("workspace-frame")).not.toBeInTheDocument();
-    expect(
-      screen.getByText("Choose a patient before opening the clinical workspace."),
-    ).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByTestId("workspace-frame")).not.toBeInTheDocument();
+      expect(
+        screen.getByText("Choose a patient before opening the clinical workspace."),
+      ).toBeInTheDocument();
+    });
   });
 
-  it("opens the trace tab without toggling the inspector closed when it is already visible", () => {
+  it("opens the trace tab without toggling the inspector closed when it is already visible", async () => {
     render(
       <MemoryRouter initialEntries={["/caspian/sessions/s2?patient=patient-123"]}>
         <AccessProvider>
@@ -177,6 +219,7 @@ describe("CaspianWorkspace", () => {
       </MemoryRouter>,
     );
 
+    await waitFor(() => expect(screen.getByText("1 tool calls")).toBeInTheDocument());
     fireEvent.click(screen.getByText("1 tool calls"));
 
     expect(togglePaneSpy).not.toHaveBeenCalled();

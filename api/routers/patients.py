@@ -12,8 +12,14 @@ from datetime import date, datetime
 from functools import lru_cache
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 
+from api.core.auth import (
+    DEMO_PATIENTS,
+    authorize_patient_access,
+    demo_patient_label,
+    require_access_session,
+)
 from api.core.loader import (
     list_patient_files,
     patient_display_name,
@@ -499,8 +505,11 @@ def _limit_evidence(items: list[str], limit: int = 5) -> list[str]:
 
 
 @router.get("", response_model=list[PatientListItem])
-def list_patients() -> list[PatientListItem]:
+def list_patients(request: Request) -> list[PatientListItem]:
+    session = require_access_session(request)
     all_synthea_items = _cached_patient_list()
+    if session.is_demo:
+        return _demo_patient_items(all_synthea_items)
     synthea_items = _curated_demo_patients(all_synthea_items)
     all_synthea_ids = {patient.id for patient in all_synthea_items}
     upload_items = [
@@ -508,6 +517,29 @@ def list_patients() -> list[PatientListItem]:
         if item.id not in all_synthea_ids
     ]
     return upload_items + synthea_items
+
+
+def _demo_patient_items(items: list[PatientListItem]) -> list[PatientListItem]:
+    by_id = {item.id: item for item in items}
+    demo_items: list[PatientListItem] = []
+    for demo in DEMO_PATIENTS:
+        base = by_id.get(demo.actual_patient_id)
+        if base is None:
+            continue
+        demo_items.append(
+            base.model_copy(
+                update={
+                    "id": demo.alias_id,
+                    "name": demo.name,
+                    "workspace_type": "demo",
+                }
+            )
+        )
+    return demo_items
+
+
+def _authorized_patient_id(request: Request, patient_id: str) -> str:
+    return authorize_patient_access(require_access_session(request), patient_id)
 
 
 def _curated_demo_patients(items: list[PatientListItem]) -> list[PatientListItem]:
@@ -576,8 +608,19 @@ def _cached_patient_list() -> list[PatientListItem]:
 
 
 @router.get("/risk-summary", response_model=PatientRiskSummaryResponse)
-def patient_risk_summary() -> PatientRiskSummaryResponse:
-    return _cached_patient_risk_summary()
+def patient_risk_summary(request: Request) -> PatientRiskSummaryResponse:
+    session = require_access_session(request)
+    summary = _cached_patient_risk_summary()
+    if not session.is_demo:
+        return summary
+    by_id = {item.id: item for item in summary.patients}
+    return PatientRiskSummaryResponse(
+        patients=[
+            item.model_copy(update={"id": demo.alias_id, "name": demo.name})
+            for demo in DEMO_PATIENTS
+            if (item := by_id.get(demo.actual_patient_id)) is not None
+        ]
+    )
 
 
 @lru_cache(maxsize=1)
@@ -620,11 +663,12 @@ def _cached_patient_risk_summary() -> PatientRiskSummaryResponse:
 
 
 @router.get("/loaded", response_model=list[PatientListItem])
-def list_patients_with_stats() -> list[PatientListItem]:
+def list_patients_with_stats(request: Request) -> list[PatientListItem]:
     """
     Return patient list WITH stats computed. Loads all bundles — slow for
     large corpora. Use sparingly (corpus view, sorting/filtering).
     """
+    session = require_access_session(request)
     files = list_patient_files()
     items: list[PatientListItem] = []
     for path in files:
@@ -644,15 +688,19 @@ def list_patients_with_stats() -> list[PatientListItem]:
             active_condition_count=stats.active_condition_count,
             active_med_count=stats.active_med_count,
         ))
+    if session.is_demo:
+        return _demo_patient_items(items)
     return items
 
 
 @router.get("/{patient_id}/overview", response_model=PatientOverview)
-def patient_overview(patient_id: str) -> PatientOverview:
+def patient_overview(patient_id: str, request: Request) -> PatientOverview:
     """Full patient overview — demographics, resource counts, conditions, meds."""
+    requested_patient_id = patient_id
+    patient_id = authorize_patient_access(require_access_session(request), patient_id)
     result = load_patient(patient_id)
     if result is None:
-        raise HTTPException(status_code=404, detail=f"Patient not found: {patient_id}")
+        raise HTTPException(status_code=404, detail=f"Patient not found: {requested_patient_id}")
 
     record, stats = result
     s = record.summary
@@ -702,8 +750,8 @@ def patient_overview(patient_id: str) -> PatientOverview:
     care_team, sites_of_service = _care_network_summary(record)
 
     return PatientOverview(
-        id=patient_id,
-        name=stats.name,
+        id=requested_patient_id,
+        name=demo_patient_label(requested_patient_id) if requested_patient_id != patient_id else stats.name,
         age_years=stats.age_years,
         gender=stats.gender,
         birth_date=str(s.birth_date) if s.birth_date else None,
@@ -749,11 +797,13 @@ def patient_overview(patient_id: str) -> PatientOverview:
 
 
 @router.get("/{patient_id}/timeline", response_model=TimelineResponse)
-def patient_timeline(patient_id: str) -> TimelineResponse:
+def patient_timeline(patient_id: str, request: Request) -> TimelineResponse:
     """Encounter timeline — chronological list with linked resource counts."""
+    requested_patient_id = patient_id
+    patient_id = authorize_patient_access(require_access_session(request), patient_id)
     result = load_patient(patient_id)
     if result is None:
-        raise HTTPException(status_code=404, detail=f"Patient not found: {patient_id}")
+        raise HTTPException(status_code=404, detail=f"Patient not found: {requested_patient_id}")
 
     record, stats = result
 
@@ -794,16 +844,17 @@ def patient_timeline(patient_id: str) -> TimelineResponse:
         ))
 
     return TimelineResponse(
-        patient_id=patient_id,
-        name=stats.name,
+        patient_id=requested_patient_id,
+        name=demo_patient_label(requested_patient_id) if requested_patient_id != patient_id else stats.name,
         encounters=events,
         year_counts=dict(year_counts),
     )
 
 
 @router.get("/{patient_id}/encounters/{encounter_id}", response_model=EncounterDetail)
-def encounter_detail(patient_id: str, encounter_id: str) -> EncounterDetail:
+def encounter_detail(patient_id: str, encounter_id: str, request: Request) -> EncounterDetail:
     """Full detail for a single encounter — all linked resources."""
+    patient_id = _authorized_patient_id(request, patient_id)
     result = load_patient(patient_id)
     if result is None:
         raise HTTPException(status_code=404, detail=f"Patient not found: {patient_id}")
@@ -907,15 +958,17 @@ def encounter_detail(patient_id: str, encounter_id: str) -> EncounterDetail:
 
 
 @router.get("/{patient_id}/clinical-notes", response_model=ClinicalNotesResponse)
-def patient_clinical_notes(patient_id: str) -> ClinicalNotesResponse:
+def patient_clinical_notes(patient_id: str, request: Request) -> ClinicalNotesResponse:
     """Return narrative note artifacts from the active published chart snapshot."""
+    requested_patient_id = patient_id
+    patient_id = _authorized_patient_id(request, patient_id)
     result = load_patient(patient_id)
     if result is None:
         raise HTTPException(status_code=404, detail=f"Patient not found: {patient_id}")
     record, stats = result
     notes = _clinical_notes_for_patient(patient_id, record)
     return ClinicalNotesResponse(
-        patient_id=patient_id,
+        patient_id=requested_patient_id,
         name=stats.name,
         total_count=len(notes),
         notes=notes,
@@ -1229,7 +1282,7 @@ def _compute_timeline_events(record, today_dt: date) -> list[TimelineMonth]:
 
 
 @router.get("/{patient_id}/key-labs", response_model=KeyLabsResponse)
-def patient_key_labs(patient_id: str) -> KeyLabsResponse:
+def patient_key_labs(patient_id: str, request: Request) -> KeyLabsResponse:
     """
     Return the most recent value + trend for clinically important lab panels.
 
@@ -1239,6 +1292,8 @@ def patient_key_labs(patient_id: str) -> KeyLabsResponse:
     - Coagulation: INR, PT, PTT
     - Cardiac: Troponin, BNP, proBNP
     """
+    requested_patient_id = patient_id
+    patient_id = _authorized_patient_id(request, patient_id)
     result = load_patient(patient_id)
     if result is None:
         raise HTTPException(status_code=404, detail=f"Patient not found: {patient_id}")
@@ -1365,7 +1420,7 @@ def patient_key_labs(patient_id: str) -> KeyLabsResponse:
     timeline_events = _compute_timeline_events(record, today)
 
     return KeyLabsResponse(
-        patient_id=patient_id,
+        patient_id=requested_patient_id,
         panels=panels,
         alert_flags=alert_flags,
         timeline_events=timeline_events,
@@ -1373,8 +1428,10 @@ def patient_key_labs(patient_id: str) -> KeyLabsResponse:
 
 
 @router.get("/{patient_id}/safety", response_model=SafetyResponse)
-def patient_safety(patient_id: str) -> SafetyResponse:
+def patient_safety(patient_id: str, request: Request) -> SafetyResponse:
     """Pre-op safety flags — drug class risk classification."""
+    requested_patient_id = patient_id
+    patient_id = _authorized_patient_id(request, patient_id)
     result = load_patient(patient_id)
     if result is None:
         raise HTTPException(status_code=404, detail=f"Patient not found: {patient_id}")
@@ -1409,7 +1466,7 @@ def patient_safety(patient_id: str) -> SafetyResponse:
     historical_flag_count = sum(1 for f in flags if f.status == "HISTORICAL")
 
     return SafetyResponse(
-        patient_id=patient_id,
+        patient_id=requested_patient_id,
         name=stats.name,
         flags=flags,
         active_flag_count=active_flag_count,
@@ -1418,8 +1475,10 @@ def patient_safety(patient_id: str) -> SafetyResponse:
 
 
 @router.get("/{patient_id}/interactions", response_model=InteractionResponse)
-def patient_interactions(patient_id: str) -> InteractionResponse:
+def patient_interactions(patient_id: str, request: Request) -> InteractionResponse:
     """Drug-drug interaction checker — flags known dangerous interactions between active medications."""
+    requested_patient_id = patient_id
+    patient_id = _authorized_patient_id(request, patient_id)
     result = load_patient(patient_id)
     if result is None:
         raise HTTPException(status_code=404, detail=f"Patient not found: {patient_id}")
@@ -1457,7 +1516,7 @@ def patient_interactions(patient_id: str) -> InteractionResponse:
     ]
 
     return InteractionResponse(
-        patient_id=patient_id,
+        patient_id=requested_patient_id,
         active_class_keys=active_keys,
         interactions=results,
         contraindicated_count=sum(1 for r in results if r.severity == "contraindicated"),
@@ -1468,7 +1527,7 @@ def patient_interactions(patient_id: str) -> InteractionResponse:
 
 
 @router.get("/{patient_id}/surgical-risk", response_model=SurgicalRiskResponse)
-def patient_surgical_risk(patient_id: str) -> SurgicalRiskResponse:
+def patient_surgical_risk(patient_id: str, request: Request) -> SurgicalRiskResponse:
     """
     Deterministic surgical risk score for pre-op clearance review.
 
@@ -1476,6 +1535,8 @@ def patient_surgical_risk(patient_id: str) -> SurgicalRiskResponse:
     model; it summarizes chart signals that should trigger surgeon/anesthesia
     review before proceeding.
     """
+    requested_patient_id = patient_id
+    patient_id = _authorized_patient_id(request, patient_id)
     result = load_patient(patient_id)
     if result is None:
         raise HTTPException(status_code=404, detail=f"Patient not found: {patient_id}")
@@ -1683,7 +1744,7 @@ def patient_surgical_risk(patient_id: str) -> SurgicalRiskResponse:
         disposition = "CLEARED"
 
     return SurgicalRiskResponse(
-        patient_id=patient_id,
+        patient_id=requested_patient_id,
         name=stats.name,
         score=total_score,
         max_score=100,
@@ -1702,8 +1763,10 @@ def patient_surgical_risk(patient_id: str) -> SurgicalRiskResponse:
 
 
 @router.get("/{patient_id}/immunizations", response_model=ImmunizationResponse)
-def patient_immunizations(patient_id: str) -> ImmunizationResponse:
+def patient_immunizations(patient_id: str, request: Request) -> ImmunizationResponse:
     """Immunization history — all vaccines with dates."""
+    requested_patient_id = patient_id
+    patient_id = _authorized_patient_id(request, patient_id)
     result = load_patient(patient_id)
     if result is None:
         raise HTTPException(status_code=404, detail=f"Patient not found: {patient_id}")
@@ -1739,7 +1802,7 @@ def patient_immunizations(patient_id: str) -> ImmunizationResponse:
     unique_vaccines.sort()
 
     return ImmunizationResponse(
-        patient_id=patient_id,
+        patient_id=requested_patient_id,
         name=stats.name,
         total_count=len(items),
         immunizations=items,
@@ -1748,8 +1811,10 @@ def patient_immunizations(patient_id: str) -> ImmunizationResponse:
 
 
 @router.get("/{patient_id}/condition-acuity", response_model=ConditionAcuityResponse)
-def condition_acuity(patient_id: str) -> ConditionAcuityResponse:
+def condition_acuity(patient_id: str, request: Request) -> ConditionAcuityResponse:
     """Active conditions ranked by surgical risk category."""
+    requested_patient_id = patient_id
+    patient_id = _authorized_patient_id(request, patient_id)
     result = load_patient(patient_id)
     if result is None:
         raise HTTPException(status_code=404, detail=f"Patient not found: {patient_id}")
@@ -1781,7 +1846,7 @@ def condition_acuity(patient_id: str) -> ConditionAcuityResponse:
         )
 
     return ConditionAcuityResponse(
-        patient_id=patient_id,
+        patient_id=requested_patient_id,
         name=stats.name,
         active_count=len(ranked_active),
         resolved_count=len(ranked_resolved),
@@ -1791,8 +1856,10 @@ def condition_acuity(patient_id: str) -> ConditionAcuityResponse:
 
 
 @router.get("/{patient_id}/procedures", response_model=ProceduresResponse)
-def patient_procedures(patient_id: str) -> ProceduresResponse:
+def patient_procedures(patient_id: str, request: Request) -> ProceduresResponse:
     """Full procedure history sorted by date descending."""
+    requested_patient_id = patient_id
+    patient_id = _authorized_patient_id(request, patient_id)
     result = load_patient(patient_id)
     if result is None:
         raise HTTPException(status_code=404, detail=f"Patient not found: {patient_id}")
@@ -1820,7 +1887,7 @@ def patient_procedures(patient_id: str) -> ProceduresResponse:
     ]
 
     return ProceduresResponse(
-        patient_id=patient_id,
+        patient_id=requested_patient_id,
         name=stats.name,
         total_count=len(items),
         procedures=items,
@@ -1828,8 +1895,9 @@ def patient_procedures(patient_id: str) -> ProceduresResponse:
 
 
 @router.get("/{patient_id}/encounters/{encounter_id}/raw")
-def encounter_raw(patient_id: str, encounter_id: str) -> dict:
+def encounter_raw(patient_id: str, encounter_id: str, request: Request) -> dict:
     """Return the raw FHIR Encounter resource JSON from the bundle file."""
+    patient_id = _authorized_patient_id(request, patient_id)
     path = path_from_patient_id(patient_id)
     if path is None:
         raise HTTPException(status_code=404, detail=f"Patient not found: {patient_id}")
@@ -1991,13 +2059,15 @@ def _record_diagnostic_reports(record) -> list[DiagnosticReportItem]:
 
 
 @router.get("/{patient_id}/care-journey", response_model=CareJourneyResponse)
-def get_care_journey(patient_id: str) -> CareJourneyResponse:
+def get_care_journey(patient_id: str, request: Request) -> CareJourneyResponse:
     """Return medication episodes, conditions, and encounters for the Gantt timeline."""
     import sqlite3
 
+    requested_patient_id = patient_id
+    patient_id = _authorized_patient_id(request, patient_id)
     result = load_patient(patient_id)
     if result is None:
-        raise HTTPException(status_code=404, detail=f"Patient not found: {patient_id}")
+        raise HTTPException(status_code=404, detail=f"Patient not found: {requested_patient_id}")
 
     record, stats = result
 
@@ -2132,7 +2202,7 @@ def get_care_journey(patient_id: str) -> CareJourneyResponse:
     })
 
     return CareJourneyResponse(
-        patient_id=patient_id,
+        patient_id=requested_patient_id,
         name=name,
         earliest_date=earliest,
         latest_date=latest,

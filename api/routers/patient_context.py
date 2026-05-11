@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 
+from api.core.auth import authorize_patient_access, require_access_session
 from api.core.patient_context import (
     PatientContextConfigurationError,
     add_turn,
@@ -35,12 +36,19 @@ def patient_context_status() -> dict:
 @router.post("/sessions", response_model=PatientContextSessionResponse)
 def create_patient_context_session(
     payload: PatientContextSessionCreateRequest,
+    request: Request,
 ) -> PatientContextSessionResponse:
-    return create_session(payload.patient_id, payload.source_mode)
+    resolved_patient_id = authorize_patient_access(
+        require_access_session(request),
+        payload.patient_id,
+        event_type="patient_context.session_created",
+    )
+    return create_session(resolved_patient_id, payload.source_mode)
 
 
 @router.get("/sessions/{session_id}", response_model=PatientContextSessionResponse)
-def get_patient_context_session(session_id: str) -> PatientContextSessionResponse:
+def get_patient_context_session(session_id: str, request: Request) -> PatientContextSessionResponse:
+    require_access_session(request)
     try:
         return get_session(session_id)
     except FileNotFoundError as exc:
@@ -51,7 +59,9 @@ def get_patient_context_session(session_id: str) -> PatientContextSessionRespons
 def patient_context_turn(
     session_id: str,
     payload: PatientContextTurnRequest,
+    request: Request,
 ) -> PatientContextTurnResponse:
+    require_access_session(request)
     try:
         return add_turn(session_id, payload.message, payload.selected_gap_id)
     except FileNotFoundError as exc:
@@ -61,7 +71,8 @@ def patient_context_turn(
 
 
 @router.post("/sessions/{session_id}/export", response_model=PatientContextExportResponse)
-def export_patient_context(session_id: str) -> PatientContextExportResponse:
+def export_patient_context(session_id: str, request: Request) -> PatientContextExportResponse:
+    require_access_session(request)
     try:
         return export_markdown(session_id)
     except FileNotFoundError as exc:

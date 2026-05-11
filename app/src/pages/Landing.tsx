@@ -1,8 +1,8 @@
+import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, Boxes, Database, FileSearch, ShieldCheck } from "lucide-react";
 import { DemoPatientPicker } from "../components/atlas/DemoPatientPicker";
 import { useAccessContext } from "../context/AccessContext";
-import { mockPatients } from "../api/mockData";
 
 const moduleCards = [
   {
@@ -52,12 +52,28 @@ const moduleCards = [
 ];
 
 export function Landing() {
-  const { activePatientId, isUnlocked, isDemo } = useAccessContext();
-  const activePatient = mockPatients.find((patient) => patient.id === activePatientId) ?? null;
+  const { activePatientId, activePatientName, isDemo, isLoading, isUnlocked, signIn, user } = useAccessContext();
+  const [email, setEmail] = useState("clinician@atlas.local");
+  const [password, setPassword] = useState("atlas-demo-password");
+  const [signInError, setSignInError] = useState<string | null>(null);
   const moduleCardsForState = moduleCards.map((card) => ({
     ...card,
     to: activePatientId ? `${card.to}?patient=${encodeURIComponent(activePatientId)}` : card.to,
   }));
+
+  const handleSignIn = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setSignInError(null);
+    try {
+      await signIn(email, password);
+    } catch (error) {
+      if (error instanceof Error && error.message.trim()) {
+        setSignInError(error.message);
+        return;
+      }
+      setSignInError("Sign-in failed. Check the account credentials and try again.");
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,#f6f9ff_0%,#eef3f8_42%,#e9eef4_100%)] text-[#18202b]">
@@ -140,8 +156,8 @@ export function Landing() {
                         Continue with demo patient
                         <ArrowRight size={16} />
                       </a>
-                      <span className="inline-flex items-center gap-2 rounded-2xl border border-[#d5deea] bg-[rgba(255,255,255,0.76)] px-5 py-3 text-sm font-semibold text-[#98a2b3]">
-                        Sign in coming soon
+                      <span className="inline-flex items-center gap-2 rounded-2xl border border-[#d5deea] bg-[rgba(255,255,255,0.76)] px-5 py-3 text-sm font-semibold text-[#52627f]">
+                        Sign in available below
                       </span>
                     </>
                   )}
@@ -149,20 +165,29 @@ export function Landing() {
               </div>
 
               <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
-                {isUnlocked && activePatient ? (
+                {isUnlocked && activePatientId ? (
                   <div className="rounded-[24px] border border-[rgba(77,104,255,0.14)] bg-[rgba(255,255,255,0.82)] p-5 backdrop-blur sm:col-span-3 lg:col-span-1">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#4d68ff]">
                       Active environment
                     </p>
                     <p className="mt-3 text-xl font-semibold text-[#18202b]">
-                      {activePatient.name}
+                      {activePatientName ?? activePatientId}
                     </p>
                     <p className="mt-2 text-sm leading-6 text-[#3e4d68]">
-                      {Math.round(activePatient.age_years)}y {activePatient.gender} · {activePatient.total_resources.toLocaleString()} resources · {activePatient.encounter_count} encounters
+                      {isDemo
+                        ? "Demo access posture is active. The shared shell now runs through a server-backed demo session."
+                        : user
+                          ? `Signed in as ${user.display_name}. Select or switch patients without leaving the shell.`
+                          : "Authenticated access is active."}
                     </p>
                     <div className="mt-3 inline-flex rounded-full bg-[#eef2ff] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#4d68ff]">
                       {isDemo ? "Demo patient unlocked" : "Active patient context"}
                     </div>
+                    {user && !isDemo && (
+                      <div className="mt-3 text-xs font-medium text-[#62728d]">
+                        Logged in as {user.email}
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <>
@@ -198,8 +223,51 @@ export function Landing() {
 
           <section className="mt-8" id="demo-access">
             {!isUnlocked && (
-              <div className="mb-6 rounded-[30px] border border-[#cad6ff] bg-[rgba(255,255,255,0.78)] p-6 shadow-[0_22px_70px_rgba(77,104,255,0.08)]">
-                <DemoPatientPicker destination={(patientId) => `/patient-record?patient=${encodeURIComponent(patientId)}`} />
+              <div className="mb-6 grid gap-6 rounded-[30px] border border-[#cad6ff] bg-[rgba(255,255,255,0.78)] p-6 shadow-[0_22px_70px_rgba(77,104,255,0.08)] lg:grid-cols-[0.95fr_1.05fr]">
+                <form onSubmit={handleSignIn} className="rounded-[24px] border border-[#d8e0eb] bg-white/75 p-5">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#4d68ff]">
+                    Sign in
+                  </p>
+                  <h3 className="mt-2 text-xl font-semibold text-[#18202b]">
+                    Use a real application session
+                  </h3>
+                  <p className="mt-2 text-sm leading-6 text-[#62728d]">
+                    Patient data should not load until the backend trusts the session. For local development, the seeded clinician account is enabled by default.
+                  </p>
+                  <label className="mt-4 block text-xs font-semibold uppercase tracking-[0.12em] text-[#7a88a3]">
+                    Email
+                  </label>
+                  <input
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    className="mt-2 w-full rounded-2xl border border-[#d5deea] bg-white px-4 py-3 text-sm text-[#18202b] outline-none transition-colors focus:border-[#4d68ff]"
+                    autoComplete="username"
+                  />
+                  <label className="mt-4 block text-xs font-semibold uppercase tracking-[0.12em] text-[#7a88a3]">
+                    Password
+                  </label>
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    className="mt-2 w-full rounded-2xl border border-[#d5deea] bg-white px-4 py-3 text-sm text-[#18202b] outline-none transition-colors focus:border-[#4d68ff]"
+                    autoComplete="current-password"
+                  />
+                  {signInError && (
+                    <p className="mt-3 text-sm text-[#b42318]">{signInError}</p>
+                  )}
+                  <button
+                    type="submit"
+                    disabled={isLoading}
+                    className="mt-5 inline-flex items-center gap-2 rounded-2xl bg-[#4d68ff] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#3c57ef] disabled:cursor-not-allowed disabled:opacity-70"
+                  >
+                    {isLoading ? "Checking session..." : "Sign in"}
+                    <ArrowRight size={16} />
+                  </button>
+                </form>
+                <div>
+                  <DemoPatientPicker destination={(patientId) => `/patient-record?patient=${encodeURIComponent(patientId)}`} />
+                </div>
               </div>
             )}
             <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">

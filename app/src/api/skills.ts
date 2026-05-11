@@ -32,6 +32,7 @@ import type {
 const http = axios.create({
   baseURL: "/api/skills",
   headers: { "Content-Type": "application/json" },
+  withCredentials: true,
 });
 
 export const skillsApi = {

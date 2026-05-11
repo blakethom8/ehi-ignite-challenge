@@ -18,9 +18,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
+from api.core.auth import init_auth_store
 from api.core.loader import warm_patient_indexes
 from api.core.sof_materialize import materialize_from_env
 from api.middleware.tracing import TracingMiddleware
+from api.routers import auth
 from api.routers import patients
 from api.routers import corpus
 from api.routers import assistant
@@ -67,11 +69,12 @@ def _materialize_sof_db() -> None:
     never raises (see ``sof_materialize.materialize_from_env``).
     """
     materialize_from_env()
+    init_auth_store()
     # The first app interaction needs /api/patients. Build that lightweight
     # index during startup so production users do not pay the corpus-cache
     # rebuild cost on the first page load after deploy.
     warm_patient_indexes()
-    patients.list_patients()
+    patients._cached_patient_list()
     # Cache verified plugin manifests in memory so /api/plugins/installed
     # serves without re-verifying signatures on every request.
     try:
@@ -103,13 +106,14 @@ app.add_middleware(
             "https://ehi.healthcaredataai.com",
         ],
     ),
-    allow_credentials=False,
+    allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Accept", "Authorization", "Content-Type"],
 )
 
 app.add_middleware(TracingMiddleware)
 
+app.include_router(auth.router, prefix="/api")
 app.include_router(patients.router, prefix="/api")
 app.include_router(corpus.router, prefix="/api")
 app.include_router(assistant.router, prefix="/api")

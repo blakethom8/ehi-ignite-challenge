@@ -1,5 +1,6 @@
 import axios from "axios";
 import type {
+  AuthSessionResponse,
   PatientListItem,
   PatientOverview,
   TimelineResponse,
@@ -83,6 +84,7 @@ import {
 const http = axios.create({
   baseURL: "/api",
   headers: { "Content-Type": "application/json" },
+  withCredentials: true,
 });
 
 const useMockData = import.meta.env.VITE_USE_MOCK_DATA === "true";
@@ -101,6 +103,24 @@ async function getOrMock<T>(request: Promise<T>, fallback: T): Promise<T> {
 }
 
 export const api = {
+  getAuthSession: (): Promise<AuthSessionResponse> =>
+    http.get<AuthSessionResponse>("/auth/session").then((r) => r.data),
+
+  login: (email: string, password: string): Promise<AuthSessionResponse> =>
+    http.post<AuthSessionResponse>("/auth/login", { email, password }).then((r) => r.data),
+
+  logout: (): Promise<AuthSessionResponse> =>
+    http.post<AuthSessionResponse>("/auth/logout").then((r) => r.data),
+
+  enterDemo: (patientId: string): Promise<AuthSessionResponse> =>
+    http.post<AuthSessionResponse>("/auth/demo", { patient_id: patientId }).then((r) => r.data),
+
+  exitDemo: (): Promise<AuthSessionResponse> =>
+    http.post<AuthSessionResponse>("/auth/demo/exit").then((r) => r.data),
+
+  selectActivePatient: (patientId: string | null): Promise<AuthSessionResponse> =>
+    http.post<AuthSessionResponse>("/auth/select-patient", { patient_id: patientId }).then((r) => r.data),
+
   /** Lightweight patient list — names only, no bundle loading */
   listPatients: (): Promise<PatientListItem[]> =>
     getOrMock(http.get<PatientListItem[]>("/patients").then((r) => r.data), mockPatients),

@@ -15,7 +15,6 @@ import {
   UserRound,
 } from "lucide-react";
 import { api } from "../api/client";
-import { mockPatients } from "../api/mockData";
 import { DemoPatientPicker } from "../components/atlas/DemoPatientPicker";
 import { StartStateCard } from "../components/atlas/StartStateCard";
 import { useAccessContext } from "../context/AccessContext";
@@ -91,7 +90,7 @@ function SortButton({
 }
 
 export function PatientRecordPool() {
-  const { isDemo, isUnlocked, mode } = useAccessContext();
+  const { isUnlocked } = useAccessContext();
   const [search, setSearch] = useState("");
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("complexity_score");
@@ -100,13 +99,10 @@ export function PatientRecordPool() {
   const { data: queriedPatients = [], isLoading } = useQuery<PatientListItem[]>({
     queryKey: ["patients", "records-pool"],
     queryFn: api.listPatients,
-    enabled: mode === "authenticated",
+    enabled: isUnlocked,
   });
 
-  const patients = useMemo(
-    () => (isDemo ? mockPatients : queriedPatients),
-    [isDemo, queriedPatients],
-  );
+  const patients = queriedPatients;
 
   if (!isUnlocked) {
     return (

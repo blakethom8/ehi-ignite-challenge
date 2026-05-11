@@ -4,8 +4,9 @@
 
 import json
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 
+from api.core.auth import authorize_patient_access, require_access_session
 from api.core.provider_assistant_cursor import CursorSidecarConfigurationError, CursorSidecarExecutionError
 from api.core.provider_assistant_service import answer_provider_question
 from api.core.tracing import get_current_trace, SpanKind
@@ -199,18 +200,24 @@ def _build_trace_detail() -> TraceDetail | None:
 
 
 @router.post("/chat", response_model=ProviderAssistantResponse)
-def provider_chat(payload: ProviderAssistantRequest) -> ProviderAssistantResponse:
+def provider_chat(payload: ProviderAssistantRequest, request: Request) -> ProviderAssistantResponse:
     """
     Chat endpoint for provider Q&A over a single patient's chart.
     """
+    session = require_access_session(request)
     if not payload.patient_id:
         raise HTTPException(status_code=422, detail="patient_id is required")
     if not payload.question.strip():
         raise HTTPException(status_code=422, detail="question is required")
+    resolved_patient_id = authorize_patient_access(
+        session,
+        payload.patient_id,
+        event_type="assistant.question",
+    )
 
     try:
         result = answer_provider_question(
-            patient_id=payload.patient_id,
+            patient_id=resolved_patient_id,
             question=payload.question,
             history=[turn.model_dump() for turn in payload.history],
             context_packages=[package.model_dump() for package in payload.context_packages],

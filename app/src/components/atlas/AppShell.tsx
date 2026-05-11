@@ -18,6 +18,16 @@ const DEFAULT_USER: User = {
   org: "Mercy Medical Group · Clinician",
 };
 
+function initialsFromName(name: string): string {
+  const letters = name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("");
+  return letters || "AT";
+}
+
 type AppShellProps = {
   children: React.ReactNode;
   /** Optional breadcrumb override; defaults to ["module / page"] */
@@ -56,7 +66,7 @@ export function AppShell({
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const { activePatientId, mode } = useAccessContext();
+  const { activePatientId, mode, user } = useAccessContext();
   const [workspaceId, setWorkspaceId] = useState<WorkspaceId>(() => {
     // Migration: the slug "clinical-insights" was renamed to "caspian" in
     // Phase 6 of the Atlas IA refactor. If a user had the old slug stored,
@@ -101,6 +111,18 @@ export function AppShell({
     }
     navigate(withPatientContext(`/workspaces/${w}`, patientId, mode));
   };
+  const shellUser = useMemo<User>(() => {
+    if (!user) {
+      return mode === "demo"
+        ? { initials: "DM", name: "Demo Session", org: "Atlas demo access" }
+        : DEFAULT_USER;
+    }
+    return {
+      initials: initialsFromName(user.display_name),
+      name: user.display_name,
+      org: `${user.email} · ${user.role}`,
+    };
+  }, [mode, user]);
   return (
     <div
       className="flex h-screen min-h-0 flex-col"
@@ -112,7 +134,7 @@ export function AppShell({
         workspaceId={workspaceId}
         onSwitchWorkspace={handleSwitchWorkspace}
         onOpenDrawer={() => setDrawerOpen(true)}
-        user={DEFAULT_USER}
+        user={shellUser}
         crumbs={showTitlebar ? resolvedCrumbs : undefined}
         panes={panes ?? DEFAULT_PANES}
         onTogglePane={onTogglePane}
@@ -132,14 +154,14 @@ export function AppShell({
       <PlatformDrawer
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
-        user={DEFAULT_USER}
+        user={shellUser}
       />
     </div>
   );
 }
 
-function withPatientContext(path: string, patientId: string | null, mode: "locked" | "demo" | "authenticated") {
-  if (!patientId || path === "/" || mode === "locked") return path;
+function withPatientContext(path: string, patientId: string | null, mode: "anonymous" | "demo" | "authenticated") {
+  if (!patientId || path === "/" || mode === "anonymous") return path;
   const url = new URL(path, "http://atlas.local");
   url.searchParams.set("patient", patientId);
   return `${url.pathname}${url.search}`;

@@ -29,7 +29,7 @@ function startPreviewServer() {
     {
       cwd: process.cwd(),
       stdio: "pipe",
-      env: process.env,
+      env: { ...process.env, VITE_USE_MOCK_DATA: "true" },
     },
   );
 

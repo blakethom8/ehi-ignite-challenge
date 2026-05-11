@@ -24,6 +24,9 @@ __pycache__/
 data/traces.db
 data/traces.db-*
 data/atlas-signing.key
+data/atlas-session.key
+data/auth.db
+data/auth.db-*
 data/provenance.db
 data/provenance.db-*
 data/runs.db

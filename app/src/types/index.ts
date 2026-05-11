@@ -1,5 +1,29 @@
 // API response types — mirrors api/models.py
 
+export type AuthMode = "anonymous" | "demo" | "authenticated";
+
+export interface AuthUser {
+  id: string;
+  email: string;
+  display_name: string;
+  role: "clinician" | "attending" | "coordinator" | "admin";
+}
+
+export interface DemoPatientOption {
+  id: string;
+  name: string;
+  description: string;
+}
+
+export interface AuthSessionResponse {
+  mode: AuthMode;
+  user: AuthUser | null;
+  active_patient_id: string | null;
+  active_patient_name: string | null;
+  expires_at: string | null;
+  available_demo_patients: DemoPatientOption[];
+}
+
 export interface PatientListItem {
   id: string;
   name: string;

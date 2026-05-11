@@ -10,9 +10,10 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
+from api.core.auth import authorize_patient_access, require_access_session
 from api.plugins import provenance as prov_log
 from api.plugins import runtime as rt
 from api.plugins.anchors import AnchorError, AnchorExpired, OutOfScope
@@ -24,25 +25,12 @@ from api.plugins.manifest import (
     load_manifest,
 )
 from api.plugins.tools import ApprovalRequired, PermissionDenied, UnknownTool
-from api.trust.models import UserIdentity
-
-
 router = APIRouter(prefix="/plugins", tags=["plugins"])
 
 
 # ============================================================
 # Helpers
 # ============================================================
-
-
-def _coerce_user(body: dict) -> UserIdentity:
-    raw = body.get("user") or body.get("approver") or {
-        "id": "demo-clinician",
-        "name": "Demo Clinician",
-        "role": "clinician",
-    }
-    return UserIdentity.model_validate(raw)
-
 
 def _wrap_runtime_error(exc: Exception) -> HTTPException:
     """Map a runtime exception to a typed HTTP error the frontend can parse."""
@@ -78,7 +66,8 @@ def _manifest_to_payload(loaded) -> dict:
 
 
 @router.get("/installed")
-def list_installed() -> list[dict]:
+def list_installed(request: Request) -> list[dict]:
+    require_access_session(request)
     out: list[dict] = []
     for plugin_id, version in discover_installed():
         try:
@@ -90,7 +79,8 @@ def list_installed() -> list[dict]:
 
 
 @router.get("/{plugin_id}/manifest")
-def get_manifest(plugin_id: str) -> dict:
+def get_manifest(plugin_id: str, request: Request) -> dict:
+    require_access_session(request)
     # Find first installed version
     for pid, version in discover_installed():
         if pid == plugin_id:
@@ -103,7 +93,8 @@ def get_manifest(plugin_id: str) -> dict:
 
 
 @router.get("/{plugin_id}/runs")
-def list_runs(plugin_id: str) -> list[dict]:
+def list_runs(plugin_id: str, request: Request) -> list[dict]:
+    require_access_session(request)
     return [_run_to_payload(r) for r in rt.list_runs_for_plugin(plugin_id)]
 
 
@@ -138,12 +129,14 @@ def _run_to_payload(run: rt.RunRow) -> dict:
 
 
 @router.post("/runs")
-def start_run(body: StartRunBody) -> dict:
-    user = _coerce_user(body.model_dump())
+def start_run(body: StartRunBody, request: Request) -> dict:
+    session = require_access_session(request)
+    user = session.to_user_identity()
+    resolved_patient_id = authorize_patient_access(session, body.patientId, event_type="plugin.run_started")
     try:
         run = rt.start_run(
             plugin_id=body.pluginId,
-            patient_id=body.patientId,
+            patient_id=resolved_patient_id,
             workflow_id=body.workflowId,
             title=body.title,
             user=user,
@@ -154,7 +147,8 @@ def start_run(body: StartRunBody) -> dict:
 
 
 @router.get("/runs/{run_id}")
-def get_run(run_id: str) -> dict:
+def get_run(run_id: str, request: Request) -> dict:
+    require_access_session(request)
     try:
         return _run_to_payload(rt.get_run(run_id))
     except RuntimeError as e:
@@ -166,8 +160,8 @@ class ConsentBody(BaseModel):
 
 
 @router.post("/runs/{run_id}/consent")
-def grant_consent(run_id: str, body: ConsentBody) -> dict:
-    user = _coerce_user(body.model_dump())
+def grant_consent(run_id: str, body: ConsentBody, request: Request) -> dict:
+    user = require_access_session(request).to_user_identity()
     try:
         token = rt.grant_consent(run_id, approver=user)
     except Exception as e:
@@ -179,8 +173,8 @@ def grant_consent(run_id: str, body: ConsentBody) -> dict:
 
 
 @router.post("/runs/{run_id}/revoke-consent")
-def revoke_consent(run_id: str, body: ConsentBody) -> dict:
-    user = _coerce_user(body.model_dump())
+def revoke_consent(run_id: str, body: ConsentBody, request: Request) -> dict:
+    user = require_access_session(request).to_user_identity()
     try:
         rt.revoke_consent(run_id, approver=user)
     except Exception as e:
@@ -198,7 +192,8 @@ class ToolCallBody(BaseModel):
 
 
 @router.post("/runs/{run_id}/tool/{tool_id}")
-def call_tool(run_id: str, tool_id: str, body: ToolCallBody) -> dict:
+def call_tool(run_id: str, tool_id: str, body: ToolCallBody, request: Request) -> dict:
+    require_access_session(request)
     try:
         return rt.call_tool(
             run_id=run_id, tool_id=tool_id, payload=body.payload or {}
@@ -223,7 +218,8 @@ class ApprovalRequestBody(BaseModel):
 
 
 @router.post("/runs/{run_id}/approvals")
-def request_approval(run_id: str, body: ApprovalRequestBody) -> dict:
+def request_approval(run_id: str, body: ApprovalRequestBody, request: Request) -> dict:
+    require_access_session(request)
     try:
         request = rt.request_outbound_approval(
             run_id=run_id,
@@ -241,7 +237,8 @@ def request_approval(run_id: str, body: ApprovalRequestBody) -> dict:
 
 
 @router.get("/runs/{run_id}/approvals")
-def list_approvals(run_id: str) -> list[dict]:
+def list_approvals(run_id: str, request: Request) -> list[dict]:
+    require_access_session(request)
     return rt.list_approvals(run_id)
 
 
@@ -250,8 +247,8 @@ class ApprovalDecisionBody(BaseModel):
 
 
 @router.post("/runs/{run_id}/approvals/{approval_id}/approve")
-def approve_outbound(run_id: str, approval_id: str, body: ApprovalDecisionBody) -> dict:
-    user = _coerce_user(body.model_dump())
+def approve_outbound(run_id: str, approval_id: str, body: ApprovalDecisionBody, request: Request) -> dict:
+    user = require_access_session(request).to_user_identity()
     try:
         return rt.approve_outbound(approval_id=approval_id, approver=user)
     except Exception as e:
@@ -259,8 +256,8 @@ def approve_outbound(run_id: str, approval_id: str, body: ApprovalDecisionBody) 
 
 
 @router.post("/runs/{run_id}/approvals/{approval_id}/deny")
-def deny_outbound(run_id: str, approval_id: str, body: ApprovalDecisionBody) -> dict:
-    user = _coerce_user(body.model_dump())
+def deny_outbound(run_id: str, approval_id: str, body: ApprovalDecisionBody, request: Request) -> dict:
+    user = require_access_session(request).to_user_identity()
     try:
         rt.deny_outbound(approval_id=approval_id, approver=user)
     except Exception as e:
@@ -274,15 +271,18 @@ def deny_outbound(run_id: str, approval_id: str, body: ApprovalDecisionBody) -> 
 
 
 @router.get("/runs/{run_id}/events")
-def list_events(run_id: str) -> list[dict]:
+def list_events(run_id: str, request: Request) -> list[dict]:
+    require_access_session(request)
     return rt.list_events(run_id)
 
 
 @router.get("/runs/{run_id}/provenance")
-def list_run_provenance(run_id: str) -> list[dict]:
+def list_run_provenance(run_id: str, request: Request) -> list[dict]:
+    require_access_session(request)
     return [r.model_dump(mode="json") for r in prov_log.list_records(run_id=run_id)]
 
 
 @router.get("/{plugin_id}/provenance")
-def list_plugin_provenance(plugin_id: str) -> list[dict]:
+def list_plugin_provenance(plugin_id: str, request: Request) -> list[dict]:
+    require_access_session(request)
     return [r.model_dump(mode="json") for r in prov_log.list_records(plugin_id=plugin_id)]

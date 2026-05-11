@@ -123,9 +123,9 @@ function AppShellRoute({
 }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { activePatientId, isUnlocked, setActivePatient } = useAccessContext();
+  const { activePatientId, isLoading, isUnlocked, setActivePatient } = useAccessContext();
   const routeKey = `${location.pathname}${location.search}`;
-  const stripPatient = shouldStripPatient(location.pathname, location.search, isUnlocked);
+  const stripPatient = shouldStripPatient(location.pathname, location.search, isUnlocked, isLoading);
   const hydratePatient = shouldHydratePatient(
     location.pathname,
     location.search,
@@ -136,12 +136,12 @@ function AppShellRoute({
   const isFhirChartsRoute = location.pathname.startsWith("/fhir-charts");
 
   useEffect(() => {
-    if (!isUnlocked) return;
+    if (isLoading || !isUnlocked) return;
     const params = new URLSearchParams(location.search);
     const patientId = params.get("patient");
     if (!patientId || patientId === activePatientId) return;
-    setActivePatient(patientId);
-  }, [activePatientId, isUnlocked, location.search, setActivePatient]);
+    void setActivePatient(patientId);
+  }, [activePatientId, isLoading, isUnlocked, location.search, setActivePatient]);
 
   useEffect(() => {
     if (fullBleed || !hydratePatient) return;
@@ -149,6 +149,10 @@ function AppShellRoute({
     params.set("patient", activePatientId as string);
     navigate({ pathname: location.pathname, search: `?${params.toString()}` }, { replace: true });
   }, [activePatientId, fullBleed, hydratePatient, location.pathname, location.search, navigate]);
+
+  if (isLoading) {
+    return fullBleed ? <FullscreenPageFallback /> : <PageFallback />;
+  }
 
   if (stripPatient) {
     return <Navigate replace to={location.pathname} />;
@@ -367,7 +371,8 @@ function shouldHydratePatient(
   return !params.has("patient");
 }
 
-function shouldStripPatient(pathname: string, search: string, isUnlocked: boolean): boolean {
+function shouldStripPatient(pathname: string, search: string, isUnlocked: boolean, isLoading: boolean): boolean {
+  if (isLoading) return false;
   if (isUnlocked) return false;
   if (
     !pathname.startsWith("/patient-record") &&

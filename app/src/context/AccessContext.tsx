@@ -6,97 +6,164 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { api } from "../api/client";
 import { mockPatients } from "../api/mockData";
+import type { AuthSessionResponse, AuthUser, DemoPatientOption } from "../types";
 
-export type AccessMode = "locked" | "demo" | "authenticated";
+export type AccessMode = "anonymous" | "demo" | "authenticated";
 
 type AccessState = {
   mode: AccessMode;
+  user: AuthUser | null;
   activePatientId: string | null;
+  activePatientName: string | null;
+  expiresAt: string | null;
+  availableDemoPatients: DemoPatientOption[];
 };
 
 type AccessContextValue = AccessState & {
+  isLoading: boolean;
   isUnlocked: boolean;
   isDemo: boolean;
-  enterDemoPatient: (patientId: string) => void;
-  setActivePatient: (patientId: string | null, mode?: AccessMode) => void;
-  clearAccess: () => void;
+  signIn: (email: string, password: string) => Promise<void>;
+  enterDemoPatient: (patientId: string) => Promise<void>;
+  setActivePatient: (patientId: string | null) => Promise<void>;
+  clearAccess: () => Promise<void>;
+  refreshSession: () => Promise<void>;
 };
 
-const STORAGE_KEY = "atlas:access";
 const AccessContext = createContext<AccessContextValue | null>(null);
 
 const DEFAULT_STATE: AccessState = {
-  mode: "locked",
+  mode: "anonymous",
+  user: null,
   activePatientId: null,
+  activePatientName: null,
+  expiresAt: null,
+  availableDemoPatients: [],
 };
 
-function isKnownDemoPatient(patientId: string | null): boolean {
-  return Boolean(patientId && mockPatients.some((patient) => patient.id === patientId));
+const STORAGE_KEY = "atlas:access";
+const useMockData = import.meta.env.VITE_USE_MOCK_DATA === "true";
+
+function mockDemoOptions(): DemoPatientOption[] {
+  return mockPatients.map((patient) => ({
+    id: patient.id,
+    name: patient.name,
+    description: "Frontend mock-mode demo patient.",
+  }));
 }
 
-function normalizeState(raw: unknown): AccessState {
-  if (!raw || typeof raw !== "object") return DEFAULT_STATE;
-  const candidate = raw as Partial<AccessState>;
-  const patientId = typeof candidate.activePatientId === "string" ? candidate.activePatientId : null;
-  const mode =
-    candidate.mode === "demo" || candidate.mode === "authenticated" || candidate.mode === "locked"
-      ? candidate.mode
-      : "locked";
-
-  if (mode === "demo" && !isKnownDemoPatient(patientId)) {
-    return DEFAULT_STATE;
+function mockSessionFromStorage(): AccessState {
+  if (typeof window === "undefined") {
+    return { ...DEFAULT_STATE, availableDemoPatients: mockDemoOptions() };
   }
-
-  if (mode === "locked") {
-    return DEFAULT_STATE;
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const parsed = raw ? (JSON.parse(raw) as { mode?: string; activePatientId?: string | null }) : {};
+    const mode = parsed.mode === "demo" || parsed.mode === "authenticated" ? parsed.mode : "anonymous";
+    const patientId = typeof parsed.activePatientId === "string" ? parsed.activePatientId : null;
+    const activePatientName = mockPatients.find((patient) => patient.id === patientId)?.name ?? null;
+    return {
+      mode,
+      user: mode === "authenticated"
+        ? {
+            id: "mock-user",
+            email: "clinician@atlas.local",
+            display_name: "Atlas Clinician",
+            role: "clinician",
+          }
+        : null,
+      activePatientId: patientId,
+      activePatientName,
+      expiresAt: null,
+      availableDemoPatients: mockDemoOptions(),
+    };
+  } catch {
+    return { ...DEFAULT_STATE, availableDemoPatients: mockDemoOptions() };
   }
+}
 
+function writeMockSession(mode: AccessMode, activePatientId: string | null) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ mode, activePatientId }));
+}
+
+function mapSession(session: AuthSessionResponse): AccessState {
   return {
-    mode,
-    activePatientId: patientId,
+    mode: session.mode,
+    user: session.user,
+    activePatientId: session.active_patient_id,
+    activePatientName: session.active_patient_name,
+    expiresAt: session.expires_at,
+    availableDemoPatients: session.available_demo_patients,
   };
 }
 
 export function AccessProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<AccessState>(() => {
-    if (typeof window === "undefined") return DEFAULT_STATE;
+  const [state, setState] = useState<AccessState>(DEFAULT_STATE);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const applySession = (session: AuthSessionResponse) => {
+    setState(mapSession(session));
+  };
+
+  const refreshSession = async () => {
+    setIsLoading(true);
     try {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
-      return raw ? normalizeState(JSON.parse(raw)) : DEFAULT_STATE;
+      applySession(await api.getAuthSession());
     } catch {
-      return DEFAULT_STATE;
+      setState(useMockData ? mockSessionFromStorage() : DEFAULT_STATE);
+    } finally {
+      setIsLoading(false);
     }
-  });
+  };
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  }, [state]);
+    void refreshSession();
+  }, []);
 
   const value = useMemo<AccessContextValue>(
     () => ({
       ...state,
-      isUnlocked: state.mode !== "locked",
+      isLoading,
+      isUnlocked: state.mode !== "anonymous",
       isDemo: state.mode === "demo",
-      enterDemoPatient: (patientId: string) => {
-        if (!isKnownDemoPatient(patientId)) return;
-        setState({ mode: "demo", activePatientId: patientId });
-      },
-      setActivePatient: (patientId: string | null, mode?: AccessMode) => {
-        if (!patientId) {
-          setState(DEFAULT_STATE);
+      signIn: async (email: string, password: string) => {
+        if (useMockData) {
+          writeMockSession("authenticated", null);
+          setState(mockSessionFromStorage());
           return;
         }
-        if (mode === "demo" || isKnownDemoPatient(patientId)) {
-          setState({ mode: "demo", activePatientId: patientId });
+        applySession(await api.login(email, password));
+      },
+      enterDemoPatient: async (patientId: string) => {
+        if (useMockData) {
+          writeMockSession("demo", patientId);
+          setState(mockSessionFromStorage());
           return;
         }
-        setState({ mode: mode === "locked" ? "locked" : "authenticated", activePatientId: patientId });
+        applySession(await api.enterDemo(patientId));
       },
-      clearAccess: () => setState(DEFAULT_STATE),
+      setActivePatient: async (patientId: string | null) => {
+        if (useMockData) {
+          writeMockSession(state.mode, patientId);
+          setState(mockSessionFromStorage());
+          return;
+        }
+        applySession(await api.selectActivePatient(patientId));
+      },
+      clearAccess: async () => {
+        if (useMockData) {
+          writeMockSession("anonymous", null);
+          setState(mockSessionFromStorage());
+          return;
+        }
+        applySession(await api.logout());
+      },
+      refreshSession,
     }),
-    [state],
+    [isLoading, state],
   );
 
   return <AccessContext.Provider value={value}>{children}</AccessContext.Provider>;

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, Compass, Database, HelpCircle, Menu, Pill, Play, Search, Send, Telescope } from "lucide-react";
 import { Link } from "react-router-dom";
-import { getMockBundleContext, mockPatients } from "../../api/mockData";
+import { getMockBundleContext } from "../../api/mockData";
 import { hrefForModule } from "./navigation";
 import type { Crumb } from "./Titlebar";
 import type {
@@ -78,7 +78,7 @@ export function ModuleBar({
 }: ModuleBarProps) {
   const [wsOpen, setWsOpen] = useState(false);
   const wsRef = useRef<HTMLDivElement>(null);
-  const { activePatientId, isDemo, isUnlocked } = useAccessContext();
+  const { activePatientId, activePatientName, isDemo, isUnlocked } = useAccessContext();
 
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
@@ -92,9 +92,8 @@ export function ModuleBar({
 
   const activeBundle = useMemo(() => {
     if (!activePatientId) return null;
-    const mockPatient = mockPatients.find((patient) => patient.id === activePatientId) ?? null;
     const bundle = getMockBundleContext(activePatientId);
-    const label = bundle?.label ?? mockPatient?.name ?? activePatientId;
+    const label = bundle?.label ?? activePatientName ?? activePatientId;
     const subtitle = bundle?.updated_at
       ? `Updated ${new Date(`${bundle.updated_at}T00:00:00`).toLocaleDateString("en-US", {
           month: "short",
@@ -103,7 +102,7 @@ export function ModuleBar({
         })}`
       : "Selected data space";
     return { label, subtitle };
-  }, [activePatientId]);
+  }, [activePatientId, activePatientName]);
 
   const contextCrumbs = useMemo(() => {
     if (!crumbs?.length) return [];

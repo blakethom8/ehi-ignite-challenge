@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Atlas — User, Session &amp; Security Audit</title>
+  <style>
+    :root {
+      --blue-700: #1d4ed8;
+      --blue-600: #2563eb;
+      --blue-100: #dbeafe;
+      --blue-50:  #eff6ff;
+      --red-700:  #b91c1c;
+      --red-100:  #fee2e2;
+      --red-50:   #fef2f2;
+      --amber-700:#b45309;
+      --amber-100:#fef3c7;
+      --amber-50: #fffbeb;
+      --green-700:#15803d;
+      --green-100:#dcfce7;
+      --green-50: #f0fdf4;
+      --gray-900: #111827;
+      --gray-800: #1f2937;
+      --gray-700: #374151;
+      --gray-600: #4b5563;
+      --gray-400: #9ca3af;
+      --gray-200: #e5e7eb;
+      --gray-100: #f3f4f6;
+      --gray-50:  #f9fafb;
+      --paper:    #eef2f6;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif; font-size: 14px; line-height: 1.6; color: var(--gray-800); background: var(--paper); }
+    .page-header { background: var(--gray-900); color: white; padding: 40px 48px 32px; border-bottom: 3px solid var(--blue-600); }
+    .page-header .kicker { font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--gray-400); margin-bottom: 8px; }
+    .page-header h1 { font-family: 'Inter Tight', 'Inter', sans-serif; font-size: 28px; font-weight: 700; letter-spacing: -.02em; margin-bottom: 8px; }
+    .page-header .subtitle { font-size: 14px; color: var(--gray-400); }
+    .page-header .meta { margin-top: 20px; display: flex; gap: 24px; font-size: 12px; color: var(--gray-400); }
+    .page-header .meta span strong { color: #e5e7eb; }
+    .layout { display: flex; min-height: calc(100vh - 120px); }
+    .sidebar { width: 220px; flex-shrink: 0; background: white; border-right: 1px solid var(--gray-200); padding: 24px 0; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+    .sidebar .nav-group-label { font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--gray-400); padding: 16px 20px 6px; }
+    .sidebar a { display: block; padding: 6px 20px; font-size: 13px; color: var(--gray-700); text-decoration: none; border-left: 2px solid transparent; }
+    .sidebar a:hover { background: var(--gray-50); color: var(--blue-700); border-left-color: var(--blue-600); }
+    .main { flex: 1; padding: 36px 48px 80px; max-width: 960px; }
+    .section { margin-bottom: 48px; }
+    .section-title { font-family: 'Inter Tight', 'Inter', sans-serif; font-size: 20px; font-weight: 700; color: var(--gray-900); margin-bottom: 16px; padding-bottom: 10px; border-bottom: 1px solid var(--gray-200); }
+    h3 { font-size: 15px; font-weight: 600; color: var(--gray-900); margin: 20px 0 10px; }
+    h4 { font-size: 13px; font-weight: 600; color: var(--gray-700); margin: 14px 0 6px; }
+    p { margin-bottom: 10px; color: var(--gray-700); }
+    .callout { border-radius: 6px; padding: 14px 16px; margin: 16px 0; display: flex; gap: 12px; }
+    .callout .icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+    .callout .body { flex: 1; }
+    .callout .body strong { display: block; font-size: 13px; margin-bottom: 3px; }
+    .callout .body p { margin: 0; font-size: 13px; }
+    .callout-critical { background: var(--red-50); border-left: 3px solid var(--red-700); }
+    .callout-critical .icon, .callout-critical strong { color: var(--red-700); }
+    .callout-warning { background: var(--amber-50); border-left: 3px solid var(--amber-700); }
+    .callout-warning .icon, .callout-warning strong { color: var(--amber-700); }
+    .callout-good { background: var(--green-50); border-left: 3px solid var(--green-700); }
+    .callout-good .icon, .callout-good strong { color: var(--green-700); }
+    .callout-info { background: var(--blue-50); border-left: 3px solid var(--blue-700); }
+    .callout-info .icon, .callout-info strong { color: var(--blue-700); }
+    table { width: 100%; border-collapse: collapse; margin: 12px 0 20px; font-size: 13px; }
+    thead th { background: var(--gray-100); color: var(--gray-700); font-weight: 600; text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--gray-200); }
+    tbody td { padding: 7px 12px; border-bottom: 1px solid var(--gray-100); vertical-align: top; }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr:hover td { background: var(--gray-50); }
+    code { font-family: 'IBM Plex Mono', 'Fira Code', monospace; font-size: 12px; background: var(--gray-100); border: 1px solid var(--gray-200); border-radius: 3px; padding: 1px 5px; }
+    .badge { display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: .05em; padding: 2px 7px; border-radius: 99px; text-transform: uppercase; }
+    .badge-critical { background: var(--red-100); color: var(--red-700); }
+    .badge-warning { background: var(--amber-100); color: var(--amber-700); }
+    .badge-info { background: var(--blue-100); color: var(--blue-700); }
+    .badge-good { background: var(--green-100); color: var(--green-700); }
+    .findings-list { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+    .finding { border: 1px solid var(--gray-200); border-radius: 6px; background: white; padding: 14px 16px; }
+    .finding-header { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 6px; }
+    .finding-number { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+    .finding-number.critical { background: var(--red-100); color: var(--red-700); }
+    .finding-number.warning { background: var(--amber-100); color: var(--amber-700); }
+    .finding-title { font-size: 14px; font-weight: 600; color: var(--gray-900); }
+    .finding-meta { font-size: 11px; color: var(--gray-400); margin-top: 2px; }
+    .finding-body { font-size: 13px; color: var(--gray-700); margin-top: 6px; padding-left: 34px; }
+    .option-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0; }
+    .option-card { border: 1px solid var(--gray-200); border-radius: 8px; background: white; padding: 16px; }
+    .option-card.recommended { border-color: var(--blue-600); }
+    .option-card h4 { margin-top: 0; font-size: 14px; }
+    .option-card ul { padding-left: 16px; font-size: 13px; color: var(--gray-700); }
+    .option-card ul li { margin-bottom: 4px; }
+    .rec-pill { display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: .08em; background: var(--blue-100); color: var(--blue-700); padding: 2px 8px; border-radius: 99px; text-transform: uppercase; margin-left: 8px; }
+    .roadmap { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+    .roadmap-item { display: grid; grid-template-columns: 80px 1fr; gap: 12px; align-items: start; }
+    .roadmap-phase { font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; padding: 3px 8px; border-radius: 4px; text-align: center; }
+    .phase-p0 { background: var(--red-100); color: var(--red-700); }
+    .phase-p1 { background: var(--amber-100); color: var(--amber-700); }
+    .phase-p2 { background: var(--blue-100); color: var(--blue-700); }
+    .roadmap-content { font-size: 13px; color: var(--gray-700); padding-top: 2px; }
+    .roadmap-content strong { color: var(--gray-900); }
+    .lifecycle { display: flex; gap: 0; margin: 16px 0; overflow-x: auto; }
+    .lifecycle-step { flex: 1; min-width: 100px; text-align: center; }
+    .lifecycle-step .step-label { font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--gray-500); margin-bottom: 4px; }
+    .lifecycle-step .step-box { background: white; border: 1px solid var(--gray-200); border-radius: 6px; padding: 10px 6px; font-size: 12px; font-weight: 600; color: var(--gray-800); position: relative; }
+    .lifecycle-step .step-box::after { content: '\2192'; position: absolute; right: -12px; top: 50%; transform: translateY(-50%); color: var(--gray-400); font-size: 14px; }
+    .lifecycle-step:last-child .step-box::after { display: none; }
+    .lifecycle-step .step-detail { font-size: 11px; color: var(--gray-500); margin-top: 4px; }
+    .scorecard { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 16px 0 24px; }
+    .score-item { background: white; border: 1px solid var(--gray-200); border-radius: 8px; padding: 16px; text-align: center; }
+    .score-item .score-value { font-family: 'Inter Tight', 'Inter', sans-serif; font-size: 32px; font-weight: 700; line-height: 1; margin-bottom: 6px; }
+    .score-item .score-label { font-size: 12px; color: var(--gray-500); }
+    .score-red { color: var(--red-700); }
+    .score-amber { color: var(--amber-700); }
+    .score-blue { color: var(--blue-700); }
+    .score-green { color: var(--green-700); }
+    ul.plain { padding-left: 18px; }
+    ul.plain li { margin-bottom: 4px; font-size: 13px; color: var(--gray-700); }
+    .divider { border: none; border-top: 1px solid var(--gray-200); margin: 32px 0; }
+  </style>
+</head>
+<body>
+
+<header class="page-header">
+  <div class="kicker">EHI Ignite Challenge &middot; Atlas Agentic Workspaces</div>
+  <h1>User, Session &amp; Security Audit</h1>
+  <div class="subtitle">Current-state analysis &middot; Production readiness recommendations &middot; Demo user architecture</div>
+  <div class="meta">
+    <span><strong>Date:</strong> May 11, 2026</span>
+    <span><strong>Branch:</strong> master (post-consumer-demo-ux merge)</span>
+    <span><strong>Scope:</strong> api/core/auth.py &middot; api/routers/auth.py &middot; app/src/context/AccessContext.tsx &middot; demo + guest infrastructure</span>
+  </div>
+</header>
+
+<div class="layout">
+
+<nav class="sidebar">
+  <div class="nav-group-label">Overview</div>
+  <a href="#executive-summary">Executive Summary</a>
+  <a href="#scorecard">Scorecard</a>
+  <div class="nav-group-label">Current Architecture</div>
+  <a href="#backend-auth">Backend Auth System</a>
+  <a href="#data-model">Data Model</a>
+  <a href="#frontend-sessions">Frontend Sessions</a>
+  <a href="#demo-architecture">Demo Architecture</a>
+  <a href="#guest-architecture">Guest Harmonization</a>
+  <div class="nav-group-label">Security Findings</div>
+  <a href="#critical-findings">Critical Blockers</a>
+  <a href="#important-findings">Important Gaps</a>
+  <a href="#solid-foundations">What's Solid</a>
+  <div class="nav-group-label">Recommendations</div>
+  <a href="#demo-decision">Demo User Decision</a>
+  <a href="#production-roadmap">Production Roadmap</a>
+</nav>
+
+<main class="main">
+
+  <section class="section" id="executive-summary">
+    <h2 class="section-title">Executive Summary</h2>
+    <p>Atlas has a real, purpose-built authentication system &mdash; not a placeholder. Password hashing, HMAC-signed cookies, session lifecycle, audit logging, and demo patient isolation are all correctly implemented. The foundations are strong.</p>
+    <p>However, several production blockers exist that must be resolved before real users with identifiable health data can be onboarded. The most critical are: <strong>no rate limiting on login/signup</strong>, <strong>seven unprotected internal API routers</strong>, and <strong>no email verification</strong>. These are well-understood problems with straightforward fixes &mdash; none require architectural rework.</p>
+    <p>On the demo user question: the current model (demo sessions as <code>user_id=NULL</code> rows in the sessions table) is clean, secure, and appropriate for the current scale. The main practical argument for promoting demo users to first-class accounts is enabling <strong>workspace persistence across visits</strong> and an <strong>upgrade/conversion flow</strong> &mdash; not security. This report recommends deferring that change until the production auth system is fully hardened.</p>
+    <div class="callout callout-info">
+      <div class="icon">i</div>
+      <div class="body">
+        <strong>Synthea data only &mdash; not real PHI</strong>
+        <p>All data currently in the system is algorithmically generated by the Synthea simulator. The privacy stakes are low today. The recommendations in this report are written for the production state where real patient data will be onboarded.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="scorecard">
+    <h2 class="section-title">Production Readiness Scorecard</h2>
+    <div class="scorecard">
+      <div class="score-item"><div class="score-value score-red">6</div><div class="score-label">Critical blockers</div></div>
+      <div class="score-item"><div class="score-value score-amber">7</div><div class="score-label">Important gaps</div></div>
+      <div class="score-item"><div class="score-value score-green">11</div><div class="score-label">Solid foundations</div></div>
+      <div class="score-item"><div class="score-value score-blue">~3 wk</div><div class="score-label">Est. to P0+P1 ready</div></div>
+    </div>
+    <table>
+      <thead><tr><th>Area</th><th>Status</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>Password hashing</td><td><span class="badge badge-good">Solid</span></td><td>scrypt, constant-time compare, random salt</td></tr>
+        <tr><td>Session tokens</td><td><span class="badge badge-good">Solid</span></td><td>HMAC-signed cookies, HttpOnly, sliding expiry</td></tr>
+        <tr><td>Demo isolation</td><td><span class="badge badge-good">Solid</span></td><td>Server-side alias allowlist, no demo&rarr;real data leakage</td></tr>
+        <tr><td>Audit logging</td><td><span class="badge badge-good">Solid</span></td><td>Every auth event and patient access logged to auth.db</td></tr>
+        <tr><td>Rate limiting</td><td><span class="badge badge-critical">Missing</span></td><td>Zero brute-force protection on login/signup</td></tr>
+        <tr><td>Unguarded routers</td><td><span class="badge badge-critical">Missing</span></td><td>7 routers expose data with no session check</td></tr>
+        <tr><td>Email verification</td><td><span class="badge badge-critical">Missing</span></td><td>Any email creates an account immediately</td></tr>
+        <tr><td>Password reset</td><td><span class="badge badge-critical">Missing</span></td><td>No forgot-password flow at all</td></tr>
+        <tr><td>Frontend route guards</td><td><span class="badge badge-warning">Soft only</span></td><td>No hard redirect guards &mdash; backend is the real gate</td></tr>
+        <tr><td>RBAC enforcement</td><td><span class="badge badge-warning">Partial</span></td><td>Roles defined and stored, but not checked at any endpoint</td></tr>
+        <tr><td>Session cleanup</td><td><span class="badge badge-warning">Missing</span></td><td>Expired/revoked sessions accumulate forever in auth.db</td></tr>
+        <tr><td>CSRF protection</td><td><span class="badge badge-warning">Unverified</span></td><td>SameSite=Lax on cookies; no CSRF token in frontend</td></tr>
+        <tr><td>Signup UI</td><td><span class="badge badge-warning">Broken</span></td><td>Backend endpoint live; frontend is a placeholder</td></tr>
+        <tr><td>Chat history on logout</td><td><span class="badge badge-warning">Missing</span></td><td>Caspian conversation history not purged on logout</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <hr class="divider" />
+
+  <section class="section" id="backend-auth">
+    <h2 class="section-title">Backend Auth System</h2>
+    <h3>Key Files</h3>
+    <table>
+      <thead><tr><th>File</th><th>Role</th></tr></thead>
+      <tbody>
+        <tr><td><code>api/core/auth.py</code></td><td>Core engine &mdash; password hashing, session CRUD, demo sessions, patient access control, audit logging, HMAC cookie signing</td></tr>
+        <tr><td><code>api/auth_models.py</code></td><td>Pydantic models &mdash; <code>AuthLoginRequest</code>, <code>AuthSignupRequest</code>, <code>AuthDemoRequest</code>, <code>AuthSessionResponse</code>, <code>AuthRole</code></td></tr>
+        <tr><td><code>api/routers/auth.py</code></td><td>HTTP handlers &mdash; POST /login, /signup, /logout, /demo, /demo/exit, GET /session, POST /select-patient</td></tr>
+        <tr><td><code>api/core/guest_harmonization.py</code></td><td>Separate guest workspace system &mdash; file upload, 24h TTL, own HMAC cookie, own key, not in auth.db</td></tr>
+        <tr><td><code>api/tests/test_auth_api.py</code></td><td>Auth test suite &mdash; login, signup, demo, session persistence, password hashing, duplicate detection</td></tr>
+      </tbody>
+    </table>
+    <h3>User Lifecycle</h3>
+    <div class="lifecycle">
+      <div class="lifecycle-step">
+        <div class="step-label">Signup</div>
+        <div class="step-box">POST /signup</div>
+        <div class="step-detail">email + password + display_name</div>
+      </div>
+      <div class="lifecycle-step">
+        <div class="step-label">Verify</div>
+        <div class="step-box" style="border-color:var(--amber-700);color:var(--amber-700);">Not wired</div>
+        <div class="step-detail">Email verification missing</div>
+      </div>
+      <div class="lifecycle-step">
+        <div class="step-label">Session</div>
+        <div class="step-box">atlas_session</div>
+        <div class="step-detail">HMAC-signed, HttpOnly, SameSite=Lax</div>
+      </div>
+      <div class="lifecycle-step">
+        <div class="step-label">Refresh</div>
+        <div class="step-box">Sliding expiry</div>
+        <div class="step-detail">expires_at extended on every request</div>
+      </div>
+      <div class="lifecycle-step">
+        <div class="step-label">Logout</div>
+        <div class="step-box">POST /logout</div>
+        <div class="step-detail">revoked_at set; cookie cleared</div>
+      </div>
+    </div>
+    <h3>Password Storage</h3>
+    <p>Passwords hashed with <strong>scrypt</strong> (N=16384, r=8, p=1, 16-byte random salt). Format: <code>scrypt$16384$8$1$&lt;b64_salt&gt;$&lt;b64_digest&gt;</code>. Verification uses <code>hmac.compare_digest</code> &mdash; constant-time, no timing oracle.</p>
+    <div class="callout callout-warning">
+      <div class="icon">!</div>
+      <div class="body">
+        <strong>scrypt N=2^14 is below current OWASP recommendations</strong>
+        <p>OWASP recommends N=2^15 (32768) as the minimum for 2024+. Fix: lazy migration &mdash; rehash at higher cost on the next successful login. Not a blocker but should be done before real PHI enters the system.</p>
+      </div>
+    </div>
+    <h3>Bootstrap Account</h3>
+    <p><code>_seed_bootstrap_user()</code> runs at every startup. In development, creates a <code>clinician</code>-role account with a <strong>hardcoded password of "atlas-demo-password"</strong> if <code>EHI_AUTH_BOOTSTRAP_PASSWORD</code> is not set. In production (<code>ENVIRONMENT=prod</code>) seeding is skipped if no env var is set &mdash; but no deployment check verifies the admin account was properly provisioned.</p>
+    <h3>Session Cookie</h3>
+    <p>Cookie: <code>atlas_session = &lt;session_id&gt;.&lt;HMAC-SHA256&gt;</code>. Secret from <code>data/atlas-session.key</code> (auto-generated 32 random bytes) or <code>EHI_SESSION_SECRET</code> env var. Flags: <code>HttpOnly=True</code>, <code>Secure=True</code> in production (env-gated), <code>SameSite=lax</code>, <code>Max-Age=7 days</code>.</p>
+  </section>
+
+  <section class="section" id="data-model">
+    <h2 class="section-title">Data Model</h2>
+    <p>SQLite at <code>data/auth.db</code> (gitignored, created on first startup). Three tables.</p>
+    <h3>users</h3>
+    <table>
+      <thead><tr><th>Column</th><th>Type</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td><code>id</code></td><td>TEXT PK</td><td><code>user_&lt;12-char UUID hex&gt;</code></td></tr>
+        <tr><td><code>email</code></td><td>TEXT UNIQUE NOT NULL</td><td>Normalized to lowercase before storage</td></tr>
+        <tr><td><code>display_name</code></td><td>TEXT NOT NULL</td><td>Whitespace-stripped</td></tr>
+        <tr><td><code>role</code></td><td>TEXT DEFAULT 'clinician'</td><td><code>consumer | clinician | attending | coordinator | admin</code></td></tr>
+        <tr><td><code>password_hash</code></td><td>TEXT NOT NULL</td><td>scrypt format string</td></tr>
+        <tr><td><code>status</code></td><td>TEXT DEFAULT 'active'</td><td>Allows future soft-delete</td></tr>
+        <tr><td><code>created_at</code></td><td>TEXT</td><td>ISO-8601 UTC</td></tr>
+        <tr><td><code>last_login_at</code></td><td>TEXT</td><td>Updated on every successful login</td></tr>
+      </tbody>
+    </table>
+    <h3>sessions</h3>
+    <table>
+      <thead><tr><th>Column</th><th>Type</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td><code>id</code></td><td>TEXT PK</td><td><code>sess_&lt;UUID hex&gt;</code></td></tr>
+        <tr><td><code>mode</code></td><td>TEXT</td><td><code>'demo'</code> or <code>'authenticated'</code></td></tr>
+        <tr><td><code>user_id</code></td><td>TEXT FK&rarr;users</td><td>NULL for demo sessions</td></tr>
+        <tr><td><code>active_patient_id</code></td><td>TEXT</td><td>Demo alias or real Synthea UUID</td></tr>
+        <tr><td><code>active_patient_name</code></td><td>TEXT</td><td>Display name</td></tr>
+        <tr><td><code>created_at / last_seen_at / expires_at / revoked_at</code></td><td>TEXT</td><td>ISO-8601 UTC timestamps; sliding expiry window</td></tr>
+        <tr><td><code>user_agent</code></td><td>TEXT</td><td>Truncated to 255 chars</td></tr>
+        <tr><td><code>ip_address_hash</code></td><td>TEXT</td><td>SHA-256 of client IP &mdash; one-way, no raw IP stored</td></tr>
+      </tbody>
+    </table>
+    <h3>audit_events</h3>
+    <table>
+      <thead><tr><th>Column</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td><code>id, created_at, session_id, user_id, mode, patient_id</code></td><td>Standard metadata fields</td></tr>
+        <tr><td><code>event_type</code></td><td><code>session.created</code> &middot; <code>auth.login_succeeded</code> &middot; <code>auth.login_failed</code> &middot; <code>auth.signup_succeeded</code> &middot; <code>auth.demo_entered</code> &middot; <code>auth.logout</code> &middot; <code>patient.selected</code> &middot; <code>patient.accessed</code></td></tr>
+        <tr><td><code>payload_json</code></td><td>Arbitrary JSON blob per event type</td></tr>
+      </tbody>
+    </table>
+    <div class="callout callout-warning">
+      <div class="icon">!</div>
+      <div class="body">
+        <strong>No multi-tenant data isolation</strong>
+        <p>Any authenticated user can read any Synthea file if they know the UUID. Any authenticated user can access any upload workspace collection. Must be addressed before onboarding multiple real organizations.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="frontend-sessions">
+    <h2 class="section-title">Frontend Session Handling</h2>
+    <h3>Architecture</h3>
+    <p>All auth state lives in <code>AccessContext</code> (<code>app/src/context/AccessContext.tsx</code>) &mdash; single source of truth for mode, user identity, active patient, and all mutations. In production, <strong>no auth data is written to localStorage</strong>. The session is entirely server-side (HTTP-only cookie). The frontend re-hydrates by calling <code>GET /api/auth/session</code> on mount.</p>
+    <h3>Key Files</h3>
+    <table>
+      <thead><tr><th>File</th><th>Role</th></tr></thead>
+      <tbody>
+        <tr><td><code>app/src/context/AccessContext.tsx</code></td><td>Central auth state machine &mdash; <code>signIn()</code>, <code>enterDemoPatient()</code>, <code>clearAccess()</code></td></tr>
+        <tr><td><code>app/src/api/client.ts</code></td><td>Axios instance with <code>withCredentials: true</code>; all auth API calls; <code>getOrDemoFallback()</code> for graceful demo degradation</td></tr>
+        <tr><td><code>app/src/types/index.ts</code></td><td><code>AuthMode</code>, <code>AuthUser</code>, <code>AuthSessionResponse</code>, <code>DemoPatientOption</code></td></tr>
+        <tr><td><code>app/src/pages/AccountAccess.tsx</code></td><td>Login/signup UI at <code>/account</code></td></tr>
+        <tr><td><code>app/src/demoCatalog.ts</code></td><td>Hardcoded demo patient IDs and display metadata</td></tr>
+        <tr><td><code>app/src/routing.ts</code></td><td>Route helpers incl. open-redirect guard for demo destination param</td></tr>
+      </tbody>
+    </table>
+    <h3>Route Protection</h3>
+    <p>Protection is <strong>soft at the frontend layer</strong>. <code>AppShellRoute</code> strips <code>?patient=</code> params from clinical routes when the session is anonymous, but the page still renders. There is no <code>&lt;RequireAuth&gt;</code> that redirects unauthenticated users. Security relies entirely on the backend.</p>
+    <table>
+      <thead><tr><th>Route</th><th>Guard</th></tr></thead>
+      <tbody>
+        <tr><td><code>/</code>, <code>/demo</code>, <code>/account</code>, <code>/guest-harmonization</code></td><td>No guard &mdash; public</td></tr>
+        <tr><td><code>/using-atlas/*</code>, <code>/learn/*</code></td><td>No guard &mdash; fully public</td></tr>
+        <tr><td><code>/patient-record/*</code>, <code>/fhir-charts/*</code>, <code>/caspian</code>, <code>/workspaces/*</code></td><td>Soft: <code>?patient=</code> stripped if anonymous; page renders empty</td></tr>
+      </tbody>
+    </table>
+    <h3>LocalStorage (non-auth)</h3>
+    <ul class="plain">
+      <li><code>atlas:workspaceId</code> &mdash; last active workspace tab</li>
+      <li><code>atlas:caspian:assistant:{patientId}:{sessionId}</code> &mdash; Caspian AI chat history (persists after logout)</li>
+      <li><code>ehi-agent-settings</code>, <code>ehi-provider-assistant-context-packages</code> &mdash; assistant preferences</li>
+    </ul>
+    <div class="callout callout-warning">
+      <div class="icon">!</div>
+      <div class="body">
+        <strong>Chat history persists across logouts</strong>
+        <p><code>clearAccess()</code> does not purge any localStorage keys. Caspian conversation history &mdash; including clinical AI reasoning about specific patients &mdash; is readable by the next person who uses the same browser.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="demo-architecture">
+    <h2 class="section-title">Demo Session Architecture</h2>
+    <p>Demo mode is a <strong>first-class session mode</strong>, not a separate deployment. It creates a real row in the <code>sessions</code> table with <code>mode="demo"</code> and <code>user_id=NULL</code>. The cookie is identical to an authenticated session.</p>
+    <h3>How It Works</h3>
+    <ol style="padding-left:18px; font-size:13px; color:var(--gray-700);">
+      <li style="margin-bottom:6px">Visitor calls <code>POST /api/auth/demo { patient_id: "demo-high-risk" }</code></li>
+      <li style="margin-bottom:6px">Backend validates alias against hardcoded <code>DEMO_PATIENTS</code> allowlist; invalid IDs get HTTP 403</li>
+      <li style="margin-bottom:6px">Session row created with <code>user_id=NULL</code>; <code>atlas_session</code> cookie set</li>
+      <li style="margin-bottom:6px">On every patient data request, <code>authorize_patient_access()</code> checks <code>session.is_demo</code> and resolves alias to real Synthea UUID</li>
+      <li style="margin-bottom:6px">Patient list returns only the 3 demo aliases; full corpus is never surfaced</li>
+    </ol>
+    <h3>Demo Patients</h3>
+    <table>
+      <thead><tr><th>Alias</th><th>Display Purpose</th><th>Target Synthea UUID</th></tr></thead>
+      <tbody>
+        <tr><td><code>demo-high-risk</code></td><td>Pre-op chart &mdash; complex comorbidities</td><td><code>81e1b4cb-6817-4bdc-97cd-c1f3ac960345</code></td></tr>
+        <tr><td><code>demo-trial-match</code></td><td>Trial Finder plugin demo</td><td><code>8143897c-...</code></td></tr>
+        <tr><td><code>demo-med-access</code></td><td>Med Access plugin demo</td><td><code>eec393be-...</code></td></tr>
+      </tbody>
+    </table>
+    <div class="callout callout-good">
+      <div class="icon">&#10003;</div>
+      <div class="body">
+        <strong>Demo isolation is correctly enforced</strong>
+        <p>The alias resolution is a hard server-side gate. A demo session cannot reach any non-demo patient regardless of what patient ID a client sends. The guard is a one-line chokepoint that must not be accidentally deleted &mdash; there is no defense in depth below it.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="guest-architecture">
+    <h2 class="section-title">Guest Harmonization (Separate System)</h2>
+    <p>Entirely separate from the demo session system. Anonymous file-upload workflow &mdash; no account, no row in auth.db.</p>
+    <table>
+      <thead><tr><th></th><th>Demo Sessions</th><th>Guest Harmonization</th></tr></thead>
+      <tbody>
+        <tr><td>Auth DB</td><td>Yes &mdash; sessions table</td><td>No &mdash; filesystem only</td></tr>
+        <tr><td>Cookie</td><td><code>atlas_session</code></td><td><code>atlas_guest_harmonization</code> (separate HMAC key)</td></tr>
+        <tr><td>Identity</td><td><code>session_id</code></td><td>List of <code>run_id</code>s in cookie</td></tr>
+        <tr><td>Data location</td><td>Synthea corpus</td><td><code>data/guest-harmonization/&lt;run_id&gt;/</code></td></tr>
+        <tr><td>TTL</td><td>7 days (sliding)</td><td>24 hours (hard), cleanup on next run creation</td></tr>
+        <tr><td>Limits</td><td>3 demo patients only</td><td>10 MB/file, 20 run IDs in cookie</td></tr>
+        <tr><td>File content</td><td>Synthea synthetic data</td><td>User-uploaded &mdash; <strong>may contain real PHI</strong></td></tr>
+      </tbody>
+    </table>
+    <div class="callout callout-critical">
+      <div class="icon">&#9649;</div>
+      <div class="body">
+        <strong>Guest uploads may contain real PHI and are stored in plaintext</strong>
+        <p>Files are stored unencrypted at <code>data/guest-harmonization/</code>. The 24-hour TTL limits exposure window but does not protect against server compromise. Encryption at rest required before this feature is promoted.</p>
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <section class="section" id="critical-findings">
+    <h2 class="section-title">Critical Findings &mdash; Production Blockers</h2>
+    <p>These must be resolved before real users with identifiable health data are onboarded.</p>
+    <div class="findings-list">
+
+      <div class="finding">
+        <div class="finding-header">
+          <div class="finding-number critical">C1</div>
+          <div>
+            <div class="finding-title">No rate limiting on authentication endpoints</div>
+            <div class="finding-meta">api/routers/auth.py &middot; POST /login, /signup, /demo</div>
+          </div>
+          <span class="badge badge-critical" style="margin-left:auto;flex-shrink:0">Critical</span>
+        </div>
+        <div class="finding-body">Zero brute-force protection. An attacker can send unlimited login attempts to enumerate valid emails and crack passwords. Fix: add <code>slowapi</code> or a Redis-backed counter &mdash; 5 attempts per email per 15 minutes, exponential backoff, lockout with <code>Retry-After</code> header.</div>
+      </div>
+
+      <div class="finding">
+        <div class="finding-header">
+          <div class="finding-number critical">C2</div>
+          <div>
+            <div class="finding-title">Seven API routers have no authentication check</div>
+            <div class="finding-meta">api/routers/corpus.py &middot; harmonize.py &middot; classifications.py &middot; pipeline_lab.py &middot; ground_truth_review.py &middot; ccda.py &middot; and others</div>
+          </div>
+          <span class="badge badge-critical" style="margin-left:auto;flex-shrink:0">Critical</span>
+        </div>
+        <div class="finding-body">
+          Unprotected routes include: <code>/api/corpus/*</code> (full CSV/ZIP export of all patient data), <code>/api/harmonize/*</code> (all harmonization collections), <code>/api/classifications/*</code> (raw FHIR by patient ID), <code>/api/pipeline-lab/*</code>, <code>/api/ground-truth-review/*</code>, <code>/api/internal/ccda-lab/*</code>.
+          Fix: add <code>require_authenticated_session</code> to all. For internal routes, consider restricting via nginx to the internal network only.
+        </div>
+      </div>
+
+      <div class="finding">
+        <div class="finding-header">
+          <div class="finding-number critical">C3</div>
+          <div>
+            <div class="finding-title">No email verification before PHI access</div>
+            <div class="finding-meta">api/core/auth.py &middot; signup flow</div>
+          </div>
+          <span class="badge badge-critical" style="margin-left:auto;flex-shrink:0">Critical</span>
+        </div>
+        <div class="finding-body">Any email address creates a fully active account immediately; a session is returned with the signup response. Fix: add <code>status='pending_verification'</code>, a time-limited HMAC-signed email token, and gate patient data access on <code>status='active'</code> only.</div>
+      </div>
+
+      <div class="finding">
+        <div class="finding-header">
+          <div class="finding-number critical">C4</div>
+          <div>
+            <div class="finding-title">No password reset flow</div>
+            <div class="finding-meta">api/routers/auth.py &mdash; endpoint missing entirely</div>
+          </div>
+          <span class="badge badge-critical" style="margin-left:auto;flex-shrink:0">Critical</span>
+        </div>
+        <div class="finding-body">A locked-out user cannot recover access without direct database manipulation. Fix: <code>POST /api/auth/forgot-password</code> (sends time-limited HMAC token to verified email) + <code>POST /api/auth/reset-password</code> (validates token, sets new hash, invalidates all sessions). Token must be single-use.</div>
+      </div>
+
+      <div class="finding">
+        <div class="finding-header">
+          <div class="finding-number critical">C5</div>
+          <div>
+            <div class="finding-title">Bootstrap account ships with a hardcoded known password</div>
+            <div class="finding-meta">api/core/auth.py &middot; _seed_bootstrap_user()</div>
+          </div>
+          <span class="badge badge-critical" style="margin-left:auto;flex-shrink:0">Critical</span>
+        </div>
+        <div class="finding-body">When <code>EHI_AUTH_BOOTSTRAP_PASSWORD</code> is not set, the bootstrap account is created with password <code>"atlas-demo-password"</code>. Fix: remove the fallback default entirely. Add a startup assertion that fails loudly if <code>ENVIRONMENT=production</code> and the bootstrap password env var is not set.</div>
+      </div>
+
+      <div class="finding">
+        <div class="finding-header">
+          <div class="finding-number critical">C6</div>
+          <div>
+            <div class="finding-title">Guest harmonization files stored in plaintext</div>
+            <div class="finding-meta">api/core/guest_harmonization.py &middot; data/guest-harmonization/</div>
+          </div>
+          <span class="badge badge-critical" style="margin-left:auto;flex-shrink:0">Critical</span>
+        </div>
+        <div class="finding-body">User-uploaded health records (which may contain real PHI) are written to disk without encryption. Fix: encrypt files at rest using a per-run AES-GCM key derived from the run ID, or enable filesystem-level encryption on the Hetzner data volume.</div>
+      </div>
+
+    </div>
+  </section>
+
+  <section class="section" id="important-findings">
+    <h2 class="section-title">Important Gaps &mdash; Pre-Production Hardening</h2>
+    <div class="findings-list">
+
+      <div class="finding">
+        <div class="finding-header">
+          <div class="finding-number warning">I1</div>
+          <div>
+            <div class="finding-title">Session table grows unboundedly &mdash; no cleanup job</div>
+            <div class="finding-meta">api/core/auth.py &middot; data/auth.db sessions table</div>
+          </div>
+          <span class="badge badge-warning" style="margin-left:auto;flex-shrink:0">Important</span>
+        </div>
+        <div class="finding-body">Expired and revoked sessions are marked but never deleted. Add a background task: <code>DELETE FROM sessions WHERE revoked_at IS NOT NULL OR expires_at &lt; datetime('now', '-30 days')</code>. Also define a data retention policy for audit events.</div>
+      </div>
+
+      <div class="finding">
+        <div class="finding-header">
+          <div class="finding-number warning">I2</div>
+          <div>
+            <div class="finding-title">Role-based access control defined but never enforced</div>
+            <div class="finding-meta">api/auth_models.py &middot; AuthRole enum &middot; all routers</div>
+          </div>
+          <span class="badge badge-warning" style="margin-left:auto;flex-shrink:0">Important</span>
+        </div>
+        <div class="finding-body">Five roles exist (<code>consumer</code>, <code>clinician</code>, <code>attending</code>, <code>coordinator</code>, <code>admin</code>) and are stored correctly. No endpoint checks the role. A <code>consumer</code> has identical access to an <code>admin</code>. Define the access matrix and add a <code>require_role()</code> FastAPI dependency.</div>
+      </div>
+
+      <div class="finding">
+        <div class="finding-header">
+          <div class="finding-number warning">I3</div>
+          <div>
+            <div class="finding-title">Signup UI is a placeholder &mdash; backend endpoint is live</div>
+            <div class="finding-meta">app/src/pages/AccountAccess.tsx &middot; api/routers/auth.py POST /signup</div>
+          </div>
+          <span class="badge badge-warning" style="margin-left:auto;flex-shrink:0">Important</span>
+        </div>
+        <div class="finding-body">The frontend shows "Public account creation is not wired to the backend in this release." The backend <code>POST /api/auth/signup</code> endpoint is fully functional. Either wire the UI or add a feature-flag gate on the backend endpoint. The current mismatch is ambiguous.</div>
+      </div>
+
+      <div class="finding">
+        <div class="finding-header">
+          <div class="finding-number warning">I4</div>
+          <div>
+            <div class="finding-title">Chat history not cleared on logout</div>
+            <div class="finding-meta">app/src/context/AccessContext.tsx &middot; clearAccess()</div>
+          </div>
+          <span class="badge badge-warning" style="margin-left:auto;flex-shrink:0">Important</span>
+        </div>
+        <div class="finding-body">Caspian AI conversation history (<code>atlas:caspian:assistant:{patientId}:{sessionId}</code>) persists in localStorage after logout. On a shared device the next user can read prior clinical conversations. <code>clearAccess()</code> should purge all <code>atlas:caspian:*</code> and <code>ehi-provider-assistant-*</code> keys.</div>
+      </div>
+
+      <div class="finding">
+        <div class="finding-header">
+          <div class="finding-number warning">I5</div>
+          <div>
+            <div class="finding-title">No session expiry detection in the frontend</div>
+            <div class="finding-meta">app/src/context/AccessContext.tsx</div>
+          </div>
+          <span class="badge badge-warning" style="margin-left:auto;flex-shrink:0">Important</span>
+        </div>
+        <div class="finding-body">The <code>expiresAt</code> field is stored in <code>AccessState</code> but nothing checks it. When a session expires mid-use, API calls silently fail until the user manually refreshes. Fix: Axios response interceptor that catches 401s and calls <code>refreshSession()</code> or redirects to <code>/account</code>.</div>
+      </div>
+
+      <div class="finding">
+        <div class="finding-header">
+          <div class="finding-number warning">I6</div>
+          <div>
+            <div class="finding-title">No hard frontend route protection</div>
+            <div class="finding-meta">app/src/App.tsx &middot; AppShellRoute</div>
+          </div>
+          <span class="badge badge-warning" style="margin-left:auto;flex-shrink:0">Important</span>
+        </div>
+        <div class="finding-body">Unauthenticated users navigating directly to <code>/patient-record</code> or <code>/caspian</code> are not redirected &mdash; the page renders with empty data. Security relies entirely on the backend. A <code>&lt;RequireAuth&gt;</code> wrapper improves UX and defense-in-depth. Low urgency if backend gates are solid.</div>
+      </div>
+
+      <div class="finding">
+        <div class="finding-header">
+          <div class="finding-number warning">I7</div>
+          <div>
+            <div class="finding-title">Missing security response headers</div>
+            <div class="finding-meta">deploy/nginx-app.conf &middot; deploy/nginx-host.conf &middot; api/main.py</div>
+          </div>
+          <span class="badge badge-warning" style="margin-left:auto;flex-shrink:0">Important</span>
+        </div>
+        <div class="finding-body">Neither nginx nor FastAPI middleware adds <code>Content-Security-Policy</code>, <code>X-Content-Type-Options: nosniff</code>, or <code>X-Frame-Options: DENY</code>. Add these to the nginx host config before public launch. A restrictive CSP is especially important for a clinical app.</div>
+      </div>
+
+    </div>
+  </section>
+
+  <section class="section" id="solid-foundations">
+    <h2 class="section-title">What's Solid</h2>
+    <div class="callout callout-good">
+      <div class="icon">&#10003;</div>
+      <div class="body">
+        <strong>11 security fundamentals correctly implemented</strong>
+        <p>The auth system was designed with production in mind. The gaps above are gaps, not flaws in the foundation.</p>
+      </div>
+    </div>
+    <table>
+      <thead><tr><th>Item</th><th>Detail</th></tr></thead>
+      <tbody>
+        <tr><td>scrypt password hashing</td><td>N=16384, 16-byte random salt per password, stored as formatted string</td></tr>
+        <tr><td>Constant-time verification</td><td><code>hmac.compare_digest</code> prevents timing oracle attacks</td></tr>
+        <tr><td>HMAC-signed session cookies</td><td>Session ID forgery requires the server secret; signature validated before any DB hit</td></tr>
+        <tr><td>HttpOnly cookies</td><td>Session tokens inaccessible to JavaScript &mdash; XSS cannot steal them</td></tr>
+        <tr><td>No raw IP logging</td><td>Client IPs are SHA-256 hashed before storage</td></tr>
+        <tr><td>Email normalization</td><td>Lowercase normalization before duplicate check prevents case-variant bypass</td></tr>
+        <tr><td>Demo patient isolation</td><td>Server-side alias allowlist; demo sessions cannot access any non-demo patient</td></tr>
+        <tr><td>Full audit trail</td><td>Every login, logout, signup, demo entry, and patient access logged to <code>audit_events</code></td></tr>
+        <tr><td>Docs disabled in production</td><td><code>docs_url=None</code>, <code>redoc_url=None</code> when <code>ENVIRONMENT=production</code></td></tr>
+        <tr><td>CORS + TrustedHost middleware</td><td>Explicit allowlists, not wildcards</td></tr>
+        <tr><td>Open-redirect protection</td><td><code>resolveDemoDestination()</code> rejects non-relative URLs in demo destination param</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <hr class="divider" />
+
+  <section class="section" id="demo-decision">
+    <h2 class="section-title">Demo User Architecture &mdash; Decision Analysis</h2>
+    <p>Should demo users be modeled as first-class accounts with <code>role="demo"</code> rather than the current <code>user_id=NULL</code> session model?</p>
+    <div class="option-grid">
+      <div class="option-card recommended">
+        <h4>Option A: Keep demo as a separate mode <span class="rec-pill">Recommended for now</span></h4>
+        <p style="font-size:12px;color:var(--gray-600);margin-bottom:8px">Status quo &mdash; <code>user_id=NULL</code> sessions, <code>mode="demo"</code></p>
+        <strong style="font-size:12px;color:var(--green-700)">Pros</strong>
+        <ul style="margin-bottom:10px">
+          <li>Zero friction &mdash; two clicks to a chart, no email required</li>
+          <li>No user table garbage accumulation</li>
+          <li>Hard, simple security boundary (alias allowlist)</li>
+          <li>No per-user state to clean up on bounce</li>
+          <li>Audit trail still works (events written with null user_id)</li>
+        </ul>
+        <strong style="font-size:12px;color:var(--red-700)">Cons</strong>
+        <ul>
+          <li>No workspace persistence across visits</li>
+          <li>No upgrade path from demo &rarr; real account</li>
+          <li>Mode check scattered across routers (manual consistency)</li>
+        </ul>
+      </div>
+      <div class="option-card">
+        <h4>Option B: Demo users as first-class accounts (<code>role="demo"</code>)</h4>
+        <p style="font-size:12px;color:var(--gray-600);margin-bottom:8px">Auto-create a user row on demo entry; promote on signup</p>
+        <strong style="font-size:12px;color:var(--green-700)">Pros</strong>
+        <ul style="margin-bottom:10px">
+          <li>Workspace state persists across visits</li>
+          <li>Clean upgrade path: <code>POST /auth/claim-demo</code></li>
+          <li>Role-based gate replaces mode-based gate (cleaner long-term)</li>
+          <li>Stable <code>user_id</code> enables cross-visit analytics</li>
+        </ul>
+        <strong style="font-size:12px;color:var(--red-700)">Cons</strong>
+        <ul>
+          <li>User table accumulates throwaway rows</li>
+          <li>Requires background cleanup job for expired demo accounts</li>
+          <li>Patient access restriction still needs same enforcement logic</li>
+          <li>Adds complexity before production auth system is hardened</li>
+        </ul>
+      </div>
+    </div>
+    <div class="callout callout-info">
+      <div class="icon">&#8594;</div>
+      <div class="body">
+        <strong>Recommendation: Defer Option B until production auth is hardened</strong>
+        <p>The current demo model is clean and correctly implemented. The benefits of Option B (workspace persistence, upgrade path) are real but not urgent for Phase 1. The production auth blockers are higher priority. Revisit this when the Phase 2 "consumer account" story is designed.</p>
+      </div>
+    </div>
+    <h3>If You Do Move to Option B &mdash; Minimal Change Set</h3>
+    <table>
+      <thead><tr><th>Component</th><th>Change</th></tr></thead>
+      <tbody>
+        <tr><td><code>auth.py begin_demo_session()</code></td><td>Create a <code>users</code> row with <code>role="demo"</code>, then create a normal <code>mode="authenticated"</code> session against it</td></tr>
+        <tr><td><code>auth.py authorize_patient_access()</code></td><td>Swap <code>if session.is_demo</code> for <code>if principal.role == "demo"</code>; alias resolution logic unchanged</td></tr>
+        <tr><td>All routers using <code>is_demo</code></td><td>Mechanical substitution of <code>principal.role == "demo"</code></td></tr>
+        <tr><td>Users table</td><td>Add <code>demo_expires_at</code> column; background cleanup job</td></tr>
+        <tr><td>New endpoint</td><td><code>POST /api/auth/claim-demo</code> &mdash; takes email + password, updates demo user row to <code>role="consumer"</code>, returns new session</td></tr>
+        <tr><td><code>AccessContext.tsx</code></td><td>Derive <code>isDemo</code> from <code>user.role === "demo"</code> instead of <code>mode === "demo"</code></td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="section" id="production-roadmap">
+    <h2 class="section-title">Production Readiness Roadmap</h2>
+
+    <h3>Phase 0 &mdash; Before any real user data enters the system</h3>
+    <div class="roadmap">
+      <div class="roadmap-item">
+        <div class="roadmap-phase phase-p0">P0</div>
+        <div class="roadmap-content"><strong>Rate limiting</strong> &mdash; add slowapi to POST /login, /signup, /demo. 5 attempts/email/15 min, exponential backoff. ~2h.</div>
+      </div>
+      <div class="roadmap-item">
+        <div class="roadmap-phase phase-p0">P0</div>
+        <div class="roadmap-content"><strong>Protect unguarded routers</strong> &mdash; add <code>require_authenticated_session</code> to corpus, harmonize, classifications, pipeline-lab, ground-truth-review, ccda-lab. Or restrict via nginx to internal network. ~3h.</div>
+      </div>
+      <div class="roadmap-item">
+        <div class="roadmap-phase phase-p0">P0</div>
+        <div class="roadmap-content"><strong>Remove hardcoded bootstrap password fallback</strong> &mdash; delete <code>"atlas-demo-password"</code> default. Add startup assertion when <code>ENVIRONMENT=production</code>. ~30m.</div>
+      </div>
+      <div class="roadmap-item">
+        <div class="roadmap-phase phase-p0">P0</div>
+        <div class="roadmap-content"><strong>Guest upload encryption at rest</strong> &mdash; AES-GCM per-run key for <code>data/guest-harmonization/</code> files, or enable filesystem-level encryption on the Hetzner data volume. ~1d.</div>
+      </div>
+    </div>
+
+    <h3 style="margin-top:24px">Phase 1 &mdash; Before general account creation</h3>
+    <div class="roadmap">
+      <div class="roadmap-item">
+        <div class="roadmap-phase phase-p1">P1</div>
+        <div class="roadmap-content"><strong>Email verification</strong> &mdash; <code>status='pending_verification'</code> state, HMAC token via email, gate patient access on verified status. Requires email sender decision (SES / Postmark / Resend). ~1d.</div>
+      </div>
+      <div class="roadmap-item">
+        <div class="roadmap-phase phase-p1">P1</div>
+        <div class="roadmap-content"><strong>Password reset flow</strong> &mdash; POST /forgot-password + POST /reset-password, single-use HMAC token, invalidate all sessions. ~1d.</div>
+      </div>
+      <div class="roadmap-item">
+        <div class="roadmap-phase phase-p1">P1</div>
+        <div class="roadmap-content"><strong>Wire signup UI or kill the backend endpoint</strong> &mdash; AccountAccess.tsx placeholder must match backend reality. ~2h either way.</div>
+      </div>
+      <div class="roadmap-item">
+        <div class="roadmap-phase phase-p1">P1</div>
+        <div class="roadmap-content"><strong>Clear localStorage on logout</strong> &mdash; purge <code>atlas:caspian:*</code> and agent settings keys in <code>clearAccess()</code>. ~30m.</div>
+      </div>
+      <div class="roadmap-item">
+        <div class="roadmap-phase phase-p1">P1</div>
+        <div class="roadmap-content"><strong>Session expiry detection</strong> &mdash; Axios 401 interceptor &rarr; <code>refreshSession()</code> or redirect to /account. ~2h.</div>
+      </div>
+      <div class="roadmap-item">
+        <div class="roadmap-phase phase-p1">P1</div>
+        <div class="roadmap-content"><strong>Security response headers</strong> &mdash; add CSP, X-Content-Type-Options, X-Frame-Options to nginx host config. ~1h.</div>
+      </div>
+    </div>
+
+    <h3 style="margin-top:24px">Phase 2 &mdash; Before multi-tenant / multi-org use</h3>
+    <div class="roadmap">
+      <div class="roadmap-item">
+        <div class="roadmap-phase phase-p2">P2</div>
+        <div class="roadmap-content"><strong>RBAC enforcement</strong> &mdash; define access matrix per role; implement <code>require_role()</code> FastAPI dependency; scope data access by organization/user. ~2&ndash;3d.</div>
+      </div>
+      <div class="roadmap-item">
+        <div class="roadmap-phase phase-p2">P2</div>
+        <div class="roadmap-content"><strong>Session table cleanup</strong> &mdash; background APScheduler task deleting revoked + expired sessions past retention period. ~2h.</div>
+      </div>
+      <div class="roadmap-item">
+        <div class="roadmap-phase phase-p2">P2</div>
+        <div class="roadmap-content"><strong>Upgrade scrypt N to 2^15</strong> &mdash; rehash at higher cost on successful login (lazy migration). ~3h.</div>
+      </div>
+      <div class="roadmap-item">
+        <div class="roadmap-phase phase-p2">P2</div>
+        <div class="roadmap-content"><strong>Multi-tenant patient isolation</strong> &mdash; bind upload workspaces to a user/org owner; prevent cross-user collection access. ~1&ndash;2d.</div>
+      </div>
+      <div class="roadmap-item">
+        <div class="roadmap-phase phase-p2">P2</div>
+        <div class="roadmap-content"><strong>Demo user upgrade path</strong> (if Option B chosen) &mdash; <code>POST /auth/claim-demo</code> + demo account expiry + cross-visit analytics. ~1d.</div>
+      </div>
+    </div>
+
+    <div class="callout callout-info" style="margin-top:24px">
+      <div class="icon">i</div>
+      <div class="body">
+        <strong>Timeline: ~3 weeks to P0+P1 complete</strong>
+        <p>P0 items are 1-day fixes (less than a week total). P1 items require an email-sending infrastructure decision (SES, Postmark, Resend, or SMTP relay) &mdash; factor that in before starting. P2 is a separate multi-week effort aligned with Phase 2 of the competition.</p>
+      </div>
+    </div>
+  </section>
+
+</main>
+</div>
+</body>
+</html>

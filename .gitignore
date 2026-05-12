@@ -23,6 +23,15 @@ __pycache__/
 *.pyc
 data/traces.db
 data/traces.db-*
+
+# Generated per-episode narrative Compositions (regenerated on publish).
+# The curated `episodes.json` per patient is tracked; the generated
+# current.json + history/ live alongside but are not.
+data/narratives/*/*/current.json
+data/narratives/*/*/history/
+
+# Patient-voice classifier cache (regenerable).
+data/.cache/patient-voice/
 data/atlas-signing.key
 data/atlas-session.key
 data/atlas-guest-harmonization.key

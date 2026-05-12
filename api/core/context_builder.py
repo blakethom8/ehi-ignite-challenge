@@ -39,6 +39,33 @@ from api.core.sof_tools import DEFAULT_SOF_DB
 # ---------------------------------------------------------------------------
 
 @dataclass
+class PatientVoiceContext:
+    """Brief first-person summary of patient-reported facts (T8a)."""
+    summary: str
+    citations: list[str] = field(default_factory=list)
+
+
+@dataclass
+class EpisodeBrief:
+    """One-line summary of an EpisodeOfCare narrative (T8b)."""
+    episode_id: str
+    type: str
+    period_start: str
+    period_end: str | None
+    one_liner: str
+
+
+@dataclass
+class HarmonizationCaveat:
+    """Structured LLM-adjudicated conflict (T7) for UI surfacing."""
+    fact_path: str
+    verdict: str
+    confidence: str
+    rationale: str
+    dissenting_sources: list[str] = field(default_factory=list)
+
+
+@dataclass
 class ClinicalContext:
     """The assembled clinical context ready for LLM consumption."""
     patient_summary: str          # one-line patient summary
@@ -54,6 +81,12 @@ class ClinicalContext:
     resolved_conditions: list[str]  # compressed resolved conditions
     absences: list[str]           # explicitly declared absences
 
+    # T8a/T8b/T7 — LLM-augmented context fields. All read from disk in
+    # `build_clinical_context`; never (re-)computed on the request path.
+    patient_voice: PatientVoiceContext | None = None
+    episode_briefs: list[EpisodeBrief] = field(default_factory=list)
+    caveats: list[HarmonizationCaveat] = field(default_factory=list)
+
     # Metadata
     total_tokens_estimate: int = 0
     fact_count: int = 0
@@ -63,6 +96,31 @@ class ClinicalContext:
         sections: list[str] = []
 
         sections.append(f"# Patient: {self.patient_summary}\n")
+
+        # T8c: lead with the patient's own words so the clinician (and
+        # the LLM) reasons about the patient as a person, not just a
+        # set of structured rows. The plan §6 demo arc relies on this
+        # being the first sentence of Caspian's system prompt.
+        if self.patient_voice and self.patient_voice.summary:
+            sections.append(f"In the patient's own words: {self.patient_voice.summary}\n")
+
+        if self.episode_briefs:
+            sections.append("## CARE EPISODES")
+            for brief in self.episode_briefs:
+                period = brief.period_start
+                if brief.period_end:
+                    period = f"{brief.period_start} → {brief.period_end}"
+                sections.append(f"- **{brief.type}** ({period}): {brief.one_liner}")
+            sections.append("")
+
+        if self.caveats:
+            sections.append("## OPEN CONFLICTS (LLM-adjudicated; clinician review pending)")
+            for c in self.caveats:
+                sections.append(
+                    f"- `{c.fact_path}` → verdict: **{c.verdict}** "
+                    f"({c.confidence} confidence). {c.rationale}"
+                )
+            sections.append("")
 
         if self.safety_flags:
             sections.append("## SAFETY FLAGS (Action Required)")
@@ -684,6 +742,12 @@ def build_clinical_context(patient_id: str) -> ClinicalContext:
         for allergy in record.allergies[:5]:
             safety_flags.append(f"- ⚠️ **Allergy**: {allergy.code.label()} (criticality: {allergy.criticality or 'unknown'})")
 
+    # T8b: read LLM-augmented context from disk. Generation happens at
+    # publish/intake time (D8); the request path is purely a disk read.
+    patient_voice_ctx = _load_patient_voice_context(patient_id)
+    episode_briefs = _load_episode_briefs(patient_id)
+    caveats = _load_caveats(patient_id)
+
     return ClinicalContext(
         patient_summary=patient_summary,
         safety_flags=safety_flags,
@@ -697,4 +761,115 @@ def build_clinical_context(patient_id: str) -> ClinicalContext:
         historical_meds=historical_meds,
         resolved_conditions=resolved_conditions,
         absences=absences,
+        patient_voice=patient_voice_ctx,
+        episode_briefs=episode_briefs,
+        caveats=caveats,
     )
+
+
+# ---------------------------------------------------------------------------
+# T8b loaders — disk reads, no LLM
+# ---------------------------------------------------------------------------
+
+
+def _load_patient_voice_context(patient_id: str) -> PatientVoiceContext | None:
+    """Read the cached PatientVoiceSummary if present."""
+    try:
+        from lib.patient_voice import load_summary
+    except ImportError:
+        return None
+    summary = load_summary(patient_id)
+    if summary is None or not summary.summary:
+        return None
+    return PatientVoiceContext(summary=summary.summary, citations=list(summary.citations))
+
+
+def _load_episode_briefs(patient_id: str) -> list[EpisodeBrief]:
+    """Read episode metadata + each episode's Composition summary section."""
+    import json as _json
+
+    episodes_path = _REPO_ROOT / "data" / "narratives" / patient_id / "episodes.json"
+    if not episodes_path.exists():
+        return []
+    try:
+        bundle = _json.loads(episodes_path.read_text(encoding="utf-8"))
+    except (OSError, _json.JSONDecodeError):
+        return []
+    briefs: list[EpisodeBrief] = []
+    for entry in bundle.get("entry") or []:
+        episode = (entry or {}).get("resource") or {}
+        if episode.get("resourceType") != "EpisodeOfCare":
+            continue
+        ep_id = str(episode.get("id") or "")
+        slug = ep_id[len("episode-"):] if ep_id.startswith("episode-") else ep_id
+        type_arr = episode.get("type") or []
+        type_text = (
+            (type_arr[0] or {}).get("text")
+            or (((type_arr[0] or {}).get("coding") or [{}])[0]).get("display")
+            or "(unspecified)"
+        ) if type_arr else "(unspecified)"
+        period = episode.get("period") or {}
+        one_liner = _read_summary_section(patient_id, slug)
+        briefs.append(
+            EpisodeBrief(
+                episode_id=ep_id,
+                type=type_text,
+                period_start=str(period.get("start") or ""),
+                period_end=str(period.get("end")) if period.get("end") else None,
+                one_liner=one_liner,
+            )
+        )
+    return briefs
+
+
+def _read_summary_section(patient_id: str, episode_slug: str) -> str:
+    """Pull the 'Summary' section text from a Composition's current.json."""
+    import json as _json
+    import re as _re
+
+    path = _REPO_ROOT / "data" / "narratives" / patient_id / episode_slug / "current.json"
+    if not path.exists():
+        return "(narrative not yet generated — publish to regenerate)"
+    try:
+        composition = _json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, _json.JSONDecodeError):
+        return "(narrative unreadable)"
+    for section in composition.get("section") or []:
+        if str(section.get("title", "")).lower() == "summary":
+            div = (section.get("text") or {}).get("div") or ""
+            return _re.sub(r"<[^>]+>", "", div).strip() or "(empty summary)"
+    return "(no summary section)"
+
+
+def _load_caveats(patient_id: str) -> list[HarmonizationCaveat]:
+    """Read T7 caveats.json if present."""
+    import json as _json
+
+    path = _REPO_ROOT / "data" / "patient-context" / patient_id / "caveats.json"
+    if not path.exists():
+        return []
+    try:
+        payload = _json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, _json.JSONDecodeError):
+        return []
+    out: list[HarmonizationCaveat] = []
+    for entry in payload.get("entry") or []:
+        resource = (entry or {}).get("resource") or {}
+        if resource.get("resourceType") != "Observation":
+            continue
+        components = {
+            (c.get("code") or {}).get("text"): c.get("valueString", "")
+            for c in (resource.get("component") or [])
+            if isinstance(c, dict)
+        }
+        dissent = components.get("dissenting_sources", "")
+        out.append(
+            HarmonizationCaveat(
+                fact_path=str(components.get("fact_path", "")),
+                verdict=str(components.get("verdict", "")),
+                confidence=str(components.get("confidence", "medium")),
+                rationale=str(components.get("rationale", "")),
+                dissenting_sources=[s for s in dissent.split(";") if s],
+            )
+        )
+    return out

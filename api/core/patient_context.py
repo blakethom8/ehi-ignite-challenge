@@ -505,9 +505,17 @@ You are reading a Patient Context bundle produced by EHI Atlas.
     for name, content in files.items():
         (root / name).write_text(content, encoding="utf-8")
 
+    # T1 (LLM-CONTEXT-AUGMENTATION-PLAN §T1): also emit the session as a
+    # FHIR Bundle so the cross-source harmonizer (`lib.harmonize`) can
+    # consume patient voice as a first-class source. Markdown export
+    # remains the durable bronze artifact; FHIR emission is a downstream
+    # enrichment and never blocks Markdown export on failure.
+    fhir_bundle_files = _write_patient_voice_fhir_bundle(session)
+    file_names = sorted(files.keys()) + fhir_bundle_files
+
     export_status = PatientContextExportStatus(
         generated=True,
-        files=sorted(files.keys()),
+        files=file_names,
         generated_at=generated_at,
     )
     session.export_status = export_status
@@ -516,6 +524,40 @@ You are reading a Patient Context bundle produced by EHI Atlas.
     return PatientContextExportResponse(
         session_id=session_id,
         generated_at=generated_at,
-        files=sorted(files.keys()),
+        files=file_names,
         preview=patient_context[:2000],
     )
+
+
+def _write_patient_voice_fhir_bundle(session: PatientContextSessionResponse) -> list[str]:
+    """Emit ``data/patient-context/<patient>/fhir/<session>.json`` as FHIR.
+
+    Returns the list of relative file paths written, or ``[]`` if
+    emission is skipped (no Anthropic key, classifier error, etc.).
+    Errors are logged but do not raise — Markdown export is the durable
+    artifact.
+    """
+    try:
+        from lib.patient_voice import HaikuTurnClassifier, session_to_fhir_bundle
+    except ImportError:
+        return []
+
+    session_payload = session.model_dump(mode="json")
+    api_key = _resolve_api_key()
+    classifier = HaikuTurnClassifier(api_key=api_key) if api_key else None
+
+    try:
+        bundle = session_to_fhir_bundle(session_payload, classifier=classifier)
+    except Exception as exc:  # noqa: BLE001 — best-effort emission
+        import logging
+
+        logging.getLogger(__name__).warning(
+            "patient_voice FHIR emission failed: %s", exc
+        )
+        return []
+
+    fhir_dir = STORE_ROOT / _safe_id(session.patient_id) / "fhir"
+    fhir_dir.mkdir(parents=True, exist_ok=True)
+    path = fhir_dir / f"{_safe_id(session.session_id)}.json"
+    _write_json(path, bundle)
+    return [f"fhir/{path.name}"]

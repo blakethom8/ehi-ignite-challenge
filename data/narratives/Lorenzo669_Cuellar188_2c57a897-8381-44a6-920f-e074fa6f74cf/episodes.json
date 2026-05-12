@@ -1,0 +1,119 @@
+{
+  "resourceType": "Bundle",
+  "type": "collection",
+  "entry": [
+    {
+      "resource": {
+        "resourceType": "EpisodeOfCare",
+        "id": "episode-cardiometabolic",
+        "status": "active",
+        "patient": {
+          "reference": "Patient/afafca2f-b97d-4fc9-b3b6-984e46d4c0b8"
+        },
+        "period": {
+          "start": "1980-08-18"
+        },
+        "type": [
+          {
+            "coding": [
+              {
+                "system": "http://atlas.healthcaredataai.com/fhir/CodeSystem/episode-type",
+                "code": "chronic-condition-management",
+                "display": "Cardiometabolic management"
+              }
+            ],
+            "text": "Cardiometabolic management"
+          }
+        ],
+        "diagnosis": [
+          {
+            "condition": {
+              "reference": "Condition/301d0079-5118-4b3a-b8b2-af81a7e22d8d"
+            },
+            "rank": 1
+          },
+          {
+            "condition": {
+              "reference": "Condition/dce5b796-afa4-4f42-915d-927723001859"
+            },
+            "rank": 2
+          },
+          {
+            "condition": {
+              "reference": "Condition/c9cdaf78-7161-4de4-85dc-297854615e03"
+            },
+            "rank": 3
+          },
+          {
+            "condition": {
+              "reference": "Condition/b8f27e68-4e1e-4f7a-a170-3b148b325846"
+            },
+            "rank": 4
+          }
+        ],
+        "extension": [
+          {
+            "url": "http://atlas.healthcaredataai.com/fhir/StructureDefinition/episode-narrative-id",
+            "valueReference": {
+              "reference": "Composition/narrative-cardiometabolic-current"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "EpisodeOfCare",
+        "id": "episode-lung-cancer-workup",
+        "status": "finished",
+        "patient": {
+          "reference": "Patient/afafca2f-b97d-4fc9-b3b6-984e46d4c0b8"
+        },
+        "period": {
+          "start": "2006-09-07",
+          "end": "2006-09-19"
+        },
+        "type": [
+          {
+            "coding": [
+              {
+                "system": "http://atlas.healthcaredataai.com/fhir/CodeSystem/episode-type",
+                "code": "diagnostic-workup",
+                "display": "Lung cancer workup"
+              }
+            ],
+            "text": "Lung cancer workup"
+          }
+        ],
+        "diagnosis": [
+          {
+            "condition": {
+              "reference": "Condition/84bf3faa-b8cd-4094-bada-e65599705ebc"
+            },
+            "rank": 1
+          },
+          {
+            "condition": {
+              "reference": "Condition/922a07f9-414c-4b6e-94c6-ab3dabaaea33"
+            },
+            "rank": 2
+          },
+          {
+            "condition": {
+              "reference": "Condition/a56754d4-8857-4ceb-a3aa-37e68725dba4"
+            },
+            "rank": 3
+          }
+        ],
+        "extension": [
+          {
+            "url": "http://atlas.healthcaredataai.com/fhir/StructureDefinition/episode-narrative-id",
+            "valueReference": {
+              "reference": "Composition/narrative-lung-cancer-workup-current"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

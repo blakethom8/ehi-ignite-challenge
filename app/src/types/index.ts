@@ -2156,3 +2156,49 @@ export interface CcdaLabConversionResponse {
   warnings: string[];
   bundle: Record<string, unknown>;
 }
+
+// T8c — Patient Context augmentation read shapes.
+// See docs/architecture/LLM-CONTEXT-AUGMENTATION-PLAN.md §3 + §T8.
+export interface PatientVoiceSummaryDTO {
+  summary: string;
+  citations: string[];
+}
+
+export interface EpisodeBriefDTO {
+  episode_id: string;
+  type: string;
+  period_start: string;
+  period_end: string | null;
+  one_liner: string;
+}
+
+export interface HarmonizationCaveatDTO {
+  fact_path: string;
+  verdict: string;
+  confidence: "high" | "medium" | "low" | string;
+  rationale: string;
+  dissenting_sources: string[];
+}
+
+export interface PatientContextAugmentationResponse {
+  patient_voice: PatientVoiceSummaryDTO | null;
+  episode_briefs: EpisodeBriefDTO[];
+  caveats: HarmonizationCaveatDTO[];
+}
+
+// Minimal FHIR Composition shape — the narrative endpoint returns the
+// raw FHIR resource. The UI mostly reads `section[].title` +
+// `section[].text.div`.
+export interface FhirCompositionSection {
+  title: string;
+  text?: { status: string; div: string };
+}
+
+export interface FhirComposition {
+  resourceType: "Composition";
+  id: string;
+  status: string;
+  date?: string;
+  section?: FhirCompositionSection[];
+  relatesTo?: Array<{ code: string; targetReference?: { reference: string } }>;
+}

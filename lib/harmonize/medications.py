@@ -118,6 +118,18 @@ def _extract_status(mr: dict[str, Any]) -> str | None:
     return mr.get("status")
 
 
+def _extract_meta_source(mr: dict[str, Any]) -> str | None:
+    """Pull the ``meta.source`` URI from a MedicationRequest, if any.
+
+    Used by ``lib.harmonize.source_weights`` to identify patient-voice
+    sources during status resolution. Returns ``None`` for resources
+    that don't carry one (older bundles, hand-rolled fixtures).
+    """
+    meta = mr.get("meta") or {}
+    source = meta.get("source")
+    return source if isinstance(source, str) and source else None
+
+
 def _extract_authored_on(mr: dict[str, Any]) -> datetime | None:
     raw = mr.get("authoredOn")
     if not raw:
@@ -207,6 +219,7 @@ def merge_medications(sources: Iterable[SourceBundle]) -> list[MergedMedication]
                 status=_extract_status(mr),
                 authored_on=_extract_authored_on(mr),
                 document_reference=bundle.document_reference,
+                meta_source=_extract_meta_source(mr),
             )
 
             # Register canonical-name → key mapping so later text-only

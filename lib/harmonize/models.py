@@ -182,6 +182,11 @@ class MedicationSource:
 
     authored_on: datetime | None
     document_reference: str | None = None
+    meta_source: str | None = None
+    """The FHIR ``meta.source`` URI of the originating resource, when
+    known. Used by the source-weight table
+    (``lib.harmonize.source_weights``) to route patient-voice
+    assertions through the override rule on ``medication.status``."""
 
 
 @dataclass
@@ -202,21 +207,61 @@ class MergedMedication:
     provenance: list[ProvenanceEdge] = field(default_factory=list)
 
     @property
-    def is_active(self) -> bool:
-        """True if any source still considers the medication active.
+    def canonical_status(self) -> str | None:
+        """The status the merged record surfaces, after source weighting.
 
-        Mirrors ``MergedCondition.is_active`` semantics: PDF-extracted
-        MedicationRequests often lack a status, so missing-status defaults
-        to active rather than inactive.
+        Resolution rule (see ``lib.harmonize.source_weights``):
+
+        1. For each source with a non-empty status, look up the merge
+           weight for ``medication.status`` using its ``meta_source``.
+           Patient-voice sources weigh 5.0; everything else 1.0.
+        2. Sum weights per distinct status value.
+        3. Return the status with the highest weight sum. Tiebreak by
+           the most recent ``authored_on``.
+        4. If no source has a status, return ``None`` (caller may default
+           to ``active``).
+
+        Phase 1: only ``medication.status`` is weighted; this is the
+        intentional scope from plan §D2.
         """
-        seen_any_status = False
+        from .source_weights import MEDICATION_STATUS_FIELD, weight_for_source
+
+        votes: dict[str, float] = {}
+        recent: dict[str, datetime] = {}
         for s in self.sources:
             if not s.status:
                 continue
-            seen_any_status = True
-            if s.status in ("active", "on-hold"):
-                return True
-        return not seen_any_status
+            w = weight_for_source(s.meta_source, MEDICATION_STATUS_FIELD)
+            votes[s.status] = votes.get(s.status, 0.0) + w
+            authored = s.authored_on
+            if authored is not None:
+                if authored.tzinfo is None:
+                    authored = authored.replace(tzinfo=timezone.utc)
+                prior = recent.get(s.status)
+                if prior is None or authored > prior:
+                    recent[s.status] = authored
+        if not votes:
+            return None
+        # Sort by (-weight, -recency) so the winner is index 0.
+        epoch = datetime.fromtimestamp(0, tz=timezone.utc)
+        ranked = sorted(
+            votes.items(),
+            key=lambda kv: (-kv[1], -(recent.get(kv[0], epoch).timestamp())),
+        )
+        return ranked[0][0]
+
+    @property
+    def is_active(self) -> bool:
+        """Boolean view of ``canonical_status``.
+
+        Mirrors ``MergedCondition.is_active`` semantics: when no source
+        recorded a status, default to active (PDF-extracted
+        MedicationRequests often lack one).
+        """
+        status = self.canonical_status
+        if status is None:
+            return True
+        return status in ("active", "on-hold")
 
 
 @dataclass(frozen=True)

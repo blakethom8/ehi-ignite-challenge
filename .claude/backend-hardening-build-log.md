@@ -73,3 +73,52 @@ Template:
 
 ---
 -->
+
+## 2026-05-11 — H0.1 — Persist plugin consent revocation across restarts
+
+**Shipped:** 2026-05-11
+**Commit:** `f38aeff`
+**Files:**
+- `api/plugins/runtime.py` — added `revoked_at TEXT` column to `runs`; `revoke_consent()` writes the timestamp; new `reload_revoked_runs()` rehydrates `_revoked_ids` from rows where `revoked_at IS NOT NULL`. Forward-compat ALTER guards existing DBs.
+- `api/main.py` — startup hook now calls `plugin_runtime.reload_revoked_runs()` after `reload_manifests()`. Wrapped in try/except so a malformed runs.db doesn't crash boot.
+- `api/tests/test_plugin_runtime.py` — added `test_revocation_survives_restart`: revoke → clear `_revoked_ids` (simulate restart) → `reload_revoked_runs()` → assert tool call still raises `ConsentError`.
+
+**What it does:** Closes the gap where revoking a plugin's consent only invalidated tool access until the next API restart. The `_revoked_ids` set is now seeded at startup from a persistent column, so a deploy or crash mid-run can no longer silently restore a revoked plugin's access.
+
+**Smoke test:**
+```
+$ uv run pytest api/tests/test_plugin_runtime.py -q
+9 passed in 1.13s
+$ uv run pytest api/tests/test_plugin_runtime.py api/tests/test_plugin_tools.py \
+    api/tests/test_plugin_routers.py api/tests/test_plugin_consent.py \
+    api/tests/test_plugin_anchors.py -q
+47 passed in 0.85s
+```
+
+**Follow-ups:** the ad-hoc `ALTER TABLE` belongs to a real migration runner — that's H1.2.
+
+---
+
+## 2026-05-11 — H0.2 — Production refuses file-based secret fallback
+
+**Shipped:** 2026-05-11
+**Commit:** `4edbbaa`
+**Files:**
+- `api/trust/keys.py` — new `_is_production()` helper; `_load_or_create_atlas_key()` now raises `RuntimeError` when `ENVIRONMENT=production` and `ATLAS_SIGNING_KEY` is unset.
+- `api/core/auth.py` — same shape: new `_is_production()`; `_session_secret()` now raises when `ENVIRONMENT=production` and `EHI_SESSION_SECRET` is unset.
+- `api/tests/test_trust_keys.py` (new) — 6 tests covering production-fail, development-fallback, and env-supplied paths for both secrets.
+
+**What it does:** Both functions already preferred env vars over the file fallback. The change closes the silent-degradation path: in production, a missing env var now fails fast at the call site instead of materializing a key on disk in the data bind mount.
+
+**Smoke test:**
+```
+$ uv run pytest api/tests/test_trust_keys.py -v
+6 passed in 0.20s
+$ uv run pytest api/tests/test_auth_api.py api/tests/test_trust_models.py \
+    api/tests/test_plugin_runtime.py api/tests/test_plugin_routers.py -q
+30 passed in 9.81s
+```
+
+**Follow-ups:** `api/core/guest_harmonization.py` loads `data/atlas-guest-harmonization.key` with the same fallback shape. Out of explicit scope for H0.2 (plan named only the two files above) — flagged here so it can be swept either as part of H0.5 wiring (the events-store work touches similar surfaces) or as a tiny standalone follow-up. Track as a punch-list item before deploy.
+
+---

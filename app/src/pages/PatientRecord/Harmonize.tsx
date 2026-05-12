@@ -2732,9 +2732,20 @@ function ImmunizationsTab({ collectionId }: { collectionId: string }) {
   );
 }
 
+type BundleAudience = "" | "patient-summary" | "clinician-handoff" | "second-opinion" | "preop-review";
+
+const BUNDLE_AUDIENCE_OPTIONS: Array<{ value: BundleAudience; label: string }> = [
+  { value: "", label: "No primary packet" },
+  { value: "patient-summary", label: "Patient summary" },
+  { value: "clinician-handoff", label: "Clinician handoff" },
+  { value: "second-opinion", label: "Second opinion" },
+  { value: "preop-review", label: "Pre-op review" },
+];
+
 export function HarmonizeView() {
   const [tab, setTab] = useState<ResourceTab>("labs");
   const [workspaceTab, setWorkspaceTab] = useState<WorkspaceTab>("record");
+  const [exportAudience, setExportAudience] = useState<BundleAudience>("");
   const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
   const patientId = searchParams.get("patient");
@@ -2957,13 +2968,29 @@ export function HarmonizeView() {
               </span>
             )}
             {activeId && !activeCollectionHasNoSources && (
-              <a
-                href={`/api/harmonize/${encodeURIComponent(activeId)}/export-workspace`}
-                className="inline-flex items-center gap-2 rounded-lg border border-[#dfe4ea] bg-white px-3 py-2 text-sm font-semibold text-[#555a6a] hover:border-[#5b76fe] hover:text-[#5b76fe]"
-              >
-                <FileText size={14} />
-                Download workspace
-              </a>
+              <div className="inline-flex items-stretch gap-px overflow-hidden rounded-lg border border-[#dfe4ea] bg-white">
+                <select
+                  value={exportAudience}
+                  onChange={(event) => setExportAudience(event.target.value as BundleAudience)}
+                  className="cursor-pointer bg-white px-2 py-2 text-xs font-semibold text-[#555a6a] focus:outline-none"
+                  aria-label="Bundle primary packet"
+                >
+                  {BUNDLE_AUDIENCE_OPTIONS.map((option) => (
+                    <option key={option.value || "none"} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <a
+                  href={`/api/harmonize/${encodeURIComponent(activeId)}/export-workspace${
+                    exportAudience ? `?audience=${exportAudience}` : ""
+                  }`}
+                  className="inline-flex items-center gap-2 border-l border-[#dfe4ea] px-3 py-2 text-sm font-semibold text-[#555a6a] hover:bg-[#f6f8fc] hover:text-[#5b76fe]"
+                >
+                  <FileText size={14} />
+                  Download workspace
+                </a>
+              </div>
             )}
             <Link
               to={`/patient-record/sources${patientId ? `?patient=${encodeURIComponent(patientId)}` : ""}`}

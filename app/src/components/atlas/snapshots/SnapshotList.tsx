@@ -1,3 +1,4 @@
+import { Download } from "lucide-react";
 import type { PublishedChartSnapshot } from "../../../types";
 
 function signedCount(value: number): string {
@@ -28,12 +29,20 @@ export function SnapshotList({
   snapshots,
   activatingSnapshotId,
   onActivate,
+  buildDownloadHref,
   emptyMessage,
   showHeader = true,
 }: {
   snapshots: PublishedChartSnapshot[];
   activatingSnapshotId: string | null;
   onActivate: (snapshotId: string) => void;
+  /**
+   * Optional href builder for the per-row Download button. When provided,
+   * each row renders a Download anchor that points to the result. Pass
+   * `undefined` to suppress the Download column (e.g., aggregator Publish
+   * Readiness page which uses its own existing download UI).
+   */
+  buildDownloadHref?: (snapshotId: string) => string;
   emptyMessage?: string;
   showHeader?: boolean;
 }) {
@@ -85,18 +94,30 @@ export function SnapshotList({
                 </p>
                 <p className="mt-1 text-xs text-[#8d92a3]">{snapshotDeltaLabel(snapshot)}</p>
               </div>
-              <button
-                type="button"
-                disabled={snapshot.is_active || activatingSnapshotId === snapshot.snapshot_id}
-                onClick={() => onActivate(snapshot.snapshot_id)}
-                className="inline-flex w-fit items-center justify-center rounded-lg border border-[#dfe4ea] bg-white px-3 py-2 text-xs font-semibold text-[#555a6a] hover:border-[#5b76fe] hover:text-[#5b76fe] disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {activatingSnapshotId === snapshot.snapshot_id
-                  ? "Activating..."
-                  : snapshot.is_active
-                  ? "Active"
-                  : "Activate"}
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  disabled={snapshot.is_active || activatingSnapshotId === snapshot.snapshot_id}
+                  onClick={() => onActivate(snapshot.snapshot_id)}
+                  className="inline-flex w-fit items-center justify-center rounded-lg border border-[#dfe4ea] bg-white px-3 py-2 text-xs font-semibold text-[#555a6a] hover:border-[#5b76fe] hover:text-[#5b76fe] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {activatingSnapshotId === snapshot.snapshot_id
+                    ? "Activating..."
+                    : snapshot.is_active
+                    ? "Active"
+                    : "Activate"}
+                </button>
+                {buildDownloadHref && (
+                  <a
+                    href={buildDownloadHref(snapshot.snapshot_id)}
+                    className="inline-flex items-center gap-1 rounded-lg border border-[#dfe4ea] bg-white px-2.5 py-2 text-xs font-semibold text-[#555a6a] hover:border-[#5b76fe] hover:text-[#5b76fe]"
+                    title="Download bundle pinned to this snapshot"
+                  >
+                    <Download size={13} />
+                    Bundle
+                  </a>
+                )}
+              </div>
             </div>
           ))}
         </div>

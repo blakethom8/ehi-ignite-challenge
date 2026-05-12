@@ -55,6 +55,11 @@ class WorkspaceInput:
     package_id_override: str | None = None
     patient_voice: str | None = None
     audience: str | None = None
+    patient_context: dict[str, Any] | None = None
+    """When a /patient-record/context session exists for this patient,
+    carries ``{markdown_files: {filename: contents}, session_json: dict,
+    session_id: str}``. Folded into ``context/`` in the ZIP and into
+    ``packets/patient-summary.context.json``."""
 FHIR_TYPES = {
     "Observation",
     "Condition",
@@ -464,10 +469,18 @@ def discover_sources(collection: str) -> list[dict[str, Any]]:
     return sources
 
 
-def load_harmonization(collection: str) -> dict[str, Any] | None:
+def load_harmonization(collection: str, *, run_id: str | None = None) -> dict[str, Any] | None:
+    """Load a harmonization run JSON for a collection.
+
+    Without ``run_id``, returns ``latest.json``. With ``run_id``, returns
+    ``<run_id>.json`` — used by snapshot-pinned exports so the bundle
+    reflects the exact run that was published rather than drifting on
+    re-harmonization.
+    """
+    filename = f"{run_id}.json" if run_id else "latest.json"
     candidates = [
-        REPO_ROOT / "data" / "harmonization-runs" / collection / "latest.json",
-        REPO_ROOT / "data" / "harmonization-runs" / f"workspace-{collection}" / "latest.json",
+        REPO_ROOT / "data" / "harmonization-runs" / collection / filename,
+        REPO_ROOT / "data" / "harmonization-runs" / f"workspace-{collection}" / filename,
     ]
     for path in candidates:
         if path.exists():
@@ -537,7 +550,12 @@ def build_evidence(collection: str, sources: list[dict[str, Any]], harmonization
                     "source_label": src["label"],
                     "resource_ref": f"{rt}/{res.get('id', j)}",
                     "locator": src_ref,
-                    "method": "fhir-bundle-import" if src["kind"] == "fhir-bundle" else "prepared-upload-import",
+                    "method": (
+                        "patient_context_voice"
+                        if src["kind"] == "patient-context-voice"
+                        else "fhir-bundle-import" if src["kind"] == "fhir-bundle"
+                        else "prepared-upload-import"
+                    ),
                     "confidence": "source-structured" if src["kind"] == "fhir-bundle" else "prepared-extraction",
                 }
             )
@@ -715,15 +733,120 @@ if __name__ == '__main__': main()
 '''
 
 
-def workspace_input_from_collection(collection: str) -> WorkspaceInput:
-    """Adapter: build a WorkspaceInput for an authenticated harmonize collection."""
+def workspace_input_from_collection(
+    collection: str,
+    *,
+    audience: str | None = None,
+    run_id: str | None = None,
+) -> WorkspaceInput:
+    """Adapter: build a WorkspaceInput for an authenticated harmonize collection.
+
+    Resolves the patient_id from the collection (workspace collections
+    encode it directly; demo/fixed collections fall back to peeking at
+    Patient resources in the discovered sources) and, when a patient
+    context session exists on disk, folds it in:
+
+    - Appends the session's FHIR voice bundle to ``sources`` so its
+      facts merge through ``build_evidence()`` with provenance method
+      ``patient_context_voice``.
+    - Populates ``patient_voice`` for ``packets/patient-summary.context.json``.
+    - Carries the four context markdown files in ``patient_context`` so
+      ``build_package_from_input()`` writes them under ``context/``.
+
+    When ``run_id`` is supplied (snapshot-pinned export), the harmonization
+    is loaded for that specific run rather than ``latest.json``.
+    """
     sources = discover_sources(collection)
-    harmonization = load_harmonization(collection)
+    harmonization = load_harmonization(collection, run_id=run_id)
+    patient_voice: str | None = None
+    patient_context: dict[str, Any] | None = None
+
+    patient_id = _resolve_patient_id_for_collection(collection, sources)
+    if patient_id:
+        try:
+            from api.core.patient_context import (
+                latest_session_for_patient,
+                patient_voice_summary,
+            )
+        except Exception:
+            latest_session_for_patient = None  # type: ignore[assignment]
+
+        if latest_session_for_patient is not None:
+            session_data = latest_session_for_patient(patient_id)
+            if session_data is not None:
+                voice_text = patient_voice_summary(session_data["session"])
+                patient_voice = voice_text or None
+                patient_context = {
+                    "session_id": session_data["session_id"],
+                    "session_json": session_data["session"],
+                    "markdown_files": session_data["markdown_files"],
+                }
+                fhir_bundle = session_data.get("fhir_bundle")
+                if isinstance(fhir_bundle, dict):
+                    resources = bundle_entries(fhir_bundle) if fhir_bundle.get("resourceType") == "Bundle" else []
+                    if resources:
+                        sources.append(
+                            {
+                                "source_id": f"patient-context-voice-{session_data['session_id'][:12]}",
+                                "label": "Patient voice (Atlas guided intake)",
+                                "kind": "patient-context-voice",
+                                "path": session_data.get("fhir_bundle_path"),
+                                "original_path": None,
+                                "resources": resources,
+                                "demo_source": False,
+                            }
+                        )
+
     return WorkspaceInput(
         workspace_id=collection,
         sources=sources,
         harmonization=harmonization,
+        patient_voice=patient_voice,
+        audience=audience,
+        patient_context=patient_context,
     )
+
+
+def _resolve_patient_id_for_collection(
+    collection: str, sources: list[dict[str, Any]]
+) -> str | None:
+    """Recover a FHIR Patient.id for a collection, for context lookup.
+
+    Two strategies:
+
+    1. ``workspace-<patient_id>`` collections encode the id directly —
+       delegate to ``harmonize_service`` which already knows this trick.
+    2. Otherwise peek at the first source carrying a Patient resource
+       in its ``resources`` list (or, for harmonize-discovered sources,
+       its parsed bundle). Returns ``None`` when nothing recognizable
+       is present.
+    """
+    try:
+        from api.core.harmonize_service import _patient_id_from_workspace_collection
+    except Exception:
+        _patient_id_from_workspace_collection = None  # type: ignore[assignment]
+
+    if _patient_id_from_workspace_collection is not None:
+        workspace_pid = _patient_id_from_workspace_collection(collection)
+        if workspace_pid:
+            return workspace_pid
+
+    for source in sources:
+        resources = source.get("resources") if isinstance(source, dict) else None
+        if isinstance(resources, list):
+            for resource in resources:
+                if isinstance(resource, dict) and resource.get("resourceType") == "Patient":
+                    pid = resource.get("id")
+                    if isinstance(pid, str) and pid:
+                        return pid
+        bundle = source_bundle(source) if isinstance(source, dict) else None
+        if bundle:
+            for resource in bundle_entries(bundle):
+                if resource.get("resourceType") == "Patient":
+                    pid = resource.get("id")
+                    if isinstance(pid, str) and pid:
+                        return pid
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -1019,6 +1142,7 @@ def build_packets(
     *,
     patient_voice: str | None = None,
     audience: str | None = None,
+    patient_context: dict[str, Any] | None = None,
 ) -> dict[str, dict[str, Any]]:
     """Build the four context packets that ship in every bundle.
 
@@ -1061,12 +1185,17 @@ def build_packets(
             "Use the facts list to surface the most recent, representative entries.",
             "Flag missing-information items so the patient knows what to follow up on.",
             "Do not invent clinical findings that are not in the facts list.",
+            "Treat patient_context_facts and patient_voice as patient-reported context, not verified chart truth.",
             "This summary is not medical advice.",
         ],
         "summary": base_summary,
         "facts": top_facts,
         "missing_information": evidence["missing_information"],
         "patient_voice": patient_voice or "",
+        "patient_context_facts": (
+            (patient_context or {}).get("session_json", {}).get("facts") or []
+            if patient_context else []
+        ),
     }
 
     clinician_handoff = {
@@ -1234,6 +1363,7 @@ def build_package_from_input(
             medication_episodes,
             patient_voice=workspace_input.patient_voice,
             audience=workspace_input.audience,
+            patient_context=workspace_input.patient_context,
         )
 
         manifest_files = [
@@ -1263,6 +1393,13 @@ def build_package_from_input(
             manifest_files.append(f"terminology/{slice_name}")
         for narrative in narratives:
             manifest_files.append(f"fhir/narratives/{narrative['episode_slug']}.json")
+
+        # Patient context — markdown + session.json from /patient-record/context
+        patient_context = workspace_input.patient_context
+        if patient_context:
+            for filename in sorted(patient_context.get("markdown_files") or {}):
+                manifest_files.append(f"context/{filename}")
+            manifest_files.append("context/session.json")
         manifest = {
             "package_version": "atlas-workspace.v1",
             "workspace_id": collection,
@@ -1392,6 +1529,17 @@ def build_package_from_input(
                 root / "fhir" / "narratives" / f"{narrative['episode_slug']}.json",
                 narrative["composition"],
             )
+
+        # Patient context — markdown + session payload (auth path only; Guest
+        # collects voice + audience inline through /api/guest-harmonization/runs/.../context)
+        if patient_context:
+            context_dir = root / "context"
+            context_dir.mkdir(parents=True, exist_ok=True)
+            for filename, content in (patient_context.get("markdown_files") or {}).items():
+                (context_dir / filename).write_text(content, encoding="utf-8")
+            session_json = patient_context.get("session_json")
+            if isinstance(session_json, dict):
+                write_json(context_dir / "session.json", session_json)
 
         # Four context packets
         for purpose, payload in packets.items():

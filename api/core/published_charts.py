@@ -153,6 +153,15 @@ def _snapshot_from_run(run: dict[str, Any], previous_snapshot: dict[str, Any] | 
     }
 
 
+def get_snapshot(collection_id: str, snapshot_id: str) -> dict[str, Any] | None:
+    """Return the snapshot record with the given id, or None."""
+    current = _load_state(collection_id)
+    for snapshot in current["snapshots"]:
+        if snapshot.get("snapshot_id") == snapshot_id:
+            return snapshot
+    return None
+
+
 def state(collection_id: str) -> dict[str, Any]:
     current = _load_state(collection_id)
     active_snapshot_id = current.get("active_snapshot_id")

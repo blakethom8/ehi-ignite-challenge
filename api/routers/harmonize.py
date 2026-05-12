@@ -31,7 +31,11 @@ from fastapi.responses import FileResponse
 
 from api.core import harmonization_runs, harmonize_service, published_charts
 from api.core.auth import require_authenticated_session
-from scripts.export_workspace_package import build_package
+from scripts.export_workspace_package import (
+    build_package,
+    build_package_from_input,
+    workspace_input_from_collection,
+)
 from api.models import (
     HarmonizeAllergiesResponse,
     HarmonizeCollection,
@@ -595,27 +599,83 @@ def get_source_diff(request: Request, collection_id: str) -> HarmonizeSourceDiff
     )
 
 
+_ALLOWED_AUDIENCES = {
+    "patient-summary",
+    "clinician-handoff",
+    "second-opinion",
+    "preop-review",
+}
+
+
 @router.get("/{collection_id}/export-workspace")
-def export_workspace_package(request: Request,
+def export_workspace_package(
+    request: Request,
     collection_id: str,
     include_originals: bool = False,
+    audience: str | None = None,
+    snapshot: str | None = None,
 ) -> FileResponse:
     """Download a portable patient-owned EHI Atlas workspace package.
 
     The zip contains source inventory, canonical facts, provenance, source
     contributions, missing-information signals, agent instructions, context
     packets, markdown/CSV exports, and a tiny package-inspection CLI.
+
+    Optional query params:
+
+    - ``audience=patient-summary|clinician-handoff|second-opinion|preop-review``
+      marks the matching context packet ``primary: true``.
+    - ``snapshot=<snapshot_id>`` pins the bundle to a previously-published
+      snapshot's underlying harmonization run. Without it, the bundle is
+      built against the latest run, which may drift on re-harmonization.
     """
     require_authenticated_session(request)
     if harmonize_service.get_collection(collection_id) is None:
         raise HTTPException(status_code=404, detail=f"Collection not found: {collection_id}")
 
+    if audience is not None and audience not in _ALLOWED_AUDIENCES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown audience '{audience}'. Allowed: {sorted(_ALLOWED_AUDIENCES)}.",
+        )
+
+    run_id: str | None = None
+    if snapshot:
+        from api.core import published_charts
+        record = published_charts.get_snapshot(collection_id, snapshot)
+        if record is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Snapshot '{snapshot}' not found for collection '{collection_id}'.",
+            )
+        run_id = record.get("run_id")
+        if not run_id:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Snapshot '{snapshot}' has no associated run_id.",
+            )
+
     out_dir = Path("data/workspace-packages")
+    if snapshot:
+        out_dir = out_dir / collection_id
     out_dir.mkdir(parents=True, exist_ok=True)
-    out = out_dir / f"{collection_id}.zip"
+
+    suffix_parts: list[str] = []
+    if snapshot:
+        suffix_parts.append(snapshot[:8])
+    if audience:
+        suffix_parts.append(audience)
+    suffix = ("-" + "-".join(suffix_parts)) if suffix_parts else ""
+    filename = f"{collection_id}{suffix}.zip"
+    out = out_dir / filename
+
     try:
-        build_package(
-            collection_id,
+        build_package_from_input(
+            workspace_input_from_collection(
+                collection_id,
+                audience=audience,
+                run_id=run_id,
+            ),
             out,
             include_originals=include_originals,
         )

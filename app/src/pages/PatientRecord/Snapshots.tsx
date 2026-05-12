@@ -5,6 +5,21 @@ import { History } from "lucide-react";
 import { api } from "../../api/client";
 import { SnapshotList } from "../../components/atlas/snapshots/SnapshotList";
 
+type BundleAudience =
+  | ""
+  | "patient-summary"
+  | "clinician-handoff"
+  | "second-opinion"
+  | "preop-review";
+
+const AUDIENCE_OPTIONS: Array<{ value: BundleAudience; label: string }> = [
+  { value: "", label: "No primary packet" },
+  { value: "patient-summary", label: "Patient summary" },
+  { value: "clinician-handoff", label: "Clinician handoff" },
+  { value: "second-opinion", label: "Second opinion" },
+  { value: "preop-review", label: "Pre-op review" },
+];
+
 function collectionForPatient(patientId: string | null): string | null {
   if (!patientId) return null;
   return patientId.startsWith("workspace-") ? patientId : `workspace-${patientId}`;
@@ -17,6 +32,7 @@ export function PatientRecordSnapshots() {
   const queryClient = useQueryClient();
   const [activatingId, setActivatingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [audience, setAudience] = useState<BundleAudience>("");
 
   const publishedQuery = useQuery({
     queryKey: ["published-chart", collectionId],
@@ -101,10 +117,33 @@ export function PatientRecordSnapshots() {
               </p>
             </section>
           )}
+          <div className="mb-3 flex items-center gap-2 text-xs text-[#5d6474]">
+            <label htmlFor="snapshot-audience" className="font-semibold uppercase tracking-[0.12em] text-[#7b8597]">
+              Primary packet:
+            </label>
+            <select
+              id="snapshot-audience"
+              value={audience}
+              onChange={(event) => setAudience(event.target.value as BundleAudience)}
+              className="cursor-pointer rounded-md border border-[#dfe4ea] bg-white px-2 py-1.5 text-xs font-semibold text-[#555a6a] focus:outline-none"
+            >
+              {AUDIENCE_OPTIONS.map((option) => (
+                <option key={option.value || "none"} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
           <SnapshotList
             snapshots={snapshots}
             activatingSnapshotId={activatingId}
             onActivate={handleActivate}
+            buildDownloadHref={(snapshotId) => {
+              if (!collectionId) return "#";
+              const params = new URLSearchParams({ snapshot: snapshotId });
+              if (audience) params.set("audience", audience);
+              return `/api/harmonize/${encodeURIComponent(collectionId)}/export-workspace?${params.toString()}`;
+            }}
           />
         </>
       )}

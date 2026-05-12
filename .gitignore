@@ -69,6 +69,13 @@ data/pdf-lab/suites/
 data/pipeline-evals/runs/
 data/pipeline-evals/runs.jsonl
 data/workspace-packages/workspace-*.zip
+# Audience- and snapshot-variant ZIPs are regenerated on demand by the
+# export endpoint; only the canonical <collection>.zip stays in git.
+data/workspace-packages/*-patient-summary.zip
+data/workspace-packages/*-clinician-handoff.zip
+data/workspace-packages/*-second-opinion.zip
+data/workspace-packages/*-preop-review.zip
+data/workspace-packages/*/*.zip
 data/sof.db
 data/sof.db-*
 data/sof.db.tmp

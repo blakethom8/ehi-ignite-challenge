@@ -529,6 +529,94 @@ You are reading a Patient Context bundle produced by EHI Atlas.
     )
 
 
+def latest_session_for_patient(patient_id: str) -> dict[str, Any] | None:
+    """Return the most-recent context session artifacts for a patient.
+
+    Walks ``data/patient-context/<safe_patient_id>/*/session.json`` and
+    picks the session with the newest ``created_at``. Returns ``None``
+    when the patient has no sessions on disk. Used by the workspace
+    exporter to fold patient context into the bundle.
+
+    Output shape::
+
+        {
+            "session_id": str,
+            "session_dir": Path,
+            "session": dict[str, Any],     # parsed session.json
+            "markdown_files": dict[str, str],  # {filename: contents}
+            "fhir_bundle_path": Path | None,
+            "fhir_bundle": dict[str, Any] | None,
+        }
+    """
+    safe = _safe_id(patient_id)
+    patient_dir = STORE_ROOT / safe
+    if not patient_dir.exists():
+        return None
+
+    candidates: list[tuple[str, Path, dict[str, Any]]] = []
+    for session_dir in patient_dir.iterdir():
+        if not session_dir.is_dir():
+            continue
+        session_path = session_dir / "session.json"
+        if not session_path.exists():
+            continue
+        try:
+            payload = _read_json(session_path)
+        except (OSError, json.JSONDecodeError):
+            continue
+        candidates.append((str(payload.get("created_at") or ""), session_dir, payload))
+
+    if not candidates:
+        return None
+
+    candidates.sort(key=lambda item: item[0], reverse=True)
+    _, session_dir, session_payload = candidates[0]
+
+    markdown_files: dict[str, str] = {}
+    for filename in ("PATIENT_CONTEXT.md", "QUESTIONS.md", "SOURCES.md", "AGENT.md"):
+        path = session_dir / filename
+        if path.exists():
+            try:
+                markdown_files[filename] = path.read_text(encoding="utf-8")
+            except OSError:
+                continue
+
+    session_id = str(session_payload.get("session_id") or session_dir.name)
+    fhir_path = STORE_ROOT / safe / "fhir" / f"{_safe_id(session_id)}.json"
+    fhir_bundle: dict[str, Any] | None = None
+    if fhir_path.exists():
+        try:
+            fhir_bundle = _read_json(fhir_path)
+        except (OSError, json.JSONDecodeError):
+            fhir_bundle = None
+
+    return {
+        "session_id": session_id,
+        "session_dir": session_dir,
+        "session": session_payload,
+        "markdown_files": markdown_files,
+        "fhir_bundle_path": fhir_path if fhir_path.exists() else None,
+        "fhir_bundle": fhir_bundle,
+    }
+
+
+def patient_voice_summary(session: dict[str, Any]) -> str:
+    """Build a single-string patient_voice summary from a session payload.
+
+    Concatenates each fact's ``summary`` field into a single newline-
+    separated string suitable for ``packets/patient-summary.context.json:patient_voice``.
+    """
+    facts = session.get("facts") or []
+    lines = []
+    for fact in facts:
+        if not isinstance(fact, dict):
+            continue
+        summary = fact.get("summary")
+        if isinstance(summary, str) and summary.strip():
+            lines.append(summary.strip())
+    return "\n".join(lines)
+
+
 def _write_patient_voice_fhir_bundle(session: PatientContextSessionResponse) -> list[str]:
     """Emit ``data/patient-context/<patient>/fhir/<session>.json`` as FHIR.
 

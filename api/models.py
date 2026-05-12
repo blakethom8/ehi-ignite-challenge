@@ -1731,7 +1731,10 @@ class WorkflowArtifact(BaseModel):
     chat_narration: str = Field(min_length=1, max_length=400)
     # Set to the relative workspace path (e.g. "workflow-runs/2026-05-12-pre-op-…")
     # once the runner persists the artifact to the Caspian file workspace.
+    # Stays None for demo/guest sessions where artifacts are not persisted.
     file_path: str | None = Field(default=None, max_length=240)
+    # File-kind taxonomy — workflow artifacts are always "generated".
+    kind: Literal["generated"] = "generated"
 
 
 class WorkflowRunRequest(BaseModel):
@@ -1758,11 +1761,34 @@ class WorkflowRunResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+class CaspianFileNode(BaseModel):
+    """One file node in the workspace tree.
+
+    The list endpoint actually returns a free-form ``tree: list[dict]`` because
+    the file/folder/group discriminator is awkward to model in Pydantic — but
+    every file leaf in that tree carries this shape (id/name/ext/icon/dirty/
+    editable/kind).
+    """
+    type: Literal["file"] = "file"
+    name: str
+    id: str
+    ext: str = ""
+    icon: str = "FileText"
+    dirty: bool = False
+    editable: bool = False
+    kind: Literal["system", "user", "generated", "demo-seed"] = "user"
+
+
 class CaspianFileListResponse(BaseModel):
     """Tree of files under (session, patient). Tree is freeform JSON because the
-    server enforces the FileTreeNode shape; the frontend has its own typed union."""
+    server enforces the FileTreeNode shape; the frontend has its own typed union.
+
+    ``capabilities`` echoes the current session's policy so the FilesPane can
+    render the right affordances (sample-workspace banner, edit button, etc.).
+    """
     workspace_key: str
     tree: list[dict]
+    capabilities: "Capabilities | None" = None
 
 
 class CaspianFileReadResponse(BaseModel):
@@ -1771,6 +1797,7 @@ class CaspianFileReadResponse(BaseModel):
     mtime: datetime | None
     editable: bool
     kind: Literal["markdown", "json", "text"]
+    file_kind: Literal["system", "user", "generated", "demo-seed"] = "user"
 
 
 class CaspianFileWriteRequest(BaseModel):
@@ -1785,3 +1812,12 @@ class CaspianFileWriteResponse(BaseModel):
     path: str
     bytes: int
     mtime: datetime
+
+
+# Late import + forward-ref resolution: api.core.access_policy imports from
+# api.core.auth which is fine, but api.core.access_policy.Capabilities is the
+# canonical source. We re-export it here so callers can `from api.models import
+# Capabilities` without dragging in api.core.access_policy directly.
+from api.core.access_policy import Capabilities as Capabilities  # noqa: E402
+
+CaspianFileListResponse.model_rebuild()

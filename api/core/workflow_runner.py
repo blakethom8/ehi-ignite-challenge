@@ -337,9 +337,18 @@ def _persist_artifact_to_workspace(
 ) -> str | None:
     """Write the artifact's markdown form to the patient workspace.
 
-    Returns the relative path on success, None if persistence failed (we never
-    fail the workflow run because the file write hiccupped — the artifact is
-    still useful even if the file copy fails)."""
+    Demo + guest sessions: persistence is skipped entirely (returns None) —
+    those modes get an in-memory artifact only. Authenticated sessions land
+    the artifact under ``workflow-runs/`` via the generated-artifact path.
+
+    Returns the relative path on success, None if persistence was skipped or
+    a write hiccup occurred (we never fail the workflow run because the file
+    write failed — the artifact is still useful even without the file copy).
+    """
+    if not session.is_authenticated:
+        # Demo + guest: don't persist. The frontend renders the artifact from
+        # the in-flight response and lets the user copy / export manually.
+        return None
     try:
         short_id = artifact.artifact_id.rsplit(":", 1)[-1]
         filename = caspian_workspace.workflow_run_filename(
@@ -347,10 +356,13 @@ def _persist_artifact_to_workspace(
         )
         rel_path = f"workflow-runs/{filename}"
         markdown = _artifact_to_markdown(artifact)
-        caspian_workspace.write_workspace_file(
+        caspian_workspace.write_generated_artifact(
             session, resolved_patient_id, rel_path, markdown
         )
         return rel_path
+    except caspian_workspace.WorkspaceForbiddenError as exc:
+        LOGGER.info("Workflow artifact not persisted (forbidden): %s", exc)
+        return None
     except Exception as exc:  # pragma: no cover - defensive
         LOGGER.warning("Failed to persist workflow artifact: %s", exc)
         return None

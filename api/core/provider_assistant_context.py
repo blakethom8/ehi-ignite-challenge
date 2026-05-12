@@ -213,6 +213,12 @@ def answer_with_context(
     total_output_tokens = 0
     total_cost = 0.0
 
+    # Per-session tool surface: authenticated gets list/read/write, demo gets
+    # list/read only, guest/anonymous gets nothing. ``offer_tools`` only flips
+    # whether we attach the (possibly empty) list to the request.
+    session_tools = caspian_tools.caspian_chat_tools_for(session)
+    tools_enabled = tools_enabled and bool(session_tools)
+
     MAX_TOOL_ITERATIONS = 4
     for iteration in range(MAX_TOOL_ITERATIONS + 1):
         # On the final iteration, drop tools so Claude must finalize the answer.
@@ -237,7 +243,7 @@ def answer_with_context(
                 "messages": messages,
             }
             if offer_tools:
-                request_kwargs["tools"] = caspian_tools.CASPIAN_CHAT_TOOLS
+                request_kwargs["tools"] = session_tools
             response = client.messages.create(**request_kwargs)
             duration_ms = (time.time() - start_time) * 1000
 

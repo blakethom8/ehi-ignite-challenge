@@ -14,11 +14,13 @@ from api.auth_models import (
     AuthSessionResponse,
     AuthSignupRequest,
 )
+from api.core.access_policy import Capabilities, capabilities_for
 from api.core.auth import (
     begin_demo_session,
     change_own_password,
     clear_session_cookie,
     current_session,
+    current_session_including_guest,
     delete_own_account,
     login_user,
     optional_session_response,
@@ -32,6 +34,16 @@ from api.core.auth import (
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+@router.get("/capabilities", response_model=Capabilities)
+def get_capabilities(request: Request) -> Capabilities:
+    """Return the capability surface for the current session.
+
+    Always 200 — anonymous callers get the anonymous capability shape so the
+    frontend can render the landing page without an auth round-trip.
+    """
+    return capabilities_for(current_session_including_guest(request))
 
 
 @router.get("/session", response_model=AuthSessionResponse)

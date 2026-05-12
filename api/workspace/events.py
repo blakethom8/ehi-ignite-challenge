@@ -16,6 +16,7 @@ Schema:
   target_id        TEXT NOT NULL DEFAULT ''  (run_id, tool_id, patient_id, etc.)
   payload_json     TEXT NOT NULL DEFAULT '{}'
   parent_event_id  TEXT              (optional — for threading related events)
+  mode             TEXT NOT NULL DEFAULT 'authenticated'  (anonymous | demo | authenticated | guest)
 """
 
 from __future__ import annotations
@@ -88,7 +89,8 @@ def _ensure_schema(db_path: Path | None = None) -> None:
                   event_type      TEXT NOT NULL,
                   target_id       TEXT NOT NULL DEFAULT '',
                   payload_json    TEXT NOT NULL DEFAULT '{}',
-                  parent_event_id TEXT
+                  parent_event_id TEXT,
+                  mode            TEXT NOT NULL DEFAULT 'authenticated'
                 );
                 CREATE INDEX IF NOT EXISTS idx_events_user_ts
                     ON events(user_id, ts);
@@ -101,6 +103,21 @@ def _ensure_schema(db_path: Path | None = None) -> None:
                 CREATE INDEX IF NOT EXISTS idx_events_ts ON events(ts);
                 """
             )
+            # Forward-compat migration: older events.db files won't have the
+            # ``mode`` column. Add it idempotently — matches the pattern used
+            # in api/core/tracing.py for the traces table.
+            existing_columns = {
+                row[1]
+                for row in conn.execute("PRAGMA table_info(events)").fetchall()
+            }
+            if "mode" not in existing_columns:
+                try:
+                    conn.execute(
+                        "ALTER TABLE events ADD COLUMN mode TEXT NOT NULL DEFAULT 'authenticated'"
+                    )
+                except sqlite3.OperationalError:
+                    pass
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_events_mode ON events(mode)")
         finally:
             conn.close()
         _initialized_paths.add(path)
@@ -143,6 +160,7 @@ def record_event(
     target_id: str = "",
     payload: dict[str, Any] | None = None,
     parent_event_id: str | None = None,
+    mode: str = "authenticated",
     db_path: Path | None = None,
 ) -> str:
     """Append one row to the unified events log. Returns the event_id.
@@ -159,8 +177,8 @@ def record_event(
             conn.execute(
                 """INSERT INTO events
                    (event_id, ts, user_id, session_id, workspace_kind, event_type,
-                    target_id, payload_json, parent_event_id)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    target_id, payload_json, parent_event_id, mode)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     event_id,
                     _now_iso(),
@@ -171,6 +189,7 @@ def record_event(
                     target_id or "",
                     json.dumps(redacted, default=str),
                     parent_event_id,
+                    mode or "authenticated",
                 ),
             )
         finally:
@@ -198,7 +217,7 @@ def record_event_for_session(
     parent_event_id: str | None = None,
     db_path: Path | None = None,
 ) -> str:
-    """Convenience wrapper — pulls user_id/session_id off a SessionPrincipal.
+    """Convenience wrapper — pulls user_id/session_id/mode off a SessionPrincipal.
 
     Tolerates None (returns empty string without writing) so callers in
     test paths or unauthenticated surfaces don't have to guard.
@@ -213,6 +232,7 @@ def record_event_for_session(
         target_id=target_id,
         payload=payload,
         parent_event_id=parent_event_id,
+        mode=getattr(session, "mode", None) or "anonymous",
         db_path=db_path,
     )
 
@@ -287,17 +307,21 @@ def query_events(
         rows = conn.execute(sql, params).fetchall()
     finally:
         conn.close()
-    return [
-        {
-            "event_id": r["event_id"],
-            "ts": r["ts"],
-            "user_id": r["user_id"],
-            "session_id": r["session_id"],
-            "workspace_kind": r["workspace_kind"],
-            "event_type": r["event_type"],
-            "target_id": r["target_id"],
-            "payload": json.loads(r["payload_json"] or "{}"),
-            "parent_event_id": r["parent_event_id"],
-        }
-        for r in rows
-    ]
+    out: list[dict[str, Any]] = []
+    for r in rows:
+        keys = r.keys()
+        out.append(
+            {
+                "event_id": r["event_id"],
+                "ts": r["ts"],
+                "user_id": r["user_id"],
+                "session_id": r["session_id"],
+                "workspace_kind": r["workspace_kind"],
+                "event_type": r["event_type"],
+                "target_id": r["target_id"],
+                "payload": json.loads(r["payload_json"] or "{}"),
+                "parent_event_id": r["parent_event_id"],
+                "mode": r["mode"] if "mode" in keys else "authenticated",
+            }
+        )
+    return out

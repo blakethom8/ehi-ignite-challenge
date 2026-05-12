@@ -8,7 +8,7 @@ from typing import Literal
 from pydantic import BaseModel, Field, field_validator
 
 
-AuthMode = Literal["anonymous", "demo", "authenticated"]
+AuthMode = Literal["anonymous", "demo", "authenticated", "guest"]
 AuthRole = Literal["consumer", "clinician", "attending", "coordinator", "admin"]
 
 

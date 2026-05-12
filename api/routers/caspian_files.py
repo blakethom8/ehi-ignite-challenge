@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Query, Request
 
+from api.core.access_policy import capabilities_for
 from api.core.auth import authorize_patient_access, require_access_session
 from api.core import caspian_workspace
 from api.core.caspian_workspace import (
@@ -32,7 +33,11 @@ def list_files(request: Request, patient_id: str = Query(min_length=1, max_lengt
     session = require_access_session(request)
     resolved = authorize_patient_access(session, patient_id, event_type="caspian.file.list")
     data = caspian_workspace.list_workspace(session, resolved)
-    return CaspianFileListResponse(workspace_key=data["workspace_key"], tree=data["tree"])
+    return CaspianFileListResponse(
+        workspace_key=data["workspace_key"],
+        tree=data["tree"],
+        capabilities=capabilities_for(session),
+    )
 
 
 @router.get("/read", response_model=CaspianFileReadResponse)
@@ -55,12 +60,21 @@ def read_file(
         mtime=result.mtime,
         editable=result.editable,
         kind=result.kind,
+        file_kind=result.file_kind,
     )
 
 
 @router.put("/write", response_model=CaspianFileWriteResponse)
 def write_file(payload: CaspianFileWriteRequest, request: Request) -> CaspianFileWriteResponse:
     session = require_access_session(request)
+    # Defense in depth: reject demo + guest at the route boundary before we
+    # even touch the workspace layer. The workspace layer also gates this,
+    # but this gives the API a clear 403 with a stable error message.
+    if session.is_demo or session.is_guest:
+        raise HTTPException(
+            status_code=403,
+            detail="Workspace writes require an authenticated session.",
+        )
     resolved = authorize_patient_access(session, payload.patient_id, event_type="caspian.file.write")
     try:
         result = caspian_workspace.write_workspace_file(session, resolved, payload.path, payload.content)

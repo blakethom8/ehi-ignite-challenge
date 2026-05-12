@@ -107,6 +107,25 @@ LIST_FILES_TOOL: dict[str, Any] = {
 }
 
 
+def caspian_chat_tools_for(session: SessionPrincipal | None) -> list[dict[str, Any]]:
+    """Return the tool spec list the agent should be offered for this session.
+
+    - authenticated: read + write + list
+    - demo:          read + list only (workspace is read-only sample data)
+    - guest / anonymous / unknown: no tools (Caspian is not available)
+    """
+    if session is None:
+        return []
+    if session.is_authenticated:
+        return [LIST_FILES_TOOL, READ_FILE_TOOL, WRITE_FILE_TOOL]
+    if session.is_demo:
+        return [LIST_FILES_TOOL, READ_FILE_TOOL]
+    return []
+
+
+# Deprecated: kept as a back-compat alias for older callers that read tools at
+# import time. Prefer ``caspian_chat_tools_for(session)`` so we can gate the
+# write tool per mode. Remove once no callers reference this constant.
 CASPIAN_CHAT_TOOLS: list[dict[str, Any]] = [
     LIST_FILES_TOOL,
     READ_FILE_TOOL,
@@ -209,6 +228,18 @@ def execute_tool(
     resolved_patient_id: str,
 ) -> tuple[dict[str, Any], bool]:
     """Dispatch a tool call. Returns (payload, is_error)."""
+    # Mode-aware gate for the write tool. The tool spec list itself is filtered
+    # per-session by ``caspian_chat_tools_for``, but if the model somehow tries
+    # to call ``write_file`` anyway (cached schema, prompt-injection, etc.) we
+    # surface a clean error rather than 500 from the workspace layer.
+    if name == "write_file" and not session.is_authenticated:
+        return (
+            {
+                "error": "write_file is not available in this session. "
+                "Sample workspaces are read-only."
+            },
+            True,
+        )
     executor = EXECUTORS.get(name)
     if executor is None:
         return ({"error": f"unknown tool: {name}"}, True)

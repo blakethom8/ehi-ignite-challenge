@@ -10,7 +10,7 @@ import os
 import secrets
 import sqlite3
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Literal
@@ -109,7 +109,7 @@ DEMO_PATIENT_BY_ALIAS = {item.alias_id: item for item in DEMO_PATIENTS}
 @dataclass
 class SessionPrincipal:
     session_id: str
-    mode: Literal["demo", "authenticated"]
+    mode: Literal["demo", "authenticated", "guest"]
     user_id: str | None
     email: str | None
     display_name: str | None
@@ -117,6 +117,7 @@ class SessionPrincipal:
     active_patient_id: str | None
     active_patient_name: str | None
     expires_at: datetime
+    guest_run_ids: tuple[str, ...] = field(default_factory=tuple)
 
     @property
     def is_demo(self) -> bool:
@@ -125,6 +126,10 @@ class SessionPrincipal:
     @property
     def is_authenticated(self) -> bool:
         return self.mode == "authenticated"
+
+    @property
+    def is_guest(self) -> bool:
+        return self.mode == "guest"
 
     def to_response(self) -> AuthSessionResponse:
         user = None
@@ -587,6 +592,56 @@ def current_session(request: Request) -> SessionPrincipal | None:
     if session_id is None:
         return None
     return _lookup_session(session_id)
+
+
+def _guest_principal_from_request(request: Request) -> SessionPrincipal | None:
+    """Synthesize a guest SessionPrincipal from the harmonization cookie.
+
+    Guest sessions are not stored in the auth.db sessions table — they live in
+    the signed ``atlas_guest_harmonization`` cookie. This adapter lets the rest
+    of the app treat them as a SessionPrincipal at the request boundary.
+    """
+    # Import locally to avoid an import cycle with api.core.guest_harmonization
+    # (which may eventually pull from this module).
+    from api.core import guest_harmonization as guest_module
+
+    raw = request.cookies.get(guest_module.GUEST_COOKIE_NAME)
+    state = guest_module.parse_cookie(raw)
+    if not state.run_ids:
+        return None
+    primary = state.run_ids[0] if state.run_ids else "anon"
+    expires_at = datetime.now(UTC) + timedelta(hours=guest_module.GUEST_TTL_HOURS)
+    return SessionPrincipal(
+        session_id=f"guest-{primary}",
+        mode="guest",
+        user_id=None,
+        email=None,
+        display_name=None,
+        role="consumer",
+        active_patient_id=None,
+        active_patient_name=None,
+        expires_at=expires_at,
+        guest_run_ids=tuple(state.run_ids),
+    )
+
+
+def current_session_including_guest(request: Request) -> SessionPrincipal | None:
+    """Resolve the active session OR a guest principal from the harmonization cookie."""
+    session = current_session(request)
+    if session is not None:
+        return session
+    return _guest_principal_from_request(request)
+
+
+def require_session_or_guest(request: Request) -> SessionPrincipal:
+    """Require any session — demo, authenticated, OR guest. Raises 401 otherwise."""
+    principal = current_session_including_guest(request)
+    if principal is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Sign in, choose a demo patient, or start a guest run first.",
+        )
+    return principal
 
 
 def optional_session_response(request: Request) -> AuthSessionResponse:

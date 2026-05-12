@@ -43,8 +43,25 @@ _WORKSPACES_ROOT = _REPO_ROOT / "data" / "caspian-workspaces"
 MAX_FILE_BYTES = 200_000
 MAX_PATH_LENGTH = 200
 
-WRITABLE_PREFIXES = ("notes/", "workflow-runs/")
-WRITABLE_FILES = {"user-instructions.md"}
+# File-kind taxonomy:
+#   "system"     — virtual system-context tree, always read-only
+#   "user"       — clinician-authored files (notes/, user-instructions.md)
+#   "generated"  — workflow-run artifacts (workflow-runs/), read-only to users
+#   "demo-seed"  — virtual sample files shown only in demo mode (P3)
+#
+# Writes split:
+#   USER_WRITABLE_*       — user-authored paths, gated by session.is_authenticated
+#   GENERATED_WRITABLE_*  — system-generated paths (workflow runner), same gate
+#
+# Demo and guest sessions can never write. The route-layer gate in
+# api/routers/caspian_files.py provides defense in depth.
+USER_WRITABLE_PREFIXES = ("notes/",)
+GENERATED_WRITABLE_PREFIXES = ("workflow-runs/",)
+USER_WRITABLE_FILES = {"user-instructions.md"}
+
+# Backwards-compat aliases — keep until all callers migrate.
+WRITABLE_PREFIXES = USER_WRITABLE_PREFIXES + GENERATED_WRITABLE_PREFIXES
+WRITABLE_FILES = USER_WRITABLE_FILES
 
 USER_INSTRUCTIONS_PATH = "user-instructions.md"
 
@@ -101,7 +118,14 @@ def _folder(name: str, children: list[dict], expanded: bool = False) -> dict:
     }
 
 
-def _file(name: str, path: str, *, editable: bool, dirty: bool = False) -> dict:
+def _file(
+    name: str,
+    path: str,
+    *,
+    editable: bool,
+    kind: str = "user",
+    dirty: bool = False,
+) -> dict:
     return {
         "type": "file",
         "name": name,
@@ -110,6 +134,7 @@ def _file(name: str, path: str, *, editable: bool, dirty: bool = False) -> dict:
         "icon": _icon_for_ext(_ext(name)),
         "dirty": dirty,
         "editable": editable,
+        "kind": kind,
     }
 
 
@@ -185,10 +210,32 @@ def _normalize_relative_path(raw: str) -> str:
     return "/".join(parts)
 
 
-def _is_writable_path(rel_path: str) -> bool:
-    if rel_path in WRITABLE_FILES:
+def _is_user_writable_path(rel_path: str) -> bool:
+    """User-authored content (notes/, user-instructions.md)."""
+    if rel_path in USER_WRITABLE_FILES:
         return True
-    return any(rel_path.startswith(prefix) for prefix in WRITABLE_PREFIXES)
+    return any(rel_path.startswith(prefix) for prefix in USER_WRITABLE_PREFIXES)
+
+
+def _is_generated_writable_path(rel_path: str) -> bool:
+    """System-generated artifacts (workflow-runs/)."""
+    return any(rel_path.startswith(prefix) for prefix in GENERATED_WRITABLE_PREFIXES)
+
+
+def _is_writable_path(rel_path: str) -> bool:
+    """Legacy combined check — kept for back-compat. Prefer the split helpers."""
+    return _is_user_writable_path(rel_path) or _is_generated_writable_path(rel_path)
+
+
+def _kind_for_path(rel_path: str) -> str:
+    """Map a workspace-relative path to its file-kind tag."""
+    if _is_system_context_path(rel_path):
+        return "system"
+    if _is_generated_writable_path(rel_path):
+        return "generated"
+    if _is_user_writable_path(rel_path):
+        return "user"
+    return "user"
 
 
 def _is_system_context_path(rel_path: str) -> bool:
@@ -215,6 +262,9 @@ class FileReadResult:
     mtime: datetime | None
     editable: bool
     kind: str
+    """``kind_for_ext`` — markdown/json/text (legacy content-format field)."""
+    file_kind: str = "user"
+    """File-kind taxonomy: system / user / generated / demo-seed."""
 
 
 def read_workspace_file(
@@ -225,6 +275,7 @@ def read_workspace_file(
     rel_path = _normalize_relative_path(raw_path)
     ext = _ext(rel_path.rsplit("/", 1)[-1])
     kind = _kind_for_ext(ext)
+    file_kind = _kind_for_path(rel_path)
 
     if _is_system_context_path(rel_path):
         content = caspian_context_files.render_virtual_file(rel_path, resolved_patient_id)
@@ -234,6 +285,7 @@ def read_workspace_file(
             mtime=None,
             editable=False,
             kind=kind,
+            file_kind="system",
         )
 
     root = workspace_root(session, resolved_patient_id)
@@ -249,19 +301,23 @@ def read_workspace_file(
                 path=rel_path,
                 content="",
                 mtime=None,
-                editable=True,
+                editable=session.is_authenticated,
                 kind="markdown",
+                file_kind="user",
             )
         raise WorkspaceNotFoundError(rel_path)
     if not target.is_file():
         raise WorkspacePathError("path is not a file")
     content = target.read_text(encoding="utf-8")
+    # Editable iff this is a user-authored path AND the caller is authenticated.
+    editable = file_kind == "user" and session.is_authenticated
     return FileReadResult(
         path=rel_path,
         content=content,
         mtime=datetime.fromtimestamp(target.stat().st_mtime, tz=timezone.utc),
-        editable=_is_writable_path(rel_path),
+        editable=editable,
         kind=kind,
+        file_kind=file_kind,
     )
 
 
@@ -277,34 +333,8 @@ class FileWriteResult:
     mtime: datetime
 
 
-def write_workspace_file(
-    session: SessionPrincipal,
-    resolved_patient_id: str,
-    raw_path: str,
-    content: str,
-) -> FileWriteResult:
-    rel_path = _normalize_relative_path(raw_path)
-
-    if _is_system_context_path(rel_path):
-        raise WorkspaceForbiddenError("system-context/ is read-only")
-    if not _is_writable_path(rel_path):
-        raise WorkspaceForbiddenError(f"writes are not allowed at {rel_path!r}")
-
-    if not isinstance(content, str):
-        raise WorkspacePathError("content must be a string")
-    encoded = content.encode("utf-8")
-    if len(encoded) > MAX_FILE_BYTES:
-        raise WorkspacePathError(f"content exceeds {MAX_FILE_BYTES} byte limit")
-
-    root = workspace_root(session, resolved_patient_id)
-    target = (root / rel_path).resolve()
-    try:
-        target.relative_to(root.resolve())
-    except ValueError as exc:
-        raise WorkspacePathError("path escapes workspace") from exc
-
+def _atomic_write(target: Path, encoded: bytes) -> FileWriteResult:
     target.parent.mkdir(parents=True, exist_ok=True)
-
     # Atomic write: tmp file in the same dir, then rename.
     fd, tmp_name = tempfile.mkstemp(dir=str(target.parent), prefix=".tmp-", suffix=".part")
     tmp_path = Path(tmp_name)
@@ -315,11 +345,102 @@ def write_workspace_file(
     except Exception:
         tmp_path.unlink(missing_ok=True)
         raise
-
     return FileWriteResult(
-        path=rel_path,
+        path=str(target.name),
         bytes=len(encoded),
         mtime=datetime.fromtimestamp(target.stat().st_mtime, tz=timezone.utc),
+    )
+
+
+def _resolve_write_target(
+    session: SessionPrincipal,
+    resolved_patient_id: str,
+    rel_path: str,
+) -> Path:
+    root = workspace_root(session, resolved_patient_id)
+    target = (root / rel_path).resolve()
+    try:
+        target.relative_to(root.resolve())
+    except ValueError as exc:
+        raise WorkspacePathError("path escapes workspace") from exc
+    return target
+
+
+def write_workspace_file(
+    session: SessionPrincipal,
+    resolved_patient_id: str,
+    raw_path: str,
+    content: str,
+) -> FileWriteResult:
+    """Write a USER-authored file. Authenticated sessions only.
+
+    User files live under ``notes/`` or are the bare ``user-instructions.md``.
+    Generated workflow-run artifacts must go through ``write_generated_artifact``.
+    """
+    rel_path = _normalize_relative_path(raw_path)
+
+    if _is_system_context_path(rel_path):
+        raise WorkspaceForbiddenError("system-context/ is read-only")
+    if not session.is_authenticated:
+        raise WorkspaceForbiddenError(
+            "Workspace writes require an authenticated session."
+        )
+    if not _is_user_writable_path(rel_path):
+        raise WorkspaceForbiddenError(
+            f"Path is not user-writable: {rel_path!r}. "
+            "User-writable paths: notes/ or user-instructions.md."
+        )
+
+    if not isinstance(content, str):
+        raise WorkspacePathError("content must be a string")
+    encoded = content.encode("utf-8")
+    if len(encoded) > MAX_FILE_BYTES:
+        raise WorkspacePathError(f"content exceeds {MAX_FILE_BYTES} byte limit")
+
+    target = _resolve_write_target(session, resolved_patient_id, rel_path)
+    result = _atomic_write(target, encoded)
+    return FileWriteResult(
+        path=rel_path,
+        bytes=result.bytes,
+        mtime=result.mtime,
+    )
+
+
+def write_generated_artifact(
+    session: SessionPrincipal,
+    resolved_patient_id: str,
+    raw_path: str,
+    content: str,
+) -> FileWriteResult:
+    """Write a SYSTEM-GENERATED artifact (e.g. a workflow-run output).
+
+    Same authenticated-only gate as user writes. Demo and guest sessions get a
+    ``WorkspaceForbiddenError`` — demo workflow runs are not persisted to disk.
+    """
+    rel_path = _normalize_relative_path(raw_path)
+
+    if not session.is_authenticated:
+        raise WorkspaceForbiddenError(
+            "Workspace writes require an authenticated session."
+        )
+    if not _is_generated_writable_path(rel_path):
+        raise WorkspaceForbiddenError(
+            f"Path is not a generated-artifact path: {rel_path!r}. "
+            "Generated paths: workflow-runs/."
+        )
+
+    if not isinstance(content, str):
+        raise WorkspacePathError("content must be a string")
+    encoded = content.encode("utf-8")
+    if len(encoded) > MAX_FILE_BYTES:
+        raise WorkspacePathError(f"content exceeds {MAX_FILE_BYTES} byte limit")
+
+    target = _resolve_write_target(session, resolved_patient_id, rel_path)
+    result = _atomic_write(target, encoded)
+    return FileWriteResult(
+        path=rel_path,
+        bytes=result.bytes,
+        mtime=result.mtime,
     )
 
 
@@ -328,8 +449,15 @@ def write_workspace_file(
 # ---------------------------------------------------------------------------
 
 
-def _list_on_disk(root: Path) -> tuple[list[dict], list[dict], dict | None]:
-    """Return (notes_children, workflow_runs_children, user_instructions_file)."""
+def _list_on_disk(
+    root: Path, *, user_editable: bool
+) -> tuple[list[dict], list[dict], dict | None]:
+    """Return (notes_children, workflow_runs_children, user_instructions_file).
+
+    ``user_editable`` flips the editable flag for user-authored files based on
+    the caller's session mode — only authenticated sessions get edit affordance.
+    Generated artifacts (workflow-runs/) are never editable regardless of mode.
+    """
     notes_children: list[dict] = []
     runs_children: list[dict] = []
     user_instructions: dict | None = None
@@ -341,7 +469,8 @@ def _list_on_disk(root: Path) -> tuple[list[dict], list[dict], dict | None]:
             user_instructions = _file(
                 USER_INSTRUCTIONS_PATH,
                 USER_INSTRUCTIONS_PATH,
-                editable=True,
+                editable=user_editable,
+                kind="user",
                 dirty=ui_target.stat().st_size > 0,
             )
 
@@ -354,7 +483,12 @@ def _list_on_disk(root: Path) -> tuple[list[dict], list[dict], dict | None]:
                 if entry.name.startswith("."):
                     continue
                 notes_children.append(
-                    _file(entry.name, f"notes/{entry.name}", editable=True)
+                    _file(
+                        entry.name,
+                        f"notes/{entry.name}",
+                        editable=user_editable,
+                        kind="user",
+                    )
                 )
 
         # workflow-runs/
@@ -365,7 +499,12 @@ def _list_on_disk(root: Path) -> tuple[list[dict], list[dict], dict | None]:
             entries.sort(key=lambda e: e.stat().st_mtime, reverse=True)
             for entry in entries:
                 runs_children.append(
-                    _file(entry.name, f"workflow-runs/{entry.name}", editable=True)
+                    _file(
+                        entry.name,
+                        f"workflow-runs/{entry.name}",
+                        editable=False,
+                        kind="generated",
+                    )
                 )
 
     # user-instructions.md placeholder if not on disk.
@@ -373,7 +512,8 @@ def _list_on_disk(root: Path) -> tuple[list[dict], list[dict], dict | None]:
         user_instructions = _file(
             USER_INSTRUCTIONS_PATH,
             USER_INSTRUCTIONS_PATH,
-            editable=True,
+            editable=user_editable,
+            kind="user",
             dirty=False,
         )
 
@@ -382,7 +522,7 @@ def _list_on_disk(root: Path) -> tuple[list[dict], list[dict], dict | None]:
 
 def _system_context_tree() -> dict:
     workflows = [
-        _file(name, f"system-context/workflows/{name}", editable=False)
+        _file(name, f"system-context/workflows/{name}", editable=False, kind="system")
         for name in (
             "preop_review_v1.md",
             "medication_safety_v1.md",
@@ -396,11 +536,13 @@ def _system_context_tree() -> dict:
                 "caspian-system-prompt.md",
                 "system-context/caspian-system-prompt.md",
                 editable=False,
+                kind="system",
             ),
             _file(
                 "patient-chart-context.md",
                 "system-context/patient-chart-context.md",
                 editable=False,
+                kind="system",
             ),
             _folder("workflows", workflows, expanded=False),
         ],
@@ -414,7 +556,9 @@ def list_workspace(
 ) -> dict:
     """Return the file tree shape the frontend FilesPane consumes."""
     root = workspace_root(session, resolved_patient_id)
-    notes_children, runs_children, user_instructions = _list_on_disk(root)
+    notes_children, runs_children, user_instructions = _list_on_disk(
+        root, user_editable=session.is_authenticated
+    )
 
     tree: list[dict] = [
         _group("Patient workspace"),

@@ -42,7 +42,9 @@ describe("Landing", () => {
     expect(screen.getByText("Atlas data flow")).toBeInTheDocument();
     expect(screen.getAllByText("Harmonize + prepare").length).toBeGreaterThan(0);
     expect(screen.getByText("One patient record. Multiple downstream environments.")).toBeInTheDocument();
-    expect(screen.getByText("One harmonized patient record, four ways to work from it.")).toBeInTheDocument();
+    expect(
+      screen.getByText("One harmonized patient record, three prepared applications, and data you can take anywhere."),
+    ).toBeInTheDocument();
     expect(screen.getByText("Data harmonizer")).toBeInTheDocument();
     expect(screen.getAllByText("FHIR Charts").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Caspian").length).toBeGreaterThan(0);

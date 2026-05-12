@@ -144,7 +144,7 @@ export function Landing() {
                   Workspace surfaces
                 </p>
                 <h2 className="mt-2 text-3xl font-semibold tracking-[-0.03em] text-[#18202b] sm:text-4xl">
-                  One harmonized patient record, four ways to work from it.
+                  One harmonized patient record, three prepared applications, and data you can take anywhere.
                 </h2>
               </div>
               <p className="max-w-3xl text-sm leading-7 text-[#62728d]">

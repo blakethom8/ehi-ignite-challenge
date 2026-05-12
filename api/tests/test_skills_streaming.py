@@ -43,6 +43,36 @@ def isolated_cases_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path
     return cases_root
 
 
+@pytest.fixture(autouse=True)
+def fake_skills_session(monkeypatch: pytest.MonkeyPatch):
+    """Stand in for require_access_session in skill router tests.
+
+    H0.7 made every POST require an authenticated session. The pre-existing
+    tests in this file hit those endpoints without setting a cookie, so
+    rather than re-route every test through the auth flow, we stub the
+    session check at the router import site.
+    """
+    from datetime import datetime, timedelta, timezone
+
+    from api.core.auth import SessionPrincipal
+    from api.routers import skills as skills_router
+
+    principal = SessionPrincipal(
+        session_id="sess_test",
+        mode="authenticated",
+        user_id="u_test_clinician",
+        email="test@atlas.local",
+        display_name="Test Clinician",
+        role="clinician",
+        active_patient_id=None,
+        active_patient_name=None,
+        expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+    )
+    monkeypatch.setattr(skills_router, "require_access_session", lambda req: principal)
+    monkeypatch.setattr(skills_router, "current_session", lambda req: principal)
+    return principal
+
+
 @pytest.fixture()
 def trial_skill():
     return load_skill(SKILLS_ROOT / "trial-matching")

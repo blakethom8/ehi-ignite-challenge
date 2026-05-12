@@ -27,7 +27,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from api.core.auth import current_session
+from api.core.auth import current_session, require_access_session
 from api.core.skills import workspace as workspace_module
 from api.workspace.events import WORKSPACE_SKILL, record_event_for_session
 from api.core.skills.event_hub import EventHub
@@ -376,15 +376,14 @@ def get_skill_detail(skill_name: str) -> SkillDetail:
 async def start_run(
     skill_name: str, payload: RunStartRequest, request: Request
 ) -> RunStartResponse:
+    session = require_access_session(request)
     skill = _resolve_skill(skill_name)
     pool = get_pool()
     run_id, _task = await pool.submit(
         skill=skill, patient_id=payload.patient_id, brief=payload.brief
     )
-    # Best-effort audit event — current_session is None for unauthenticated
-    # callers, in which case record_event_for_session is a no-op.
     record_event_for_session(
-        current_session(request),
+        session,
         workspace_kind=WORKSPACE_SKILL,
         event_type="run.started",
         target_id=run_id,
@@ -499,7 +498,9 @@ async def set_canvas_node_selection(
     node_id: str,
     patient_id: str,
     payload: CanvasSelectionRequest,
+    request: Request,
 ) -> CanvasNodeModel:
+    require_access_session(request)
     skill = _resolve_skill(skill_name)
     workspace = _resolve_workspace(skill, patient_id, run_id)
     pool = get_pool()
@@ -631,7 +632,9 @@ async def add_run_message(
     run_id: str,
     patient_id: str,
     payload: RunMessageRequest,
+    request: Request,
 ) -> RunMessageModel:
+    require_access_session(request)
     """Add a clinician/patient steering message to an active run.
 
     REST is the uplink; SSE remains the downlink. If the run is active, attach
@@ -770,7 +773,9 @@ async def resolve_escalation(
     approval_id: str,
     patient_id: str,
     payload: EscalationResolutionRequest,
+    request: Request,
 ) -> RunStateResponse:
+    require_access_session(request)
     skill = _resolve_skill(skill_name)
     workspace = _resolve_workspace(skill, patient_id, run_id)
     try:
@@ -800,7 +805,9 @@ async def save_run(
     run_id: str,
     patient_id: str,
     payload: SaveRequest,
+    request: Request,
 ) -> SaveResponse:
+    require_access_session(request)
     skill = _resolve_skill(skill_name)
     workspace = _resolve_workspace(skill, patient_id, run_id)
 
@@ -879,7 +886,9 @@ async def list_trial_pursuits(patient_id: str) -> TrialPursuitListResponse:
 async def upsert_trial_pursuit(
     patient_id: str,
     payload: TrialPursuitUpsertRequest,
+    request: Request,
 ) -> TrialPursuitModel:
+    require_access_session(request)
     store = TrialPursuitStore(patient_id)
     try:
         pursuit = store.upsert(payload.model_dump(exclude={"actor"}), actor=payload.actor)
@@ -896,7 +905,9 @@ async def update_trial_pursuit(
     patient_id: str,
     pursuit_id: str,
     payload: TrialPursuitUpdateRequest,
+    request: Request,
 ) -> TrialPursuitModel:
+    require_access_session(request)
     store = TrialPursuitStore(patient_id)
     try:
         pursuit = store.update(
@@ -917,7 +928,9 @@ async def add_trial_pursuit_event(
     patient_id: str,
     pursuit_id: str,
     payload: TrialPursuitEventRequest,
+    request: Request,
 ) -> TrialPursuitModel:
+    require_access_session(request)
     store = TrialPursuitStore(patient_id)
     try:
         pursuit = store.add_event(
@@ -940,7 +953,9 @@ async def add_trial_pursuit_task(
     patient_id: str,
     pursuit_id: str,
     payload: TrialPursuitTaskRequest,
+    request: Request,
 ) -> TrialPursuitModel:
+    require_access_session(request)
     store = TrialPursuitStore(patient_id)
     try:
         pursuit = store.add_task(

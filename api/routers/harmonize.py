@@ -614,6 +614,7 @@ def export_workspace_package(
     include_originals: bool = False,
     audience: str | None = None,
     snapshot: str | None = None,
+    include_narrative_history: bool = True,
 ) -> FileResponse:
     """Download a portable patient-owned EHI Atlas workspace package.
 
@@ -670,12 +671,14 @@ def export_workspace_package(
     out = out_dir / filename
 
     try:
+        workspace_input = workspace_input_from_collection(
+            collection_id,
+            audience=audience,
+            run_id=run_id,
+        )
+        workspace_input.include_narrative_history = include_narrative_history
         build_package_from_input(
-            workspace_input_from_collection(
-                collection_id,
-                audience=audience,
-                run_id=run_id,
-            ),
+            workspace_input,
             out,
             include_originals=include_originals,
         )
@@ -687,6 +690,45 @@ def export_workspace_package(
         media_type="application/zip",
         filename=out.name,
     )
+
+
+@router.get("/{collection_id}/snapshots/{snapshot_id}/diff")
+def get_snapshot_diff(
+    request: Request,
+    collection_id: str,
+    snapshot_id: str,
+    against: str | None = None,
+) -> dict:
+    """Compute the fact-level diff between two snapshots.
+
+    When ``against`` is omitted, diffs against the chronologically previous
+    snapshot. 404 when either snapshot is missing or when ``snapshot_id`` is
+    the earliest snapshot (no predecessor to diff against).
+    """
+    require_authenticated_session(request)
+    if harmonize_service.get_collection(collection_id) is None:
+        raise HTTPException(status_code=404, detail=f"Collection not found: {collection_id}")
+
+    from api.core import published_charts
+
+    against_id = against
+    if against_id is None:
+        against_id = published_charts.previous_snapshot_id(collection_id, snapshot_id)
+        if against_id is None:
+            raise HTTPException(
+                status_code=404,
+                detail=(
+                    f"Snapshot '{snapshot_id}' has no chronologically previous snapshot "
+                    "to diff against. Pass ?against=<other_snapshot_id> explicitly."
+                ),
+            )
+
+    try:
+        return published_charts.compute_snapshot_diff(
+            collection_id, against_id, snapshot_id
+        )
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @router.get(

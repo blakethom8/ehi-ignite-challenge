@@ -1,4 +1,4 @@
-import { Download } from "lucide-react";
+import { Download, GitCompare } from "lucide-react";
 import type { PublishedChartSnapshot } from "../../../types";
 
 function signedCount(value: number): string {
@@ -30,6 +30,7 @@ export function SnapshotList({
   activatingSnapshotId,
   onActivate,
   buildDownloadHref,
+  onDiff,
   emptyMessage,
   showHeader = true,
 }: {
@@ -43,9 +44,21 @@ export function SnapshotList({
    * Readiness page which uses its own existing download UI).
    */
   buildDownloadHref?: (snapshotId: string) => string;
+  /**
+   * Optional callback for the per-row Diff button. The earliest snapshot
+   * has its Diff button disabled (no chronological predecessor to diff
+   * against). When undefined, no Diff button renders.
+   */
+  onDiff?: (snapshotId: string) => void;
   emptyMessage?: string;
   showHeader?: boolean;
 }) {
+  // Earliest snapshot (oldest published_at) has no predecessor to diff against.
+  const earliestSnapshotId = snapshots.length
+    ? [...snapshots].sort(
+        (a, b) => (a.published_at || "").localeCompare(b.published_at || ""),
+      )[0].snapshot_id
+    : null;
   return (
     <div className="overflow-hidden rounded-lg border border-[#dfe4ea] bg-white">
       {showHeader && (
@@ -116,6 +129,22 @@ export function SnapshotList({
                     <Download size={13} />
                     Bundle
                   </a>
+                )}
+                {onDiff && (
+                  <button
+                    type="button"
+                    onClick={() => onDiff(snapshot.snapshot_id)}
+                    disabled={snapshot.snapshot_id === earliestSnapshotId}
+                    title={
+                      snapshot.snapshot_id === earliestSnapshotId
+                        ? "Earliest snapshot has no predecessor to diff against"
+                        : "Diff against the chronologically previous snapshot"
+                    }
+                    className="inline-flex items-center gap-1 rounded-lg border border-[#dfe4ea] bg-white px-2.5 py-2 text-xs font-semibold text-[#555a6a] hover:border-[#5b76fe] hover:text-[#5b76fe] disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <GitCompare size={13} />
+                    Diff
+                  </button>
                 )}
               </div>
             </div>

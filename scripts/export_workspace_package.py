@@ -60,6 +60,10 @@ class WorkspaceInput:
     carries ``{markdown_files: {filename: contents}, session_json: dict,
     session_id: str}``. Folded into ``context/`` in the ZIP and into
     ``packets/patient-summary.context.json``."""
+    include_narrative_history: bool = True
+    """When True (the default), prior FHIR Composition versions for each
+    episode ship under ``fhir/narratives/<slug>/history/<timestamp>.json``
+    alongside the current narrative. Pass ``False`` to keep bundles small."""
 FHIR_TYPES = {
     "Observation",
     "Condition",
@@ -1097,13 +1101,27 @@ def build_terminology_slices(code_index: dict[str, set[str]]) -> dict[str, dict[
     return slices
 
 
-def load_patient_narratives(patient_id: str | None) -> list[dict[str, Any]]:
+def load_patient_narratives(
+    patient_id: str | None,
+    *,
+    include_history: bool = False,
+) -> list[dict[str, Any]]:
     """Return Composition resources for each episode that has a current narrative.
 
     Reads from ``data/narratives/<patient_id>/<slug>/current.json`` directly to
     avoid forcing the export script to import ``lib.narratives.storage`` (which
     pulls in optional generator deps). Yields ``[]`` when no narratives exist
     for this patient (common for Guest runs).
+
+    Each entry has shape::
+
+        {
+            "episode_slug": str,
+            "composition": dict[str, Any],     # current
+            "history": list[{"timestamp": str, "composition": dict}],  # oldest-first
+        }
+
+    ``history`` is empty unless ``include_history=True``.
     """
     if not patient_id:
         return []
@@ -1121,8 +1139,26 @@ def load_patient_narratives(patient_id: str | None) -> list[dict[str, Any]]:
             composition = read_json(current)
         except Exception:
             continue
-        if isinstance(composition, dict):
-            out.append({"episode_slug": slug_dir.name, "composition": composition})
+        if not isinstance(composition, dict):
+            continue
+        history: list[dict[str, Any]] = []
+        if include_history:
+            history_dir = slug_dir / "history"
+            if history_dir.exists():
+                for hpath in sorted(history_dir.glob("*.json")):
+                    try:
+                        archived = read_json(hpath)
+                    except Exception:
+                        continue
+                    if isinstance(archived, dict):
+                        history.append({"timestamp": hpath.stem, "composition": archived})
+        out.append(
+            {
+                "episode_slug": slug_dir.name,
+                "composition": composition,
+                "history": history,
+            }
+        )
     return out
 
 
@@ -1355,7 +1391,10 @@ def build_package_from_input(
         patient_id_for_narratives = (
             (evidence.get("patient") or {}).get("id") if isinstance(evidence.get("patient"), dict) else None
         )
-        narratives = load_patient_narratives(patient_id_for_narratives)
+        narratives = load_patient_narratives(
+            patient_id_for_narratives,
+            include_history=workspace_input.include_narrative_history,
+        )
         packets = build_packets(
             collection,
             evidence,
@@ -1393,6 +1432,10 @@ def build_package_from_input(
             manifest_files.append(f"terminology/{slice_name}")
         for narrative in narratives:
             manifest_files.append(f"fhir/narratives/{narrative['episode_slug']}.json")
+            for archived in narrative.get("history") or []:
+                manifest_files.append(
+                    f"fhir/narratives/{narrative['episode_slug']}/history/{archived['timestamp']}.json"
+                )
 
         # Patient context — markdown + session.json from /patient-record/context
         patient_context = workspace_input.patient_context
@@ -1523,12 +1566,20 @@ def build_package_from_input(
         for slice_name, slice_payload in terminology_slices.items():
             write_json(root / "terminology" / slice_name, slice_payload)
 
-        # Per-episode FHIR Compositions (only present when authored upstream)
+        # Per-episode FHIR Compositions (only present when authored upstream).
+        # When include_narrative_history is set on the workspace input (default),
+        # prior versions are co-located under history/.
         for narrative in narratives:
+            slug = narrative["episode_slug"]
             write_json(
-                root / "fhir" / "narratives" / f"{narrative['episode_slug']}.json",
+                root / "fhir" / "narratives" / f"{slug}.json",
                 narrative["composition"],
             )
+            for archived in narrative.get("history") or []:
+                write_json(
+                    root / "fhir" / "narratives" / slug / "history" / f"{archived['timestamp']}.json",
+                    archived["composition"],
+                )
 
         # Patient context — markdown + session payload (auth path only; Guest
         # collects voice + audience inline through /api/guest-harmonization/runs/.../context)

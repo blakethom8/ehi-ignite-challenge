@@ -755,4 +755,59 @@ export const api = {
         `/patient-context/${encodeURIComponent(patientId)}/narratives/${encodeURIComponent(episodeSlug)}`,
       )
       .then((r) => r.data),
+
+  getNarrativeHistory: (
+    patientId: string,
+    episodeSlug: string,
+  ): Promise<{
+    patient_id: string;
+    episode_slug: string;
+    versions: Array<{
+      timestamp: string;
+      composition_id: string | null;
+      replaces_id: string | null;
+      archived_path: string;
+    }>;
+  }> =>
+    http
+      .get(
+        `/patient-context/${encodeURIComponent(patientId)}/narratives/${encodeURIComponent(episodeSlug)}/history`,
+      )
+      .then((r) => r.data),
+
+  getArchivedNarrative: (
+    patientId: string,
+    episodeSlug: string,
+    timestamp: string,
+  ): Promise<FhirComposition> =>
+    http
+      .get<FhirComposition>(
+        `/patient-context/${encodeURIComponent(patientId)}/narratives/${encodeURIComponent(episodeSlug)}/history/${encodeURIComponent(timestamp)}`,
+      )
+      .then((r) => r.data),
+
+  getSnapshotDiff: (
+    collectionId: string,
+    snapshotId: string,
+    against?: string,
+  ): Promise<{
+    snapshot_a: { snapshot_id: string; run_id: string; published_at: string | null };
+    snapshot_b: { snapshot_id: string; run_id: string; published_at: string | null };
+    categories: Record<
+      string,
+      {
+        added: Array<{ merged_ref: string; label: string; value: string }>;
+        removed: Array<{ merged_ref: string; label: string; value: string }>;
+        changed: Array<{ merged_ref: string; label: string; before: string; after: string }>;
+      }
+    >;
+    totals: { added: number; removed: number; changed: number };
+  }> =>
+    http
+      .get(
+        `/harmonize/${encodeURIComponent(collectionId)}/snapshots/${encodeURIComponent(snapshotId)}/diff${
+          against ? `?against=${encodeURIComponent(against)}` : ""
+        }`,
+      )
+      .then((r) => r.data),
 };

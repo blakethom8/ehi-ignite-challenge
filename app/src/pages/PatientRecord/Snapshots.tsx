@@ -4,6 +4,8 @@ import { useSearchParams } from "react-router-dom";
 import { History } from "lucide-react";
 import { api } from "../../api/client";
 import { SnapshotList } from "../../components/atlas/snapshots/SnapshotList";
+import { NarrativeHistoryPanel } from "../../components/atlas/snapshots/NarrativeHistoryPanel";
+import { SnapshotDiffModal } from "../../components/atlas/snapshots/SnapshotDiffModal";
 
 type BundleAudience =
   | ""
@@ -33,6 +35,7 @@ export function PatientRecordSnapshots() {
   const [activatingId, setActivatingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [audience, setAudience] = useState<BundleAudience>("");
+  const [diffSnapshotId, setDiffSnapshotId] = useState<string | null>(null);
 
   const publishedQuery = useQuery({
     queryKey: ["published-chart", collectionId],
@@ -144,7 +147,22 @@ export function PatientRecordSnapshots() {
               if (audience) params.set("audience", audience);
               return `/api/harmonize/${encodeURIComponent(collectionId)}/export-workspace?${params.toString()}`;
             }}
+            onDiff={(snapshotId) => setDiffSnapshotId(snapshotId)}
           />
+
+          {patientId && (
+            <div className="mt-6">
+              <NarrativeHistoryPanel patientId={patientId} />
+            </div>
+          )}
+
+          {diffSnapshotId && collectionId && (
+            <SnapshotDiffModal
+              collectionId={collectionId}
+              snapshotId={diffSnapshotId}
+              onClose={() => setDiffSnapshotId(null)}
+            />
+          )}
         </>
       )}
     </div>

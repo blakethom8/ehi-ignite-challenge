@@ -162,6 +162,166 @@ def get_snapshot(collection_id: str, snapshot_id: str) -> dict[str, Any] | None:
     return None
 
 
+_DIFF_CATEGORIES = (
+    "observations",
+    "conditions",
+    "medications",
+    "allergies",
+    "immunizations",
+)
+
+
+def _fact_label(category: str, fact: dict[str, Any]) -> str:
+    if category == "observations":
+        return str(fact.get("canonical_name") or fact.get("name") or fact.get("merged_ref") or "")
+    if category in ("medications", "allergies", "immunizations", "conditions"):
+        return str(fact.get("canonical_name") or fact.get("display") or fact.get("name") or fact.get("merged_ref") or "")
+    return str(fact.get("merged_ref") or "")
+
+
+def _fact_summary_value(category: str, fact: dict[str, Any]) -> str:
+    if category == "observations":
+        latest = fact.get("latest") or {}
+        value = latest.get("value")
+        unit = latest.get("unit") or ""
+        if value is None:
+            return ""
+        return f"{value} {unit}".strip()
+    if category == "medications":
+        latest = fact.get("latest") or {}
+        return str(latest.get("status") or fact.get("status") or "")
+    if category == "conditions":
+        return str(fact.get("clinical_status") or fact.get("status") or "")
+    return ""
+
+
+def _index_facts(candidate_record: dict[str, Any]) -> dict[str, dict[str, dict[str, Any]]]:
+    """Build {category -> {merged_ref -> fact}} from a run's candidate_record."""
+    by_category: dict[str, dict[str, dict[str, Any]]] = {}
+    for category in _DIFF_CATEGORIES:
+        rows = candidate_record.get(category) or []
+        index: dict[str, dict[str, Any]] = {}
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            ref = row.get("merged_ref") or row.get("name") or row.get("canonical_name")
+            if not ref:
+                continue
+            index[str(ref)] = row
+        by_category[category] = index
+    return by_category
+
+
+def compute_snapshot_diff(
+    collection_id: str, snapshot_a: str, snapshot_b: str
+) -> dict[str, Any]:
+    """Compute the per-category fact-level diff between two snapshots.
+
+    Returns ``{snapshot_a, snapshot_b, categories: {category: {added, removed,
+    changed}}, totals}``. Each fact entry includes ``merged_ref``, ``label``,
+    and (when applicable) the value/status snapshot from each side.
+
+    Raises ``FileNotFoundError`` if either snapshot or its underlying run is
+    missing.
+    """
+    from api.core import harmonization_runs
+
+    snap_a = get_snapshot(collection_id, snapshot_a)
+    snap_b = get_snapshot(collection_id, snapshot_b)
+    if snap_a is None or snap_b is None:
+        raise FileNotFoundError(snapshot_a if snap_a is None else snapshot_b)
+
+    run_a = harmonization_runs.get_run(collection_id, snap_a["run_id"])
+    run_b = harmonization_runs.get_run(collection_id, snap_b["run_id"])
+    if run_a is None or run_b is None:
+        raise FileNotFoundError(snap_a["run_id"] if run_a is None else snap_b["run_id"])
+
+    a_index = _index_facts(run_a.get("candidate_record") or {})
+    b_index = _index_facts(run_b.get("candidate_record") or {})
+
+    categories: dict[str, dict[str, list[dict[str, Any]]]] = {}
+    totals = {"added": 0, "removed": 0, "changed": 0}
+
+    for category in _DIFF_CATEGORIES:
+        a_map = a_index.get(category, {})
+        b_map = b_index.get(category, {})
+        a_keys = set(a_map.keys())
+        b_keys = set(b_map.keys())
+
+        added = []
+        removed = []
+        changed = []
+
+        # "Added in B" means present in B but not in A.
+        for ref in sorted(b_keys - a_keys):
+            fact = b_map[ref]
+            added.append(
+                {
+                    "merged_ref": ref,
+                    "label": _fact_label(category, fact),
+                    "value": _fact_summary_value(category, fact),
+                }
+            )
+        # "Removed in B" means present in A but absent in B.
+        for ref in sorted(a_keys - b_keys):
+            fact = a_map[ref]
+            removed.append(
+                {
+                    "merged_ref": ref,
+                    "label": _fact_label(category, fact),
+                    "value": _fact_summary_value(category, fact),
+                }
+            )
+        # "Changed" — present in both, but a summary field shifted.
+        for ref in sorted(a_keys & b_keys):
+            a_value = _fact_summary_value(category, a_map[ref])
+            b_value = _fact_summary_value(category, b_map[ref])
+            if a_value != b_value:
+                changed.append(
+                    {
+                        "merged_ref": ref,
+                        "label": _fact_label(category, a_map[ref]),
+                        "before": a_value,
+                        "after": b_value,
+                    }
+                )
+
+        categories[category] = {"added": added, "removed": removed, "changed": changed}
+        totals["added"] += len(added)
+        totals["removed"] += len(removed)
+        totals["changed"] += len(changed)
+
+    return {
+        "snapshot_a": {
+            "snapshot_id": snap_a["snapshot_id"],
+            "run_id": snap_a["run_id"],
+            "published_at": snap_a.get("published_at"),
+        },
+        "snapshot_b": {
+            "snapshot_id": snap_b["snapshot_id"],
+            "run_id": snap_b["run_id"],
+            "published_at": snap_b.get("published_at"),
+        },
+        "categories": categories,
+        "totals": totals,
+    }
+
+
+def previous_snapshot_id(collection_id: str, snapshot_id: str) -> str | None:
+    """Return the chronologically previous snapshot for diff defaults."""
+    current = _load_state(collection_id)
+    snapshots = sorted(
+        current["snapshots"],
+        key=lambda item: item.get("published_at", ""),
+    )
+    prior_id: str | None = None
+    for snapshot in snapshots:
+        if snapshot.get("snapshot_id") == snapshot_id:
+            return prior_id
+        prior_id = snapshot.get("snapshot_id")
+    return None
+
+
 def state(collection_id: str) -> dict[str, Any]:
     current = _load_state(collection_id)
     active_snapshot_id = current.get("active_snapshot_id")

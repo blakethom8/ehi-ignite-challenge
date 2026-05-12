@@ -160,3 +160,42 @@ def patient_context_narrative(
             detail=f"narrative for {patient_id}/{episode_slug} not yet generated",
         )
     return composition
+
+
+@router.get("/{patient_id}/narratives/{episode_slug}/history")
+def patient_context_narrative_history(
+    patient_id: str, episode_slug: str, request: Request
+) -> dict:
+    """List archived prior versions of an episode's narrative.
+
+    Walks ``data/narratives/<patient>/<slug>/history/*.json`` (written
+    by ``lib.narratives.storage.write_current_narrative`` whenever a new
+    Composition replaces the prior). Each entry has the archive
+    timestamp, the FHIR Composition id, and the resource it replaces.
+    Newest-first.
+    """
+    require_access_session(request)
+    from api.core.narrative_history import list_history
+
+    return {
+        "patient_id": patient_id,
+        "episode_slug": episode_slug,
+        "versions": list_history(patient_id, episode_slug),
+    }
+
+
+@router.get("/{patient_id}/narratives/{episode_slug}/history/{timestamp}")
+def patient_context_narrative_archived(
+    patient_id: str, episode_slug: str, timestamp: str, request: Request
+) -> dict:
+    """Return the archived FHIR Composition for one prior version."""
+    require_access_session(request)
+    from api.core.narrative_history import load_archived
+
+    archived = load_archived(patient_id, episode_slug, timestamp)
+    if archived is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"archived narrative {patient_id}/{episode_slug}/{timestamp} not found",
+        )
+    return archived

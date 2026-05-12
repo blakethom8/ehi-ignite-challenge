@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import { AlertTriangle, ArrowUp, Bot, FileText, GitBranch, RotateCcw, Sparkles, User } from "lucide-react";
 import { CitationChip } from "./CitationChip";
+import { CaspianAgentSettingsPopover } from "./CaspianAgentSettingsPopover";
 import type { CaspianAssistantMessage } from "./useCaspianAssistantSession";
+import type { AgentSettings } from "../../context/ChatContext";
 
 type CaspianChatPaneProps = {
   patientId: string | null;
@@ -17,6 +19,9 @@ type CaspianChatPaneProps = {
   onOpenTrace: () => void;
   /** Open a workspace file path in the workbench (file chip click). */
   onOpenFile?: (path: string) => void;
+  /** Caspian agent settings (mode/model/maxTokens). */
+  agentSettings?: AgentSettings;
+  onUpdateAgentSettings?: (next: AgentSettings) => void;
 };
 
 const STARTER_PROMPTS = [
@@ -190,6 +195,8 @@ export function CaspianChatPane({
   onCitationClick,
   onOpenTrace,
   onOpenFile,
+  agentSettings,
+  onUpdateAgentSettings,
 }: CaspianChatPaneProps) {
   const [text, setText] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -229,7 +236,13 @@ export function CaspianChatPane({
             {patientId ? `Patient ${patientId}` : "Choose a patient to start reviewing a chart in Caspian."}
           </div>
         </div>
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-1.5">
+          {agentSettings && onUpdateAgentSettings && (
+            <CaspianAgentSettingsPopover
+              settings={agentSettings}
+              onUpdate={onUpdateAgentSettings}
+            />
+          )}
           <button
             onClick={onReset}
             className="inline-flex items-center gap-1 rounded border px-2.5 py-1 text-[11px] font-medium hover:bg-[var(--surface-2)]"

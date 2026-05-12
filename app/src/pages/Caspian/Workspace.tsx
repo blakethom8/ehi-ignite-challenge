@@ -13,6 +13,7 @@ import {
   type Workflow as WorkspaceWorkflow,
 } from "../../components/atlas/data";
 import { useCaspianAssistantSession } from "../../components/atlas/useCaspianAssistantSession";
+import { useCaspianAgentSettings } from "../../components/atlas/useCaspianAgentSettings";
 import { useCaspianFiles } from "../../components/atlas/useCaspianFiles";
 import type { WorkflowId } from "../../types";
 
@@ -65,8 +66,10 @@ export function CaspianWorkspace() {
   const activeSession = sessions[0] ?? null;
   const [paneControls, setPaneControls] = useState<WorkspaceFrameControls | null>(null);
   const files = useCaspianFiles(patientId);
+  const agentSettings = useCaspianAgentSettings();
   const assistant = useCaspianAssistantSession(patientId, resolvedSessionId, {
     onFilesChanged: () => files.refetchTree(),
+    agentSettings: agentSettings.settings,
   });
 
   // When a workflow run completes, route the newly produced artifact tab into
@@ -193,6 +196,8 @@ export function CaspianWorkspace() {
               activeCitationId={paneControls?.activeCitationId ?? null}
               onSubmit={assistant.submitQuestion}
               onReset={assistant.resetConversation}
+              agentSettings={agentSettings.settings}
+              onUpdateAgentSettings={agentSettings.setSettings}
               onCitationClick={(id) => {
                 paneControls?.focusCitation(id);
                 paneControls?.setInspectorTab("evidence");

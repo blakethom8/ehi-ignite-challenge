@@ -3,6 +3,7 @@ import { useMutation } from "@tanstack/react-query";
 import { Activity } from "lucide-react";
 import { api } from "../../api/client";
 import { useAccessContext, type AccessMode } from "../../context/AccessContext";
+import type { AgentSettings } from "../../context/ChatContext";
 import { migrateLegacyKey, storageNamespace } from "../../storage";
 import type {
   ProviderAssistantCitation,
@@ -258,6 +259,8 @@ function workflowTabFromArtifact(artifact: WorkflowArtifact): WorkbenchTab {
 export type CaspianAssistantSessionOptions = {
   /** Called whenever a chat turn or workflow run reports files written. */
   onFilesChanged?: () => void;
+  /** Caspian-scoped agent settings (mode/model/maxTokens) to send with each chat turn. */
+  agentSettings?: AgentSettings;
 };
 
 export function useCaspianAssistantSession(
@@ -265,6 +268,12 @@ export function useCaspianAssistantSession(
   sessionId: string | null,
   options: CaspianAssistantSessionOptions = {},
 ) {
+  // Capture the latest agent settings in a ref so the mutation closure always
+  // reads the current values without re-creating the mutation on every change.
+  const agentSettingsRef = useRef<AgentSettings | undefined>(options.agentSettings);
+  useEffect(() => {
+    agentSettingsRef.current = options.agentSettings;
+  }, [options.agentSettings]);
   const { mode, user, activeDemoPatient, activePatientId, activeGuestRunId } = useAccessContext();
   const identity = identityKeyFor(
     mode,
@@ -322,11 +331,15 @@ export function useCaspianAssistantSession(
       if (!patientId) {
         throw new Error("Select a patient before using Caspian.");
       }
+      const agentSettings = agentSettingsRef.current;
       return api.chatProviderAssistant({
         patient_id: patientId,
         question: payload.question,
         history: payload.history,
         stance: "opinionated",
+        mode: agentSettings?.mode || undefined,
+        model: agentSettings?.model || undefined,
+        max_tokens: agentSettings?.maxTokens || undefined,
       });
     },
     onSuccess: (data) => {

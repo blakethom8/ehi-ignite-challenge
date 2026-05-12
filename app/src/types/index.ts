@@ -901,6 +901,17 @@ export type CaspianFileFolderNode = {
   children: CaspianFileTreeNode[];
 };
 
+/**
+ * File-kind taxonomy — mirrors api/core/caspian_workspace._kind_for_path.
+ *
+ *  - `system`    — read-only system-context tree (system prompt + chart
+ *                  context + workflow packets)
+ *  - `user`      — clinician-authored files (notes/, user-instructions.md)
+ *  - `generated` — workflow-run artifacts, always read-only to users
+ *  - `demo-seed` — virtual sample files only present in demo sessions
+ */
+export type CaspianFileKind = "system" | "user" | "generated" | "demo-seed";
+
 export type CaspianFileFileNode = {
   type: "file";
   name: string;
@@ -909,6 +920,7 @@ export type CaspianFileFileNode = {
   icon: string;
   dirty?: boolean;
   editable: boolean;
+  kind?: CaspianFileKind;
 };
 
 export type CaspianFileRefNode = {
@@ -927,6 +939,7 @@ export type CaspianFileTreeNode =
 export interface CaspianFileListResponse {
   workspace_key: string;
   tree: CaspianFileTreeNode[];
+  capabilities?: Capabilities | null;
 }
 
 export interface CaspianFileReadResponse {
@@ -934,7 +947,15 @@ export interface CaspianFileReadResponse {
   content: string;
   mtime: string | null;
   editable: boolean;
+  /** Content format — drives the renderer (markdown formatter, JSON pretty-print, monospaced text). */
   kind: "markdown" | "json" | "text";
+  /** File-kind taxonomy — drives the provenance pill in WorkspaceFileRenderer. */
+  file_kind?: CaspianFileKind;
+}
+
+export interface SaveAsNoteRequest {
+  patient_id: string;
+  source_path: string;
 }
 
 export interface CaspianFileWriteRequest {

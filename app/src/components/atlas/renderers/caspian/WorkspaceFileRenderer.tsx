@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
-import { Edit3, RotateCcw, Save } from "lucide-react";
+import { Bookmark, Edit3, RotateCcw, Save } from "lucide-react";
 import type { RendererProps } from "../types";
 import type { CaspianFileBlob } from "../../useCaspianFiles";
+import { useCapabilities } from "../../../../hooks/useCapabilities";
+import type { CaspianFileKind } from "../../../../types";
 
 /**
  * WorkspaceFileRenderer
@@ -11,6 +13,11 @@ import type { CaspianFileBlob } from "../../useCaspianFiles";
  * monospaced text. If `blob.editable` is true and `canvas.__files.saveFile`
  * is wired, the renderer offers an Edit toggle that flips into a textarea
  * with Save / Cancel.
+ *
+ * The provenance pill at the top is keyed off `blob.fileKind` and surfaces
+ * the file-kind taxonomy (System / User-authored / Generated / Sample). The
+ * backend drives `editable`; the renderer only adds a "Save as note" button
+ * on generated artifacts when the session has `can_write_caspian_notes`.
  */
 export function WorkspaceFileRenderer({ canvas, tabId }: RendererProps) {
   const blob = canvas[tabId] as CaspianFileBlob | undefined;
@@ -19,11 +26,15 @@ export function WorkspaceFileRenderer({ canvas, tabId }: RendererProps) {
         openFile: (path: string) => Promise<CaspianFileBlob | null>;
         saveFile: (path: string, content: string) => Promise<unknown>;
         refreshFile: (path: string) => Promise<CaspianFileBlob | null>;
+        saveAsNote?: (path: string) => Promise<string>;
       }
     | undefined;
 
+  const capabilities = useCapabilities();
+
   const [draft, setDraft] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [savingAsNote, setSavingAsNote] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // If the blob isn't in the canvas yet, trigger a load. The hook's
@@ -77,6 +88,29 @@ export function WorkspaceFileRenderer({ canvas, tabId }: RendererProps) {
   const isEmptyUserInstructions =
     !editing && blob.path === "user-instructions.md" && body.trim().length === 0;
 
+  // "Save as note" is only meaningful for generated artifacts that the user
+  // can actually write into notes/. Demo + anonymous sessions don't get it
+  // because `can_write_caspian_notes` is false in those modes.
+  const canSaveAsNote =
+    blob.fileKind === "generated" &&
+    capabilities.can_write_caspian_notes &&
+    typeof filesApi?.saveAsNote === "function";
+
+  const onSaveAsNote = async () => {
+    if (!filesApi?.saveAsNote) return;
+    setSavingAsNote(true);
+    setError(null);
+    try {
+      const newPath = await filesApi.saveAsNote(blob.path);
+      // Open the freshly-created note so the user lands on the editable copy.
+      void filesApi.openFile?.(newPath);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSavingAsNote(false);
+    }
+  };
+
   return (
     <div className="mx-auto max-w-[860px] px-10 pb-16 pt-8" style={{ fontFamily: "var(--font-sans)" }}>
       <div className="mb-5 flex items-baseline justify-between">
@@ -88,21 +122,14 @@ export function WorkspaceFileRenderer({ canvas, tabId }: RendererProps) {
             {blob.path}
           </h1>
           <div className="mt-1 flex items-center gap-3 text-[11.5px]" style={{ color: "var(--ink-4)" }}>
+            <ProvenancePill kind={blob.fileKind} />
             <span style={{ fontFamily: "var(--font-mono)" }}>{blob.kind}</span>
             {blob.mtime && (
               <span style={{ fontFamily: "var(--font-mono)" }}>{formatMtime(blob.mtime)}</span>
             )}
-            {!blob.editable && (
-              <span
-                className="rounded-full px-1.5 py-px text-[10px] uppercase tracking-wider"
-                style={{ background: "var(--surface-2)", color: "var(--ink-3)" }}
-              >
-                read only
-              </span>
-            )}
           </div>
         </div>
-        {editable && (
+        {(editable || canSaveAsNote) && (
           <div className="flex items-center gap-1.5">
             {editing ? (
               <>
@@ -125,13 +152,28 @@ export function WorkspaceFileRenderer({ canvas, tabId }: RendererProps) {
                 </button>
               </>
             ) : (
-              <button
-                onClick={onEdit}
-                className="inline-flex h-[26px] items-center gap-1 rounded-md border px-2.5 text-[11.5px] font-medium hover:bg-[var(--surface-2)]"
-                style={{ borderColor: "var(--line-1)", color: "var(--ink-2)" }}
-              >
-                <Edit3 className="h-3 w-3" strokeWidth={1.5} /> Edit
-              </button>
+              <>
+                {canSaveAsNote && (
+                  <button
+                    onClick={onSaveAsNote}
+                    disabled={savingAsNote}
+                    className="inline-flex h-[26px] items-center gap-1 rounded-md border px-2.5 text-[11.5px] font-medium hover:bg-[var(--surface-2)]"
+                    style={{ borderColor: "var(--line-1)", color: "var(--ink-2)" }}
+                  >
+                    <Bookmark className="h-3 w-3" strokeWidth={1.5} />
+                    {savingAsNote ? "Saving…" : "Save as note"}
+                  </button>
+                )}
+                {editable && (
+                  <button
+                    onClick={onEdit}
+                    className="inline-flex h-[26px] items-center gap-1 rounded-md border px-2.5 text-[11.5px] font-medium hover:bg-[var(--surface-2)]"
+                    style={{ borderColor: "var(--line-1)", color: "var(--ink-2)" }}
+                  >
+                    <Edit3 className="h-3 w-3" strokeWidth={1.5} /> Edit
+                  </button>
+                )}
+              </>
             )}
           </div>
         )}
@@ -414,6 +456,67 @@ function renderInlineMarkdown(text: string): React.ReactNode {
   }
   if (last < text.length) parts.push(text.slice(last));
   return parts.length === 0 ? text : parts;
+}
+
+/**
+ * Provenance pill — surfaces the file-kind taxonomy so the reader sees at a
+ * glance whether the file is system-managed, user-authored, agent/workflow
+ * generated, or a demo sample. The mapping mirrors the four `kind` values
+ * the backend emits from `api/core/caspian_workspace._kind_for_path`.
+ */
+function ProvenancePill({ kind }: { kind: CaspianFileKind | undefined }) {
+  const cfg = pillConfig(kind);
+  return (
+    <span
+      className="rounded-full px-1.5 py-px text-[10.5px] font-semibold uppercase tracking-wider"
+      style={{ background: cfg.background, color: cfg.color }}
+    >
+      {cfg.label}
+    </span>
+  );
+}
+
+function pillConfig(kind: CaspianFileKind | undefined): {
+  label: string;
+  background: string;
+  color: string;
+} {
+  switch (kind) {
+    case "user":
+      return {
+        label: "User-authored",
+        background: "var(--action-tint, rgba(29,78,216,0.10))",
+        color: "var(--action, #1d4ed8)",
+      };
+    case "generated":
+      return {
+        label: "Generated · read-only",
+        // Amber / copper accent so generated artifacts read as "agent-made"
+        // rather than user-owned. Falls back to a warm surface tint.
+        background: "var(--caution-tint, rgba(202,138,4,0.12))",
+        color: "var(--caution, #a16207)",
+      };
+    case "demo-seed":
+      return {
+        label: "Sample · read-only",
+        background: "var(--surface-2)",
+        color: "var(--ink-3)",
+      };
+    case "system":
+      return {
+        label: "System · read-only",
+        background: "var(--surface-2)",
+        color: "var(--ink-3)",
+      };
+    default:
+      // Older fixtures or anonymous blobs (no fileKind) — treat as read-only
+      // system content so we never accidentally claim it was authored.
+      return {
+        label: "Read-only",
+        background: "var(--surface-2)",
+        color: "var(--ink-3)",
+      };
+  }
 }
 
 function formatMtime(value: string): string {

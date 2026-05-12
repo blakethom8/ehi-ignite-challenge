@@ -1814,6 +1814,20 @@ class CaspianFileWriteResponse(BaseModel):
     mtime: datetime
 
 
+class SaveAsNoteRequest(BaseModel):
+    """Copy a generated workflow-run artifact into the user's notes/ folder.
+
+    The route enforces that ``source_path`` lives under ``workflow-runs/`` and
+    that the session is authenticated; the workspace layer enforces atomic
+    write + path scoping. Filename collisions in ``notes/`` are resolved by
+    suffixing ``-2``, ``-3``, … to the basename.
+    """
+    model_config = ConfigDict(extra="forbid")
+
+    patient_id: str = Field(min_length=1, max_length=200)
+    source_path: str = Field(min_length=1, max_length=200)
+
+
 # Late import + forward-ref resolution: api.core.access_policy imports from
 # api.core.auth which is fine, but api.core.access_policy.Capabilities is the
 # canonical source. We re-export it here so callers can `from api.models import

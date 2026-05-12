@@ -33,6 +33,8 @@ from pathlib import Path
 
 from api.core.auth import SessionPrincipal
 from api.core import caspian_context_files
+from api.core import caspian_demo_seed
+from api.core.access_policy import capabilities_for
 
 LOGGER = logging.getLogger(__name__)
 
@@ -231,6 +233,8 @@ def _kind_for_path(rel_path: str) -> str:
     """Map a workspace-relative path to its file-kind tag."""
     if _is_system_context_path(rel_path):
         return "system"
+    if rel_path.startswith(caspian_demo_seed.DEMO_SEED_PREFIX):
+        return "demo-seed"
     if _is_generated_writable_path(rel_path):
         return "generated"
     if _is_user_writable_path(rel_path):
@@ -286,6 +290,23 @@ def read_workspace_file(
             editable=False,
             kind=kind,
             file_kind="system",
+        )
+
+    # Demo-seed files are virtual: they only exist inside demo sessions and
+    # are rendered on demand. Reading one outside demo mode is a 404.
+    if rel_path.startswith(caspian_demo_seed.DEMO_SEED_PREFIX):
+        if not session.is_demo:
+            raise WorkspaceNotFoundError(rel_path)
+        content = caspian_demo_seed.render_demo_seed_file(rel_path)
+        if content is None:
+            raise WorkspaceNotFoundError(rel_path)
+        return FileReadResult(
+            path=rel_path,
+            content=content,
+            mtime=None,
+            editable=False,
+            kind="markdown",
+            file_kind="demo-seed",
         )
 
     root = workspace_root(session, resolved_patient_id)
@@ -560,14 +581,25 @@ def list_workspace(
         root, user_editable=session.is_authenticated
     )
 
-    tree: list[dict] = [
+    tree: list[dict] = []
+
+    # Demo-seed folder is virtual — merged in only when the session is demo
+    # AND policy says we should surface the sample workspace. The descriptors
+    # already report kind="demo-seed" + editable=False.
+    if session.is_demo and capabilities_for(session).show_caspian_seed_files:
+        tree.extend([
+            _group("Sample workspace (read-only)"),
+            _folder("demo-seed", caspian_demo_seed.list_demo_seed_files(), expanded=True),
+        ])
+
+    tree.extend([
         _group("Patient workspace"),
         user_instructions,
         _folder("notes", notes_children, expanded=True),
         _folder("workflow-runs", runs_children, expanded=True),
         _group("System context (read-only)"),
         _system_context_tree(),
-    ]
+    ])
     return {
         "workspace_key": workspace_key_for(session, resolved_patient_id),
         "tree": tree,

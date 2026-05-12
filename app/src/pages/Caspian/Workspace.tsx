@@ -99,9 +99,16 @@ export function CaspianWorkspace() {
       openFile: files.openFile,
       saveFile: files.saveFile,
       refreshFile: files.refreshFile,
+      saveAsNote: files.saveAsNote,
     };
     return merged;
-  }, [assistant.workflow.canvas, files.openFile, files.saveFile, files.refreshFile]);
+  }, [
+    assistant.workflow.canvas,
+    files.openFile,
+    files.saveFile,
+    files.refreshFile,
+    files.saveAsNote,
+  ]);
 
   // Layer the cached file blobs on top (keyed by file path === tab id).
   // Subscribes to files.openContent so the canvas updates as fetches resolve.

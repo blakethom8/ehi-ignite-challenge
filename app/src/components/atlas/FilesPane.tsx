@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Braces, ChevronDown, ChevronRight, FileSpreadsheet, FileText, Folder, Hash, MoreHorizontal, Plus, Search } from "lucide-react";
 import { FILE_TREES, type FileNode, type FileTreeNode, type FolderTreeNode } from "./data";
 import type { WorkspaceId } from "./types";
+import { useCapabilities } from "../../hooks/useCapabilities";
 
 const ICONS: Record<string, typeof FileText> = {
   FileText,
@@ -32,6 +33,12 @@ export function FilesPane({ workspaceId, onOpen, activeFileId, tree: treeOverrid
   const tree = treeOverride ?? FILE_TREES[workspaceId] ?? [];
   const [filter, setFilter] = useState("");
   const [expanded, setExpanded] = useState<Record<string, boolean>>(() => collectInitiallyExpanded(tree));
+  const capabilities = useCapabilities();
+  // Sample-workspace banner: shown only in demo mode where nothing persists
+  // beyond the browser tab. The two-flag gate (mode AND persistence_scope)
+  // keeps the banner from leaking into authenticated previews of demo data.
+  const showSampleBanner =
+    capabilities.mode === "demo" && capabilities.persistence_scope === "browser-ephemeral";
 
   // When the tree gets reseeded with a new shape (e.g. after a workflow run
   // adds a workflow-runs entry), keep any newly-expanded folders open and
@@ -85,6 +92,21 @@ export function FilesPane({ workspaceId, onOpen, activeFileId, tree: treeOverrid
         />
       </div>
       <div className="overflow-y-auto px-1 py-1 text-[12px]">
+        {showSampleBanner && (
+          <div
+            className="mx-1 mb-2 mt-1 rounded px-2 py-1 text-[11px] leading-[1.4]"
+            style={{
+              background: "var(--surface-2)",
+              color: "var(--ink-3)",
+              border: "1px solid var(--line-1)",
+            }}
+            role="status"
+          >
+            <span style={{ color: "var(--ink-1)", fontWeight: 600 }}>Sample workspace</span>
+            <span className="mx-1" style={{ color: "var(--ink-4)" }}>·</span>
+            <span>changes don't persist</span>
+          </div>
+        )}
         {tree.map((n, i) =>
           renderNode(n, `${i}`, "", expanded, setExpanded, onOpen, activeFileId, filter, 10),
         )}

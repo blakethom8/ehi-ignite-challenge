@@ -275,6 +275,19 @@ export const api = {
   writeCaspianFile: (payload: CaspianFileWriteRequest): Promise<CaspianFileWriteResponse> =>
     http.put<CaspianFileWriteResponse>("/caspian/files/write", payload).then((r) => r.data),
 
+  /**
+   * Copy a generated workflow-run artifact into the user's notes/ folder.
+   * Authenticated sessions only — the backend 403s for demo/guest. Filename
+   * collisions in notes/ are resolved with a -2 / -3 / … suffix on the stem.
+   */
+  saveCaspianFileAsNote: (patientId: string, sourcePath: string): Promise<CaspianFileWriteResponse> =>
+    http
+      .post<CaspianFileWriteResponse>("/caspian/files/save-as-note", {
+        patient_id: patientId,
+        source_path: sourcePath,
+      })
+      .then((r) => r.data),
+
   /** Patient-facing guided context intake */
   getPatientContextStatus: (): Promise<PatientContextStatus> =>
     getOrMock(

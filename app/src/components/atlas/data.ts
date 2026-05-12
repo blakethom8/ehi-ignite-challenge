@@ -192,6 +192,10 @@ export type FileNode = {
   dirty?: boolean;
   /** When false, the workbench renderer should not offer an edit affordance. */
   editable?: boolean;
+  /** File-kind taxonomy — system / user / generated / demo-seed. Drives the
+   *  provenance pill on the workbench file renderer. Optional because the
+   *  static fixture trees in this file predate it. */
+  kind?: "system" | "user" | "generated" | "demo-seed";
 };
 
 export const FILE_TREES: Record<WorkspaceId, FileTreeNode[]> = {

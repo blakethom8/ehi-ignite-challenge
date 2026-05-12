@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../api/client";
 import type {
+  CaspianFileKind,
   CaspianFileReadResponse,
   CaspianFileTreeNode,
 } from "../../types";
@@ -12,7 +13,11 @@ export type CaspianFileBlob = {
   content: string;
   mtime: string | null;
   editable: boolean;
+  /** Content format — markdown/json/text. Drives the renderer. */
   kind: "markdown" | "json" | "text";
+  /** File-kind taxonomy — system/user/generated/demo-seed. Drives the
+   *  provenance pill + the "Save as note" affordance. */
+  fileKind?: CaspianFileKind;
 };
 
 /**
@@ -73,6 +78,7 @@ export function useCaspianFiles(patientId: string | null) {
             mtime: res.mtime,
             editable: res.editable,
             kind: res.kind,
+            fileKind: res.file_kind,
           };
           setOpenContent((current) => ({ ...current, [path]: blob }));
           return blob;
@@ -130,6 +136,7 @@ export function useCaspianFiles(patientId: string | null) {
           mtime: res.mtime,
           editable: true,
           kind: current[res.path]?.kind ?? "markdown",
+          fileKind: current[res.path]?.fileKind ?? "user",
         },
       }));
       queryClient.invalidateQueries({ queryKey: treeKey });
@@ -139,6 +146,29 @@ export function useCaspianFiles(patientId: string | null) {
   const saveFile = useCallback(
     (path: string, content: string) => saveMutation.mutateAsync({ path, content }),
     [saveMutation],
+  );
+
+  const saveAsNoteMutation = useMutation({
+    mutationFn: async (sourcePath: string) => {
+      if (!patientId) throw new Error("No patient selected.");
+      return api.saveCaspianFileAsNote(patientId, sourcePath);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: treeKey });
+    },
+  });
+
+  /**
+   * Copy a generated workflow-run artifact into the user's notes/ folder.
+   * Returns the new note path so the caller can open the resulting tab.
+   * The tree is invalidated on success so the new note appears in FilesPane.
+   */
+  const saveAsNote = useCallback(
+    async (sourcePath: string): Promise<string> => {
+      const res = await saveAsNoteMutation.mutateAsync(sourcePath);
+      return res.path;
+    },
+    [saveAsNoteMutation],
   );
 
   const refetchTree = useCallback(() => {
@@ -161,12 +191,15 @@ export function useCaspianFiles(patientId: string | null) {
     openFile,
     refreshFile,
     saveFile,
+    saveAsNote,
     refetchTree,
     getCachedBlob,
     /** Raw blob cache — exposed so consumers can use it as a memo dep. */
     openContent,
     isSaving: saveMutation.isPending,
     saveError: saveMutation.error,
+    isSavingAsNote: saveAsNoteMutation.isPending,
+    saveAsNoteError: saveAsNoteMutation.error,
   };
 }
 

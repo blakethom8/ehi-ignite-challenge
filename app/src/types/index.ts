@@ -1257,6 +1257,41 @@ export type GuestHarmonizationAudience =
   | "second-opinion"
   | "preop-review";
 
+export interface GuestHarmonizationProgressEvent {
+  event_id: string;
+  event_type: string;
+  created_at: string;
+  stage: string | null;
+  message: string;
+  source_id: string | null;
+  source_label: string | null;
+  page_start: number | null;
+  page_end: number | null;
+  page_count: number | null;
+  processed_pages: number | null;
+  total_pages: number | null;
+  processed_files: number | null;
+  total_files: number | null;
+  progress_basis: string | null;
+  is_estimate: boolean | null;
+}
+
+export interface GuestHarmonizationProgress {
+  status: "pending" | "running" | "complete" | "failed";
+  stage: string;
+  total_files: number;
+  processed_files: number;
+  total_pages: number;
+  processed_pages: number;
+  estimated_processed_pages: number;
+  current_source_label: string | null;
+  progress_mode: "lifecycle" | "reported";
+  progress_percent: number;
+  started_at: string | null;
+  completed_at: string | null;
+  events: GuestHarmonizationProgressEvent[];
+}
+
 export interface GuestHarmonizationRunResponse {
   run_id: string;
   mode: "guest";
@@ -1268,6 +1303,7 @@ export interface GuestHarmonizationRunResponse {
   disclosure: string;
   patient_voice?: string | null;
   audience?: GuestHarmonizationAudience | "" | null;
+  progress?: GuestHarmonizationProgress | null;
 }
 
 export interface GuestHarmonizationContextRequest {

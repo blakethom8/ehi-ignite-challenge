@@ -1110,6 +1110,45 @@ class GuestHarmonizationOutput(BaseModel):
     storage_path: str
 
 
+class GuestHarmonizationProgressEvent(BaseModel):
+    event_id: str
+    event_type: str
+    created_at: datetime
+    stage: str | None = None
+    message: str
+    source_id: str | None = None
+    source_label: str | None = None
+    page_start: int | None = None
+    page_end: int | None = None
+    page_count: int | None = None
+    processed_pages: int | None = None
+    total_pages: int | None = None
+    processed_files: int | None = None
+    total_files: int | None = None
+    progress_basis: str | None = None
+    is_estimate: bool | None = None
+
+
+class GuestHarmonizationProgress(BaseModel):
+    """Mirror of the authenticated ExtractJob shape so the same React
+    components (PdfPageProgressMap, PdfExtractionEventTimeline) can render
+    both surfaces."""
+
+    status: Literal["pending", "running", "complete", "failed"] = "pending"
+    stage: str = "Queued"
+    total_files: int = 0
+    processed_files: int = 0
+    total_pages: int = 0
+    processed_pages: int = 0
+    estimated_processed_pages: int = 0
+    current_source_label: str | None = None
+    progress_mode: Literal["lifecycle", "reported"] = "lifecycle"
+    progress_percent: int = 0
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    events: list[GuestHarmonizationProgressEvent] = Field(default_factory=list)
+
+
 class GuestHarmonizationRunResponse(BaseModel):
     run_id: str
     mode: Literal["guest"] = "guest"
@@ -1121,6 +1160,7 @@ class GuestHarmonizationRunResponse(BaseModel):
     disclosure: str
     patient_voice: str | None = None
     audience: str | None = None
+    progress: GuestHarmonizationProgress | None = None
 
 
 class GuestHarmonizationDeleteResponse(BaseModel):

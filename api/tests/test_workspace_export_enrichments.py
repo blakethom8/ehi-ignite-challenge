@@ -143,6 +143,7 @@ class GuestEnrichmentTests(unittest.TestCase):
             files={"file": ("bundle.json", json.dumps(bundle), "application/json")},
         )
         self.client.post(f"/api/guest-harmonization/runs/{run_id}/process")
+        guest_harmonization.wait_for_processing(run_id)
         return run_id
 
     def test_guest_export_includes_enrichments_and_drug_class(self) -> None:

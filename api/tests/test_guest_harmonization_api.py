@@ -86,8 +86,16 @@ class GuestHarmonizationAPITests(unittest.TestCase):
 
         processed = self.client.post(f"/api/guest-harmonization/runs/{run_id}/process")
         self.assertEqual(processed.status_code, 200)
-        self.assertEqual(processed.json()["status"], "completed")
-        self.assertEqual(processed.json()["outputs"][0]["file_name"], "harmonized-record.json")
+        # /process is now async — initial response carries "processing" + a
+        # seeded progress block; the daemon thread completes the work.
+        self.assertEqual(processed.json()["status"], "processing")
+        self.assertIsNotNone(processed.json().get("progress"))
+
+        guest_harmonization.wait_for_processing(run_id)
+        final = self.client.get(f"/api/guest-harmonization/runs/{run_id}").json()
+        self.assertEqual(final["status"], "completed")
+        self.assertEqual(final["outputs"][0]["file_name"], "harmonized-record.json")
+        self.assertEqual(final["progress"]["status"], "complete")
 
         output = self.client.get(f"/api/guest-harmonization/runs/{run_id}/output")
         self.assertEqual(output.status_code, 200)

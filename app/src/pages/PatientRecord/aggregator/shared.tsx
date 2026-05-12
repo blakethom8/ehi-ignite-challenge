@@ -23,6 +23,11 @@ import {
   X,
 } from "lucide-react";
 import { api } from "../../../api/client";
+import {
+  PdfExtractionEventTimeline,
+  PdfPageProgressMap,
+} from "../../../components/atlas/extraction";
+import type { ExtractionProgress } from "../../../components/atlas/extraction";
 import { SnapshotList } from "../../../components/atlas/snapshots/SnapshotList";
 import type {
   AggregationEnvironmentResponse,
@@ -131,123 +136,28 @@ function uploadErrorMessage(error: unknown): string | null {
   return "The file could not be saved. Please try again.";
 }
 
-function PdfPageProgressMap({ job }: { job: HarmonizeExtractJobResponse | null }) {
-  const totalPages = job?.total_pages ?? null;
-  const visiblePages = totalPages ? Math.min(totalPages, 8) : 4;
-  const reportedPages = job?.processed_pages ?? 0;
-  const estimatedPages = Math.max(reportedPages, job?.estimated_processed_pages ?? reportedPages);
-  const isRunning = job?.status === "pending" || job?.status === "running";
-  const hasReportedPageProgress = Boolean(totalPages && reportedPages > 0);
-  const hasEstimatedPageProgress = Boolean(totalPages && isRunning && estimatedPages > reportedPages);
-  const activePage = totalPages ? Math.min(totalPages, Math.max(1, estimatedPages + 1)) : 1;
-  const progressMode = job?.progress_mode ?? "lifecycle";
-
-  return (
-    <div className="rounded-lg border border-[#ead3b9] bg-white px-3 py-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs font-semibold uppercase tracking-wider text-[#9a5a16]">
-          {progressMode === "reported" ? "Reported page checkpoints" : "Estimated page position"}
-        </p>
-        <p className="text-xs text-[#667085]">
-          {hasReportedPageProgress
-            ? `${reportedPages}/${totalPages} pages completed`
-            : hasEstimatedPageProgress
-              ? `Estimating page ${activePage} of ${totalPages}`
-            : totalPages
-              ? `${totalPages} pages detected; waiting for first checkpoint`
-              : "Counting pages when extraction starts"}
-        </p>
-      </div>
-      <div className="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-8">
-        {Array.from({ length: visiblePages }).map((_, index) => {
-          const pageNumber = index + 1;
-          const isReportedComplete = totalPages ? pageNumber <= reportedPages : false;
-          const isEstimatedPassed = totalPages ? pageNumber <= estimatedPages && !isReportedComplete : false;
-          const isActive = isRunning && !isReportedComplete && (totalPages ? pageNumber === activePage : index === 0);
-          return (
-            <div
-              key={pageNumber}
-              className={`flex h-16 flex-col justify-between rounded-md border px-2 py-2 text-[11px] ${
-                isReportedComplete
-                  ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                  : isActive
-                    ? "border-[#5b76fe] bg-[#f4f6ff] text-[#4157d8]"
-                    : isEstimatedPassed
-                      ? "border-[#f1d4a9] bg-[#fff8ed] text-[#9a5a16]"
-                    : "border-[#eef0f4] bg-[#f7f9fc] text-[#667085]"
-              }`}
-            >
-              <span className="font-semibold">{totalPages ? `Page ${pageNumber}` : ["Read", "Extract", "Map", "Validate"][index]}</span>
-              <span
-                className={`h-1.5 rounded-full ${
-                  isReportedComplete
-                    ? "bg-emerald-400"
-                    : isActive
-                      ? "bg-[#5b76fe]"
-                      : isEstimatedPassed
-                        ? "bg-[#d99a35]"
-                        : "bg-[#dfe4ea]"
-                }`}
-              />
-            </div>
-          );
-        })}
-      </div>
-      <p className="mt-2 text-xs leading-5 text-[#667085]">
-        {progressMode === "reported"
-          ? "Green pages come from backend checkpoint events. The current worker reports by completed file, so multiple pages may complete at once."
-          : "Blue shows estimated position while the server runs. Green appears only after the backend reports a completed checkpoint."}
-      </p>
-      {totalPages && totalPages > visiblePages && (
-        <p className="mt-2 text-xs text-[#667085]">Showing the first {visiblePages} pages; remaining pages continue in the same server job.</p>
-      )}
-    </div>
-  );
-}
-
-function PdfExtractionEventTimeline({ job }: { job: HarmonizeExtractJobResponse | null }) {
-  const events = job?.events ?? [];
-  if (!events.length) return null;
-  const visibleEvents = events.slice(-6).reverse();
-
-  return (
-    <div className="rounded-lg border border-[#dfe4ea] bg-white px-3 py-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs font-semibold uppercase tracking-wider text-[#667085]">Worker events</p>
-        <p className="text-xs text-[#667085]">
-          {job?.progress_mode === "reported" ? "reported checkpoints" : "lifecycle + estimates"}
-        </p>
-      </div>
-      <div className="mt-2 divide-y divide-[#eef1f5] rounded-lg border border-[#eef1f5]">
-        {visibleEvents.map((event) => {
-          const pages =
-            event.page_start && event.page_end
-              ? event.page_start === event.page_end
-                ? `Page ${event.page_start}`
-                : `Pages ${event.page_start}-${event.page_end}`
-              : event.page_count
-                ? `${event.page_count} pages`
-                : null;
-          return (
-            <div key={event.event_id} className="grid gap-2 px-3 py-2 text-xs md:grid-cols-[160px_minmax(0,1fr)_150px]">
-              <div>
-                <p className="font-semibold text-[#1c1c1e]">{event.stage}</p>
-                <p className="mt-0.5 text-[#8d92a3]">{dateLabel(event.created_at)}</p>
-              </div>
-              <p className="min-w-0 text-[#667085]">{event.message}</p>
-              <div className="md:text-right">
-                <p className="font-semibold text-[#555a6a]">{pages ?? event.progress_basis}</p>
-                <p className="mt-0.5 text-[#8d92a3]">
-                  {event.processed_files}/{event.total_files} files
-                  {event.total_pages ? ` · ${event.processed_pages}/${event.total_pages} pages` : ""}
-                </p>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
+/**
+ * The job → ExtractionProgress adapter. Authenticated jobs and Guest runs
+ * report the same essential shape but with slightly different field names;
+ * this collapses them so ``PdfPageProgressMap`` and
+ * ``PdfExtractionEventTimeline`` can render either surface.
+ */
+function jobToExtractionProgress(
+  job: HarmonizeExtractJobResponse | null,
+): ExtractionProgress | null {
+  if (!job) return null;
+  return {
+    status: job.status,
+    stage: job.stage,
+    total_files: job.total_files,
+    processed_files: job.processed_files,
+    total_pages: job.total_pages,
+    processed_pages: job.processed_pages,
+    estimated_processed_pages: job.estimated_processed_pages ?? null,
+    current_source_label: job.current_source_label,
+    progress_mode: job.progress_mode,
+    events: job.events,
+  };
 }
 
 function LoadingState() {
@@ -790,8 +700,8 @@ function PreparedPreviewPane({
                       />
                     </div>
                   </div>
-                  <PdfPageProgressMap job={extractJob} />
-                  <PdfExtractionEventTimeline job={extractJob} />
+                  <PdfPageProgressMap progress={jobToExtractionProgress(extractJob)} />
+                  <PdfExtractionEventTimeline progress={jobToExtractionProgress(extractJob)} />
                 </div>
               )}
               {extractError && (

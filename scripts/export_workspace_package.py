@@ -64,6 +64,20 @@ class WorkspaceInput:
     """When True (the default), prior FHIR Composition versions for each
     episode ship under ``fhir/narratives/<slug>/history/<timestamp>.json``
     alongside the current narrative. Pass ``False`` to keep bundles small."""
+    extraction: dict[str, Any] | None = None
+    """Optional extraction-stack metadata stamped onto ``MANIFEST.json``.
+
+    Expected shape (all keys optional):
+    ``{"tier": "guest" | "authenticated",
+       "pdf_pipeline": str | None,
+       "pdf_pipelines_used": list[str],
+       "pdf_pages_processed": int,
+       "ccda_pipeline": str | None,
+       "ran_at": iso8601 str | None}``
+
+    Lets consumers tell whether facts came from the vision multipass
+    pipeline, a deterministic fallback, or both. Diagnostic only — does
+    not change packet contents."""
 FHIR_TYPES = {
     "Observation",
     "Condition",
@@ -279,7 +293,7 @@ def coding_code(codeable: dict[str, Any] | None) -> str | None:
 
 def patient_display(patient: dict[str, Any] | None) -> str:
     if not patient:
-        return "Synthetic Demo Patient"
+        return "Unknown patient"
     names = patient.get("name") or []
     if names:
         n = names[0]
@@ -288,7 +302,7 @@ def patient_display(patient: dict[str, Any] | None) -> str:
         full = " ".join(x for x in [given, family] if x).strip()
         if full:
             return full
-    return patient.get("id") or "Synthetic Demo Patient"
+    return patient.get("id") or "Unknown patient"
 
 
 def resource_date(res: dict[str, Any]) -> str | None:
@@ -1455,6 +1469,8 @@ def build_package_from_input(
             "files": [{"path": p} for p in manifest_files],
             "privacy": {"contains_phi": not all(s.get("demo_source") for s in sources), "demo_data": all(s.get("demo_source") for s in sources), "sharing_warning": "Review before sharing outside your care team."},
         }
+        if workspace_input.extraction:
+            manifest["extraction"] = workspace_input.extraction
 
         (root / "README.md").write_text(textwrap.dedent(f"""
         # EHI Atlas Portable Workspace — {collection}

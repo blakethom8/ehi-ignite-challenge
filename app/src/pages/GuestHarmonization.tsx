@@ -14,9 +14,15 @@ import {
   Trash2,
 } from "lucide-react";
 import { api } from "../api/client";
+import {
+  PdfExtractionEventTimeline,
+  PdfPageProgressMap,
+} from "../components/atlas/extraction";
+import type { ExtractionProgress } from "../components/atlas/extraction";
 import { useAccessContext } from "../context/AccessContext";
 import type {
   GuestHarmonizationAudience,
+  GuestHarmonizationProgress,
   GuestHarmonizationRunResponse,
   GuestHarmonizationUploadedFile,
 } from "../types";
@@ -167,6 +173,70 @@ function Metric({ label, value, tone }: { label: string; value: number; tone?: "
   );
 }
 
+function GuestExtractionProgress({ progress }: { progress: GuestHarmonizationProgress | null }) {
+  const adapted = guestProgressForRender(progress);
+  const percent = progress?.progress_percent ?? 0;
+  const stageLabel = progress?.stage ?? "Starting";
+  const currentSource = progress?.current_source_label;
+  const processedFiles = progress?.processed_files ?? 0;
+  const totalFiles = progress?.total_files ?? 0;
+
+  return (
+    <div className="space-y-3">
+      <div className="rounded-lg border border-[#cad6ff] bg-[#f4f6ff] px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-sm font-semibold text-[#33415b]">
+            <Loader2 className="animate-spin text-[#4d68ff]" size={15} />
+            <span>{stageLabel}</span>
+            {currentSource ? (
+              <span className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-[#4d68ff]">
+                {currentSource}
+              </span>
+            ) : null}
+          </div>
+          <div className="text-xs font-semibold text-[#4d68ff]">
+            {processedFiles}/{totalFiles} files · {percent}%
+          </div>
+        </div>
+        <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-white">
+          <div
+            className="h-full rounded-full bg-[#4d68ff] transition-all"
+            style={{ width: `${Math.min(100, Math.max(2, percent))}%` }}
+          />
+        </div>
+        <p className="mt-2 text-xs leading-5 text-[#5f6f89]">
+          Runs on the server, so you can leave this tab and come back. PDF page checkpoints stream in
+          as the multipass pipeline finishes each file.
+        </p>
+      </div>
+
+      <PdfPageProgressMap progress={adapted} />
+      <PdfExtractionEventTimeline progress={adapted} />
+    </div>
+  );
+}
+
+// Adapts the Guest manifest's progress block to the shared
+// ExtractionProgress shape so PdfPageProgressMap + PdfExtractionEventTimeline
+// can render it identically to the authenticated extract-job UI.
+function guestProgressForRender(
+  progress: GuestHarmonizationProgress | null | undefined,
+): ExtractionProgress | null {
+  if (!progress) return null;
+  return {
+    status: progress.status,
+    stage: progress.stage,
+    total_files: progress.total_files,
+    processed_files: progress.processed_files,
+    total_pages: progress.total_pages,
+    processed_pages: progress.processed_pages,
+    estimated_processed_pages: progress.estimated_processed_pages,
+    current_source_label: progress.current_source_label,
+    progress_mode: progress.progress_mode,
+    events: progress.events,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // GuestHarmonization page
 // ---------------------------------------------------------------------------
@@ -264,6 +334,11 @@ export function GuestHarmonization() {
     setError(null);
     setBusy("Harmonizing");
     try {
+      // POST /process is async now — returns immediately with status:
+      // "processing" + a seeded progress block. The polling effect below
+      // watches run.status and refetches every 1.5s until it flips to
+      // "completed" or "failed". The progress UI has its own loader, so
+      // we drop the global busy flag as soon as the kickoff returns.
       const next = await api.processGuestHarmonizationRun(run.run_id);
       setRun(next);
     } catch (err) {
@@ -272,6 +347,37 @@ export function GuestHarmonization() {
       setBusy(null);
     }
   }
+
+  // While processing, poll the run state so the progress block (stage label,
+  // page checkpoints, worker events) ticks in real time. Mirrors the
+  // authenticated extract-job polling at aggregator/shared.tsx.
+  const isProcessing = run?.status === "processing";
+  useEffect(() => {
+    if (!isProcessing || !run) return;
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const next = await api.getGuestHarmonizationRun(run.run_id);
+        if (!cancelled) setRun(next);
+      } catch {
+        // Transient polling errors are non-fatal — we'll catch up on the
+        // next tick. A hard failure surfaces via run.status === "failed".
+      }
+    };
+    const interval = setInterval(tick, 1500);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [isProcessing, run?.run_id]);
+
+  // Surface the daemon's failure event as a user-visible error.
+  useEffect(() => {
+    if (run?.status !== "failed") return;
+    const events = run.progress?.events ?? [];
+    const failureEvent = [...events].reverse().find((e) => e.event_type === "job_failed");
+    setError(failureEvent?.message ?? "Harmonization failed. Try again or upload smaller files.");
+  }, [run?.status, run?.progress]);
 
   async function saveContext() {
     if (!run) return;
@@ -458,10 +564,20 @@ export function GuestHarmonization() {
             hint={
               isProcessed
                 ? "Your files have been parsed and merged into canonical facts."
-                : "Pulls FHIR resources from each file, dedupes across sources, classifies medications, and detects conflicts."
+                : isProcessing
+                  ? "Extraction is running on the server. You can leave this page open; checkpoints stream in as each file completes."
+                  : "Pulls FHIR resources from each file, dedupes across sources, classifies medications, and detects conflicts."
             }
           >
-            {!isProcessed ? (
+            {isProcessed ? (
+              <div className="grid grid-cols-3 gap-3">
+                <Metric label="Sources" value={factCount} />
+                <Metric label="Status" value={1} />
+                <Metric label="Conflicts" value={0} tone="warn" />
+              </div>
+            ) : isProcessing ? (
+              <GuestExtractionProgress progress={run?.progress ?? null} />
+            ) : (
               <button
                 type="button"
                 onClick={harmonize}
@@ -475,12 +591,6 @@ export function GuestHarmonization() {
                 )}
                 Harmonize my files
               </button>
-            ) : (
-              <div className="grid grid-cols-3 gap-3">
-                <Metric label="Sources" value={factCount} />
-                <Metric label="Status" value={1} />
-                <Metric label="Conflicts" value={0} tone="warn" />
-              </div>
             )}
           </StepCard>
 

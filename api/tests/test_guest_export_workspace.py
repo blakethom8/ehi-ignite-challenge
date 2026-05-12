@@ -107,6 +107,7 @@ class GuestWorkspaceExportTests(unittest.TestCase):
 
         processed = self.client.post(f"/api/guest-harmonization/runs/{run_id}/process")
         self.assertEqual(processed.status_code, 200)
+        guest_harmonization.wait_for_processing(run_id)
 
         response = self.client.get(f"/api/guest-harmonization/runs/{run_id}/export-workspace")
         self.assertEqual(response.status_code, 200, response.text)
@@ -152,6 +153,7 @@ class GuestWorkspaceExportTests(unittest.TestCase):
             files={"file": ("sample.json", json.dumps(self._bundle_payload()), "application/json")},
         )
         self.client.post(f"/api/guest-harmonization/runs/{run_id}/process")
+        guest_harmonization.wait_for_processing(run_id)
 
         other = TestClient(app)
         response = other.get(f"/api/guest-harmonization/runs/{run_id}/export-workspace")

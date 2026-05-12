@@ -104,9 +104,16 @@ async def upload_guest_file(
 
 @router.post("/runs/{run_id}/process", response_model=GuestHarmonizationRunResponse)
 def process_guest_run(run_id: str, request: Request) -> GuestHarmonizationRunResponse:
+    """Kick off the extraction pipeline on a background thread.
+
+    Returns immediately with ``status: "processing"`` so the frontend can
+    poll ``GET /runs/{run_id}`` every ~1.5s to watch the ``progress``
+    block tick through file_started / file_completed events. Matches the
+    authenticated ``/api/harmonize/{id}/extract`` job pattern.
+    """
     _require_guest_run(request, run_id)
     try:
-        return _response(guest_harmonization.process_run(run_id))
+        return _response(guest_harmonization.start_processing(run_id))
     except Exception as exc:
         raise _map_run_error(exc) from exc
 

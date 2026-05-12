@@ -113,6 +113,7 @@ class GuestCCDADispatchTests(unittest.TestCase):
 
         processed = self.client.post(f"/api/guest-harmonization/runs/{run_id}/process")
         self.assertEqual(processed.status_code, 200, processed.text)
+        guest_harmonization.wait_for_processing(run_id)
 
         output = self.client.get(f"/api/guest-harmonization/runs/{run_id}/output").json()
         resource_types = {fact["resource_type"] for fact in output["facts"]}
@@ -128,6 +129,7 @@ class GuestCCDADispatchTests(unittest.TestCase):
             files={"file": ("not-ccda.xml", "<note>hi</note>", "text/xml")},
         )
         self.client.post(f"/api/guest-harmonization/runs/{run_id}/process")
+        guest_harmonization.wait_for_processing(run_id)
         output = self.client.get(f"/api/guest-harmonization/runs/{run_id}/output").json()
 
         codes = {issue["code"] for issue in output["quality_issues"]}
@@ -168,14 +170,21 @@ class GuestPDFDispatchTests(unittest.TestCase):
         )
         processed = self.client.post(f"/api/guest-harmonization/runs/{run_id}/process")
         self.assertEqual(processed.status_code, 200, processed.text)
+        guest_harmonization.wait_for_processing(run_id)
 
         output = self.client.get(f"/api/guest-harmonization/runs/{run_id}/output").json()
         codes = {issue["code"] for issue in output["quality_issues"]}
         # Either the text layer is unreadable, or the pipeline ran and found no
-        # lab rows. Both are acceptable graceful outcomes — we just need not
-        # to crash the run.
+        # clinical resources, or vision wasn't configured in this env. All are
+        # acceptable graceful outcomes — we just need not to crash the run.
         self.assertTrue(
-            codes & {"pdf_unreadable", "pdf_low_yield", "pdf_extraction_failed"},
+            codes
+            & {
+                "pdf_unreadable",
+                "pdf_low_yield",
+                "pdf_extraction_failed",
+                "pipeline_unconfigured",
+            },
             f"expected a graceful PDF quality issue, got {codes}",
         )
 

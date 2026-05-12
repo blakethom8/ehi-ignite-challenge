@@ -118,6 +118,57 @@ def _minimal(slice_: dict) -> dict:
     return deepcopy(slice_)
 
 
+# ---------------------------------------------------------------------------
+# Audit-log preset — for unstructured event payloads (api/workspace/events.py)
+# ---------------------------------------------------------------------------
+
+_EVENT_FREETEXT_KEYS = {
+    "question",
+    "question_preview",
+    "message",
+    "brief",
+    "description",
+    "payload_preview",
+    "response_summary",
+    "summary",
+    "narrative",
+    "note",
+    "notes",
+    "text",
+}
+
+
+def _redact_freetext(d: Any, keys: set[str]) -> Any:
+    """Recursively replace string values whose key is in ``keys`` with a
+    placeholder. Free-text clinician input frequently embeds patient names
+    and other PHI that key-stripping alone won't catch."""
+    if isinstance(d, dict):
+        out: dict = {}
+        for k, v in d.items():
+            if k in keys and isinstance(v, str) and v:
+                out[k] = "[redacted]"
+            else:
+                out[k] = _redact_freetext(v, keys)
+        return out
+    if isinstance(d, list):
+        return [_redact_freetext(v, keys) for v in d]
+    return d
+
+
+@register("events-strict")
+def _events_strict(payload: dict) -> dict:
+    """Default redaction preset for audit-log event payloads.
+
+    Aggressive: strips direct identifiers (name, MRN, DOB, ...) AND
+    replaces free-text fields likely to contain clinician-typed PHI
+    (question, message, brief, description, ...) with ``[redacted]``.
+    Lossy on purpose — the audit log is for who/when/where, not what
+    was said. Use ``minimal`` for dev when you need to see content.
+    """
+    out = _strip_keys(deepcopy(payload), _DIRECT_IDENTIFIERS)
+    return _redact_freetext(out, _EVENT_FREETEXT_KEYS)
+
+
 def apply_preset(name: str, slice_: dict) -> dict:
     if name not in PRESETS:
         raise ValueError(f"unknown redaction preset: {name}")

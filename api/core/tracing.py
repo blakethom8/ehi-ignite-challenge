@@ -33,6 +33,21 @@ LOGGER = logging.getLogger(__name__)
 TRACING_ENABLED = os.getenv("TRACING_ENABLED", "false").lower() in ("true", "1", "yes")
 DB_PATH = Path(os.getenv("TRACES_DB_PATH", "data/traces.db"))
 
+# Sampling — fraction of requests that get traced when TRACING_ENABLED=true.
+# 1.0 = always (default), 0.2 = 20%. Keep at 1.0 in early production until
+# trace volume justifies stepping down.
+try:
+    TRACING_SAMPLE_RATE = float(os.getenv("TRACING_SAMPLE_RATE", "1.0"))
+except ValueError:
+    TRACING_SAMPLE_RATE = 1.0
+TRACING_SAMPLE_RATE = max(0.0, min(1.0, TRACING_SAMPLE_RATE))
+
+# Workspace kinds — every traced surface tags its origin so per-user audit
+# queries can group by surface (caspian chat vs skill run vs plugin tool).
+WORKSPACE_CASPIAN = "caspian"
+WORKSPACE_SKILL = "skill"
+WORKSPACE_PLUGIN = "plugin"
+
 # Langfuse (optional)
 LANGFUSE_PUBLIC_KEY = os.getenv("LANGFUSE_PUBLIC_KEY", "")
 LANGFUSE_SECRET_KEY = os.getenv("LANGFUSE_SECRET_KEY", "")
@@ -74,13 +89,20 @@ class Span:
 
 @dataclass
 class Trace:
-    """Top-level trace for a single assistant chat request."""
+    """Top-level trace for a single audited request — caspian chat, skill
+    run, or plugin tool call. The (user_id, session_id, workspace_kind)
+    triple is the join key for the per-user audit query."""
 
     trace_id: str = field(default_factory=lambda: uuid.uuid4().hex)
     patient_id: str = ""
     question: str = ""
     stance: str = "opinionated"
     engine: str | None = None
+    # Assistant mode that produced this trace — context | deterministic |
+    # agent_sdk | cursor. Populated by provider_assistant_service after
+    # the mode resolves; lets the per-user audit query group by mode and
+    # supports H3.1 mode comparison.
+    mode: str | None = None
     status: str = "ok"  # "ok" | "error" | "fallback"
     confidence: str | None = None
     answer_preview: str = ""  # First 500 chars of the answer
@@ -89,6 +111,10 @@ class Trace:
     follow_up_count: int = 0
     duration_ms: float = 0.0
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    # Per-user audit join keys — populated by middleware from the session.
+    user_id: str = ""
+    session_id: str = ""
+    workspace_kind: str = WORKSPACE_CASPIAN
     spans: list[Span] = field(default_factory=list)
     # Internal timing
     _start_time: float = field(default=0.0, repr=False)
@@ -126,16 +152,37 @@ def start_trace(
     patient_id: str,
     question: str,
     stance: str = "opinionated",
+    *,
+    user_id: str = "",
+    session_id: str = "",
+    workspace_kind: str = WORKSPACE_CASPIAN,
 ) -> Generator[Trace | None, None, None]:
-    """Open a new trace. On exit, flush to storage."""
+    """Open a new trace. On exit, flush to storage.
+
+    ``user_id``, ``session_id``, and ``workspace_kind`` are the join keys
+    used by the per-user audit query. The middleware populates them from
+    the request session; downstream callers (skill/plugin runtimes that
+    open their own traces) should pass them through explicitly.
+    """
     if not TRACING_ENABLED:
         yield None
         return
+
+    # Sampling — drop a fraction of traces when TRACING_SAMPLE_RATE < 1.0.
+    if TRACING_SAMPLE_RATE < 1.0:
+        import random
+
+        if random.random() > TRACING_SAMPLE_RATE:
+            yield None
+            return
 
     trace = Trace(
         patient_id=patient_id,
         question=question[:2000],  # Cap stored question length
         stance=stance,
+        user_id=user_id,
+        session_id=session_id,
+        workspace_kind=workspace_kind,
         _start_time=time.monotonic(),
     )
     token = _current_trace.set(trace)
@@ -233,7 +280,11 @@ def _ensure_db() -> None:
                     citation_count INTEGER DEFAULT 0,
                     follow_up_count INTEGER DEFAULT 0,
                     duration_ms    REAL DEFAULT 0,
-                    created_at     TEXT NOT NULL
+                    created_at     TEXT NOT NULL,
+                    user_id        TEXT NOT NULL DEFAULT '',
+                    session_id     TEXT NOT NULL DEFAULT '',
+                    workspace_kind TEXT NOT NULL DEFAULT 'caspian',
+                    mode           TEXT
                 );
 
                 CREATE TABLE IF NOT EXISTS spans (
@@ -256,8 +307,22 @@ def _ensure_db() -> None:
 
                 CREATE INDEX IF NOT EXISTS idx_traces_created_at ON traces(created_at);
                 CREATE INDEX IF NOT EXISTS idx_traces_patient_id ON traces(patient_id);
+                CREATE INDEX IF NOT EXISTS idx_traces_user_id ON traces(user_id);
+                CREATE INDEX IF NOT EXISTS idx_traces_workspace_kind ON traces(workspace_kind);
                 CREATE INDEX IF NOT EXISTS idx_spans_trace_id ON spans(trace_id);
             """)
+            # Forward-compat for traces.db files created before the audit
+            # join keys existed. H1.2 will replace with a real migration runner.
+            for column, ddl in [
+                ("user_id", "ALTER TABLE traces ADD COLUMN user_id TEXT NOT NULL DEFAULT ''"),
+                ("session_id", "ALTER TABLE traces ADD COLUMN session_id TEXT NOT NULL DEFAULT ''"),
+                ("workspace_kind", "ALTER TABLE traces ADD COLUMN workspace_kind TEXT NOT NULL DEFAULT 'caspian'"),
+                ("mode", "ALTER TABLE traces ADD COLUMN mode TEXT"),
+            ]:
+                try:
+                    conn.execute(ddl)
+                except sqlite3.OperationalError:
+                    pass
         finally:
             conn.close()
 
@@ -274,8 +339,9 @@ def _flush_trace(trace: Trace) -> None:
                 """INSERT OR REPLACE INTO traces
                    (trace_id, patient_id, question, stance, engine, status,
                     confidence, answer_preview, answer_length, citation_count,
-                    follow_up_count, duration_ms, created_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    follow_up_count, duration_ms, created_at,
+                    user_id, session_id, workspace_kind, mode)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     trace.trace_id,
                     trace.patient_id,
@@ -290,6 +356,10 @@ def _flush_trace(trace: Trace) -> None:
                     trace.follow_up_count,
                     trace.duration_ms,
                     trace.created_at.isoformat(),
+                    trace.user_id,
+                    trace.session_id,
+                    trace.workspace_kind,
+                    trace.mode,
                 ),
             )
 

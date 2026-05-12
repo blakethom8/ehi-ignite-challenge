@@ -1,57 +1,114 @@
-"""
-Tracing middleware — opens a trace for each assistant chat request.
+"""Tracing middleware — wraps audited surfaces in a per-request trace.
 
-Intercepts POST /api/assistant/chat, extracts patient_id / question / stance
-from the request body, and manages the trace lifecycle via context vars.
+Audited surfaces (each emits one trace per request):
+- POST /api/assistant/chat            → workspace_kind = "caspian"
+- POST /api/skills/{name}/runs[/...]  → workspace_kind = "skill"
+- POST /api/plugins/runs/{run_id}/tool/{tool_id}  → workspace_kind = "plugin"
+
+Every trace carries (user_id, session_id, workspace_kind) extracted from
+the session cookie so the per-user audit query (H0.6) can join across
+all three surfaces.
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import re
 
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
 from starlette.responses import Response
 
-from api.core.tracing import TRACING_ENABLED, start_trace
+from api.core.tracing import (
+    TRACING_ENABLED,
+    WORKSPACE_CASPIAN,
+    WORKSPACE_PLUGIN,
+    WORKSPACE_SKILL,
+    start_trace,
+)
 
 LOGGER = logging.getLogger(__name__)
 
-_TRACED_PATH = "/api/assistant/chat"
+_CASPIAN_PATH = "/api/assistant/chat"
+_SKILL_PATH_PREFIX = "/api/skills/"
+_PLUGIN_TOOL_RE = re.compile(r"^/api/plugins/runs/[^/]+/tool/[^/]+/?$")
+
+
+def _classify(method: str, path: str) -> str | None:
+    """Return the workspace_kind for an audited path, or None to skip."""
+    if method != "POST":
+        return None
+    if path == _CASPIAN_PATH:
+        return WORKSPACE_CASPIAN
+    if path.startswith(_SKILL_PATH_PREFIX):
+        return WORKSPACE_SKILL
+    if _PLUGIN_TOOL_RE.match(path):
+        return WORKSPACE_PLUGIN
+    return None
+
+
+def _session_identity(request: Request) -> tuple[str, str]:
+    """Extract (user_id, session_id) from the request session cookie.
+
+    Failures are silent — tracing is best-effort and must not block the
+    request path. Demo sessions have no user_id; we record the empty
+    string in that case so the audit query can still group by session.
+    """
+    try:
+        # Lazy import: avoids the auth module's eager DB init at import time
+        # for tests that monkey-patch SESSION_SECRET_PATH.
+        from api.core.auth import current_session
+
+        principal = current_session(request)
+    except Exception:
+        return "", ""
+    if principal is None:
+        return "", ""
+    return principal.user_id or "", principal.session_id
 
 
 class TracingMiddleware(BaseHTTPMiddleware):
-    """Middleware that wraps assistant chat requests in a trace."""
+    """Open a trace for every audited surface and tag it with the session."""
 
     async def dispatch(
         self, request: Request, call_next: RequestResponseEndpoint
     ) -> Response:
-        # Only trace the assistant chat endpoint
-        if not TRACING_ENABLED or request.url.path != _TRACED_PATH or request.method != "POST":
+        if not TRACING_ENABLED:
             return await call_next(request)
 
-        # Parse request body to extract trace metadata
+        kind = _classify(request.method, request.url.path)
+        if kind is None:
+            return await call_next(request)
+
+        user_id, session_id = _session_identity(request)
+
+        # Body parsing only for the legacy assistant chat path — Caspian
+        # carries patient_id/question/stance in the body, while skill and
+        # plugin routes carry the relevant ids in the URL. Reading the body
+        # for non-chat paths risks consuming the request stream.
         patient_id = ""
-        question = ""
+        question = f"{request.method} {request.url.path}"
         stance = "opinionated"
-        try:
-            body_bytes = await request.body()
-            body = json.loads(body_bytes)
-            patient_id = body.get("patient_id", "")
-            question = body.get("question", "")
-            stance = body.get("stance", "opinionated")
-        except Exception:
-            LOGGER.debug("Could not parse request body for tracing")
+        if kind == WORKSPACE_CASPIAN:
+            try:
+                body_bytes = await request.body()
+                body = json.loads(body_bytes)
+                patient_id = body.get("patient_id", "")
+                question = body.get("question", "") or question
+                stance = body.get("stance", "opinionated")
+            except Exception:
+                LOGGER.debug("Could not parse chat request body for tracing")
 
-        with start_trace(patient_id=patient_id, question=question, stance=stance) as trace:
+        with start_trace(
+            patient_id=patient_id,
+            question=question,
+            stance=stance,
+            user_id=user_id,
+            session_id=session_id,
+            workspace_kind=kind,
+        ) as trace:
             response = await call_next(request)
-
-            if trace is not None:
-                # Capture HTTP-level status
-                if response.status_code >= 500:
-                    trace.status = "error"
-                elif response.status_code >= 400:
-                    trace.status = "error"
-
+            if trace is not None and response.status_code >= 400:
+                trace.status = "error"
             return response

@@ -13,9 +13,60 @@ from api.plugins.anchors import (
 from api.plugins.manifest import load_manifest
 
 
+# Canonical demo patient UUID — exists as both a Synthea bundle AND a hardcoded
+# fixture, so it covers the live-FHIR path and the fixture path under
+# PLUGIN_ANCHOR_USE_FIXTURES.
+LIVE_FHIR_PATIENT_ID = "81e1b4cb-6817-4bdc-97cd-c1f3ac960345"
+
+
 @pytest.fixture(scope="module")
 def trial_finder():
     return load_manifest("trial-finder", "2.4.1").manifest
+
+
+def test_anchor_loads_live_fhir_by_default(monkeypatch, trial_finder):
+    """H0.3 regression: by default the anchor compiler reads live FHIR data
+    via lib.fhir_parser.bundle_parser.parse_bundle(), not the curated
+    demo fixture for the same patient ID."""
+    monkeypatch.delenv("PLUGIN_ANCHOR_USE_FIXTURES", raising=False)
+    pkg = compile_anchor_package(
+        manifest=trial_finder, patient_id=LIVE_FHIR_PATIENT_ID, run_id="r_live1"
+    )
+    diagnoses = pkg.data.get("diagnoses.active", [])
+    # Live Synthea bundles for this patient carry many more conditions than the
+    # 5-entry curated fixture; >5 confirms we hit the live path.
+    assert len(diagnoses) > 5, (
+        f"expected live FHIR path to produce >5 active diagnoses, "
+        f"got {len(diagnoses)} (likely fell back to fixture)"
+    )
+
+
+def test_anchor_use_fixtures_flag_pins_demo_data(monkeypatch, trial_finder):
+    """H0.3: PLUGIN_ANCHOR_USE_FIXTURES=true keeps the demo experience
+    pinned to curated fixtures (for screenshots and marketing)."""
+    monkeypatch.setenv("PLUGIN_ANCHOR_USE_FIXTURES", "true")
+    pkg = compile_anchor_package(
+        manifest=trial_finder, patient_id=LIVE_FHIR_PATIENT_ID, run_id="r_fix1"
+    )
+    diagnoses = pkg.data.get("diagnoses.active", [])
+    assert len(diagnoses) == 5
+    assert any(d.get("display") == "Prostate cancer" for d in diagnoses)
+
+
+def test_anchor_live_path_still_applies_redactions(monkeypatch, trial_finder):
+    """H0.3: live FHIR data must still pass through the manifest's de-id
+    preset, not bypass it."""
+    monkeypatch.delenv("PLUGIN_ANCHOR_USE_FIXTURES", raising=False)
+    pkg = compile_anchor_package(
+        manifest=trial_finder, patient_id=LIVE_FHIR_PATIENT_ID, run_id="r_live2"
+    )
+    geo = pkg.data.get("demographics.geography", {})
+    if geo and geo.get("zip"):
+        # trial_finder uses redact-v3 which truncates ZIPs; full 5-digit
+        # raw value must not survive.
+        assert len(geo["zip"]) <= 3, (
+            f"de-id preset should have truncated ZIP, got {geo['zip']!r}"
+        )
 
 
 @pytest.fixture(scope="module")

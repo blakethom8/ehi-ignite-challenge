@@ -32,6 +32,8 @@ data/provenance.db
 data/provenance.db-*
 data/runs.db
 data/runs.db-*
+data/events.db
+data/events.db-*
 data/aggregation-uploads/
 data/aggregation-profiles/
 data/guest-harmonization/

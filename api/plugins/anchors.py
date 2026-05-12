@@ -7,12 +7,14 @@ scope-limited, redacted, signed slice the plugin will see.
 from __future__ import annotations
 
 import json
+import os
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
 from api.core.auth import DEMO_PATIENT_BY_ALIAS
+from api.core.loader import path_from_patient_id
 from api.trust.keys import REPO_ROOT, atlas_keypair
 from api.trust.models import AnchorPackage, PluginManifest
 from api.trust.redactions import apply_preset
@@ -288,15 +290,51 @@ PLUGIN_DEMO_RECORDS_BY_PATIENT_ID = {
 }
 
 
+def _use_fixtures_only() -> bool:
+    """When true, prefer hardcoded demo fixtures over the live FHIR loader.
+
+    Default false in all environments — fixtures are kept around as a pinned
+    demo path for screenshots and marketing, not as the everyday data path.
+    """
+    return os.getenv("PLUGIN_ANCHOR_USE_FIXTURES", "false").strip().lower() in {
+        "true",
+        "1",
+        "yes",
+    }
+
+
 def load_raw_patient(patient_id: str) -> dict:
+    """Load a raw anchor record for ``patient_id``.
+
+    Resolution:
+    1. Demo aliases ("demo-high-risk" etc.) resolve to their real Synthea UUID.
+    2. If ``PLUGIN_ANCHOR_USE_FIXTURES=true``, the curated fixture for that
+       UUID wins (preserves the demo experience for screenshots/marketing).
+    3. Otherwise, the live FHIR bundle is loaded via
+       ``lib.fhir_parser.bundle_parser.parse_bundle`` and projected into the
+       anchor schema. This is the production path.
+    4. Fallback to fixtures for legacy demo patient IDs that have no Synthea
+       bundle (e.g., the canonical Hollister fixture ``8.4127.881``).
+    """
     demo_patient = DEMO_PATIENT_BY_ALIAS.get(patient_id)
     if demo_patient is not None:
         patient_id = demo_patient.actual_patient_id
 
-    if DEFAULT_PATIENT_PATH.exists():
-        record = json.loads(DEFAULT_PATIENT_PATH.read_text())
-        if record.get("patientId") == patient_id:
-            return record
+    if _use_fixtures_only():
+        if DEFAULT_PATIENT_PATH.exists():
+            record = json.loads(DEFAULT_PATIENT_PATH.read_text())
+            if record.get("patientId") == patient_id:
+                return record
+        demo_record = PLUGIN_DEMO_RECORDS_BY_PATIENT_ID.get(patient_id)
+        if demo_record is not None:
+            return demo_record
+
+    live = _load_from_fhir(patient_id)
+    if live is not None:
+        return live
+
+    # No live bundle (e.g. Hollister 8.4127.881 has no Synthea file). Fixtures
+    # remain available as a last-resort fallback so existing demos keep working.
     demo_record = PLUGIN_DEMO_RECORDS_BY_PATIENT_ID.get(patient_id)
     if demo_record is not None:
         return demo_record
@@ -304,6 +342,151 @@ def load_raw_patient(patient_id: str) -> dict:
     if record["patientId"] != patient_id:
         raise AnchorError(f"unknown patient: {patient_id}")
     return record
+
+
+# ============================================================
+# FHIR → anchor-schema projection
+# ============================================================
+
+
+_LAB_LOINC_ECOG = {"89243-0", "42800-3"}  # ECOG performance status LOINC codes
+
+
+def _load_from_fhir(patient_id: str) -> dict | None:
+    """Load a patient bundle and project it into the anchor record shape.
+
+    Returns ``None`` if no Synthea bundle exists for ``patient_id`` (the
+    caller falls back to the fixture path). Any parse error raises
+    ``AnchorError`` rather than returning None — a corrupt bundle for an
+    indexed patient is a real failure, not a missing-data signal.
+    """
+    path = path_from_patient_id(patient_id)
+    if path is None:
+        return None
+    try:
+        # Lazy import: keep test setup cheap when the FHIR loader isn't needed.
+        from lib.fhir_parser.bundle_parser import parse_bundle
+
+        record = parse_bundle(path)
+    except Exception as exc:
+        raise AnchorError(
+            f"failed to parse FHIR bundle for {patient_id}: {exc}"
+        ) from exc
+
+    summary = record.summary
+    age = _years_since(summary.birth_date)
+
+    diagnoses_active = []
+    diagnoses_history = []
+    for cond in record.conditions:
+        entry = {
+            "code": cond.code.code,
+            "system": cond.code.system,
+            "display": cond.code.label(),
+            "onsetYear": cond.onset_dt.year if cond.onset_dt else None,
+        }
+        if cond.is_active:
+            diagnoses_active.append(entry)
+        else:
+            diagnoses_history.append(entry)
+
+    meds_active = []
+    meds_history = []
+    for med in record.medications:
+        is_active = (med.status or "").lower() == "active"
+        entry = {
+            "rxnorm": med.rxnorm_code,
+            "display": med.display,
+            "dose": med.dosage_text,
+            "startDate": med.authored_on.date().isoformat() if med.authored_on else None,
+            "status": med.status,
+        }
+        if is_active:
+            meds_active.append(entry)
+        else:
+            entry["reason"] = med.reason_display or None
+            meds_history.append(entry)
+
+    allergies = []
+    for allergy in record.allergies:
+        allergies.append(
+            {
+                "substance": allergy.code.label(),
+                "reaction": allergy.allergy_type or "",
+                "severity": allergy.criticality or "",
+            }
+        )
+
+    labs_recent = []
+    perf_status: dict[str, Any] | None = None
+    for obs in record.observations:
+        if obs.category == "laboratory" and obs.value_quantity is not None:
+            labs_recent.append(
+                {
+                    "code": obs.loinc_code,
+                    "system": "LOINC",
+                    "display": obs.display,
+                    "value": obs.value_quantity,
+                    "unit": obs.value_unit,
+                    "date": obs.effective_dt.date().isoformat() if obs.effective_dt else None,
+                }
+            )
+        if obs.loinc_code in _LAB_LOINC_ECOG and obs.value_quantity is not None:
+            perf_status = {
+                "scale": "ECOG",
+                "value": obs.value_quantity,
+                "date": obs.effective_dt.date().isoformat() if obs.effective_dt else None,
+            }
+    labs_recent.sort(key=lambda r: r.get("date") or "", reverse=True)
+    labs_recent = labs_recent[:25]
+
+    encounters_recent = []
+    for enc in sorted(
+        record.encounters,
+        key=lambda e: e.period.start or datetime.min,
+        reverse=True,
+    )[:10]:
+        encounters_recent.append(
+            {
+                "id": enc.encounter_id,
+                "type": enc.encounter_type or enc.class_code,
+                "provider": enc.practitioner_name or enc.provider_org,
+                "date": enc.period.start.date().isoformat() if enc.period.start else None,
+            }
+        )
+
+    return {
+        "patientId": summary.patient_id or patient_id,
+        "name": summary.name,
+        "mrn": summary.mrn or summary.patient_id,
+        "dob": summary.birth_date.isoformat() if summary.birth_date else None,
+        "demographics": {
+            "age": age,
+            "sex": (summary.gender or "").upper()[:1] or None,
+            "geography": {
+                "zip": summary.postal_code,
+                "city": summary.city,
+                "state": summary.state,
+            },
+        },
+        "diagnoses": {"active": diagnoses_active, "history": diagnoses_history},
+        "medications": {"active": meds_active, "history": meds_history},
+        "allergies": allergies,
+        "biomarkers": [],
+        "labs": {"recent": labs_recent},
+        "encounters": {"recent": encounters_recent},
+        "performance-status": perf_status,
+    }
+
+
+def _years_since(birth: date | None) -> int | None:
+    if birth is None:
+        return None
+    today = date.today()
+    years = today.year - birth.year - (
+        (today.month, today.day) < (birth.month, birth.day)
+    )
+    return max(years, 0)
 
 
 # ============================================================

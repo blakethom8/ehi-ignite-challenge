@@ -23,6 +23,7 @@ from api.core.loader import warm_patient_indexes
 from api.core.sof_materialize import materialize_from_env
 from api.middleware.tracing import TracingMiddleware
 from api.routers import admin
+from api.routers import audit
 from api.routers import auth
 from api.routers import patients
 from api.routers import corpus
@@ -84,6 +85,22 @@ def _materialize_sof_db() -> None:
     except Exception:
         # Don't crash the API if a manifest is malformed — just log.
         pass
+    # Rehydrate revoked-run set from runs.db so consent revocations survive
+    # the restart we just performed. Without this, a revoked plugin would
+    # silently regain tool access on the next deploy.
+    try:
+        plugin_runtime.reload_revoked_runs()
+    except Exception:
+        pass
+    # Purge audit events older than EVENTS_RETENTION_DAYS so events.db
+    # stays bounded under production traffic. Default 90 days; set to 0
+    # to disable. Best-effort — never crash the API on a purge failure.
+    try:
+        from api.workspace.events import purge_events_older_than
+
+        purge_events_older_than()
+    except Exception:
+        pass
 
 app.add_middleware(
     TrustedHostMiddleware,
@@ -121,6 +138,7 @@ app.include_router(patients.router, prefix="/api")
 app.include_router(corpus.router, prefix="/api")
 app.include_router(assistant.router, prefix="/api")
 app.include_router(traces.router, prefix="/api")
+app.include_router(audit.router, prefix="/api")
 app.include_router(classifications.router, prefix="/api")
 app.include_router(patient_context.router, prefix="/api")
 app.include_router(aggregation.router, prefix="/api")

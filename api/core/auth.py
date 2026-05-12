@@ -159,10 +159,20 @@ def _ensure_parent(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
 
 
+def _is_production() -> bool:
+    return os.getenv("ENVIRONMENT", "development").strip().lower() in {"prod", "production"}
+
+
 def _session_secret() -> bytes:
     override = (os.getenv("EHI_SESSION_SECRET") or "").strip()
     if override:
         return override.encode("utf-8")
+    if _is_production():
+        raise RuntimeError(
+            "EHI_SESSION_SECRET env var is required when ENVIRONMENT=production. "
+            "Refusing to fall back to data/atlas-session.key — session signing "
+            "secrets must not live as a plaintext file on disk in production."
+        )
     _ensure_parent(SESSION_SECRET_PATH)
     if SESSION_SECRET_PATH.exists():
         return SESSION_SECRET_PATH.read_bytes()

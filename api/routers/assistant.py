@@ -7,6 +7,7 @@ import json
 from fastapi import APIRouter, HTTPException, Request
 
 from api.core.auth import authorize_patient_access, require_access_session
+from api.workspace.events import WORKSPACE_CASPIAN, record_event_for_session
 from api.core.provider_assistant_cursor import CursorSidecarConfigurationError, CursorSidecarExecutionError
 from api.core.provider_assistant_service import answer_provider_question
 from api.core.tracing import get_current_trace, SpanKind
@@ -213,6 +214,17 @@ def provider_chat(payload: ProviderAssistantRequest, request: Request) -> Provid
         session,
         payload.patient_id,
         event_type="assistant.question",
+    )
+    record_event_for_session(
+        session,
+        workspace_kind=WORKSPACE_CASPIAN,
+        event_type="chat.turn",
+        target_id=resolved_patient_id,
+        payload={
+            "question_preview": payload.question[:200],
+            "stance": payload.stance,
+            "mode": payload.mode,
+        },
     )
 
     try:

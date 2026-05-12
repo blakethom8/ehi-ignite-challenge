@@ -134,10 +134,17 @@ def _conn(db_path: Path | None = None) -> sqlite3.Connection:
           completedAt TEXT,
           anchor TEXT,
           consent TEXT,
-          canvas TEXT NOT NULL DEFAULT '{}'
+          canvas TEXT NOT NULL DEFAULT '{}',
+          revoked_at TEXT
         )
         """
     )
+    # Forward-compat for runs.db files created before revoked_at existed.
+    # H1.2 will replace this ad-hoc ALTER with a real migration runner.
+    try:
+        conn.execute("ALTER TABLE runs ADD COLUMN revoked_at TEXT")
+    except sqlite3.OperationalError:
+        pass
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS events (
@@ -377,15 +384,31 @@ def revoke_consent(
     run_id: str, *, approver: UserIdentity, db_path: Path | None = None
 ) -> None:
     with _lock, _conn(db_path) as conn:
-        _update_state(conn, run_id, "revoked")
+        ts = _now_iso()
+        conn.execute(
+            "UPDATE runs SET state = ?, revoked_at = ? WHERE id = ?",
+            ("revoked", ts, run_id),
+        )
         # Void all pending approvals on the run.
         conn.execute(
             "UPDATE approvals SET status = 'voided', resolvedAt = ?, resolvedBy = ? "
             "WHERE runId = ? AND status = 'pending'",
-            (_now_iso(), approver.id, run_id),
+            (ts, approver.id, run_id),
         )
         _emit(conn, run_id, "run.consent-revoked", {"approverId": approver.id})
     _revoked_ids.add(run_id)
+
+
+def reload_revoked_runs(db_path: Path | None = None) -> int:
+    """Rehydrate ``_revoked_ids`` from ``runs.revoked_at``. Called at app start
+    so consent revocations survive a restart. Returns the count loaded."""
+    with _conn(db_path) as conn:
+        rows = conn.execute(
+            "SELECT id FROM runs WHERE revoked_at IS NOT NULL"
+        ).fetchall()
+    for (run_id,) in rows:
+        _revoked_ids.add(run_id)
+    return len(rows)
 
 
 def _update_canvas_value(

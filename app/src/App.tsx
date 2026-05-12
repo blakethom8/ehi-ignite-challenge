@@ -97,6 +97,7 @@ const InternalToolsPipelineLab = lazyNamed(() => import("./pages/InternalTools/P
 const InternalToolsGroundTruth = lazyNamed(() => import("./pages/InternalTools/GroundTruthReview"), "GroundTruthReview");
 const InternalToolsLabExplainer = lazyNamed(() => import("./pages/InternalTools/LabExplainer"), "LabExplainer");
 const InternalToolsDataSharing = lazyNamed(() => import("./pages/InternalTools/DataSharing"), "DataSharing");
+const InternalToolsAudit = lazyNamed(() => import("./pages/InternalTools/Audit"), "InternalToolsAudit");
 const InternalToolsTrialFinder = lazyNamed(() => import("./pages/InternalTools/skills/TrialFinder"), "TrialFinder");
 const InternalToolsPatientMemory = lazyNamed(() => import("./pages/InternalTools/skills/PatientMemory"), "PatientMemoryView");
 
@@ -252,6 +253,7 @@ function AppShellRoutes() {
     { path: "/learn/ground-truth-review/:runId", element: <InternalToolsGroundTruth /> },
     { path: "/learn/labs", element: <InternalToolsLabExplainer /> },
     { path: "/learn/data-sharing", element: <InternalToolsDataSharing /> },
+    { path: "/learn/audit", element: <InternalToolsAudit /> },
     { path: "/learn/skills/trial-finder", element: <InternalToolsTrialFinder /> },
     { path: "/learn/skills/patients/memory", element: <InternalToolsPatientMemory /> },
   ];

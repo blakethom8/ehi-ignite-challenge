@@ -12,7 +12,6 @@ import {
   Lock,
   Package,
   Trash2,
-  Upload,
 } from "lucide-react";
 import { api } from "../api/client";
 import { useAccessContext } from "../context/AccessContext";

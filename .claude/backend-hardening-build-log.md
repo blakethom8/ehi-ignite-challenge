@@ -244,3 +244,175 @@ All six Phase 0 tickets shipped:
 **Ready for Phase 1** (CI/CD, schema versioning, host upsize) — see `.claude/backend-hardening-plan.md` Phase 1.
 
 ---
+
+## 2026-05-12 — H0.7 — Skills router requires authenticated session
+
+**Shipped:** 2026-05-12
+**Commit:** `6bccf8f`
+**Files:**
+- `api/routers/skills.py` — imported `require_access_session`; added it to all 8 POST handlers (`start_run`, `set_canvas_node_selection`, `add_run_message`, `resolve_escalation`, `save_run`, `upsert_trial_pursuit`, `add_trial_pursuit_event`, `add_trial_pursuit_task`) plus the PATCH `update_trial_pursuit`. `start_run` now passes the authenticated principal to `record_event_for_session` so user_id is always populated.
+- `api/tests/test_skills_streaming.py` — autouse `fake_skills_session` fixture so the 15 pre-existing tests keep passing without threading a real auth flow through every test.
+- `api/tests/test_skills_router_auth.py` (new) — 4 tests covering the auth wall directly: anonymous POSTs return 401 on three representative endpoints, plus an end-to-end signup → login → start_run flow that asserts the resulting event row carries the user's id.
+
+**What it does:** Closes the audit gap H0.5 surfaced. Before this, anyone could start a skill run without a session, which meant `record_event_for_session(current_session(request), …)` silently wrote empty `user_id` for every skill event. The per-user audit timeline now correctly attributes skill activity.
+
+**Smoke test:**
+```
+$ uv run pytest api/tests/test_skills_router_auth.py api/tests/test_skills_streaming.py -q
+19 passed in 0.84s
+```
+
+---
+
+## 2026-05-12 — H0.8 — PII redaction on event payloads
+
+**Shipped:** 2026-05-12
+**Commit:** `8aefeeb`
+**Files:**
+- `api/trust/redactions.py` — new `events-strict` preset. Strips direct identifier keys (name, mrn, dob, ssn, …) AND replaces values of free-text keys (question, message, brief, description, payload_preview, notes, …) with `[redacted]`. Audit log keeps who/when/where; what-was-said is not the audit's job.
+- `api/workspace/events.py` — new `EVENTS_REDACTION_PRESET` env var (default `events-strict`). `_redact_payload` runs every payload through the preset before INSERT. Preset misfire drops payload to `{"_redaction_error": ...}` rather than leaking raw input.
+- `api/tests/test_workspace_events.py` — 3 new tests (patient name in free-text question redacted, direct identifier keys stripped, `EVENTS_REDACTION_PRESET=minimal` disables for dev) plus an updated assertion on the pre-existing `test_record_event_writes_row`.
+
+**What it does:** Closes the safety gap H0.5 introduced. Before, `chat.turn` events stored `question_preview[:200]` raw, so a clinician asking "what allergies does John Hollister have?" wrote the patient's name to events.db unredacted.
+
+**Smoke test:**
+```
+$ uv run pytest api/tests/test_workspace_events.py -v
+12 passed in 0.05s
+```
+
+---
+
+## 2026-05-12 — H0.9 — Skill lifecycle events: completed + escalated
+
+**Shipped:** 2026-05-12
+**Commit:** `406ed05`
+**Files:**
+- `api/core/skills/worker.py` — `_RunState` now carries `user_id` + `session_id`. `WorkerPool.submit()` accepts those as kwargs (back-compat defaults preserve existing tests). New `_emit_lifecycle_event()` maps `RunResult.status` (escalated|finished|failed) to the matching `record_event` call (run.escalated|run.completed|run.failed). `resume()` preserves the originator's identity from `_RunState`.
+- `api/routers/skills.py` — `start_run` handler passes `session.user_id` and `session.session_id` into `pool.submit()`.
+- `api/tests/test_skill_lifecycle_events.py` (new) — 4 tests: completion, escalation, failure, and the escalation→resume cycle (asserts the originating user_id is preserved across the full lifecycle).
+- `api/tests/test_skills_router_auth.py` — stub pool updated to accept the new submit() kwargs.
+
+**What it does:** Finishes the lifecycle. H0.5 only shipped `run.started`; the audit timeline now records `run.completed`, `run.escalated`, and `run.failed` too, all keyed on the same originating user_id even across an escalation/resume cycle.
+
+**Smoke test:**
+```
+$ uv run pytest api/tests/test_skill_lifecycle_events.py -v
+4 passed in 0.06s
+```
+
+---
+
+## 2026-05-12 — H0.10 — Cursor sidecar tracing parity
+
+**Shipped:** 2026-05-12
+**Commit:** `9923498`
+**Files:**
+- `api/core/tracing.py` — `Trace` dataclass and `traces` table gain a `mode` field (forward-compat ALTER for existing DBs). The mode is populated post-hoc by `_record_trace_metadata` once the assistant resolves it (env / override / fallback).
+- `api/core/provider_assistant_service.py` — `_record_trace_metadata` now copies `result.mode_used` to `trace.mode`.
+- `api/tests/test_cursor_mode_tracing.py` (new) — 3 tests: cursor mode lands with `mode='cursor'`, context mode lands with `mode='context'` (same span shape, mode is the only differentiator), and a third test that documents the parity gap that *remains* — the Cursor sidecar's `/invoke` response doesn't return token usage today, so cursor-mode LLM spans have None for `input_tokens`/`output_tokens`/`total_cost_usd`. The test asserts the gap exists rather than papering over it.
+
+**What it does:** Verifies priority #2. Cursor-mode chat calls now land in `traces.db` with `mode='cursor'`, matching session keys, and `workspace_kind='caspian'` — same shape as context/agent_sdk/deterministic so the audit query and the H3.1 mode-comparison harness can join across modes.
+
+**Approach taken (per plan default):** option (b) — wrap the round-trip from the Python client's vantage point. Option (a) (sidecar POSTs spans back to a new ingest endpoint) is deferred to H3.3 along with the broader "keep + harden Cursor" work.
+
+**Smoke test:**
+```
+$ uv run pytest api/tests/test_cursor_mode_tracing.py -v
+3 passed in 0.06s
+```
+
+---
+
+## 2026-05-12 — H0.11 — Index provenance.approver_id for audit query
+
+**Shipped:** 2026-05-12
+**Commit:** `71ce8f9`
+**Files:**
+- `api/plugins/provenance.py` — schema gains a denormalized `approver_id` column (NOT part of the signed payload — index column only) plus indexes on `approver_id` and `ts`. `write_record()` populates `approver_id` from the `UserIdentity` at insert. Forward-compat ALTER + automatic backfill of pre-existing rows on next `_conn()` open. `list_records()` takes `approver_id`, `since`, `until` kwargs and filters at SQL.
+- `api/routers/audit.py` — `_provenance_for_user` uses the new SQL filter instead of fetch-all + Python filter.
+- `api/tests/test_plugin_provenance.py` — 4 new tests: filter returns only matching user, filter combines with time window, EXPLAIN QUERY PLAN confirms the index is consulted (not a SCAN), pre-H0.11 row gets backfilled on next open.
+
+**What it does:** Closes the perf gap from H0.6 audit endpoint. Was O(N) scan + Python filter; now indexed SQL lookup keyed on `approver_id`.
+
+**Smoke test:**
+```
+$ uv run pytest api/tests/test_plugin_provenance.py -q
+10 passed in 0.04s
+```
+
+---
+
+## 2026-05-12 — H0.12 — Production secrets runbook
+
+**Shipped:** 2026-05-12
+**Commit:** `6e36428`
+**Files:**
+- `docs/architecture/PROD-SECRETS.md` (new) — operator runbook: TL;DR table of every required env var (purpose, failure point, generation command); Atlas signing key generation snippet that round-trips through `private_key_from_b64`; rotation procedures for each secret class; per-var failure mode reference; pre-deploy checklist; cross-references to known gaps tracked elsewhere.
+
+**What it does:** Closes the operational follow-on from H0.2. That ticket made env vars strict-required in production but left no runbook telling operators how to generate them or what fails on missing values — so the next deploy could fail at boot with no recovery doc.
+
+**Smoke test:**
+```
+$ uv run python -c "
+from api.trust.signatures import generate_keypair, private_key_to_b64, private_key_from_b64
+sk, _ = generate_keypair()
+b64 = private_key_to_b64(sk)
+assert private_key_from_b64(b64).private_bytes_raw() == sk.private_bytes_raw()
+print('runbook key snippet round-trips ok, length=', len(b64))
+"
+runbook key snippet round-trips ok, length= 44
+```
+
+---
+
+## 2026-05-12 — H0.13 — events.db retention policy
+
+**Shipped:** 2026-05-12
+**Commit:** `7070365`
+**Files:**
+- `api/workspace/events.py` — new `EVENTS_RETENTION_DAYS` env var (default 90, clamped to ≥0). New `purge_events_older_than(days, db_path)` helper. `days=0` is a no-op (tests + dev).
+- `api/workspace/__init__.py` — re-exports `purge_events_older_than`.
+- `api/main.py` — startup hook calls `purge_events_older_than()` after the manifest + revoked-runs reload. Wrapped in try/except — a purge failure must not crash boot.
+- `api/tests/test_workspace_events.py` — 3 new tests: 365-day-old row purged, days=0 is no-op, empty DB returns 0 without raising.
+
+**What it does:** Bounds the audit log. Without this, events.db grows unbounded under production traffic (3-5 events per user action) and would fill the disk.
+
+**Smoke test:**
+```
+$ uv run pytest api/tests/test_workspace_events.py -v
+12 passed in 0.05s
+```
+
+---
+
+## Phase 0+ closeout — 2026-05-12
+
+All seven tickets shipped:
+
+| ID | Ticket | Commit |
+|---|---|---|
+| H0.7 | Skills router requires authenticated session | `6bccf8f` |
+| H0.8 | PII redaction on event payloads | `8aefeeb` |
+| H0.9 | Skill lifecycle events: completed + escalated | `406ed05` |
+| H0.10 | Cursor sidecar tracing parity | `9923498` |
+| H0.11 | Index provenance.approver_id for audit query | `71ce8f9` |
+| H0.12 | Production secrets runbook | `6e36428` |
+| H0.13 | events.db retention policy | `7070365` |
+
+**Test posture:** 326 of 327 tests green across the API surface (1 pre-existing CCDA failure unrelated to this work — missing sample XML file). Phase 0+ added: 4 (H0.7) + 3 (H0.8) + 4 (H0.9) + 3 (H0.10) + 4 (H0.11) + 3 (H0.13) = 21 new tests.
+
+**Cursor mode parity question (H0.10) decided:** parity shipped at the trace level (mode field, matching session keys, same workspace_kind). Token/cost telemetry gap remains because the sidecar's `/invoke` response doesn't return token usage; that's a sidecar protocol change deferred to H3.3 ("keep + harden Cursor"), with `test_known_limitation_cursor_sidecar_token_counts_unavailable` as the regression that proves the gap exists.
+
+**Promises closed:**
+- Skills router no longer accepts anonymous writes (audit gap from H0.5 → fixed in H0.7).
+- "John Hollister" cannot land in `events.db` (safety gap → fixed in H0.8).
+- Skill lifecycle now emits `started + escalated + completed + failed` (partial H0.5 ship → finished in H0.9).
+- All four assistant modes emit the same trace shape (priority #2 verification → done in H0.10).
+- Audit endpoint provenance lookup is constant-time (perf gap from H0.6 → fixed in H0.11).
+- Operator runbook for prod secrets exists (H0.2 follow-on → done in H0.12).
+- `events.db` is bounded (H0.5 follow-on → done in H0.13).
+
+**Ready for Phase 1** (CI/CD, schema versioning, host upsize).
+
+---

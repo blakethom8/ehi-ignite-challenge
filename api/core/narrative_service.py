@@ -42,12 +42,27 @@ def regenerate_all_episodes(
     *,
     collection_id: str | None = None,
     generator=None,
+    voice_summarizer=None,
 ) -> list[Path]:
     """Regenerate every episode narrative for ``patient_id``.
+
+    Also regenerates ``voice_summary.json`` (T8a) so the next request
+    to Caspian / the merged-record UI sees a fresh first-sentence
+    summary. Voice-summary failures are caught and logged so they
+    don't block narrative regen.
 
     Returns the list of paths written. Errors per episode are logged
     and skipped — one bad episode doesn't block the others.
     """
+    # T8a: voice summary regen runs first so even if no episodes exist
+    # we still refresh the patient-voice card.
+    try:
+        from lib.patient_voice import regenerate_voice_summary
+
+        regenerate_voice_summary(patient_id, summarizer=voice_summarizer)
+    except Exception as exc:  # noqa: BLE001 — best-effort
+        _logger.warning("voice summary regen failed for %s: %s", patient_id, exc)
+
     episodes_path = NARRATIVE_STORE_ROOT / patient_id / "episodes.json"
     if not episodes_path.exists():
         _logger.warning("no episodes.json for patient %s; skipping regen", patient_id)

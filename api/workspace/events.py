@@ -25,7 +25,7 @@ import os
 import sqlite3
 import threading
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -40,6 +40,15 @@ DEFAULT_DB_PATH = Path(
 # clinician-typed PHI tends to land. Set to ``minimal`` in dev when you
 # need to see what got logged.
 EVENTS_REDACTION_PRESET = os.getenv("EVENTS_REDACTION_PRESET", "events-strict").strip()
+
+# Retention window in days. Events older than this get purged at startup
+# so events.db doesn't grow unbounded under production traffic (3-5 events
+# per user action × N users × N days). 0 disables purging (tests + dev).
+try:
+    EVENTS_RETENTION_DAYS = int(os.getenv("EVENTS_RETENTION_DAYS", "90"))
+except ValueError:
+    EVENTS_RETENTION_DAYS = 90
+EVENTS_RETENTION_DAYS = max(0, EVENTS_RETENTION_DAYS)
 
 # Workspace-kind tags, mirrored from api.core.tracing so callers can import
 # from a single place.
@@ -206,6 +215,28 @@ def record_event_for_session(
         parent_event_id=parent_event_id,
         db_path=db_path,
     )
+
+
+def purge_events_older_than(
+    days: int | None = None, *, db_path: Path | None = None
+) -> int:
+    """Delete event rows older than ``days`` (default ``EVENTS_RETENTION_DAYS``).
+    Returns the number of rows deleted. Pass ``days=0`` to skip — useful in
+    tests so the autouse fixture doesn't accidentally wipe seeded data."""
+    threshold_days = EVENTS_RETENTION_DAYS if days is None else days
+    if threshold_days <= 0:
+        return 0
+    _ensure_schema(db_path)
+    cutoff_dt = datetime.now(timezone.utc) - timedelta(days=threshold_days)
+    cutoff_iso = (
+        cutoff_dt.replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    )
+    conn = _conn(db_path)
+    try:
+        cursor = conn.execute("DELETE FROM events WHERE ts < ?", (cutoff_iso,))
+        return cursor.rowcount or 0
+    finally:
+        conn.close()
 
 
 def query_events(

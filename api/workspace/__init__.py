@@ -10,6 +10,7 @@ from api.workspace.events import (
     WORKSPACE_CASPIAN,
     WORKSPACE_PLUGIN,
     WORKSPACE_SKILL,
+    purge_events_older_than,
     query_events,
     record_event,
 )
@@ -18,6 +19,7 @@ __all__ = [
     "WORKSPACE_CASPIAN",
     "WORKSPACE_PLUGIN",
     "WORKSPACE_SKILL",
+    "purge_events_older_than",
     "query_events",
     "record_event",
 ]

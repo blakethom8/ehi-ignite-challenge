@@ -7,6 +7,8 @@ join across caspian, skill, and plugin events in one query.
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
+
 import pytest
 
 from api.workspace.events import (
@@ -216,6 +218,64 @@ def test_minimal_preset_disables_redaction_for_dev(monkeypatch, db):
     )
     rows = events_mod.query_events(user_id="u_3", db_path=db)
     assert rows[0]["payload"]["question_preview"] == "raw text with patient name"
+
+
+def test_purge_deletes_rows_older_than_threshold(db):
+    """H0.13: purge_events_older_than removes rows past the retention window
+    and leaves rows inside it untouched."""
+    import sqlite3
+
+    from api.workspace.events import _ensure_schema, _now_iso, purge_events_older_than
+
+    _ensure_schema(db)
+    # Backdate one row 365 days, leave another at "now".
+    old_iso = (
+        (datetime.now(timezone.utc) - timedelta(days=365))
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
+    conn = sqlite3.connect(str(db))
+    try:
+        conn.execute(
+            "INSERT INTO events (event_id, ts, user_id, session_id, "
+            "workspace_kind, event_type) VALUES (?, ?, ?, ?, ?, ?)",
+            ("e_old", old_iso, "u_1", "s", "caspian", "chat.turn"),
+        )
+        conn.execute(
+            "INSERT INTO events (event_id, ts, user_id, session_id, "
+            "workspace_kind, event_type) VALUES (?, ?, ?, ?, ?, ?)",
+            ("e_new", _now_iso(), "u_1", "s", "caspian", "chat.turn"),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    deleted = purge_events_older_than(90, db_path=db)
+    assert deleted == 1
+    rows = query_events(user_id="u_1", db_path=db)
+    assert {r["event_id"] for r in rows} == {"e_new"}
+
+
+def test_purge_with_zero_days_is_noop(db):
+    """EVENTS_RETENTION_DAYS=0 disables purge entirely — used in tests
+    so an autouse fixture doesn't accidentally wipe seeded data."""
+    from api.workspace.events import purge_events_older_than
+
+    record_event(
+        user_id="u", session_id="s", workspace_kind="caspian",
+        event_type="chat.turn", db_path=db,
+    )
+    deleted = purge_events_older_than(0, db_path=db)
+    assert deleted == 0
+    assert len(query_events(user_id="u", db_path=db)) == 1
+
+
+def test_purge_handles_empty_db_gracefully(db):
+    from api.workspace.events import purge_events_older_than
+
+    # Never-touched DB; purge should create the schema and return 0.
+    assert purge_events_older_than(30, db_path=db) == 0
 
 
 def test_record_event_failure_returns_empty_string(monkeypatch, db):

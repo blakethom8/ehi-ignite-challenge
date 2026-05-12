@@ -91,6 +91,15 @@ def _materialize_sof_db() -> None:
         plugin_runtime.reload_revoked_runs()
     except Exception:
         pass
+    # Purge audit events older than EVENTS_RETENTION_DAYS so events.db
+    # stays bounded under production traffic. Default 90 days; set to 0
+    # to disable. Best-effort — never crash the API on a purge failure.
+    try:
+        from api.workspace.events import purge_events_older_than
+
+        purge_events_older_than()
+    except Exception:
+        pass
 
 app.add_middleware(
     TrustedHostMiddleware,

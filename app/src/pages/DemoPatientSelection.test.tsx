@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DemoPatientSelection } from "./DemoPatientSelection";
 
@@ -39,6 +39,7 @@ describe("DemoPatientSelection", () => {
     enterDemoPatientMock.mockReset();
     useAccessContextMock.mockReset();
     useAccessContextMock.mockReturnValue({
+      mode: "anonymous",
       activePatientId: null,
       activePatientName: null,
       availableDemoPatients: [
@@ -89,5 +90,27 @@ describe("DemoPatientSelection", () => {
       .getAllByRole("button")
       .filter((button) => button.textContent?.includes("Demo Patient -"));
     expect(patientButtons[0]).toHaveTextContent("Demo Patient - Trial Match");
+  });
+
+  it("redirects authenticated accounts away from demo selection", () => {
+    useAccessContextMock.mockReturnValue({
+      mode: "authenticated",
+      activePatientId: null,
+      activePatientName: null,
+      availableDemoPatients: [],
+      enterDemoPatient: enterDemoPatientMock,
+      isDemo: false,
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/demo"]}>
+        <Routes>
+          <Route path="/demo" element={<DemoPatientSelection />} />
+          <Route path="/patient-record/sources" element={<div>Upload files</div>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText("Upload files")).toBeInTheDocument();
   });
 });

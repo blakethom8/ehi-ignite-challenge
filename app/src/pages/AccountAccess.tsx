@@ -55,13 +55,16 @@ export function AccountAccessPage() {
   const [signUpPassword, setSignUpPassword] = useState("");
   const [signUpDisplayName, setSignUpDisplayName] = useState("");
   const [signUpError, setSignUpError] = useState<string | null>(null);
+  const defaultAuthenticatedDestination = activePatientId
+    ? `/patient-record?patient=${encodeURIComponent(activePatientId)}`
+    : "/patient-record/sources";
 
   const handleSignIn = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSignInError(null);
     try {
       await signIn(email, password);
-      navigate(activePatientId ? `/patient-record?patient=${encodeURIComponent(activePatientId)}` : "/records-pool");
+      navigate(defaultAuthenticatedDestination);
     } catch (error) {
       setSignInError(signInErrorMessage(error));
     }
@@ -72,7 +75,7 @@ export function AccountAccessPage() {
     setSignUpError(null);
     try {
       await signUp(signUpEmail, signUpPassword, signUpDisplayName);
-      navigate("/records-pool");
+      navigate("/patient-record/sources");
     } catch (error) {
       setSignUpError(signUpErrorMessage(error));
     }

@@ -67,7 +67,7 @@ describe("AccountAccessPage", () => {
     await waitFor(() => {
       expect(signInMock).toHaveBeenCalledWith("person@example.com", "private-password");
     });
-    expect(navigateMock).toHaveBeenCalledWith("/records-pool");
+    expect(navigateMock).toHaveBeenCalledWith("/patient-record/sources");
     expect(screen.queryByText(/clinician@atlas\.local|atlas-demo-password/i)).not.toBeInTheDocument();
   });
 
@@ -97,7 +97,34 @@ describe("AccountAccessPage", () => {
         "Dr. Test",
       );
     });
-    expect(navigateMock).toHaveBeenCalledWith("/records-pool");
+    expect(navigateMock).toHaveBeenCalledWith("/patient-record/sources");
+  });
+
+  it("keeps an active patient context when a signed-in account logs in again", async () => {
+    signInMock.mockResolvedValue();
+    useAccessContextMock.mockReturnValue({
+      activePatientId: "patient-123",
+      isLoading: false,
+      isUnlocked: false,
+      signIn: signInMock,
+      signUp: signUpMock,
+      user: null,
+    });
+    renderAccountAccess();
+
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "person@example.com" },
+    });
+    fireEvent.change(screen.getByLabelText("Password"), {
+      target: { value: "private-password" },
+    });
+    const loginButtons = screen.getAllByRole("button", { name: "Log in" });
+    fireEvent.click(loginButtons[loginButtons.length - 1]);
+
+    await waitFor(() => {
+      expect(signInMock).toHaveBeenCalledWith("person@example.com", "private-password");
+    });
+    expect(navigateMock).toHaveBeenCalledWith("/patient-record?patient=patient-123");
   });
 
   it("disables the signup submit button while required fields are incomplete", () => {

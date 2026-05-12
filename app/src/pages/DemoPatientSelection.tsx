@@ -1,14 +1,21 @@
 import { ArrowLeft, ArrowRight } from "lucide-react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, Navigate, useSearchParams } from "react-router-dom";
 import { DemoPatientPicker } from "../components/atlas/DemoPatientPicker";
 import { useAccessContext } from "../context/AccessContext";
 import { resolveDemoDestination, withPatientContext } from "../routing";
 
 export function DemoPatientSelection() {
   const [searchParams] = useSearchParams();
-  const { activePatientId, activePatientName, isDemo } = useAccessContext();
+  const { activePatientId, activePatientName, isDemo, mode } = useAccessContext();
   const prioritizedPatientId = searchParams.get("patient");
   const destination = resolveDemoDestination(searchParams.get("next"));
+
+  if (mode === "authenticated") {
+    const authenticatedDestination = activePatientId
+      ? withPatientContext("/patient-record", activePatientId)
+      : "/patient-record/sources";
+    return <Navigate replace to={authenticatedDestination} />;
+  }
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,#f6f9ff_0%,#eef3f8_42%,#e9eef4_100%)] text-[#18202b]">

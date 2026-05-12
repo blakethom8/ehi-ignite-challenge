@@ -83,6 +83,13 @@ def _materialize_sof_db() -> None:
     except Exception:
         # Don't crash the API if a manifest is malformed — just log.
         pass
+    # Rehydrate revoked-run set from runs.db so consent revocations survive
+    # the restart we just performed. Without this, a revoked plugin would
+    # silently regain tool access on the next deploy.
+    try:
+        plugin_runtime.reload_revoked_runs()
+    except Exception:
+        pass
 
 app.add_middleware(
     TrustedHostMiddleware,

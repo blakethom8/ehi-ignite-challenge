@@ -213,6 +213,44 @@ def test_second_opinion_attending_approval(clinician, attending):
 # ============================================================
 
 
+def test_revocation_survives_restart(clinician):
+    """H0.1 regression: revoking consent must persist across an API restart.
+
+    Without rehydration, ``_revoked_ids`` resets to an empty set on boot
+    and a previously-revoked run silently regains tool access. The fix:
+    ``revoked_at`` column on ``runs`` + ``reload_revoked_runs()`` at startup.
+    """
+    run = rt.start_run(
+        plugin_id="trial-finder",
+        patient_id="8.4127.881",
+        workflow_id="shortlist",
+        title="Restart-survival",
+        user=clinician,
+    )
+    rt.grant_consent(run.id, approver=clinician)
+    rt.revoke_consent(run.id, approver=clinician)
+    assert run.id in rt._revoked_ids
+
+    # Simulate a process restart: drop the cached set.
+    rt._revoked_ids.clear()
+    assert run.id not in rt._revoked_ids
+
+    # Startup hook re-hydrates from runs.db.
+    loaded = rt.reload_revoked_runs()
+    assert loaded >= 1
+    assert run.id in rt._revoked_ids
+
+    # Tool calls on the revoked run still fail after restart.
+    from api.plugins.consent import ConsentError
+
+    with pytest.raises(ConsentError):
+        rt.call_tool(
+            run_id=run.id,
+            tool_id="trial.search",
+            payload={"connector": "clinicaltrials-gov"},
+        )
+
+
 def test_revoke_consent_voids_pending_approvals(clinician):
     run = rt.start_run(
         plugin_id="trial-finder",

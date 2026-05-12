@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import axios from "axios";
-import { AlertTriangle, ArrowUp, Bot, GitBranch, RotateCcw, Sparkles, User } from "lucide-react";
+import { AlertTriangle, ArrowUp, Bot, FileText, GitBranch, RotateCcw, Sparkles, User } from "lucide-react";
 import { CitationChip } from "./CitationChip";
 import type { CaspianAssistantMessage } from "./useCaspianAssistantSession";
 
@@ -15,6 +15,8 @@ type CaspianChatPaneProps = {
   onReset: () => void;
   onCitationClick: (id: string) => void;
   onOpenTrace: () => void;
+  /** Open a workspace file path in the workbench (file chip click). */
+  onOpenFile?: (path: string) => void;
 };
 
 const STARTER_PROMPTS = [
@@ -42,12 +44,14 @@ function MessageBubble({
   onSubmit,
   onCitationClick,
   onOpenTrace,
+  onOpenFile,
 }: {
   message: CaspianAssistantMessage;
   activeCitationId: string | null;
   onSubmit: (question: string) => void;
   onCitationClick: (id: string) => void;
   onOpenTrace: () => void;
+  onOpenFile?: (path: string) => void;
 }) {
   if (message.role === "user") {
     return (
@@ -130,6 +134,31 @@ function MessageBubble({
             </div>
           </div>
         )}
+        {message.filesCreated && message.filesCreated.length > 0 && (
+          <div className="mt-3">
+            <div className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-wider text-[var(--ink-4)]">
+              Files created
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {message.filesCreated.map((path) => (
+                <button
+                  key={path}
+                  onClick={() => onOpenFile?.(path)}
+                  className="inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11.5px] transition-colors hover:bg-[var(--action-tint)]"
+                  style={{
+                    background: "var(--surface-0)",
+                    borderColor: "var(--line-1)",
+                    color: "var(--action)",
+                    fontFamily: "var(--font-mono)",
+                  }}
+                >
+                  <FileText className="h-3 w-3" strokeWidth={1.5} />
+                  {path}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         {message.followUps.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-1.5">
             {message.followUps.map((followUp) => (
@@ -160,6 +189,7 @@ export function CaspianChatPane({
   onReset,
   onCitationClick,
   onOpenTrace,
+  onOpenFile,
 }: CaspianChatPaneProps) {
   const [text, setText] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -259,6 +289,7 @@ export function CaspianChatPane({
             onSubmit={onSubmit}
             onCitationClick={onCitationClick}
             onOpenTrace={onOpenTrace}
+            onOpenFile={onOpenFile}
           />
         ))}
         {isPending && (

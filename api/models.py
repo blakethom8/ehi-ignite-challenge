@@ -13,6 +13,8 @@ from datetime import datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+from typing_extensions import Annotated
+from pydantic import Discriminator
 
 
 # ---------------------------------------------------------------------------
@@ -844,6 +846,9 @@ class ProviderAssistantResponse(BaseModel):
     citations: list[ProviderAssistantCitation]
     follow_ups: list[str]
     trace: TraceDetail | None = None  # tool calls + context transparency
+    # Relative workspace paths the agent wrote during this turn (slice 3+4).
+    # Frontend renders them as chips under the message.
+    files_created: list[str] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -1659,3 +1664,124 @@ class PublishedChartStateResponse(BaseModel):
     collection_id: str
     active_snapshot: PublishedChartSnapshot | None = None
     snapshots: list[PublishedChartSnapshot] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# Caspian workflow runs — pre-packaged review packets that produce a
+# structured artifact rendered in the workbench rather than a chat reply.
+# See data/workflows/*.json for the prompt packets that drive these.
+# ---------------------------------------------------------------------------
+
+
+class WorkflowBanner(BaseModel):
+    """Disposition banner shown at the top of the artifact."""
+    status: Literal[
+        "clear",
+        "review",
+        "hold",
+        "critical",
+        "stable",
+        "evolving",
+        "deteriorating",
+    ]
+    label: str = Field(min_length=1, max_length=80)
+    headline: str = Field(min_length=1, max_length=240)
+    action_label: str | None = Field(default=None, max_length=40)
+
+
+class WorkflowFactCell(BaseModel):
+    label: str = Field(min_length=1, max_length=40)
+    value: str = Field(min_length=1, max_length=80)
+    tone: Literal["default", "tier", "caution"] = "default"
+
+
+class WorkflowTableSection(BaseModel):
+    kind: Literal["table"] = "table"
+    title: str = Field(min_length=1, max_length=120)
+    columns: list[str] = Field(min_length=1, max_length=8)
+    # Each row is the same length as `columns`. Cells are strings; citation
+    # IDs are encoded inline as `c_<id>` and the frontend renders them as
+    # clickable chips that route to the inspector.
+    rows: list[list[str]] = Field(default_factory=list)
+    empty_note: str | None = Field(default=None, max_length=200)
+
+
+class WorkflowNarrativeSection(BaseModel):
+    kind: Literal["narrative"] = "narrative"
+    title: str = Field(min_length=1, max_length=120)
+    body: str = Field(min_length=1, max_length=4000)
+
+
+WorkflowSection = Annotated[
+    WorkflowTableSection | WorkflowNarrativeSection,
+    Discriminator("kind"),
+]
+
+
+class WorkflowArtifact(BaseModel):
+    """The structured packet returned by a workflow run."""
+    workflow_id: str = Field(min_length=1, max_length=80)
+    workflow_title: str = Field(min_length=1, max_length=120)
+    workflow_type: str = Field(min_length=1, max_length=80)
+    artifact_id: str = Field(min_length=1, max_length=120)
+    generated_at: datetime
+    banner: WorkflowBanner
+    fact_rail: list[WorkflowFactCell] = Field(default_factory=list, max_length=8)
+    sections: list[WorkflowSection] = Field(default_factory=list, max_length=12)
+    chat_narration: str = Field(min_length=1, max_length=400)
+    # Set to the relative workspace path (e.g. "workflow-runs/2026-05-12-pre-op-…")
+    # once the runner persists the artifact to the Caspian file workspace.
+    file_path: str | None = Field(default=None, max_length=240)
+
+
+class WorkflowRunRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    patient_id: str = Field(min_length=1, max_length=200)
+    workflow_id: Literal[
+        "preop_review_v1",
+        "medication_safety_v1",
+        "longitudinal_synthesis_v1",
+    ]
+
+
+class WorkflowRunResponse(BaseModel):
+    patient_id: str
+    artifact: WorkflowArtifact
+    citations: list[ProviderAssistantCitation] = Field(default_factory=list)
+    trace: TraceDetail | None = None
+
+
+# ---------------------------------------------------------------------------
+# Caspian file workspace — per-patient on-disk working directory.
+# See api/core/caspian_workspace.py.
+# ---------------------------------------------------------------------------
+
+
+class CaspianFileListResponse(BaseModel):
+    """Tree of files under (session, patient). Tree is freeform JSON because the
+    server enforces the FileTreeNode shape; the frontend has its own typed union."""
+    workspace_key: str
+    tree: list[dict]
+
+
+class CaspianFileReadResponse(BaseModel):
+    path: str
+    content: str
+    mtime: datetime | None
+    editable: bool
+    kind: Literal["markdown", "json", "text"]
+
+
+class CaspianFileWriteRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    patient_id: str = Field(min_length=1, max_length=200)
+    path: str = Field(min_length=1, max_length=200)
+    content: str = Field(default="", max_length=200_000)
+
+
+class CaspianFileWriteResponse(BaseModel):
+    path: str
+    bytes: int
+    mtime: datetime

@@ -31,6 +31,7 @@ from api.core.tracing import (
 LOGGER = logging.getLogger(__name__)
 
 _CASPIAN_PATH = "/api/assistant/chat"
+_CASPIAN_WORKFLOW_PATH = "/api/caspian/workflows/run"
 _SKILL_PATH_PREFIX = "/api/skills/"
 _PLUGIN_TOOL_RE = re.compile(r"^/api/plugins/runs/[^/]+/tool/[^/]+/?$")
 
@@ -39,7 +40,7 @@ def _classify(method: str, path: str) -> str | None:
     """Return the workspace_kind for an audited path, or None to skip."""
     if method != "POST":
         return None
-    if path == _CASPIAN_PATH:
+    if path == _CASPIAN_PATH or path == _CASPIAN_WORKFLOW_PATH:
         return WORKSPACE_CASPIAN
     if path.startswith(_SKILL_PATH_PREFIX):
         return WORKSPACE_SKILL
@@ -95,7 +96,13 @@ class TracingMiddleware(BaseHTTPMiddleware):
                 body_bytes = await request.body()
                 body = json.loads(body_bytes)
                 patient_id = body.get("patient_id", "")
-                question = body.get("question", "") or question
+                workflow_id = body.get("workflow_id")
+                if workflow_id:
+                    # Workflow runs have no `question` field — name the trace
+                    # after the workflow so the Inspector shows what fired.
+                    question = f"workflow:{workflow_id}"
+                else:
+                    question = body.get("question", "") or question
                 stance = body.get("stance", "opinionated")
             except Exception:
                 LOGGER.debug("Could not parse chat request body for tracing")

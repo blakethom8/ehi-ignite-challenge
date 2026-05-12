@@ -20,6 +20,12 @@ import type {
   ClinicalNotesResponse,
   ProviderAssistantRequest,
   ProviderAssistantResponse,
+  WorkflowRunRequest,
+  WorkflowRunResponse,
+  CaspianFileListResponse,
+  CaspianFileReadResponse,
+  CaspianFileWriteRequest,
+  CaspianFileWriteResponse,
   CareJourneyResponse,
   ClassificationsResponse,
   AssistantSettings,
@@ -239,6 +245,26 @@ export const api = {
   /** Provider-facing chart Q&A */
   chatProviderAssistant: (payload: ProviderAssistantRequest): Promise<ProviderAssistantResponse> =>
     http.post<ProviderAssistantResponse>("/assistant/chat", payload).then((r) => r.data),
+
+  /** Run a prepared Caspian workflow packet and get back a structured artifact for the workbench. */
+  runCaspianWorkflow: (payload: WorkflowRunRequest): Promise<WorkflowRunResponse> =>
+    http.post<WorkflowRunResponse>("/caspian/workflows/run", payload).then((r) => r.data),
+
+  /** List the Caspian file workspace tree for (session, patient). */
+  listCaspianFiles: (patientId: string): Promise<CaspianFileListResponse> =>
+    http
+      .get<CaspianFileListResponse>("/caspian/files/list", { params: { patient_id: patientId } })
+      .then((r) => r.data),
+
+  /** Read a single Caspian workspace file by relative path. */
+  readCaspianFile: (patientId: string, path: string): Promise<CaspianFileReadResponse> =>
+    http
+      .get<CaspianFileReadResponse>("/caspian/files/read", { params: { patient_id: patientId, path } })
+      .then((r) => r.data),
+
+  /** Write (overwrite) a Caspian workspace file. */
+  writeCaspianFile: (payload: CaspianFileWriteRequest): Promise<CaspianFileWriteResponse> =>
+    http.put<CaspianFileWriteResponse>("/caspian/files/write", payload).then((r) => r.data),
 
   /** Patient-facing guided context intake */
   getPatientContextStatus: (): Promise<PatientContextStatus> =>

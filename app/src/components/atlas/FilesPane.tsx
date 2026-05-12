@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Braces, ChevronDown, ChevronRight, FileSpreadsheet, FileText, Folder, Hash, MoreHorizontal, Plus, Search } from "lucide-react";
-import { FILE_TREES, type FileNode, type FileTreeNode } from "./data";
+import { FILE_TREES, type FileNode, type FileTreeNode, type FolderTreeNode } from "./data";
 import type { WorkspaceId } from "./types";
 
 const ICONS: Record<string, typeof FileText> = {
@@ -16,16 +16,29 @@ type FilesPaneProps = {
   tree?: FileTreeNode[];
 };
 
+function collectInitiallyExpanded(nodes: FileTreeNode[], prefix = ""): Record<string, boolean> {
+  const out: Record<string, boolean> = {};
+  for (const node of nodes) {
+    if (node.type === "folder") {
+      const key = `${prefix}/${node.name}`;
+      if (node.expanded) out[key] = true;
+      Object.assign(out, collectInitiallyExpanded(node.children, key));
+    }
+  }
+  return out;
+}
+
 export function FilesPane({ workspaceId, onOpen, activeFileId, tree: treeOverride }: FilesPaneProps) {
   const tree = treeOverride ?? FILE_TREES[workspaceId] ?? [];
   const [filter, setFilter] = useState("");
-  const [expanded, setExpanded] = useState<Record<string, boolean>>(() => {
-    const e: Record<string, boolean> = {};
-    tree.forEach((n) => {
-      if (n.type === "folder" && n.expanded) e[n.name] = true;
-    });
-    return e;
-  });
+  const [expanded, setExpanded] = useState<Record<string, boolean>>(() => collectInitiallyExpanded(tree));
+
+  // When the tree gets reseeded with a new shape (e.g. after a workflow run
+  // adds a workflow-runs entry), keep any newly-expanded folders open and
+  // honor `expanded: true` on freshly-arrived folders.
+  useEffect(() => {
+    setExpanded((current) => ({ ...collectInitiallyExpanded(tree), ...current }));
+  }, [tree]);
 
   return (
     <div
@@ -72,7 +85,9 @@ export function FilesPane({ workspaceId, onOpen, activeFileId, tree: treeOverrid
         />
       </div>
       <div className="overflow-y-auto px-1 py-1 text-[12px]">
-        {tree.map((n, i) => renderNode(n, i, expanded, setExpanded, onOpen, activeFileId, filter))}
+        {tree.map((n, i) =>
+          renderNode(n, `${i}`, "", expanded, setExpanded, onOpen, activeFileId, filter, 10),
+        )}
       </div>
     </div>
   );
@@ -88,14 +103,86 @@ function FhBtn({ icon }: { icon: React.ReactNode }) {
   );
 }
 
-function renderNode(
-  n: FileTreeNode,
-  key: number,
+function renderFolderChild(
+  child: FileNode | FolderTreeNode,
+  parentKey: string,
   expanded: Record<string, boolean>,
   setExpanded: React.Dispatch<React.SetStateAction<Record<string, boolean>>>,
   onOpen: (node: FileNode | { kind: "citation"; id: string }) => void,
   activeFileId: string | null | undefined,
   filter: string,
+  depth: number,
+): React.ReactNode {
+  if (child.type === "folder") {
+    return renderNode(child, parentKey, parentKey, expanded, setExpanded, onOpen, activeFileId, filter, depth);
+  }
+  return renderFile(child, parentKey, onOpen, activeFileId, filter, depth);
+}
+
+function renderFile(
+  c: FileNode,
+  key: string,
+  onOpen: (node: FileNode | { kind: "citation"; id: string }) => void,
+  activeFileId: string | null | undefined,
+  filter: string,
+  depth: number,
+): React.ReactNode {
+  if (filter && !c.name.toLowerCase().includes(filter.toLowerCase())) return null;
+  const Icon = ICONS[c.icon] ?? FileText;
+  const active = c.id === activeFileId;
+  return (
+    <div
+      key={key}
+      onClick={() => onOpen(c)}
+      className="flex cursor-pointer items-center gap-1.5 rounded px-1.5 py-1 hover:bg-[var(--surface-2)]"
+      style={{
+        paddingLeft: depth + 16,
+        background: active ? "var(--action-tint)" : "transparent",
+      }}
+    >
+      <span className="w-2.5" />
+      <Icon
+        className="h-3 w-3"
+        strokeWidth={1.5}
+        style={{ color: active ? "var(--action)" : "var(--ink-4)" }}
+      />
+      <span
+        className="truncate text-[11.5px]"
+        style={{
+          fontFamily: "var(--font-mono)",
+          color: active ? "var(--action)" : "var(--ink-2)",
+        }}
+      >
+        {c.name}
+      </span>
+      {c.dirty && (
+        <span
+          className="ml-1 h-1.5 w-1.5 rounded-full"
+          style={{ background: "var(--action)" }}
+        />
+      )}
+      {c.editable === false && (
+        <span
+          className="ml-auto text-[9.5px] uppercase tracking-wider"
+          style={{ color: "var(--ink-4)" }}
+        >
+          ro
+        </span>
+      )}
+    </div>
+  );
+}
+
+function renderNode(
+  n: FileTreeNode,
+  key: string,
+  parentKey: string,
+  expanded: Record<string, boolean>,
+  setExpanded: React.Dispatch<React.SetStateAction<Record<string, boolean>>>,
+  onOpen: (node: FileNode | { kind: "citation"; id: string }) => void,
+  activeFileId: string | null | undefined,
+  filter: string,
+  depth: number,
 ): React.ReactNode {
   if (n.type === "group") {
     return (
@@ -109,13 +196,14 @@ function renderNode(
     );
   }
   if (n.type === "folder") {
-    const open = expanded[n.name];
+    const folderKey = `${parentKey}/${n.name}`;
+    const open = expanded[folderKey];
     return (
       <div key={key}>
         <div
-          onClick={() => setExpanded((e) => ({ ...e, [n.name]: !e[n.name] }))}
+          onClick={() => setExpanded((e) => ({ ...e, [folderKey]: !e[folderKey] }))}
           className="flex cursor-pointer items-center gap-1.5 rounded px-1.5 py-1 hover:bg-[var(--surface-2)]"
-          style={{ paddingLeft: 6 }}
+          style={{ paddingLeft: depth }}
         >
           {open ? (
             <ChevronDown className="h-2.5 w-2.5" strokeWidth={1.5} style={{ color: "var(--ink-4)" }} />
@@ -123,55 +211,19 @@ function renderNode(
             <ChevronRight className="h-2.5 w-2.5" strokeWidth={1.5} style={{ color: "var(--ink-4)" }} />
           )}
           <Folder className="h-3 w-3" strokeWidth={1.5} style={{ color: "var(--ink-4)" }} />
-          <span
-            className="text-[12px] font-medium"
-            style={{ color: "var(--ink-1)" }}
-          >
+          <span className="text-[12px] font-medium" style={{ color: "var(--ink-1)" }}>
             {n.name}
           </span>
         </div>
         {open &&
-          n.children
-            .filter((c) => !filter || c.name.toLowerCase().includes(filter.toLowerCase()))
-            .map((c, i) => {
-              const Icon = ICONS[c.icon] ?? FileText;
-              const active = c.id === activeFileId;
-              return (
-                <div
-                  key={i}
-                  onClick={() => onOpen(c)}
-                  className="flex cursor-pointer items-center gap-1.5 rounded px-1.5 py-1 hover:bg-[var(--surface-2)]"
-                  style={{
-                    paddingLeft: 26,
-                    background: active ? "var(--action-tint)" : "transparent",
-                  }}
-                >
-                  <span className="w-2.5" />
-                  <Icon
-                    className="h-3 w-3"
-                    strokeWidth={1.5}
-                    style={{ color: active ? "var(--action)" : "var(--ink-4)" }}
-                  />
-                  <span
-                    className="truncate text-[11.5px]"
-                    style={{
-                      fontFamily: "var(--font-mono)",
-                      color: active ? "var(--action)" : "var(--ink-2)",
-                    }}
-                  >
-                    {c.name}
-                  </span>
-                  {c.dirty && (
-                    <span
-                      className="ml-1 h-1.5 w-1.5 rounded-full"
-                      style={{ background: "var(--action)" }}
-                    />
-                  )}
-                </div>
-              );
-            })}
+          n.children.map((c, i) =>
+            renderFolderChild(c, `${folderKey}/${i}`, expanded, setExpanded, onOpen, activeFileId, filter, depth + 16),
+          )}
       </div>
     );
+  }
+  if (n.type === "file") {
+    return renderFile(n, key, onOpen, activeFileId, filter, depth);
   }
   if (n.type === "ref") {
     return (

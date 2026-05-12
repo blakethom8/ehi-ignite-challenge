@@ -89,6 +89,8 @@ class AssistantResult:
     max_tokens_used: int | None = None        # output limit
     context_token_estimate: int | None = None # approx input context tokens
     history_turns_sent: int | None = None     # how many prior turns included
+    # Workspace files the agent wrote during this turn (slice 3+4).
+    files_created: list[str] | None = None
 
 
 def _tokenize(text: str) -> set[str]:

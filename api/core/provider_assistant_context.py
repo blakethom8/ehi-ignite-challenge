@@ -36,6 +36,8 @@ from api.core.provider_assistant import (
     _rank_relevant_facts,
 )
 from api.core.tracing import SpanKind, start_span
+from api.core import caspian_tools, caspian_workspace
+from api.core.auth import SessionPrincipal
 
 LOGGER = logging.getLogger(__name__)
 
@@ -73,10 +75,24 @@ INSTRUCTIONS:
 - Format your response as plain text, not JSON. Use bullet points for lists.
 - At the end, suggest 2-3 follow-up questions the clinician or patient should consider.
 
+FILE TOOLS:
+- You have access to `write_file`, `read_file`, and `list_files` for this patient's working directory.
+- Use `write_file` ONLY when the clinician explicitly asks you to save, create, draft, or add a file. Don't volunteer writes.
+- Default the path to `notes/<descriptive-kebab-name>.md` unless the clinician specifies otherwise. The `system-context/` folder is read-only — writes there will fail.
+- After writing, briefly tell the clinician the filename so they can open it from the Files pane.
+
 PATIENT CHART CONTEXT:
 {context}
 
 {context_packages}
+
+{user_overrides}
+"""
+
+_USER_OVERRIDES_HEADER = """USER OVERRIDES (from this workspace's user-instructions.md):
+The clinician has set the following standing instructions for this patient's
+chats. Honor them unless they conflict with safety guidance above.
+
 """
 
 
@@ -102,6 +118,25 @@ def _format_context_packages(context_packages: list[dict[str, str]] | None) -> s
     return "\n".join(sections).strip()
 
 
+def _load_user_overrides(
+    session: SessionPrincipal | None,
+    resolved_patient_id: str | None,
+) -> str:
+    """Read user-instructions.md from the patient's workspace, if any."""
+    if session is None or not resolved_patient_id:
+        return ""
+    try:
+        result = caspian_workspace.read_workspace_file(
+            session, resolved_patient_id, caspian_workspace.USER_INSTRUCTIONS_PATH
+        )
+    except Exception:  # pragma: no cover - defensive
+        return ""
+    body = (result.content or "").strip()
+    if not body:
+        return ""
+    return _USER_OVERRIDES_HEADER + body
+
+
 def answer_with_context(
     *,
     patient_id: str,
@@ -111,6 +146,7 @@ def answer_with_context(
     stance: str = "opinionated",
     model_override: str | None = None,
     max_tokens_override: int | None = None,
+    session: SessionPrincipal | None = None,
 ) -> AssistantResult:
     """
     Single-turn context-driven answer.
@@ -143,13 +179,15 @@ def answer_with_context(
             })
 
     # Step 2: Build messages
+    user_overrides = _load_user_overrides(session, patient_id)
     system_prompt = _SYSTEM_TEMPLATE.format(
         stance=stance,
         context=context_prompt,
         context_packages=_format_context_packages(context_packages),
+        user_overrides=user_overrides,
     )
 
-    messages = []
+    messages: list[dict] = []
 
     # Include conversation history
     if history:
@@ -161,45 +199,115 @@ def answer_with_context(
 
     messages.append({"role": "user", "content": question})
 
-    # Step 3: Single Claude API call
+    # Step 3: bounded tool loop
     model = model_override or os.getenv("PROVIDER_ASSISTANT_MODEL", "claude-sonnet-4-5")
     max_tokens = max_tokens_override or 1500
+    tools_enabled = session is not None  # tools require a workspace key
 
-    with start_span(SpanKind.LLM, "claude_single_turn", input_data={
-        "model": model,
-        "stance": stance,
-        "system_prompt": system_prompt,
-        "question": question,
-    }) as llm_span:
-        import anthropic
+    import anthropic
 
-        client = anthropic.Anthropic(api_key=api_key)
-        start_time = time.time()
+    client = anthropic.Anthropic(api_key=api_key)
+    answer_text = ""
+    files_created: list[str] = []
+    total_input_tokens = 0
+    total_output_tokens = 0
+    total_cost = 0.0
 
-        response = client.messages.create(
-            model=model,
-            max_tokens=max_tokens,
-            system=system_prompt,
-            messages=messages,
-        )
+    MAX_TOOL_ITERATIONS = 4
+    for iteration in range(MAX_TOOL_ITERATIONS + 1):
+        # On the final iteration, drop tools so Claude must finalize the answer.
+        offer_tools = tools_enabled and iteration < MAX_TOOL_ITERATIONS
 
-        duration_ms = (time.time() - start_time) * 1000
-        answer_text = response.content[0].text if response.content else ""
+        with start_span(
+            SpanKind.LLM,
+            "claude_chat_turn" if iteration > 0 else "claude_single_turn",
+            input_data={
+                "model": model,
+                "stance": stance,
+                "system_prompt": system_prompt if iteration == 0 else None,
+                "question": question if iteration == 0 else None,
+                "iteration": iteration,
+            },
+        ) as llm_span:
+            start_time = time.time()
+            request_kwargs: dict = {
+                "model": model,
+                "max_tokens": max_tokens,
+                "system": system_prompt,
+                "messages": messages,
+            }
+            if offer_tools:
+                request_kwargs["tools"] = caspian_tools.CASPIAN_CHAT_TOOLS
+            response = client.messages.create(**request_kwargs)
+            duration_ms = (time.time() - start_time) * 1000
 
-        if llm_span:
-            llm_span.input_tokens = response.usage.input_tokens
-            llm_span.output_tokens = response.usage.output_tokens
-            llm_span.duration_ms = duration_ms
-            llm_span.output_data = json.dumps({
-                "result_length": len(answer_text),
-                "stop_reason": response.stop_reason,
-                "model": response.model,
-                "duration_api_ms": round(duration_ms),
-            })
-            # Estimate cost (Sonnet pricing)
-            input_cost = response.usage.input_tokens * 3.0 / 1_000_000
-            output_cost = response.usage.output_tokens * 15.0 / 1_000_000
-            llm_span.total_cost_usd = input_cost + output_cost
+            input_tokens = getattr(response.usage, "input_tokens", 0) or 0
+            output_tokens = getattr(response.usage, "output_tokens", 0) or 0
+            total_input_tokens += input_tokens
+            total_output_tokens += output_tokens
+            input_cost = input_tokens * 3.0 / 1_000_000
+            output_cost = output_tokens * 15.0 / 1_000_000
+            total_cost += input_cost + output_cost
+
+            if llm_span:
+                llm_span.input_tokens = input_tokens
+                llm_span.output_tokens = output_tokens
+                llm_span.duration_ms = duration_ms
+                llm_span.total_cost_usd = input_cost + output_cost
+                llm_span.output_data = json.dumps({
+                    "stop_reason": response.stop_reason,
+                    "model": response.model,
+                    "iteration": iteration,
+                })
+
+        # Collect text + tool_use blocks from the assistant message.
+        assistant_content_blocks: list[dict | object] = []
+        tool_uses: list[object] = []
+        text_chunks: list[str] = []
+        for block in response.content or []:
+            assistant_content_blocks.append(block)
+            btype = getattr(block, "type", None)
+            if btype == "text":
+                text_chunks.append(getattr(block, "text", ""))
+            elif btype == "tool_use":
+                tool_uses.append(block)
+
+        if text_chunks:
+            answer_text = "\n".join(c for c in text_chunks if c).strip()
+
+        if not tool_uses or not offer_tools:
+            # No tool calls (or tools disabled on final pass) — we're done.
+            break
+
+        # Append the assistant's tool_use to the message history, then execute
+        # each tool and append a tool_result block.
+        messages.append({"role": "assistant", "content": assistant_content_blocks})
+        tool_result_blocks: list[dict] = []
+        for tool_use in tool_uses:
+            name = getattr(tool_use, "name", "") or ""
+            args = getattr(tool_use, "input", None) or {}
+            tool_use_id = getattr(tool_use, "id", "")
+            with start_span(
+                SpanKind.TOOL,
+                name or "tool_use",
+                input_data=args if isinstance(args, dict) else {"raw": str(args)},
+            ) as tool_span:
+                payload, is_error = caspian_tools.execute_tool(
+                    name,
+                    args if isinstance(args, dict) else {},
+                    session,  # type: ignore[arg-type] — guarded by tools_enabled
+                    patient_id,
+                )
+                if tool_span:
+                    tool_span.output_data = json.dumps(payload, default=str)[:2000]
+                    if is_error:
+                        tool_span.error = str(payload.get("error", ""))[:500]
+            if name == "write_file" and not is_error and payload.get("path"):
+                files_created.append(payload["path"])
+            result_block = caspian_tools.tool_result_payload(payload, is_error)
+            result_block["tool_use_id"] = tool_use_id
+            tool_result_blocks.append(result_block)
+        messages.append({"role": "user", "content": tool_result_blocks})
 
     # Step 4: Extract follow-ups from the answer
     follow_ups = _extract_follow_ups(answer_text)
@@ -235,6 +343,7 @@ def answer_with_context(
         max_tokens_used=max_tokens,
         context_token_estimate=clinical_ctx.total_tokens_estimate,
         history_turns_sent=history_count,
+        files_created=files_created or None,
     )
 
 

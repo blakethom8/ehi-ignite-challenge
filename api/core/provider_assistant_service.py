@@ -71,6 +71,7 @@ def answer_provider_question(
     mode_override: str | None = None,
     max_tokens_override: int | None = None,
     cursor_model: str | None = None,
+    session=None,  # type: ignore[no-untyped-def]  # api.core.auth.SessionPrincipal | None
 ) -> AssistantResult:
     """
     Unified provider-assistant entry point.
@@ -105,6 +106,7 @@ def answer_provider_question(
                 stance=stance,
                 model_override=model_override,
                 max_tokens_override=max_tokens_override,
+                session=session,
             )
             _record_trace_metadata(result)
             return result

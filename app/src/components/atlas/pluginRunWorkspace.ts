@@ -313,7 +313,7 @@ function buildFilesTree(
 
   return folders.filter((node) => {
     if (node.type !== "folder") return true;
-    return node.children.some((file) => fileTabs[file.id]);
+    return node.children.some((child) => child.type === "file" && fileTabs[child.id]);
   });
 }
 

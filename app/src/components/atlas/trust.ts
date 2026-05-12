@@ -105,7 +105,9 @@ export type WorkbenchKind =
   | "preop-brief"
   | "summary-json"
   | "diff"
-  | "manifest-json";
+  | "manifest-json"
+  | "workflow-artifact"
+  | "workspace-file";
 
 export type WorkbenchRenderer =
   | "trial.board"
@@ -119,7 +121,9 @@ export type WorkbenchRenderer =
   | "board.network-status"
   | "markdown.doc"
   | "json.viewer"
-  | "diff.unified";
+  | "diff.unified"
+  | "workflow.artifact"
+  | "workspace.file";
 
 export type WorkbenchTabSpec = {
   id: string;

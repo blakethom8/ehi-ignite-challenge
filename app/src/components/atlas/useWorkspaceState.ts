@@ -25,7 +25,7 @@ const CASPIAN_DEFAULT_PANES: PaneVisibility = {
   sessions: true,
   chat: true,
   workbench: false,
-  files: false,
+  files: true,
   inspector: false,
 };
 
@@ -131,9 +131,19 @@ function loadInspectorTab(key: string): InspectorTab {
 
 function findFileNode(tree: FileTreeNode[], matcher: (file: FileNode) => boolean): FileNode | null {
   for (const node of tree) {
+    if (node.type === "file") {
+      if (matcher(node)) return node;
+      continue;
+    }
     if (node.type !== "folder") continue;
-    const match = node.children.find(matcher);
-    if (match) return match;
+    for (const child of node.children) {
+      if (child.type === "folder") {
+        const nested = findFileNode([child], matcher);
+        if (nested) return nested;
+        continue;
+      }
+      if (matcher(child)) return child;
+    }
   }
   return null;
 }

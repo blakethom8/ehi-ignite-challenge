@@ -790,6 +790,146 @@ export interface ProviderAssistantResponse {
   citations: ProviderAssistantCitation[];
   follow_ups: string[];
   trace: TraceDetail | null;
+  /** Relative workspace paths the agent wrote on this turn (slice 3+4). */
+  files_created: string[];
+}
+
+// ---------------------------------------------------------------------------
+// Caspian workflow runs — prepared review packets that produce a structured
+// artifact rendered in the workbench (not just a chat reply).
+// ---------------------------------------------------------------------------
+
+export type WorkflowId =
+  | "preop_review_v1"
+  | "medication_safety_v1"
+  | "longitudinal_synthesis_v1";
+
+export type WorkflowBannerStatus =
+  | "clear"
+  | "review"
+  | "hold"
+  | "critical"
+  | "stable"
+  | "evolving"
+  | "deteriorating";
+
+export interface WorkflowBanner {
+  status: WorkflowBannerStatus;
+  label: string;
+  headline: string;
+  action_label: string | null;
+}
+
+export interface WorkflowFactCell {
+  label: string;
+  value: string;
+  tone: "default" | "tier" | "caution";
+}
+
+export interface WorkflowTableSection {
+  kind: "table";
+  title: string;
+  columns: string[];
+  rows: string[][];
+  empty_note?: string | null;
+}
+
+export interface WorkflowNarrativeSection {
+  kind: "narrative";
+  title: string;
+  body: string;
+}
+
+export type WorkflowSection = WorkflowTableSection | WorkflowNarrativeSection;
+
+export interface WorkflowArtifact {
+  workflow_id: WorkflowId;
+  workflow_title: string;
+  workflow_type: string;
+  artifact_id: string;
+  generated_at: string;
+  banner: WorkflowBanner;
+  fact_rail: WorkflowFactCell[];
+  sections: WorkflowSection[];
+  chat_narration: string;
+  /** Relative workspace path where the artifact was persisted (slice 1+2). */
+  file_path: string | null;
+}
+
+export interface WorkflowRunRequest {
+  patient_id: string;
+  workflow_id: WorkflowId;
+}
+
+export interface WorkflowRunResponse {
+  patient_id: string;
+  artifact: WorkflowArtifact;
+  citations: ProviderAssistantCitation[];
+  trace: TraceDetail | null;
+}
+
+// ---------------------------------------------------------------------------
+// Caspian file workspace — per-patient on-disk working directory.
+// ---------------------------------------------------------------------------
+
+export type CaspianFileGroupNode = {
+  type: "group";
+  label: string;
+};
+
+export type CaspianFileFolderNode = {
+  type: "folder";
+  name: string;
+  expanded?: boolean;
+  children: CaspianFileTreeNode[];
+};
+
+export type CaspianFileFileNode = {
+  type: "file";
+  name: string;
+  id: string; // path relative to workspace root
+  ext: string;
+  icon: string;
+  dirty?: boolean;
+  editable: boolean;
+};
+
+export type CaspianFileRefNode = {
+  type: "ref";
+  id: string;
+  label: string;
+  sub: string;
+};
+
+export type CaspianFileTreeNode =
+  | CaspianFileGroupNode
+  | CaspianFileFolderNode
+  | CaspianFileFileNode
+  | CaspianFileRefNode;
+
+export interface CaspianFileListResponse {
+  workspace_key: string;
+  tree: CaspianFileTreeNode[];
+}
+
+export interface CaspianFileReadResponse {
+  path: string;
+  content: string;
+  mtime: string | null;
+  editable: boolean;
+  kind: "markdown" | "json" | "text";
+}
+
+export interface CaspianFileWriteRequest {
+  patient_id: string;
+  path: string;
+  content: string;
+}
+
+export interface CaspianFileWriteResponse {
+  path: string;
+  bytes: number;
+  mtime: string;
 }
 
 // ---------------------------------------------------------------------------

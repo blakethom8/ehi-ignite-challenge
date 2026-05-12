@@ -1,4 +1,4 @@
-import { Activity, ChevronDown, Home, MessageSquareText, Pin, Plus, Search, Telescope, Workflow } from "lucide-react";
+import { Activity, ChevronDown, Home, Loader2, MessageSquareText, Pin, Plus, Search, Telescope, Workflow } from "lucide-react";
 import { SESSIONS, WORKFLOWS, type Session, type Workflow as WorkspaceWorkflow } from "./data";
 import type { Workspace, WorkspaceId } from "./types";
 import { Link } from "react-router-dom";
@@ -15,6 +15,11 @@ type SessionsPaneProps = {
   onSelectSession: (id: string | "__home__") => void;
   sessions?: Session[];
   workflows?: WorkspaceWorkflow[];
+  /** Invoked when a workflow row is clicked. Absent → row is non-interactive. */
+  onRunWorkflow?: (workflowId: string) => void;
+  /** Workflow id currently in-flight; renders a spinner on that row and
+   *  disables the others while the run is pending. */
+  pendingWorkflowId?: string | null;
 };
 
 export function SessionsPane({
@@ -23,9 +28,13 @@ export function SessionsPane({
   onSelectSession,
   sessions: sessionsOverride,
   workflows: workflowsOverride,
+  onRunWorkflow,
+  pendingWorkflowId = null,
 }: SessionsPaneProps) {
   const sessions = sessionsOverride ?? SESSIONS[workspace.id as WorkspaceId] ?? [];
   const workflows = workflowsOverride ?? WORKFLOWS[workspace.id as WorkspaceId] ?? [];
+  const interactive = Boolean(onRunWorkflow);
+  const anyPending = Boolean(pendingWorkflowId);
 
   return (
     <div
@@ -154,31 +163,55 @@ export function SessionsPane({
             />
           ))}
         </Group>
-        <Group title="Workflow library" right="BROWSE">
-          {workflows.slice(0, 3).map((w) => (
-            <div
-              key={w.id}
-              className="flex cursor-pointer items-center gap-1.5 rounded-md px-2 py-1.5 text-[12px] hover:bg-[var(--surface-2)]"
-              style={{ color: "var(--ink-3)" }}
-            >
-              <Workflow className="h-3 w-3" strokeWidth={1.5} />
-              {w.title}
-            </div>
-          ))}
+        <Group title="Workflow library" right={interactive ? "RUN" : "BROWSE"}>
+          {workflows.slice(0, 3).map((w) => {
+            const pending = pendingWorkflowId === w.id;
+            const disabled = anyPending && !pending;
+            return (
+              <button
+                key={w.id}
+                type="button"
+                disabled={!interactive || disabled}
+                onClick={() => onRunWorkflow?.(w.id)}
+                className="flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-[12px] transition-colors hover:bg-[var(--surface-2)] disabled:cursor-not-allowed disabled:opacity-50"
+                style={{
+                  color: pending ? "var(--action)" : "var(--ink-3)",
+                  background: pending ? "var(--action-tint)" : undefined,
+                }}
+                title={w.desc}
+              >
+                {pending ? (
+                  <Loader2 className="h-3 w-3 animate-spin" strokeWidth={1.5} />
+                ) : (
+                  <Workflow className="h-3 w-3" strokeWidth={1.5} />
+                )}
+                <span className="flex-1 truncate">{w.title}</span>
+                {pending && (
+                  <span className="text-[10.5px]" style={{ color: "var(--action)" }}>
+                    running…
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </Group>
-        <Group title="Pinned artifacts">
-          {workspace.family === "clinical" ? (
-            <>
-              <PinRow label="pre-op-packet-v2.md" />
-              <PinRow label="clearance-summary.json" />
-            </>
-          ) : (
-            <>
-              <PinRow label="ranked-shortlist.md" />
-              <PinRow label="manifest.json" />
-            </>
-          )}
-        </Group>
+        {workspace.family === "clinical" ? (
+          interactive && (
+            <Group title="Recent runs">
+              <div
+                className="px-2 py-1.5 text-[11.5px] italic"
+                style={{ color: "var(--ink-4)" }}
+              >
+                Run a workflow above to populate this list.
+              </div>
+            </Group>
+          )
+        ) : (
+          <Group title="Pinned artifacts">
+            <PinRow label="ranked-shortlist.md" />
+            <PinRow label="manifest.json" />
+          </Group>
+        )}
       </div>
       <button
         className="mx-2 mb-2 flex items-center justify-center gap-1.5 rounded-md border border-dashed px-2.5 py-2 text-[12px] font-medium transition-colors hover:border-[var(--action)] hover:bg-[var(--action-tint)] hover:text-[var(--action)]"

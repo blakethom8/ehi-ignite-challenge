@@ -1,0 +1,25 @@
+{
+  "id": "preop_review_v1",
+  "title": "Pre-op clearance review",
+  "type": "Surgical",
+  "summary": "Medication holds, bleeding risk, anesthesia clearance, and operability disposition for elective surgery.",
+  "instructions": "Perform a structured pre-operative clearance review. Produce a single packet a surgeon can scan in 30 seconds.\n\n1. DISPOSITION — choose exactly one of {clear, review, hold}. Use 'hold' only if a finding is an absolute contraindication; 'review' if a clinician decision is required (e.g. anticoagulant hold timing, missing INR, uncontrolled glucose); 'clear' if no perioperative concerns surface from the chart.\n2. BLEEDING RISK — identify every active anticoagulant, antiplatelet, NSAID, and SSRI. State the recommended hold timing for each. If the chart shows none, declare the absence.\n3. ANESTHESIA — flag ACE inhibitors, ARBs, beta blockers, insulin, and any med with documented airway/sedation risk. Note allergies relevant to anesthesia drugs.\n4. LAB CLEARANCE — review INR/PT (if anticoagulated), eGFR/creatinine, platelets, hemoglobin, and glucose/HbA1c. Flag anything outside the perioperative window.\n5. COMORBIDITIES — list the active conditions that change perioperative risk band: AF, CAD, CHF, COPD, OSA, diabetes, CKD.\n\nGround every finding in the patient's chart context. Do not invent dates, doses, or values. If a needed datum is missing, declare the absence and surface it as a follow-up.",
+  "output_schema": {
+    "banner": {
+      "status": "clear | review | hold",
+      "headline": "≤120 chars — the single operability sentence the surgeon sees first",
+      "label": "REVIEW · ANTICOAGULATION (or similar 2-3 word tag)",
+      "action_label": "Approve hold | Acknowledge | Cleared"
+    },
+    "fact_rail": "5 cells: Patient, Age · Sex, Complexity (Tier A/B/C), Active meds count, OR date (or 'TBD')",
+    "sections": [
+      {"kind": "narrative", "title": "Summary", "body": "2-3 sentences naming the patient, the surgical context if known, and the top concern"},
+      {"kind": "table", "title": "Critical medications", "columns": ["Drug", "Dose · since", "Hold rule", "Source"]},
+      {"kind": "table", "title": "Recent labs", "columns": ["Test", "Value", "Date", "Flag", "Source"]},
+      {"kind": "table", "title": "Active comorbidities", "columns": ["Condition", "Onset", "Risk band", "Source"]},
+      {"kind": "narrative", "title": "Anesthesia handoff", "body": "≤2 sentences — airway notes, allergy flags, anesthesia-relevant interactions"},
+      {"kind": "narrative", "title": "Next action", "body": "1 sentence — what the clinician must do before the packet is exportable"}
+    ],
+    "chat_narration": "≤2 sentences — workflow result + top concern. Example: 'Pre-op review complete. Top concern: apixaban hold interval still pending confirmation.'"
+  }
+}

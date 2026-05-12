@@ -1,0 +1,25 @@
+{
+  "id": "medication_safety_v1",
+  "title": "Medication safety audit",
+  "type": "MedicationSafety",
+  "summary": "Drug-drug interactions, dose-vs-renal-function checks, duplicate-class flags, and allergy contraindications across the active medication list.",
+  "instructions": "Audit the patient's active medication list for safety issues. Produce a packet a clinician can act on without re-deriving the data.\n\n1. DISPOSITION — choose exactly one of {clear, review, critical}. 'critical' if any pair is a major/contraindicated interaction or any active med crosses a documented allergy. 'review' if there are moderate interactions, duplicate-class therapy, or doses outside the renal-adjusted range. 'clear' if nothing surfaces.\n2. DRUG-DRUG INTERACTIONS — identify every meaningful pairwise interaction among the active meds. Rank by severity (major > moderate > minor). Include a short clinical effect string for each.\n3. RENAL DOSING — if eGFR is below 60 or creatinine is documented as elevated, flag every active med whose label calls for renal adjustment. State the current dose and whether it crosses the adjustment threshold.\n4. DUPLICATE CLASS — flag any case where ≥2 active meds share a drug class (two NSAIDs, two beta blockers, two anticoagulants, etc.).\n5. ALLERGY × ACTIVE-MED — cross-check active meds against documented allergies/intolerances. Surface anything that crosses.\n\nGround every finding in the chart. If renal function or allergy data is missing, declare the absence and add it as a follow-up rather than fabricating.",
+  "output_schema": {
+    "banner": {
+      "status": "clear | review | critical",
+      "headline": "≤120 chars — the single highest-priority finding (or 'no safety issues identified' if clear)",
+      "label": "CRITICAL · INTERACTION (or REVIEW · DOSING, or CLEAR)",
+      "action_label": "Acknowledge | Open review | Escalate"
+    },
+    "fact_rail": "5 cells: Patient, Active meds count, Interactions found, Renal status (eGFR if known, else '—'), Allergies",
+    "sections": [
+      {"kind": "narrative", "title": "Summary", "body": "2-3 sentences — the most important safety findings, in plain language"},
+      {"kind": "table", "title": "Drug-drug interactions", "columns": ["Drug A", "Drug B", "Severity", "Effect", "Source"]},
+      {"kind": "table", "title": "Renal dosing checks", "columns": ["Drug", "Current dose", "Renal flag", "Recommendation", "Source"]},
+      {"kind": "table", "title": "Duplicate class", "columns": ["Class", "Drugs", "Note", "Source"]},
+      {"kind": "table", "title": "Allergy contraindications", "columns": ["Drug", "Allergy", "Severity", "Source"]},
+      {"kind": "narrative", "title": "Next action", "body": "1-2 sentences — what to reconcile, with whom, and what blocks closure"}
+    ],
+    "chat_narration": "≤2 sentences. Example: 'Medication safety audit complete. Top finding: warfarin + naproxen (major bleed-risk interaction).'"
+  }
+}

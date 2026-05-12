@@ -1,0 +1,23 @@
+{
+  "id": "longitudinal_synthesis_v1",
+  "title": "Longitudinal synthesis",
+  "type": "Longitudinal",
+  "summary": "Multi-year condition trajectory across encounters — inflection points, progression markers, and current trajectory in plain language.",
+  "instructions": "Synthesize the patient's longitudinal record into a clinician-readable narrative trajectory. This is not a chart dump — it's the answer to 'what is the arc of this patient's care, and where are they now?'\n\n1. DISPOSITION — choose exactly one of {stable, evolving, deteriorating}. 'stable' if the dominant conditions have been on consistent treatment with steady lab trends. 'evolving' if treatment intensity, conditions, or specialty involvement has changed materially in the last 18 months. 'deteriorating' if recent encounters or lab trends indicate worsening of a primary condition.\n2. THE ARC — identify the 2-3 primary conditions defining this patient's care over the observed period. For each, state the onset year, current status, and trajectory in one sentence.\n3. INFLECTION POINTS — list the encounters or diagnoses that materially changed the care plan. Each gets a date, what happened, and why it mattered.\n4. CURRENT WINDOW — summarize the last 12 months: encounters by specialty, active medication regimen, key lab trend.\n5. OPEN QUESTIONS — list the things the chart suggests but does not resolve (e.g., 'unclear whether the 2023 cardiology visit led to a sustained med change').\n\nWrite in clinical prose, not bullet salad. Cite specific dates, doses, lab values. If observed history is short, say so.",
+  "output_schema": {
+    "banner": {
+      "status": "stable | evolving | deteriorating",
+      "headline": "≤120 chars — the trajectory in one sentence",
+      "label": "STABLE · MULTI-CONDITION (or EVOLVING · CARDIORENAL, etc.)",
+      "action_label": "Acknowledge | Mark for review"
+    },
+    "fact_rail": "5 cells: Patient, Years observed, Encounter count, Active conditions, Primary specialty",
+    "sections": [
+      {"kind": "narrative", "title": "The arc", "body": "2-3 short paragraphs — the multi-year story of this patient's care, by condition"},
+      {"kind": "table", "title": "Inflection points", "columns": ["Date", "Event", "Significance", "Source"]},
+      {"kind": "narrative", "title": "Current window (last 12 months)", "body": "1 paragraph — encounters, active meds, lab trend, specialty involvement"},
+      {"kind": "narrative", "title": "Open questions", "body": "2-4 short bullet sentences — what the chart suggests but does not resolve"}
+    ],
+    "chat_narration": "≤2 sentences. Example: 'Longitudinal synthesis complete. Arc: stable T2DM + HTN since 2019, with new AF in 2023 driving an anticoagulant addition.'"
+  }
+}

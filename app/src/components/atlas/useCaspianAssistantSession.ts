@@ -1,8 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
+import { Activity } from "lucide-react";
 import { api } from "../../api/client";
-import type { ProviderAssistantCitation, ProviderAssistantTurn, TraceDetail } from "../../types";
-import type { Citation } from "./data";
+import type {
+  ProviderAssistantCitation,
+  ProviderAssistantTurn,
+  TraceDetail,
+  WorkflowArtifact,
+  WorkflowId,
+} from "../../types";
+import type { Citation, WorkbenchTab } from "./data";
 
 const STORAGE_PREFIX = "atlas:caspian:assistant";
 
@@ -27,6 +34,9 @@ export type CaspianAssistantMessage =
       followUps: string[];
       trace: TraceDetail | null;
       createdAt: string;
+      workflowId?: WorkflowId;
+      workflowTabId?: string;
+      filesCreated?: string[];
     };
 
 export type CaspianInspectorData = {
@@ -85,6 +95,7 @@ function buildAssistantMessage(
     followUps: data.follow_ups,
     trace: data.trace,
     createdAt: new Date().toISOString(),
+    filesCreated: data.files_created && data.files_created.length > 0 ? data.files_created : undefined,
   };
 }
 
@@ -175,15 +186,71 @@ function normalizeResourceType(sourceType: string): string {
   return known[normalized] ?? trimmed;
 }
 
+// ---------------------------------------------------------------------------
+// Workflow runs — these produce workbench artifacts, not chat replies.
+// ---------------------------------------------------------------------------
+
+export type CaspianWorkflowState = {
+  // Tabs to seed into the workbench (one per completed workflow run).
+  tabs: WorkbenchTab[];
+  // Canvas state keyed by tabId; each entry is a WorkflowArtifact.
+  canvas: Record<string, WorkflowArtifact>;
+  // Id of the most recently completed run's tab. Increments on every run
+  // so the parent can `openTab` + open the workbench pane via an effect.
+  latestTabId: string | null;
+  isPending: boolean;
+  pendingWorkflowId: WorkflowId | null;
+  error: Error | null;
+};
+
+const WORKFLOW_LABELS: Record<WorkflowId, string> = {
+  preop_review_v1: "Pre-op clearance briefing",
+  medication_safety_v1: "Medication safety audit",
+  longitudinal_synthesis_v1: "Longitudinal synthesis",
+};
+
+function workflowTabFromArtifact(artifact: WorkflowArtifact): WorkbenchTab {
+  return {
+    id: artifact.artifact_id,
+    label: WORKFLOW_LABELS[artifact.workflow_id] ?? artifact.workflow_title,
+    icon: "FileText",
+    kind: "workflow-artifact",
+    renderer: "workflow.artifact",
+    dirty: false,
+  };
+}
+
+export type CaspianAssistantSessionOptions = {
+  /** Called whenever a chat turn or workflow run reports files written. */
+  onFilesChanged?: () => void;
+};
+
 export function useCaspianAssistantSession(
   patientId: string | null,
   sessionId: string | null,
+  options: CaspianAssistantSessionOptions = {},
 ) {
   const key = useMemo(() => storageKey(patientId, sessionId), [patientId, sessionId]);
   const [messages, setMessages] = useState<CaspianAssistantMessage[]>(() => readMessages(key));
+  const [workflow, setWorkflow] = useState<CaspianWorkflowState>(() => ({
+    tabs: [],
+    canvas: {},
+    latestTabId: null,
+    isPending: false,
+    pendingWorkflowId: null,
+    error: null,
+  }));
 
   useEffect(() => {
     setMessages(readMessages(key));
+    setWorkflow({
+      tabs: [],
+      canvas: {},
+      latestTabId: null,
+      isPending: false,
+      pendingWorkflowId: null,
+      error: null,
+    });
   }, [key]);
 
   useEffect(() => {
@@ -209,6 +276,9 @@ export function useCaspianAssistantSession(
     },
     onSuccess: (data) => {
       setMessages((current) => [...current, buildAssistantMessage(data, current)]);
+      if (data.files_created && data.files_created.length > 0) {
+        options.onFilesChanged?.();
+      }
     },
   });
 
@@ -236,6 +306,14 @@ export function useCaspianAssistantSession(
 
   const resetConversation = useCallback(() => {
     setMessages([]);
+    setWorkflow({
+      tabs: [],
+      canvas: {},
+      latestTabId: null,
+      isPending: false,
+      pendingWorkflowId: null,
+      error: null,
+    });
     mutation.reset();
     if (!key) return;
     try {
@@ -244,6 +322,74 @@ export function useCaspianAssistantSession(
       // noop
     }
   }, [key, mutation]);
+
+  const workflowMutation = useMutation({
+    mutationFn: async (workflowId: WorkflowId) => {
+      if (!patientId) throw new Error("Select a patient before running a workflow.");
+      return api.runCaspianWorkflow({ patient_id: patientId, workflow_id: workflowId });
+    },
+    onMutate: (workflowId: WorkflowId) => {
+      setWorkflow((prev) => ({
+        ...prev,
+        isPending: true,
+        pendingWorkflowId: workflowId,
+        error: null,
+      }));
+    },
+    onError: (err: Error) => {
+      setWorkflow((prev) => ({
+        ...prev,
+        isPending: false,
+        pendingWorkflowId: null,
+        error: err,
+      }));
+    },
+    onSuccess: (data) => {
+      const artifact = data.artifact;
+      const newTab = workflowTabFromArtifact(artifact);
+      setWorkflow((prev) => ({
+        tabs: [...prev.tabs.filter((t) => t.id !== newTab.id), newTab],
+        canvas: { ...prev.canvas, [newTab.id]: artifact },
+        latestTabId: newTab.id,
+        isPending: false,
+        pendingWorkflowId: null,
+        error: null,
+      }));
+      setMessages((current) => {
+        const start = countCitations(current) + 1;
+        const citations = data.citations.map((citation, index) => ({
+          ...citation,
+          id: `e_${start + index}`,
+        }));
+        const message: Extract<CaspianAssistantMessage, { role: "assistant" }> = {
+          id: messageId("a"),
+          role: "assistant",
+          content: artifact.chat_narration,
+          confidence: "high",
+          engine: "workflow",
+          citations,
+          followUps: [],
+          trace: data.trace,
+          createdAt: new Date().toISOString(),
+          workflowId: artifact.workflow_id,
+          workflowTabId: newTab.id,
+        };
+        return [...current, message];
+      });
+    },
+  });
+
+  const runWorkflow = useCallback(
+    (workflowId: WorkflowId) => {
+      if (workflowMutation.isPending) return;
+      workflowMutation.mutate(workflowId);
+    },
+    [workflowMutation],
+  );
+
+  const acknowledgeLatestWorkflow = useCallback(() => {
+    setWorkflow((prev) => (prev.latestTabId ? { ...prev, latestTabId: null } : prev));
+  }, []);
 
   const inspector = useMemo(
     () => buildCaspianInspectorData(messages, patientId, sessionId),
@@ -258,5 +404,21 @@ export function useCaspianAssistantSession(
     submitQuestion,
     resetConversation,
     inspector,
+    workflow,
+    runWorkflow,
+    acknowledgeLatestWorkflow,
   };
 }
+
+// Re-export so callers can iterate workflow buttons in the same module.
+export const CASPIAN_WORKFLOW_IDS: WorkflowId[] = [
+  "preop_review_v1",
+  "medication_safety_v1",
+  "longitudinal_synthesis_v1",
+];
+
+export const CASPIAN_WORKFLOW_LABEL: Record<WorkflowId, string> = WORKFLOW_LABELS;
+
+// Re-export the icon mapping the SessionsPane uses today. Other UI surfaces
+// can pull a sensible default lucide icon for each workflow id.
+export const CASPIAN_WORKFLOW_ICON_DEFAULT = Activity;

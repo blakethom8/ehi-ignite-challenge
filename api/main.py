@@ -28,6 +28,8 @@ from api.routers import auth
 from api.routers import patients
 from api.routers import corpus
 from api.routers import assistant
+from api.routers import workflows as caspian_workflows
+from api.routers import caspian_files
 from api.routers import traces
 from api.routers import classifications
 from api.routers import patient_context
@@ -137,6 +139,8 @@ app.include_router(admin.router, prefix="/api")
 app.include_router(patients.router, prefix="/api")
 app.include_router(corpus.router, prefix="/api")
 app.include_router(assistant.router, prefix="/api")
+app.include_router(caspian_workflows.router, prefix="/api")
+app.include_router(caspian_files.router, prefix="/api")
 app.include_router(traces.router, prefix="/api")
 app.include_router(audit.router, prefix="/api")
 app.include_router(classifications.router, prefix="/api")

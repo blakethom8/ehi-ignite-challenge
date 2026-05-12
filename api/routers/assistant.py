@@ -238,6 +238,7 @@ def provider_chat(payload: ProviderAssistantRequest, request: Request) -> Provid
             mode_override=payload.mode,
             max_tokens_override=payload.max_tokens,
             cursor_model=payload.cursor_model,
+            session=session,
         )
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -310,4 +311,5 @@ def provider_chat(payload: ProviderAssistantRequest, request: Request) -> Provid
         ],
         follow_ups=result.follow_ups,
         trace=trace_detail,
+        files_created=result.files_created or [],
     )

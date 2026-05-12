@@ -21,8 +21,12 @@ import { ManufacturerMatcherRenderer } from "./med-access/ManufacturerMatcherRen
 import { PaFormRenderer } from "./med-access/PaFormRenderer";
 import { ReferralPacketRenderer } from "./second-opinion/ReferralPacketRenderer";
 import { SpecialtyPickerRenderer } from "./second-opinion/SpecialtyPickerRenderer";
+import { WorkflowArtifactRenderer } from "./caspian/WorkflowArtifactRenderer";
+import { WorkspaceFileRenderer } from "./caspian/WorkspaceFileRenderer";
 
 export const RENDERERS: RendererRegistry = {
+  "workflow.artifact": WorkflowArtifactRenderer,
+  "workspace.file": WorkspaceFileRenderer,
   "trial.board": TrialBoardRenderer,
   "trial.detail": TrialDetailRenderer,
   "form.eligibility": EligibilityFormRenderer,

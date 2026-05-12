@@ -54,6 +54,7 @@ data/events.db
 data/events.db-*
 data/aggregation-uploads/
 data/aggregation-profiles/
+data/caspian-workspaces/
 data/guest-harmonization/
 data/patient-context/
 data/harmonization-runs/

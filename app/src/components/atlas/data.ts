@@ -172,13 +172,16 @@ export const WORKFLOWS: Record<WorkspaceId, Workflow[]> = {
 
 export type FileTreeNode =
   | { type: "group"; label: string }
-  | {
-      type: "folder";
-      name: string;
-      expanded?: boolean;
-      children: FileNode[];
-    }
+  | FolderTreeNode
+  | FileNode
   | { type: "ref"; id: string; label: string; sub: string };
+
+export type FolderTreeNode = {
+  type: "folder";
+  name: string;
+  expanded?: boolean;
+  children: Array<FileNode | FolderTreeNode>;
+};
 
 export type FileNode = {
   type: "file";
@@ -187,45 +190,22 @@ export type FileNode = {
   ext: string;
   icon: string;
   dirty?: boolean;
+  /** When false, the workbench renderer should not offer an edit affordance. */
+  editable?: boolean;
 };
 
 export const FILE_TREES: Record<WorkspaceId, FileTreeNode[]> = {
+  // Caspian's file tree is intentionally sparse: workflow runs produce
+  // artifacts at request time and surface them as workbench tabs. There is
+  // no static patient file tree to browse.
   "caspian": [
     { type: "group", label: "Patient workspace" },
     {
       type: "folder",
-      name: "context",
+      name: "workflow runs",
       expanded: true,
-      children: [
-        { type: "file", name: "pre-op-brief.md", id: "f_brief", ext: "md", icon: "FileText" },
-        { type: "file", name: "anticoagulation-note.txt", id: "f_anticoag", ext: "txt", icon: "FileText" },
-        { type: "file", name: "recent-labs.csv", id: "f_labs", ext: "csv", icon: "FileSpreadsheet" },
-        { type: "file", name: "operative-history.md", id: "f_history", ext: "md", icon: "FileText" },
-      ],
+      children: [],
     },
-    {
-      type: "folder",
-      name: "artifacts",
-      expanded: true,
-      children: [
-        { type: "file", name: "pre-op-packet-v2.md", id: "f_packetv2", ext: "md", icon: "FileText", dirty: true },
-        { type: "file", name: "pre-op-packet-v1.md", id: "f_packetv1", ext: "md", icon: "FileText" },
-        { type: "file", name: "clearance-summary.json", id: "f_summary", ext: "json", icon: "Braces" },
-      ],
-    },
-    {
-      type: "folder",
-      name: "workflow",
-      expanded: false,
-      children: [
-        { type: "file", name: "workflow.md", id: "f_workflow", ext: "md", icon: "FileText" },
-        { type: "file", name: "settings.json", id: "f_settings", ext: "json", icon: "Braces" },
-      ],
-    },
-    { type: "group", label: "Pinned objects" },
-    { type: "ref", id: "c_1042", label: "citation:c_1042", sub: "Apixaban hold guidance" },
-    { type: "ref", id: "c_1078", label: "citation:c_1078", sub: "Recent CBC · 2025-04-22" },
-    { type: "ref", id: "task_anticoag", label: "task:approval-anticoag", sub: "1 unresolved approval" },
   ],
   "trial-finder": [
     { type: "group", label: "Package workspace" },
@@ -537,7 +517,9 @@ export type WorkbenchTab = {
     | "manufacturer-program-matcher"
     | "specialty-picker"
     | "referral-packet"
-    | "network-status-board";
+    | "network-status-board"
+    | "workflow-artifact"
+    | "workspace-file";
   /** When set, WorkbenchPane mounts this renderer from the registry
    *  instead of falling back to the legacy renderTab switch. */
   renderer?:
@@ -552,21 +534,18 @@ export type WorkbenchTab = {
     | "board.network-status"
     | "markdown.doc"
     | "json.viewer"
-    | "diff.unified";
+    | "diff.unified"
+    | "workflow.artifact"
+    | "workspace.file";
   dirty?: boolean;
 };
 
 export const INITIAL_TABS: Record<WorkspaceId, WorkbenchTab[]> = {
-  "caspian": [
-    { id: "tab_brief", label: "pre-op-packet-v2.md", icon: "FileText", kind: "preop-brief", dirty: true },
-    { id: "tab_anti", label: "anticoagulation-note.txt", icon: "FileText", kind: "anticoag-note" },
-    { id: "tab_diff", label: "v1 → v2 diff", icon: "GitCompare", kind: "diff" },
-    { id: "tab_sum", label: "clearance-summary.json", icon: "Braces", kind: "summary-json" },
-    { id: "tab_labs", label: "recent-labs.csv", icon: "FileText", kind: "packet-outline", renderer: "markdown.doc" },
-    { id: "tab_history", label: "operative-history.md", icon: "FileText", kind: "packet-outline", renderer: "markdown.doc" },
-    { id: "tab_workflow", label: "workflow.md", icon: "FileText", kind: "packet-outline", renderer: "markdown.doc" },
-    { id: "tab_settings", label: "settings.json", icon: "Braces", kind: "manifest-json", renderer: "json.viewer" },
-  ],
+  // Caspian's workbench is empty until a workflow runs. Workflow runs push
+  // a `workflow.artifact` tab via runWorkflow(); the workbench pane opens on
+  // demand. Everything that was previously hardcoded here (pre-op-packet-v2,
+  // anticoagulation-note, etc.) was fixture data not tied to the active chart.
+  "caspian": [],
   "trial-finder": [
     { id: "tab_board", label: "candidate-board.json", icon: "Beaker", kind: "trial-board" },
     { id: "tab_short", label: "ranked-shortlist.md", icon: "FileText", kind: "packet-outline", dirty: true },
@@ -591,41 +570,9 @@ export const INITIAL_TABS: Record<WorkspaceId, WorkbenchTab[]> = {
 };
 
 export const FIXTURE_CANVAS: Record<WorkspaceId, Record<string, unknown>> = {
-  "caspian": {
-    tab_history: {
-      preview: [
-        "# Operative history",
-        "",
-        "- 2025-04-18: anesthesia consult cleared with no documented airway complication.",
-        "- 2025-05-06: repeat INR ordered ahead of the scheduled hernia repair.",
-        "- 2025-05-12: pre-op packet remains in review pending anticoagulation sign-off.",
-      ].join("\n"),
-    },
-    tab_workflow: {
-      preview: [
-        "# Workflow",
-        "",
-        "1. Confirm the apixaban hold interval with the attending.",
-        "2. Verify the morning-of INR once resulted.",
-        "3. Publish the clearance summary into the patient packet.",
-      ].join("\n"),
-    },
-    tab_labs: {
-      preview: [
-        "# Recent labs",
-        "",
-        "- 2025-04-22 CBC: Hgb 12.4 g/dL, WBC 6.8, platelets 218",
-        "- 2025-05-06 INR: pending repeat for operative clearance",
-        "- Trend: no active bleeding signal in the last two draws",
-      ].join("\n"),
-    },
-    tab_settings: {
-      workflow: "preop",
-      model_preset: "clinical-high",
-      artifact_target: "pre-op-packet-v2.md",
-      approver: "attending",
-    },
-  },
+  // Caspian's canvas is populated at run time by workflow runs. See
+  // CaspianWorkspace → useCaspianAssistantSession → runWorkflow.
+  "caspian": {},
   "trial-finder": {
     tab_dx: {
       preview: [
@@ -715,17 +662,7 @@ export const FIXTURE_CANVAS: Record<WorkspaceId, Record<string, unknown>> = {
 };
 
 export const FILE_TABS_BY_WORKSPACE: Record<WorkspaceId, Record<string, WorkbenchTab>> = {
-    "caspian": {
-      f_brief: { id: "tab_brief", label: "pre-op-packet-v2.md", icon: "FileText", kind: "preop-brief", dirty: true },
-      f_packetv2: { id: "tab_brief", label: "pre-op-packet-v2.md", icon: "FileText", kind: "preop-brief", dirty: true },
-      f_packetv1: { id: "tab_diff", label: "v1 → v2 diff", icon: "GitCompare", kind: "diff" },
-      f_anticoag: { id: "tab_anti", label: "anticoagulation-note.txt", icon: "FileText", kind: "anticoag-note" },
-      f_summary: { id: "tab_sum", label: "clearance-summary.json", icon: "Braces", kind: "summary-json" },
-      f_labs: { id: "tab_labs", label: "recent-labs.csv", icon: "FileText", kind: "packet-outline", renderer: "markdown.doc" },
-      f_history: { id: "tab_history", label: "operative-history.md", icon: "FileText", kind: "packet-outline", renderer: "markdown.doc" },
-      f_workflow: { id: "tab_workflow", label: "workflow.md", icon: "FileText", kind: "packet-outline", renderer: "markdown.doc" },
-      f_settings: { id: "tab_settings", label: "settings.json", icon: "Braces", kind: "manifest-json", renderer: "json.viewer" },
-  },
+    "caspian": {},
   "trial-finder": {
     f_board: { id: "tab_board", label: "candidate-board.json", icon: "Beaker", kind: "trial-board" },
     f_shortlist: { id: "tab_short", label: "ranked-shortlist.md", icon: "FileText", kind: "packet-outline", dirty: true },

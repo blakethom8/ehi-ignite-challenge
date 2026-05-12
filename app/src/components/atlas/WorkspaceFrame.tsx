@@ -52,6 +52,10 @@ type WorkspaceFrameProps = {
     chatPane?: ReactNode;
     sessions?: Session[];
     workflows?: Workflow[];
+    /** Triggered when a workflow row in the sidebar is clicked. */
+    onRunWorkflow?: (workflowId: string) => void;
+    /** Workflow currently in-flight, used to disable other rows. */
+    pendingWorkflowId?: string | null;
     filesTree?: FileTreeNode[];
     seedTabs?: WorkbenchTab[];
     canvas?: Record<string, unknown>;
@@ -268,6 +272,8 @@ export function WorkspaceFrame({
                 workspace={workspace}
                 sessions={surface?.sessions}
                 workflows={surface?.workflows}
+                onRunWorkflow={surface?.onRunWorkflow}
+                pendingWorkflowId={surface?.pendingWorkflowId ?? null}
                 activeSessionId={showPluginHome ? "__home__" : resolvedSessionId}
                 onSelectSession={handleSelectSession}
               />

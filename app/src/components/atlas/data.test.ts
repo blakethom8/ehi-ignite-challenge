@@ -6,7 +6,11 @@ describe("atlas fixture file routing", () => {
     for (const [workspaceId, nodes] of Object.entries(FILE_TREES)) {
       const tabs = FILE_TABS_BY_WORKSPACE[workspaceId as keyof typeof FILE_TABS_BY_WORKSPACE];
       const fileIds = nodes.flatMap((node) =>
-        node.type === "folder" ? node.children.map((child) => child.id) : [],
+        node.type === "folder"
+          ? node.children
+              .filter((child): child is { type: "file"; id: string; name: string; ext: string; icon: string } => child.type === "file")
+              .map((child) => child.id)
+          : [],
       );
 
       expect(fileIds, `no fixture files found for ${workspaceId}`).not.toHaveLength(0);

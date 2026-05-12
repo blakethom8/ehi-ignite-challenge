@@ -17,6 +17,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, BinaryIO
 
+from fastapi import HTTPException
+
 from api.core.loader import load_patient, patient_display_name, path_from_patient_id
 from api.core.patient_context import private_cedars_available
 from api.models import (
@@ -106,7 +108,30 @@ def _profile_for(patient_id: str) -> AggregationProfile | None:
     return _load_profiles().get(_safe_id(patient_id))
 
 
-def _ensure_profile(patient_id: str, display_name: str | None = None, notes: str = "") -> AggregationProfile:
+def _assert_workspace_owner(session_user_id: str | None, patient_id: str) -> None:
+    """Enforce per-user ownership on aggregation workspaces.
+
+    No-ops for Synthea patient IDs (no profile is created for them) and for
+    legacy profiles where ``owner_user_id`` was never stamped. Only enforces
+    when a profile has a recorded owner that does not match the caller.
+    """
+    profile = _profile_for(patient_id)
+    if profile is None or profile.owner_user_id is None:
+        return
+    if session_user_id != profile.owner_user_id:
+        raise HTTPException(
+            status_code=403,
+            detail="This workspace belongs to a different account.",
+        )
+
+
+def _ensure_profile(
+    patient_id: str,
+    display_name: str | None = None,
+    notes: str = "",
+    *,
+    owner_user_id: str | None = None,
+) -> AggregationProfile:
     profiles = _load_profiles()
     profile_id = _safe_id(patient_id)
     existing = profiles.get(profile_id)
@@ -119,16 +144,26 @@ def _ensure_profile(patient_id: str, display_name: str | None = None, notes: str
         created_at=now,
         updated_at=now,
         notes=notes.strip(),
+        owner_user_id=owner_user_id,
     )
     profiles[profile.id] = profile
     _write_profiles(profiles)
     return profile
 
 
-def create_profile(payload: AggregationCreateProfileRequest) -> AggregationCreateProfileResponse:
+def create_profile(
+    payload: AggregationCreateProfileRequest,
+    *,
+    owner_user_id: str | None = None,
+) -> AggregationCreateProfileResponse:
     display_name = payload.display_name.strip() or "New patient workspace"
     profile_id = f"workspace-{uuid.uuid4()}"
-    profile = _ensure_profile(profile_id, display_name=display_name, notes=payload.notes)
+    profile = _ensure_profile(
+        profile_id,
+        display_name=display_name,
+        notes=payload.notes,
+        owner_user_id=owner_user_id,
+    )
     _patient_root(profile.id).mkdir(parents=True, exist_ok=True)
     return AggregationCreateProfileResponse(
         profile=profile,
@@ -140,7 +175,13 @@ def create_profile(payload: AggregationCreateProfileRequest) -> AggregationCreat
     )
 
 
-def update_profile(patient_id: str, payload: AggregationUpdateProfileRequest) -> AggregationCreateProfileResponse:
+def update_profile(
+    patient_id: str,
+    payload: AggregationUpdateProfileRequest,
+    *,
+    session_user_id: str | None = None,
+) -> AggregationCreateProfileResponse:
+    _assert_workspace_owner(session_user_id, patient_id)
     profile_id = _safe_id(patient_id)
     if path_from_patient_id(profile_id) is not None:
         raise ValueError("Seed Synthea patients cannot be renamed from the workspace library.")
@@ -158,6 +199,7 @@ def update_profile(patient_id: str, payload: AggregationUpdateProfileRequest) ->
         updated_at=now,
         notes=payload.notes.strip(),
         storage_mode=existing.storage_mode if existing else "server-local-workspace",
+        owner_user_id=existing.owner_user_id if existing else None,
     )
     profiles[profile_id] = profile
     _write_profiles(profiles)
@@ -278,20 +320,32 @@ def _load_uploaded_files(patient_id: str) -> list[AggregationUploadedFile]:
     return sorted(files, key=lambda upload: upload.uploaded_at, reverse=True)
 
 
-def list_upload_workspaces() -> list[PatientListItem]:
+def list_upload_workspaces(user_id: str | None = None) -> list[PatientListItem]:
     """Expose upload-backed workspaces to the global patient/workspace picker.
 
     Synthea patients come from the corpus catalog. Upload sessions are local
     workspaces keyed by the same patient id used by Source Intake, so surfacing
     them here lets the selector drive Source Intake and Harmonized Record from
     the same top-level context.
+
+    When ``user_id`` is provided, profiles owned by other users are hidden.
+    Legacy profiles with ``owner_user_id=None`` remain visible so pre-existing
+    shared workspaces are not lost.
     """
     items: list[PatientListItem] = []
     profile_ids: set[str] = set()
+    visible_profile_ids: set[str] = set()
     for profile in _load_profiles().values():
+        profile_ids.add(profile.id)
+        if (
+            user_id is not None
+            and profile.owner_user_id is not None
+            and profile.owner_user_id != user_id
+        ):
+            continue
+        visible_profile_ids.add(profile.id)
         uploads = _load_uploaded_files(profile.id)
         prepared = sum(1 for upload in uploads if upload.parse_status in {"structured", "extracted"})
-        profile_ids.add(profile.id)
         items.append(
             PatientListItem(
                 id=profile.id,
@@ -317,6 +371,8 @@ def list_upload_workspaces() -> list[PatientListItem]:
         if not session_dir.is_dir():
             continue
         if session_dir.name in profile_ids:
+            continue
+        if user_id is not None:
             continue
         uploads = _load_uploaded_files(session_dir.name)
         if not uploads:
@@ -521,7 +577,13 @@ def _preview_from_payload(
     )
 
 
-def upload_preview(patient_id: str, file_id: str) -> AggregationPreparedPreviewResponse:
+def upload_preview(
+    patient_id: str,
+    file_id: str,
+    *,
+    session_user_id: str | None = None,
+) -> AggregationPreparedPreviewResponse:
+    _assert_workspace_owner(session_user_id, patient_id)
     upload = _load_upload(patient_id, file_id)
 
     if upload.parse_status == "extracted" and upload.derived_artifacts:
@@ -559,7 +621,13 @@ def upload_preview(patient_id: str, file_id: str) -> AggregationPreparedPreviewR
     )
 
 
-def upload_prepared_json(patient_id: str, file_id: str) -> dict[str, Any]:
+def upload_prepared_json(
+    patient_id: str,
+    file_id: str,
+    *,
+    session_user_id: str | None = None,
+) -> dict[str, Any]:
+    _assert_workspace_owner(session_user_id, patient_id)
     upload = _load_upload(patient_id, file_id)
 
     if upload.parse_status == "extracted" and upload.derived_artifacts:
@@ -607,7 +675,12 @@ def _latest_encounter(patient_id: str) -> datetime | None:
     return max(starts) if starts else None
 
 
-def source_inventory(patient_id: str) -> AggregationEnvironmentResponse:
+def source_inventory(
+    patient_id: str,
+    *,
+    session_user_id: str | None = None,
+) -> AggregationEnvironmentResponse:
+    _assert_workspace_owner(session_user_id, patient_id)
     counts = _resource_counts(patient_id)
     uploads = _load_uploaded_files(patient_id)
     private_available = private_cedars_available()
@@ -736,8 +809,13 @@ def _active_med_count(patient_id: str) -> int:
     return sum(1 for med in record.medications if med.status == "active")
 
 
-def cleaning_queue(patient_id: str) -> AggregationCleaningQueueResponse:
-    inventory = source_inventory(patient_id)
+def cleaning_queue(
+    patient_id: str,
+    *,
+    session_user_id: str | None = None,
+) -> AggregationCleaningQueueResponse:
+    _assert_workspace_owner(session_user_id, patient_id)
+    inventory = source_inventory(patient_id, session_user_id=session_user_id)
     counts = inventory.synthetic_resource_counts
     uploads = inventory.uploaded_files
     duplicate_meds = _duplicate_medications(patient_id)
@@ -846,9 +924,14 @@ def cleaning_queue(patient_id: str) -> AggregationCleaningQueueResponse:
     )
 
 
-def readiness(patient_id: str) -> AggregationReadinessResponse:
-    inventory = source_inventory(patient_id)
-    queue = cleaning_queue(patient_id)
+def readiness(
+    patient_id: str,
+    *,
+    session_user_id: str | None = None,
+) -> AggregationReadinessResponse:
+    _assert_workspace_owner(session_user_id, patient_id)
+    inventory = source_inventory(patient_id, session_user_id=session_user_id)
+    queue = cleaning_queue(patient_id, session_user_id=session_user_id)
     has_chart = bool(inventory.synthetic_resource_counts)
     has_uploads = bool(inventory.uploaded_files)
     private_available = inventory.private_blake_cedars_available
@@ -936,9 +1019,11 @@ def save_upload(
     contains: list[str] | None = None,
     description: str = "",
     context_notes: str = "",
+    session_user_id: str | None = None,
 ) -> AggregationUploadResponse:
+    _assert_workspace_owner(session_user_id, patient_id)
     if path_from_patient_id(patient_id) is None:
-        _ensure_profile(patient_id)
+        _ensure_profile(patient_id, owner_user_id=session_user_id)
     root = _patient_root(patient_id)
     root.mkdir(parents=True, exist_ok=True)
 
@@ -988,7 +1073,13 @@ def save_upload(
     )
 
 
-def delete_upload(patient_id: str, file_id: str) -> AggregationDeleteResponse:
+def delete_upload(
+    patient_id: str,
+    file_id: str,
+    *,
+    session_user_id: str | None = None,
+) -> AggregationDeleteResponse:
+    _assert_workspace_owner(session_user_id, patient_id)
     metadata = _upload_metadata_path(patient_id, file_id)
     if not metadata.exists():
         raise FileNotFoundError(f"Uploaded file not found: {file_id}")
@@ -1000,8 +1091,13 @@ def delete_upload(patient_id: str, file_id: str) -> AggregationDeleteResponse:
     return AggregationDeleteResponse(deleted=True, file_id=file_id)
 
 
-def delete_profile(patient_id: str) -> AggregationDeleteResponse:
+def delete_profile(
+    patient_id: str,
+    *,
+    session_user_id: str | None = None,
+) -> AggregationDeleteResponse:
     """Delete a prototype upload/profile workspace and its staged files."""
+    _assert_workspace_owner(session_user_id, patient_id)
     profile_id = _safe_id(patient_id)
     if path_from_patient_id(profile_id) is not None:
         raise ValueError("Synthea demo patients cannot be deleted from Source Intake.")

@@ -14,8 +14,23 @@ def _zip_root(payload: bytes) -> tuple[zipfile.ZipFile, str]:
     return zf, roots.pop()
 
 
-def test_export_workspace_downloads_synthea_package():
+def _authenticated_client() -> TestClient:
+    """Return a TestClient logged in as the bootstrap clinician.
+
+    The harmonize router now requires an authenticated session for every
+    endpoint, so workspace-export tests log in before exercising the route.
+    """
     client = TestClient(app)
+    response = client.post(
+        "/api/auth/login",
+        json={"email": "clinician@atlas.local", "password": "atlas-demo-password"},
+    )
+    assert response.status_code == 200, response.text
+    return client
+
+
+def test_export_workspace_downloads_synthea_package():
+    client = _authenticated_client()
 
     response = client.get("/api/harmonize/synthea-demo/export-workspace")
 
@@ -35,7 +50,7 @@ def test_export_workspace_downloads_synthea_package():
 
 
 def test_export_workspace_unknown_collection_404s():
-    client = TestClient(app)
+    client = _authenticated_client()
 
     response = client.get("/api/harmonize/does-not-exist/export-workspace")
 

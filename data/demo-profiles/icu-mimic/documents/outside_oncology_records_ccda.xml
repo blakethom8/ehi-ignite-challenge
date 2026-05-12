@@ -1,0 +1,1104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ClinicalDocument xmlns="urn:hl7-org:v3" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:sdtc="urn:hl7-org:sdtc" xsi:schemaLocation="urn:hl7-org:v3 urn:hl7-org:v3/CDA.xsd">
+  <realmCode code="US"/>
+  <typeId root="2.16.840.1.113883.1.3" extension="POCD_HD000040"/>
+  <templateId root="2.16.840.1.113883.10.20.22.1.1" extension="2015-08-01"/>
+  <templateId root="2.16.840.1.113883.10.20.22.1.2" extension="2015-08-01"/>
+  <id root="2.16.840.1.113883.19.5.99999.1" extension="DFCI-20500702-cb70e6ae"/>
+  <code code="34133-9" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Summarization of Episode Note"/>
+  <title>Continuity of Care Document - Hematology &amp; Oncology</title>
+  <effectiveTime value="20500702143000-0400"/>
+  <confidentialityCode code="N" codeSystem="2.16.840.1.113883.5.25" codeSystemName="HL7 Confidentiality"/>
+  <languageCode code="en-US"/>
+  <setId root="2.16.840.1.113883.19.5.99999.19" extension="SET-cb70e6ae"/>
+  <versionNumber value="1"/>
+  <recordTarget>
+    <patientRole>
+      <id root="2.16.840.1.113883.19.5.99999.2" extension="DFCI-cb70e6ae"/>
+      <addr use="HP">
+        <streetAddressLine>142 Commonwealth Avenue</streetAddressLine>
+        <city>Boston</city>
+        <state>MA</state>
+        <postalCode>02116</postalCode>
+        <country>US</country>
+      </addr>
+      <telecom value="tel:+1(617)555-0142" use="HP"/>
+      <telecom value="mailto:patient.cb70e6ae@email.example" use="HP"/>
+      <patient>
+        <name use="L">
+          <given>Richard</given>
+          <given>Allen</given>
+          <family>Morrison</family>
+        </name>
+        <administrativeGenderCode code="M" codeSystem="2.16.840.1.113883.5.1" displayName="Male"/>
+        <birthTime value="20861008"/>
+        <maritalStatusCode code="M" codeSystem="2.16.840.1.113883.5.2" displayName="Married"/>
+        <raceCode code="2106-3" codeSystem="2.16.840.1.113883.6.238" displayName="White"/>
+        <ethnicGroupCode code="2186-5" codeSystem="2.16.840.1.113883.6.238" displayName="Not Hispanic or Latino"/>
+      </patient>
+      <providerOrganization>
+        <id root="2.16.840.1.113883.19.5.99999.1"/>
+        <name>Dana-Farber Cancer Institute</name>
+        <telecom value="tel:+1(617)632-3000" use="WP"/>
+        <addr use="WP">
+          <streetAddressLine>450 Brookline Avenue</streetAddressLine>
+          <city>Boston</city>
+          <state>MA</state>
+          <postalCode>02215</postalCode>
+          <country>US</country>
+        </addr>
+      </providerOrganization>
+    </patientRole>
+  </recordTarget>
+  <author>
+    <time value="20500702143000-0400"/>
+    <assignedAuthor>
+      <id root="2.16.840.1.113883.19.5.99999.3" extension="DFCI-PHY-82745"/>
+      <code code="207RH0003X" codeSystem="2.16.840.1.113883.11.19465" displayName="Hematology &amp; Oncology"/>
+      <addr use="WP">
+        <streetAddressLine>450 Brookline Avenue, D-2062</streetAddressLine>
+        <city>Boston</city>
+        <state>MA</state>
+        <postalCode>02215</postalCode>
+        <country>US</country>
+      </addr>
+      <telecom value="tel:+1(617)632-4790" use="WP"/>
+      <assignedPerson>
+        <name>
+          <prefix>Dr.</prefix>
+          <given>Margaret</given>
+          <family>Chen</family>
+          <suffix>MD</suffix>
+        </name>
+      </assignedPerson>
+      <representedOrganization>
+        <id root="2.16.840.1.113883.19.5.99999.1"/>
+        <name>Dana-Farber Cancer Institute - Division of Hematologic Malignancies</name>
+        <telecom value="tel:+1(617)632-4790" use="WP"/>
+        <addr use="WP">
+          <streetAddressLine>450 Brookline Avenue</streetAddressLine>
+          <city>Boston</city>
+          <state>MA</state>
+          <postalCode>02215</postalCode>
+          <country>US</country>
+        </addr>
+      </representedOrganization>
+    </assignedAuthor>
+  </author>
+  <custodian>
+    <assignedCustodian>
+      <representedCustodianOrganization>
+        <id root="2.16.840.1.113883.19.5.99999.1"/>
+        <name>Dana-Farber Cancer Institute</name>
+        <telecom value="tel:+1(617)632-3000" use="WP"/>
+        <addr use="WP">
+          <streetAddressLine>450 Brookline Avenue</streetAddressLine>
+          <city>Boston</city>
+          <state>MA</state>
+          <postalCode>02215</postalCode>
+          <country>US</country>
+        </addr>
+      </representedCustodianOrganization>
+    </assignedCustodian>
+  </custodian>
+  <documentationOf>
+    <serviceEvent classCode="PCPR">
+      <effectiveTime>
+        <low value="20481115"/>
+        <high value="20500702"/>
+      </effectiveTime>
+      <performer typeCode="PRF">
+        <functionCode code="PCP" codeSystem="2.16.840.1.113883.5.88" displayName="Primary Care Provider"/>
+        <assignedEntity>
+          <id root="2.16.840.1.113883.19.5.99999.3" extension="DFCI-PHY-82745"/>
+          <code code="207RH0003X" codeSystem="2.16.840.1.113883.11.19465" displayName="Hematology &amp; Oncology"/>
+          <addr use="WP">
+            <streetAddressLine>450 Brookline Avenue</streetAddressLine>
+            <city>Boston</city>
+            <state>MA</state>
+            <postalCode>02215</postalCode>
+            <country>US</country>
+          </addr>
+          <assignedPerson>
+            <name>
+              <prefix>Dr.</prefix>
+              <given>Margaret</given>
+              <family>Chen</family>
+              <suffix>MD</suffix>
+            </name>
+          </assignedPerson>
+        </assignedEntity>
+      </performer>
+    </serviceEvent>
+  </documentationOf>
+  <component>
+    <structuredBody>
+      <component>
+        <section>
+          <templateId root="2.16.840.1.113883.10.20.22.2.5.1" extension="2015-08-01"/>
+          <code code="11450-4" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Problem List"/>
+          <title>Problem List</title>
+          <text>
+            <table border="1" width="100%">
+              <thead>
+                <tr>
+                  <th>Problem</th>
+                  <th>Status</th>
+                  <th>Date Onset</th>
+                  <th>Comment</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr ID="problem-1">
+                  <td>Chronic lymphocytic leukemia of B-cell type</td>
+                  <td>Completed</td>
+                  <td>November 2048</td>
+                  <td>Patient has achieved complete response after FCR regimen completed June 2049. Continue surveillance.</td>
+                </tr>
+                <tr ID="problem-2">
+                  <td>Type 2 diabetes mellitus without complications</td>
+                  <td>Active</td>
+                  <td>2042</td>
+                  <td>On insulin therapy</td>
+                </tr>
+                <tr ID="problem-3">
+                  <td>Essential (primary) hypertension</td>
+                  <td>Active</td>
+                  <td>2040</td>
+                  <td>Well controlled on beta-blocker</td>
+                </tr>
+                <tr ID="problem-4">
+                  <td>Paroxysmal atrial fibrillation</td>
+                  <td>Active</td>
+                  <td>2045</td>
+                  <td>Anticoagulated</td>
+                </tr>
+                <tr ID="problem-5">
+                  <td>Atherosclerotic heart disease of native coronary artery without angina pectoris</td>
+                  <td>Active</td>
+                  <td>2046</td>
+                  <td>Status post PCI 2146, pacemaker present</td>
+                </tr>
+                <tr ID="problem-6">
+                  <td>Obstructive sleep apnea (adult)</td>
+                  <td>Active</td>
+                  <td>2043</td>
+                  <td>Uses CPAP nightly</td>
+                </tr>
+              </tbody>
+            </table>
+          </text>
+          <entry typeCode="DRIV">
+            <act classCode="ACT" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.3" extension="2015-08-01"/>
+              <id root="2.16.840.1.113883.19.5.99999.4" extension="problem-1-cb70e6ae"/>
+              <code code="CONC" codeSystem="2.16.840.1.113883.5.6"/>
+              <statusCode code="completed"/>
+              <effectiveTime>
+                <low value="204811"/>
+              </effectiveTime>
+              <entryRelationship typeCode="SUBJ">
+                <observation classCode="OBS" moodCode="EVN">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.4" extension="2015-08-01"/>
+                  <id root="2.16.840.1.113883.19.5.99999.5" extension="obs-problem-1"/>
+                  <code code="55607006" codeSystem="2.16.840.1.113883.6.96" displayName="Problem" codeSystemName="SNOMED CT">
+                    <translation code="75326-9" codeSystem="2.16.840.1.113883.6.1" displayName="Problem" codeSystemName="LOINC"/>
+                  </code>
+                  <text>
+                    <reference value="#problem-1"/>
+                  </text>
+                  <statusCode code="completed"/>
+                  <effectiveTime>
+                    <low value="204811"/>
+                  </effectiveTime>
+                  <value xsi:type="CD" code="91857006" codeSystem="2.16.840.1.113883.6.96" displayName="Chronic lymphocytic leukemia of B-cell type"/>
+                  <author>
+                    <time value="20481115"/>
+                    <assignedAuthor>
+                      <id root="2.16.840.1.113883.19.5.99999.3" extension="DFCI-PHY-82745"/>
+                    </assignedAuthor>
+                  </author>
+                  <entryRelationship typeCode="SUBJ" inversionInd="true">
+                    <observation classCode="OBS" moodCode="EVN">
+                      <templateId root="2.16.840.1.113883.10.20.22.4.6"/>
+                      <code code="33999-4" codeSystem="2.16.840.1.113883.6.1" displayName="Status"/>
+                      <statusCode code="completed"/>
+                      <value xsi:type="CE" code="413322009" codeSystem="2.16.840.1.113883.6.96" displayName="Resolved"/>
+                    </observation>
+                  </entryRelationship>
+                </observation>
+              </entryRelationship>
+            </act>
+          </entry>
+          <entry typeCode="DRIV">
+            <act classCode="ACT" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.3" extension="2015-08-01"/>
+              <id root="2.16.840.1.113883.19.5.99999.4" extension="problem-2-cb70e6ae"/>
+              <code code="CONC" codeSystem="2.16.840.1.113883.5.6"/>
+              <statusCode code="active"/>
+              <effectiveTime>
+                <low value="2042"/>
+              </effectiveTime>
+              <entryRelationship typeCode="SUBJ">
+                <observation classCode="OBS" moodCode="EVN">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.4" extension="2015-08-01"/>
+                  <id root="2.16.840.1.113883.19.5.99999.5" extension="obs-problem-2"/>
+                  <code code="55607006" codeSystem="2.16.840.1.113883.6.96" displayName="Problem" codeSystemName="SNOMED CT">
+                    <translation code="75326-9" codeSystem="2.16.840.1.113883.6.1" displayName="Problem" codeSystemName="LOINC"/>
+                  </code>
+                  <text>
+                    <reference value="#problem-2"/>
+                  </text>
+                  <statusCode code="completed"/>
+                  <effectiveTime>
+                    <low value="2042"/>
+                  </effectiveTime>
+                  <value xsi:type="CD" code="E11.9" codeSystem="2.16.840.1.113883.6.90" displayName="Type 2 diabetes mellitus without complications"/>
+                </observation>
+              </entryRelationship>
+            </act>
+          </entry>
+          <entry typeCode="DRIV">
+            <act classCode="ACT" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.3" extension="2015-08-01"/>
+              <id root="2.16.840.1.113883.19.5.99999.4" extension="problem-3-cb70e6ae"/>
+              <code code="CONC" codeSystem="2.16.840.1.113883.5.6"/>
+              <statusCode code="active"/>
+              <effectiveTime>
+                <low value="2040"/>
+              </effectiveTime>
+              <entryRelationship typeCode="SUBJ">
+                <observation classCode="OBS" moodCode="EVN">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.4" extension="2015-08-01"/>
+                  <id root="2.16.840.1.113883.19.5.99999.5" extension="obs-problem-3"/>
+                  <code code="55607006" codeSystem="2.16.840.1.113883.6.96" displayName="Problem" codeSystemName="SNOMED CT">
+                    <translation code="75326-9" codeSystem="2.16.840.1.113883.6.1" displayName="Problem" codeSystemName="LOINC"/>
+                  </code>
+                  <text>
+                    <reference value="#problem-3"/>
+                  </text>
+                  <statusCode code="completed"/>
+                  <effectiveTime>
+                    <low value="2040"/>
+                  </effectiveTime>
+                  <value xsi:type="CD" code="I10" codeSystem="2.16.840.1.113883.6.90" displayName="Essential (primary) hypertension"/>
+                </observation>
+              </entryRelationship>
+            </act>
+          </entry>
+          <entry typeCode="DRIV">
+            <act classCode="ACT" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.3" extension="2015-08-01"/>
+              <id root="2.16.840.1.113883.19.5.99999.4" extension="problem-4-cb70e6ae"/>
+              <code code="CONC" codeSystem="2.16.840.1.113883.5.6"/>
+              <statusCode code="active"/>
+              <effectiveTime>
+                <low value="2045"/>
+              </effectiveTime>
+              <entryRelationship typeCode="SUBJ">
+                <observation classCode="OBS" moodCode="EVN">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.4" extension="2015-08-01"/>
+                  <id root="2.16.840.1.113883.19.5.99999.5" extension="obs-problem-4"/>
+                  <code code="55607006" codeSystem="2.16.840.1.113883.6.96" displayName="Problem" codeSystemName="SNOMED CT">
+                    <translation code="75326-9" codeSystem="2.16.840.1.113883.6.1" displayName="Problem" codeSystemName="LOINC"/>
+                  </code>
+                  <text>
+                    <reference value="#problem-4"/>
+                  </text>
+                  <statusCode code="completed"/>
+                  <effectiveTime>
+                    <low value="2045"/>
+                  </effectiveTime>
+                  <value xsi:type="CD" code="I48.0" codeSystem="2.16.840.1.113883.6.90" displayName="Paroxysmal atrial fibrillation"/>
+                </observation>
+              </entryRelationship>
+            </act>
+          </entry>
+          <entry typeCode="DRIV">
+            <act classCode="ACT" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.3" extension="2015-08-01"/>
+              <id root="2.16.840.1.113883.19.5.99999.4" extension="problem-5-cb70e6ae"/>
+              <code code="CONC" codeSystem="2.16.840.1.113883.5.6"/>
+              <statusCode code="active"/>
+              <effectiveTime>
+                <low value="2046"/>
+              </effectiveTime>
+              <entryRelationship typeCode="SUBJ">
+                <observation classCode="OBS" moodCode="EVN">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.4" extension="2015-08-01"/>
+                  <id root="2.16.840.1.113883.19.5.99999.5" extension="obs-problem-5"/>
+                  <code code="55607006" codeSystem="2.16.840.1.113883.6.96" displayName="Problem" codeSystemName="SNOMED CT">
+                    <translation code="75326-9" codeSystem="2.16.840.1.113883.6.1" displayName="Problem" codeSystemName="LOINC"/>
+                  </code>
+                  <text>
+                    <reference value="#problem-5"/>
+                  </text>
+                  <statusCode code="completed"/>
+                  <effectiveTime>
+                    <low value="2046"/>
+                  </effectiveTime>
+                  <value xsi:type="CD" code="I25.10" codeSystem="2.16.840.1.113883.6.90" displayName="Atherosclerotic heart disease of native coronary artery without angina pectoris"/>
+                </observation>
+              </entryRelationship>
+            </act>
+          </entry>
+          <entry typeCode="DRIV">
+            <act classCode="ACT" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.3" extension="2015-08-01"/>
+              <id root="2.16.840.1.113883.19.5.99999.4" extension="problem-6-cb70e6ae"/>
+              <code code="CONC" codeSystem="2.16.840.1.113883.5.6"/>
+              <statusCode code="active"/>
+              <effectiveTime>
+                <low value="2043"/>
+              </effectiveTime>
+              <entryRelationship typeCode="SUBJ">
+                <observation classCode="OBS" moodCode="EVN">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.4" extension="2015-08-01"/>
+                  <id root="2.16.840.1.113883.19.5.99999.5" extension="obs-problem-6"/>
+                  <code code="55607006" codeSystem="2.16.840.1.113883.6.96" displayName="Problem" codeSystemName="SNOMED CT">
+                    <translation code="75326-9" codeSystem="2.16.840.1.113883.6.1" displayName="Problem" codeSystemName="LOINC"/>
+                  </code>
+                  <text>
+                    <reference value="#problem-6"/>
+                  </text>
+                  <statusCode code="completed"/>
+                  <effectiveTime>
+                    <low value="2043"/>
+                  </effectiveTime>
+                  <value xsi:type="CD" code="G47.33" codeSystem="2.16.840.1.113883.6.90" displayName="Obstructive sleep apnea (adult)"/>
+                </observation>
+              </entryRelationship>
+            </act>
+          </entry>
+        </section>
+      </component>
+      <component>
+        <section>
+          <templateId root="2.16.840.1.113883.10.20.22.2.1.1" extension="2014-06-09"/>
+          <code code="10160-0" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="History of Medication Use"/>
+          <title>Medications</title>
+          <text>
+            <table border="1" width="100%">
+              <thead>
+                <tr>
+                  <th>Medication</th>
+                  <th>Dose</th>
+                  <th>Route</th>
+                  <th>Frequency</th>
+                  <th>Status</th>
+                  <th>Date Started</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr ID="med-1">
+                  <td>Fludarabine 25 mg/m2</td>
+                  <td>25 mg/m2</td>
+                  <td>IV</td>
+                  <td>Days 1-3 every 28 days</td>
+                  <td>Completed</td>
+                  <td>November 2048 - June 2049</td>
+                </tr>
+                <tr ID="med-2">
+                  <td>Cyclophosphamide 250 mg/m2</td>
+                  <td>250 mg/m2</td>
+                  <td>IV</td>
+                  <td>Days 1-3 every 28 days</td>
+                  <td>Completed</td>
+                  <td>November 2048 - June 2049</td>
+                </tr>
+                <tr ID="med-3">
+                  <td>Rituximab 375 mg/m2</td>
+                  <td>375 mg/m2</td>
+                  <td>IV</td>
+                  <td>Day 1 every 28 days</td>
+                  <td>Completed</td>
+                  <td>November 2048 - June 2049</td>
+                </tr>
+                <tr ID="med-4">
+                  <td>Acyclovir 400 mg</td>
+                  <td>400 mg</td>
+                  <td>PO</td>
+                  <td>Twice daily</td>
+                  <td>Active</td>
+                  <td>November 2048</td>
+                </tr>
+                <tr ID="med-5">
+                  <td>Trimethoprim-Sulfamethoxazole DS</td>
+                  <td>1 tablet</td>
+                  <td>PO</td>
+                  <td>Three times weekly</td>
+                  <td>Active</td>
+                  <td>November 2048</td>
+                </tr>
+              </tbody>
+            </table>
+          </text>
+          <entry typeCode="DRIV">
+            <substanceAdministration classCode="SBADM" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.16" extension="2014-06-09"/>
+              <id root="2.16.840.1.113883.19.5.99999.6" extension="med-1-cb70e6ae"/>
+              <text>
+                <reference value="#med-1"/>
+              </text>
+              <statusCode code="completed"/>
+              <effectiveTime xsi:type="IVL_TS">
+                <low value="204811"/>
+                <high value="204906"/>
+              </effectiveTime>
+              <effectiveTime xsi:type="PIVL_TS" institutionSpecified="true" operator="A">
+                <period value="28" unit="d"/>
+              </effectiveTime>
+              <routeCode code="C38276" codeSystem="2.16.840.1.113883.3.26.1.1" displayName="Intravenous"/>
+              <doseQuantity value="25" unit="mg/m2"/>
+              <consumable>
+                <manufacturedProduct classCode="MANU">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.23" extension="2014-06-09"/>
+                  <manufacturedMaterial>
+                    <code code="1790099" codeSystem="2.16.840.1.113883.6.88" displayName="Fludarabine">
+                      <originalText>
+                        <reference value="#med-1"/>
+                      </originalText>
+                    </code>
+                  </manufacturedMaterial>
+                </manufacturedProduct>
+              </consumable>
+            </substanceAdministration>
+          </entry>
+          <entry typeCode="DRIV">
+            <substanceAdministration classCode="SBADM" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.16" extension="2014-06-09"/>
+              <id root="2.16.840.1.113883.19.5.99999.6" extension="med-2-cb70e6ae"/>
+              <text>
+                <reference value="#med-2"/>
+              </text>
+              <statusCode code="completed"/>
+              <effectiveTime xsi:type="IVL_TS">
+                <low value="204811"/>
+                <high value="204906"/>
+              </effectiveTime>
+              <effectiveTime xsi:type="PIVL_TS" institutionSpecified="true" operator="A">
+                <period value="28" unit="d"/>
+              </effectiveTime>
+              <routeCode code="C38276" codeSystem="2.16.840.1.113883.3.26.1.1" displayName="Intravenous"/>
+              <doseQuantity value="250" unit="mg/m2"/>
+              <consumable>
+                <manufacturedProduct classCode="MANU">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.23" extension="2014-06-09"/>
+                  <manufacturedMaterial>
+                    <code code="121943" codeSystem="2.16.840.1.113883.6.88" displayName="Cyclophosphamide">
+                      <originalText>
+                        <reference value="#med-2"/>
+                      </originalText>
+                    </code>
+                  </manufacturedMaterial>
+                </manufacturedProduct>
+              </consumable>
+            </substanceAdministration>
+          </entry>
+          <entry typeCode="DRIV">
+            <substanceAdministration classCode="SBADM" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.16" extension="2014-06-09"/>
+              <id root="2.16.840.1.113883.19.5.99999.6" extension="med-3-cb70e6ae"/>
+              <text>
+                <reference value="#med-3"/>
+              </text>
+              <statusCode code="completed"/>
+              <effectiveTime xsi:type="IVL_TS">
+                <low value="204811"/>
+                <high value="204906"/>
+              </effectiveTime>
+              <effectiveTime xsi:type="PIVL_TS" institutionSpecified="true" operator="A">
+                <period value="28" unit="d"/>
+              </effectiveTime>
+              <routeCode code="C38276" codeSystem="2.16.840.1.113883.3.26.1.1" displayName="Intravenous"/>
+              <doseQuantity value="375" unit="mg/m2"/>
+              <consumable>
+                <manufacturedProduct classCode="MANU">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.23" extension="2014-06-09"/>
+                  <manufacturedMaterial>
+                    <code code="352135" codeSystem="2.16.840.1.113883.6.88" displayName="Rituximab">
+                      <originalText>
+                        <reference value="#med-3"/>
+                      </originalText>
+                    </code>
+                  </manufacturedMaterial>
+                </manufacturedProduct>
+              </consumable>
+            </substanceAdministration>
+          </entry>
+          <entry typeCode="DRIV">
+            <substanceAdministration classCode="SBADM" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.16" extension="2014-06-09"/>
+              <id root="2.16.840.1.113883.19.5.99999.6" extension="med-4-cb70e6ae"/>
+              <text>
+                <reference value="#med-4"/>
+              </text>
+              <statusCode code="active"/>
+              <effectiveTime xsi:type="IVL_TS">
+                <low value="204811"/>
+              </effectiveTime>
+              <effectiveTime xsi:type="PIVL_TS" institutionSpecified="true" operator="A">
+                <period value="12" unit="h"/>
+              </effectiveTime>
+              <routeCode code="C38288" codeSystem="2.16.840.1.113883.3.26.1.1" displayName="Oral"/>
+              <doseQuantity value="400" unit="mg"/>
+              <consumable>
+                <manufacturedProduct classCode="MANU">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.23" extension="2014-06-09"/>
+                  <manufacturedMaterial>
+                    <code code="142464" codeSystem="2.16.840.1.113883.6.88" displayName="Acyclovir 400 mg oral tablet">
+                      <originalText>
+                        <reference value="#med-4"/>
+                      </originalText>
+                    </code>
+                  </manufacturedMaterial>
+                </manufacturedProduct>
+              </consumable>
+            </substanceAdministration>
+          </entry>
+          <entry typeCode="DRIV">
+            <substanceAdministration classCode="SBADM" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.16" extension="2014-06-09"/>
+              <id root="2.16.840.1.113883.19.5.99999.6" extension="med-5-cb70e6ae"/>
+              <text>
+                <reference value="#med-5"/>
+              </text>
+              <statusCode code="active"/>
+              <effectiveTime xsi:type="IVL_TS">
+                <low value="204811"/>
+              </effectiveTime>
+              <effectiveTime xsi:type="PIVL_TS" institutionSpecified="true" operator="A">
+                <period value="3" unit="d"/>
+              </effectiveTime>
+              <routeCode code="C38288" codeSystem="2.16.840.1.113883.3.26.1.1" displayName="Oral"/>
+              <doseQuantity value="1" unit="tablet"/>
+              <consumable>
+                <manufacturedProduct classCode="MANU">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.23" extension="2014-06-09"/>
+                  <manufacturedMaterial>
+                    <code code="205532" codeSystem="2.16.840.1.113883.6.88" displayName="Trimethoprim-Sulfamethoxazole DS">
+                      <originalText>
+                        <reference value="#med-5"/>
+                      </originalText>
+                    </code>
+                  </manufacturedMaterial>
+                </manufacturedProduct>
+              </consumable>
+            </substanceAdministration>
+          </entry>
+        </section>
+      </component>
+      <component>
+        <section>
+          <templateId root="2.16.840.1.113883.10.20.22.2.6.1" extension="2015-08-01"/>
+          <code code="48765-2" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Allergies and Adverse Reactions"/>
+          <title>Allergies and Adverse Reactions</title>
+          <text>
+            <table border="1" width="100%">
+              <thead>
+                <tr>
+                  <th>Allergen</th>
+                  <th>Reaction</th>
+                  <th>Severity</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr ID="allergy-1">
+                  <td>No Known Drug Allergies</td>
+                  <td>None</td>
+                  <td>N/A</td>
+                </tr>
+              </tbody>
+            </table>
+          </text>
+          <entry typeCode="DRIV">
+            <act classCode="ACT" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.30" extension="2015-08-01"/>
+              <id root="2.16.840.1.113883.19.5.99999.7" extension="allergy-1-cb70e6ae"/>
+              <code code="CONC" codeSystem="2.16.840.1.113883.5.6"/>
+              <statusCode code="active"/>
+              <effectiveTime>
+                <low value="204811"/>
+              </effectiveTime>
+              <entryRelationship typeCode="SUBJ">
+                <observation classCode="OBS" moodCode="EVN">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.7" extension="2014-06-09"/>
+                  <id root="2.16.840.1.113883.19.5.99999.8" extension="obs-allergy-1"/>
+                  <code code="ASSERTION" codeSystem="2.16.840.1.113883.5.4"/>
+                  <statusCode code="completed"/>
+                  <effectiveTime>
+                    <low value="204811"/>
+                  </effectiveTime>
+                  <value xsi:type="CD" code="409137002" codeSystem="2.16.840.1.113883.6.96" displayName="No Known Drug Allergy"/>
+                  <participant typeCode="CSM">
+                    <participantRole classCode="MANU">
+                      <playingEntity classCode="MMAT">
+                        <code nullFlavor="NA"/>
+                      </playingEntity>
+                    </participantRole>
+                  </participant>
+                </observation>
+              </entryRelationship>
+            </act>
+          </entry>
+        </section>
+      </component>
+      <component>
+        <section>
+          <templateId root="2.16.840.1.113883.10.20.22.2.3.1" extension="2015-08-01"/>
+          <code code="30954-2" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Relevant Diagnostic Tests and/or Laboratory Data"/>
+          <title>Results</title>
+          <text>
+            <table border="1" width="100%">
+              <thead>
+                <tr>
+                  <th>Test</th>
+                  <th>Result</th>
+                  <th>Units</th>
+                  <th>Reference Range</th>
+                  <th>Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td colspan="5">
+                    <content ID="result-panel-1">Complete Blood Count - 02 July 2150</content>
+                  </td>
+                </tr>
+                <tr ID="result-1">
+                  <td>WBC</td>
+                  <td>6.2</td>
+                  <td>10*3/uL</td>
+                  <td>4.0-11.0</td>
+                  <td>02 Jul 2150</td>
+                </tr>
+                <tr ID="result-2">
+                  <td>Hemoglobin</td>
+                  <td>13.8</td>
+                  <td>g/dL</td>
+                  <td>13.5-17.5</td>
+                  <td>02 Jul 2150</td>
+                </tr>
+                <tr ID="result-3">
+                  <td>Platelets</td>
+                  <td>198</td>
+                  <td>10*3/uL</td>
+                  <td>150-400</td>
+                  <td>02 Jul 2150</td>
+                </tr>
+                <tr ID="result-4">
+                  <td>Lymphocytes</td>
+                  <td>24.8</td>
+                  <td>%</td>
+                  <td>20-40</td>
+                  <td>02 Jul 2150</td>
+                </tr>
+                <tr ID="result-5">
+                  <td>Absolute Lymphocyte Count</td>
+                  <td>1.54</td>
+                  <td>10*3/uL</td>
+                  <td>1.0-4.0</td>
+                  <td>02 Jul 2150</td>
+                </tr>
+                <tr ID="result-6">
+                  <td>Neutrophils</td>
+                  <td>62.5</td>
+                  <td>%</td>
+                  <td>40-70</td>
+                  <td>02 Jul 2150</td>
+                </tr>
+              </tbody>
+            </table>
+          </text>
+          <entry typeCode="DRIV">
+            <organizer classCode="BATTERY" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.1" extension="2015-08-01"/>
+              <id root="2.16.840.1.113883.19.5.99999.9" extension="result-panel-1-cb70e6ae"/>
+              <code code="57021-8" codeSystem="2.16.840.1.113883.6.1" displayName="Complete Blood Count (CBC) W Auto Differential panel"/>
+              <statusCode code="completed"/>
+              <effectiveTime value="20500702090000-0400"/>
+              <component>
+                <observation classCode="OBS" moodCode="EVN">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.2" extension="2015-08-01"/>
+                  <id root="2.16.840.1.113883.19.5.99999.10" extension="result-1-cb70e6ae"/>
+                  <code code="6690-2" codeSystem="2.16.840.1.113883.6.1" displayName="Leukocytes [#/volume] in Blood by Automated count"/>
+                  <text>
+                    <reference value="#result-1"/>
+                  </text>
+                  <statusCode code="completed"/>
+                  <effectiveTime value="20500702090000-0400"/>
+                  <value xsi:type="PQ" value="6.2" unit="10*3/uL"/>
+                  <interpretationCode code="N" codeSystem="2.16.840.1.113883.5.83" displayName="Normal"/>
+                  <referenceRange>
+                    <observationRange>
+                      <value xsi:type="IVL_PQ">
+                        <low value="4.0" unit="10*3/uL"/>
+                        <high value="11.0" unit="10*3/uL"/>
+                      </value>
+                    </observationRange>
+                  </referenceRange>
+                </observation>
+              </component>
+              <component>
+                <observation classCode="OBS" moodCode="EVN">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.2" extension="2015-08-01"/>
+                  <id root="2.16.840.1.113883.19.5.99999.10" extension="result-2-cb70e6ae"/>
+                  <code code="718-7" codeSystem="2.16.840.1.113883.6.1" displayName="Hemoglobin [Mass/volume] in Blood"/>
+                  <text>
+                    <reference value="#result-2"/>
+                  </text>
+                  <statusCode code="completed"/>
+                  <effectiveTime value="20500702090000-0400"/>
+                  <value xsi:type="PQ" value="13.8" unit="g/dL"/>
+                  <interpretationCode code="N" codeSystem="2.16.840.1.113883.5.83" displayName="Normal"/>
+                  <referenceRange>
+                    <observationRange>
+                      <value xsi:type="IVL_PQ">
+                        <low value="13.5" unit="g/dL"/>
+                        <high value="17.5" unit="g/dL"/>
+                      </value>
+                    </observationRange>
+                  </referenceRange>
+                </observation>
+              </component>
+              <component>
+                <observation classCode="OBS" moodCode="EVN">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.2" extension="2015-08-01"/>
+                  <id root="2.16.840.1.113883.19.5.99999.10" extension="result-3-cb70e6ae"/>
+                  <code code="777-3" codeSystem="2.16.840.1.113883.6.1" displayName="Platelets [#/volume] in Blood by Automated count"/>
+                  <text>
+                    <reference value="#result-3"/>
+                  </text>
+                  <statusCode code="completed"/>
+                  <effectiveTime value="20500702090000-0400"/>
+                  <value xsi:type="PQ" value="198" unit="10*3/uL"/>
+                  <interpretationCode code="N" codeSystem="2.16.840.1.113883.5.83" displayName="Normal"/>
+                  <referenceRange>
+                    <observationRange>
+                      <value xsi:type="IVL_PQ">
+                        <low value="150" unit="10*3/uL"/>
+                        <high value="400" unit="10*3/uL"/>
+                      </value>
+                    </observationRange>
+                  </referenceRange>
+                </observation>
+              </component>
+              <component>
+                <observation classCode="OBS" moodCode="EVN">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.2" extension="2015-08-01"/>
+                  <id root="2.16.840.1.113883.19.5.99999.10" extension="result-4-cb70e6ae"/>
+                  <code code="736-9" codeSystem="2.16.840.1.113883.6.1" displayName="Lymphocytes/100 leukocytes in Blood by Automated count"/>
+                  <text>
+                    <reference value="#result-4"/>
+                  </text>
+                  <statusCode code="completed"/>
+                  <effectiveTime value="20500702090000-0400"/>
+                  <value xsi:type="PQ" value="24.8" unit="%"/>
+                  <interpretationCode code="N" codeSystem="2.16.840.1.113883.5.83" displayName="Normal"/>
+                  <referenceRange>
+                    <observationRange>
+                      <value xsi:type="IVL_PQ">
+                        <low value="20" unit="%"/>
+                        <high value="40" unit="%"/>
+                      </value>
+                    </observationRange>
+                  </referenceRange>
+                </observation>
+              </component>
+              <component>
+                <observation classCode="OBS" moodCode="EVN">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.2" extension="2015-08-01"/>
+                  <id root="2.16.840.1.113883.19.5.99999.10" extension="result-5-cb70e6ae"/>
+                  <code code="731-0" codeSystem="2.16.840.1.113883.6.1" displayName="Lymphocytes [#/volume] in Blood by Automated count"/>
+                  <text>
+                    <reference value="#result-5"/>
+                  </text>
+                  <statusCode code="completed"/>
+                  <effectiveTime value="20500702090000-0400"/>
+                  <value xsi:type="PQ" value="1.54" unit="10*3/uL"/>
+                  <interpretationCode code="N" codeSystem="2.16.840.1.113883.5.83" displayName="Normal"/>
+                  <referenceRange>
+                    <observationRange>
+                      <value xsi:type="IVL_PQ">
+                        <low value="1.0" unit="10*3/uL"/>
+                        <high value="4.0" unit="10*3/uL"/>
+                      </value>
+                    </observationRange>
+                  </referenceRange>
+                </observation>
+              </component>
+              <component>
+                <observation classCode="OBS" moodCode="EVN">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.2" extension="2015-08-01"/>
+                  <id root="2.16.840.1.113883.19.5.99999.10" extension="result-6-cb70e6ae"/>
+                  <code code="770-8" codeSystem="2.16.840.1.113883.6.1" displayName="Neutrophils/100 leukocytes in Blood by Automated count"/>
+                  <text>
+                    <reference value="#result-6"/>
+                  </text>
+                  <statusCode code="completed"/>
+                  <effectiveTime value="20500702090000-0400"/>
+                  <value xsi:type="PQ" value="62.5" unit="%"/>
+                  <interpretationCode code="N" codeSystem="2.16.840.1.113883.5.83" displayName="Normal"/>
+                  <referenceRange>
+                    <observationRange>
+                      <value xsi:type="IVL_PQ">
+                        <low value="40" unit="%"/>
+                        <high value="70" unit="%"/>
+                      </value>
+                    </observationRange>
+                  </referenceRange>
+                </observation>
+              </component>
+            </organizer>
+          </entry>
+        </section>
+      </component>
+      <component>
+        <section>
+          <templateId root="2.16.840.1.113883.10.20.22.2.22" extension="2015-08-01"/>
+          <templateId root="2.16.840.1.113883.10.20.22.2.22.1" extension="2015-08-01"/>
+          <code code="46240-8" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="History of Encounters"/>
+          <title>Encounters</title>
+          <text>
+            <table border="1" width="100%">
+              <thead>
+                <tr>
+                  <th>Encounter Type</th>
+                  <th>Date</th>
+                  <th>Provider</th>
+                  <th>Location</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr ID="enc-1">
+                  <td>Office Visit - Hematology/Oncology Follow-up</td>
+                  <td>02 July 2150</td>
+                  <td>Dr. Margaret Chen, MD</td>
+                  <td>Dana-Farber Cancer Institute</td>
+                </tr>
+                <tr ID="enc-2">
+                  <td>Office Visit - Hematology/Oncology Follow-up</td>
+                  <td>09 May 2150</td>
+                  <td>Dr. Margaret Chen, MD</td>
+                  <td>Dana-Farber Cancer Institute</td>
+                </tr>
+                <tr ID="enc-3">
+                  <td>Office Visit - Hematology/Oncology Follow-up</td>
+                  <td>04 February 2150</td>
+                  <td>Dr. Margaret Chen, MD</td>
+                  <td>Dana-Farber Cancer Institute</td>
+                </tr>
+                <tr ID="enc-4">
+                  <td>Chemotherapy Administration</td>
+                  <td>14 June 2049</td>
+                  <td>Dr. Margaret Chen, MD</td>
+                  <td>Dana-Farber Cancer Institute Infusion Center</td>
+                </tr>
+              </tbody>
+            </table>
+          </text>
+          <entry typeCode="DRIV">
+            <encounter classCode="ENC" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.49" extension="2015-08-01"/>
+              <id root="2.16.840.1.113883.19.5.99999.11" extension="enc-1-cb70e6ae"/>
+              <code code="99215" codeSystem="2.16.840.1.113883.6.12" displayName="Office or other outpatient visit, established patient">
+                <translation code="185349003" codeSystem="2.16.840.1.113883.6.96" displayName="Encounter for check up"/>
+              </code>
+              <text>
+                <reference value="#enc-1"/>
+              </text>
+              <effectiveTime value="20500702140000-0400"/>
+              <performer>
+                <assignedEntity>
+                  <id root="2.16.840.1.113883.19.5.99999.3" extension="DFCI-PHY-82745"/>
+                  <code code="207RH0003X" codeSystem="2.16.840.1.113883.11.19465" displayName="Hematology &amp; Oncology"/>
+                  <addr use="WP">
+                    <streetAddressLine>450 Brookline Avenue</streetAddressLine>
+                    <city>Boston</city>
+                    <state>MA</state>
+                    <postalCode>02215</postalCode>
+                    <country>US</country>
+                  </addr>
+                  <assignedPerson>
+                    <name>
+                      <prefix>Dr.</prefix>
+                      <given>Margaret</given>
+                      <family>Chen</family>
+                      <suffix>MD</suffix>
+                    </name>
+                  </assignedPerson>
+                </assignedEntity>
+              </performer>
+              <participant typeCode="LOC">
+                <participantRole classCode="SDLOC">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.32"/>
+                  <code code="1160-1" codeSystem="2.16.840.1.113883.6.259" displayName="Urgent Care Center"/>
+                  <addr use="WP">
+                    <streetAddressLine>450 Brookline Avenue</streetAddressLine>
+                    <city>Boston</city>
+                    <state>MA</state>
+                    <postalCode>02215</postalCode>
+                    <country>US</country>
+                  </addr>
+                  <playingEntity classCode="PLC">
+                    <name>Dana-Farber Cancer Institute</name>
+                  </playingEntity>
+                </participantRole>
+              </participant>
+            </encounter>
+          </entry>
+          <entry typeCode="DRIV">
+            <encounter classCode="ENC" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.49" extension="2015-08-01"/>
+              <id root="2.16.840.1.113883.19.5.99999.11" extension="enc-2-cb70e6ae"/>
+              <code code="99215" codeSystem="2.16.840.1.113883.6.12" displayName="Office or other outpatient visit, established patient">
+                <translation code="185349003" codeSystem="2.16.840.1.113883.6.96" displayName="Encounter for check up"/>
+              </code>
+              <text>
+                <reference value="#enc-2"/>
+              </text>
+              <effectiveTime value="20500509103000-0400"/>
+              <performer>
+                <assignedEntity>
+                  <id root="2.16.840.1.113883.19.5.99999.3" extension="DFCI-PHY-82745"/>
+                  <code code="207RH0003X" codeSystem="2.16.840.1.113883.11.19465" displayName="Hematology &amp; Oncology"/>
+                  <addr use="WP">
+                    <streetAddressLine>450 Brookline Avenue</streetAddressLine>
+                    <city>Boston</city>
+                    <state>MA</state>
+                    <postalCode>02215</postalCode>
+                    <country>US</country>
+                  </addr>
+                  <assignedPerson>
+                    <name>
+                      <prefix>Dr.</prefix>
+                      <given>Margaret</given>
+                      <family>Chen</family>
+                      <suffix>MD</suffix>
+                    </name>
+                  </assignedPerson>
+                </assignedEntity>
+              </performer>
+              <participant typeCode="LOC">
+                <participantRole classCode="SDLOC">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.32"/>
+                  <code code="1160-1" codeSystem="2.16.840.1.113883.6.259" displayName="Urgent Care Center"/>
+                  <addr use="WP">
+                    <streetAddressLine>450 Brookline Avenue</streetAddressLine>
+                    <city>Boston</city>
+                    <state>MA</state>
+                    <postalCode>02215</postalCode>
+                    <country>US</country>
+                  </addr>
+                  <playingEntity classCode="PLC">
+                    <name>Dana-Farber Cancer Institute</name>
+                  </playingEntity>
+                </participantRole>
+              </participant>
+            </encounter>
+          </entry>
+          <entry typeCode="DRIV">
+            <encounter classCode="ENC" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.49" extension="2015-08-01"/>
+              <id root="2.16.840.1.113883.19.5.99999.11" extension="enc-3-cb70e6ae"/>
+              <code code="99215" codeSystem="2.16.840.1.113883.6.12" displayName="Office or other outpatient visit, established patient">
+                <translation code="185349003" codeSystem="2.16.840.1.113883.6.96" displayName="Encounter for check up"/>
+              </code>
+              <text>
+                <reference value="#enc-3"/>
+              </text>
+              <effectiveTime value="20500204111500-0500"/>
+              <performer>
+                <assignedEntity>
+                  <id root="2.16.840.1.113883.19.5.99999.3" extension="DFCI-PHY-82745"/>
+                  <code code="207RH0003X" codeSystem="2.16.840.1.113883.11.19465" displayName="Hematology &amp; Oncology"/>
+                  <addr use="WP">
+                    <streetAddressLine>450 Brookline Avenue</streetAddressLine>
+                    <city>Boston</city>
+                    <state>MA</state>
+                    <postalCode>02215</postalCode>
+                    <country>US</country>
+                  </addr>
+                  <assignedPerson>
+                    <name>
+                      <prefix>Dr.</prefix>
+                      <given>Margaret</given>
+                      <family>Chen</family>
+                      <suffix>MD</suffix>
+                    </name>
+                  </assignedPerson>
+                </assignedEntity>
+              </performer>
+              <participant typeCode="LOC">
+                <participantRole classCode="SDLOC">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.32"/>
+                  <code code="1160-1" codeSystem="2.16.840.1.113883.6.259" displayName="Urgent Care Center"/>
+                  <addr use="WP">
+                    <streetAddressLine>450 Brookline Avenue</streetAddressLine>
+                    <city>Boston</city>
+                    <state>MA</state>
+                    <postalCode>02215</postalCode>
+                    <country>US</country>
+                  </addr>
+                  <playingEntity classCode="PLC">
+                    <name>Dana-Farber Cancer Institute</name>
+                  </playingEntity>
+                </participantRole>
+              </participant>
+            </encounter>
+          </entry>
+          <entry typeCode="DRIV">
+            <encounter classCode="ENC" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.49" extension="2015-08-01"/>
+              <id root="2.16.840.1.113883.19.5.99999.11" extension="enc-4-cb70e6ae"/>
+              <code code="96413" codeSystem="2.16.840.1.113883.6.12" displayName="Chemotherapy administration, intravenous infusion technique">
+                <translation code="265764009" codeSystem="2.16.840.1.113883.6.96" displayName="Chemotherapy"/>
+              </code>
+              <text>
+                <reference value="#enc-4"/>
+              </text>
+              <effectiveTime value="20490614083000-0400"/>
+              <performer>
+                <assignedEntity>
+                  <id root="2.16.840.1.113883.19.5.99999.3" extension="DFCI-PHY-82745"/>
+                  <code code="207RH0003X" codeSystem="2.16.840.1.113883.11.19465" displayName="Hematology &amp; Oncology"/>
+                  <addr use="WP">
+                    <streetAddressLine>450 Brookline Avenue</streetAddressLine>
+                    <city>Boston</city>
+                    <state>MA</state>
+                    <postalCode>02215</postalCode>
+                    <country>US</country>
+                  </addr>
+                  <assignedPerson>
+                    <name>
+                      <prefix>Dr.</prefix>
+                      <given>Margaret</given>
+                      <family>Chen</family>
+                      <suffix>MD</suffix>
+                    </name>
+                  </assignedPerson>
+                </assignedEntity>
+              </performer>
+              <participant typeCode="LOC">
+                <participantRole classCode="SDLOC">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.32"/>
+                  <code code="1160-1" codeSystem="2.16.840.1.113883.6.259" displayName="Urgent Care Center"/>
+                  <addr use="WP">
+                    <streetAddressLine>450 Brookline Avenue, Yawkey 9</streetAddressLine>
+                    <city>Boston</city>
+                    <state>MA</state>
+                    <postalCode>02215</postalCode>
+                    <country>US</country>
+                  </addr>
+                  <playingEntity classCode="PLC">
+                    <name>Dana-Farber Cancer Institute Infusion Center</name>
+                  </playingEntity>
+                </participantRole>
+              </participant>
+            </encounter>
+          </entry>
+        </section>
+      </component>
+    </structuredBody>
+  </component>
+</ClinicalDocument>

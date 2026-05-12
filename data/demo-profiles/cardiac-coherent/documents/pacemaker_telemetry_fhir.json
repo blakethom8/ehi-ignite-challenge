@@ -1,0 +1,1723 @@
+{
+  "resourceType": "Bundle",
+  "id": "8f3c7a2d-9b4e-4c8a-a7f1-3d2e9c8b7a6f",
+  "type": "collection",
+  "meta": {
+    "source": "urn:device:medtronic-carelink",
+    "lastUpdated": "1996-08-08T14:22:00-04:00"
+  },
+  "entry": [
+    {
+      "fullUrl": "urn:uuid:patient-brady-carelink-001",
+      "resource": {
+        "resourceType": "Patient",
+        "id": "patient-brady-carelink-001",
+        "identifier": [
+          {
+            "system": "urn:device:medtronic-carelink:patient-id",
+            "value": "CL-987654-HICKLE-B"
+          }
+        ],
+        "name": [
+          {
+            "family": "Hickle",
+            "given": ["Brady"]
+          }
+        ],
+        "gender": "male",
+        "birthDate": "1914-11-27"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:device-pacemaker-azure-001",
+      "resource": {
+        "resourceType": "Device",
+        "id": "device-pacemaker-azure-001",
+        "identifier": [
+          {
+            "system": "urn:device:medtronic:serial",
+            "value": "MTZ-W2DR01-8764321"
+          }
+        ],
+        "manufacturer": "Medtronic",
+        "deviceName": [
+          {
+            "name": "Azure XT DR W2DR01",
+            "type": "model-name"
+          }
+        ],
+        "modelNumber": "W2DR01",
+        "type": {
+          "coding": [
+            {
+              "system": "http://snomed.info/sct",
+              "code": "360129009",
+              "display": "Cardiac pacemaker, device"
+            }
+          ]
+        },
+        "patient": {
+          "reference": "urn:uuid:patient-brady-carelink-001"
+        },
+        "status": "active",
+        "expirationDate": "2004-03-15"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:obs-atrial-pacing-001",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-atrial-pacing-001",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "vital-signs"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "79735-7",
+              "display": "Atrial pacing percentage"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:patient-brady-carelink-001"
+        },
+        "effectiveDateTime": "1996-02-08T00:00:00-05:00",
+        "valueQuantity": {
+          "value": 12.4,
+          "unit": "%",
+          "system": "http://unitsofmeasure.org",
+          "code": "%"
+        },
+        "device": {
+          "reference": "urn:uuid:device-pacemaker-azure-001"
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:obs-ventricular-pacing-001",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-ventricular-pacing-001",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "vital-signs"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "urn:device:medtronic-carelink:codes",
+              "code": "RV-PACING-PCT",
+              "display": "Right ventricular pacing percentage"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:patient-brady-carelink-001"
+        },
+        "effectiveDateTime": "1996-02-08T00:00:00-05:00",
+        "valueQuantity": {
+          "value": 8.2,
+          "unit": "%",
+          "system": "http://unitsofmeasure.org",
+          "code": "%"
+        },
+        "device": {
+          "reference": "urn:uuid:device-pacemaker-azure-001"
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:obs-af-burden-001",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-af-burden-001",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "vital-signs"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "urn:device:medtronic-carelink:codes",
+              "code": "AT-AF-BURDEN",
+              "display": "Atrial tachycardia/atrial fibrillation burden"
+            }
+          ],
+          "text": "AT/AF Burden %"
+        },
+        "subject": {
+          "reference": "urn:uuid:patient-brady-carelink-001"
+        },
+        "effectiveDateTime": "1996-02-08T00:00:00-05:00",
+        "valueQuantity": {
+          "value": 5.1,
+          "unit": "%",
+          "system": "http://unitsofmeasure.org",
+          "code": "%"
+        },
+        "device": {
+          "reference": "urn:uuid:device-pacemaker-azure-001"
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:obs-ra-impedance-001",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-ra-impedance-001",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "vital-signs"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "urn:device:medtronic-carelink:codes",
+              "code": "RA-LEAD-IMPEDANCE",
+              "display": "Right atrial lead impedance"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:patient-brady-carelink-001"
+        },
+        "effectiveDateTime": "1996-02-08T00:00:00-05:00",
+        "valueQuantity": {
+          "value": 485,
+          "unit": "ohm",
+          "system": "http://unitsofmeasure.org",
+          "code": "Ohm"
+        },
+        "device": {
+          "reference": "urn:uuid:device-pacemaker-azure-001"
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:obs-rv-impedance-001",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-rv-impedance-001",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "vital-signs"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "urn:device:medtronic-carelink:codes",
+              "code": "RV-LEAD-IMPEDANCE",
+              "display": "Right ventricular lead impedance"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:patient-brady-carelink-001"
+        },
+        "effectiveDateTime": "1996-02-08T00:00:00-05:00",
+        "valueQuantity": {
+          "value": 512,
+          "unit": "ohm",
+          "system": "http://unitsofmeasure.org",
+          "code": "Ohm"
+        },
+        "device": {
+          "reference": "urn:uuid:device-pacemaker-azure-001"
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:obs-battery-voltage-001",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-battery-voltage-001",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "vital-signs"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "urn:device:medtronic-carelink:codes",
+              "code": "BATTERY-VOLTAGE",
+              "display": "Device battery voltage"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:patient-brady-carelink-001"
+        },
+        "effectiveDateTime": "1996-02-08T00:00:00-05:00",
+        "valueQuantity": {
+          "value": 2.74,
+          "unit": "V",
+          "system": "http://unitsofmeasure.org",
+          "code": "V"
+        },
+        "device": {
+          "reference": "urn:uuid:device-pacemaker-azure-001"
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:obs-mode-switch-001",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-mode-switch-001",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "vital-signs"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "urn:device:medtronic-carelink:codes",
+              "code": "MODE-SWITCH-COUNT",
+              "display": "Mode switch episode count"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:patient-brady-carelink-001"
+        },
+        "effectiveDateTime": "1996-02-08T00:00:00-05:00",
+        "valueInteger": 18,
+        "device": {
+          "reference": "urn:uuid:device-pacemaker-azure-001"
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:obs-atrial-pacing-002",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-atrial-pacing-002",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "vital-signs"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "79735-7",
+              "display": "Atrial pacing percentage"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:patient-brady-carelink-001"
+        },
+        "effectiveDateTime": "1996-03-14T00:00:00-05:00",
+        "valueQuantity": {
+          "value": 14.1,
+          "unit": "%",
+          "system": "http://unitsofmeasure.org",
+          "code": "%"
+        },
+        "device": {
+          "reference": "urn:uuid:device-pacemaker-azure-001"
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:obs-ventricular-pacing-002",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-ventricular-pacing-002",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "vital-signs"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "urn:device:medtronic-carelink:codes",
+              "code": "RV-PACING-PCT",
+              "display": "Right ventricular pacing percentage"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:patient-brady-carelink-001"
+        },
+        "effectiveDateTime": "1996-03-14T00:00:00-05:00",
+        "valueQuantity": {
+          "value": 11.7,
+          "unit": "%",
+          "system": "http://unitsofmeasure.org",
+          "code": "%"
+        },
+        "device": {
+          "reference": "urn:uuid:device-pacemaker-azure-001"
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:obs-af-burden-002",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-af-burden-002",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "vital-signs"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "urn:device:medtronic-carelink:codes",
+              "code": "AT-AF-BURDEN",
+              "display": "Atrial tachycardia/atrial fibrillation burden"
+            }
+          ],
+          "text": "AT/AF Burden %"
+        },
+        "subject": {
+          "reference": "urn:uuid:patient-brady-carelink-001"
+        },
+        "effectiveDateTime": "1996-03-14T00:00:00-05:00",
+        "valueQuantity": {
+          "value": 7.8,
+          "unit": "%",
+          "system": "http://unitsofmeasure.org",
+          "code": "%"
+        },
+        "device": {
+          "reference": "urn:uuid:device-pacemaker-azure-001"
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:obs-ra-impedance-002",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-ra-impedance-002",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "vital-signs"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "urn:device:medtronic-carelink:codes",
+              "code": "RA-LEAD-IMPEDANCE",
+              "display": "Right atrial lead impedance"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:patient-brady-carelink-001"
+        },
+        "effectiveDateTime": "1996-03-14T00:00:00-05:00",
+        "valueQuantity": {
+          "value": 492,
+          "unit": "ohm",
+          "system": "http://unitsofmeasure.org",
+          "code": "Ohm"
+        },
+        "device": {
+          "reference": "urn:uuid:device-pacemaker-azure-001"
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:obs-rv-impedance-002",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-rv-impedance-002",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "vital-signs"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "urn:device:medtronic-carelink:codes",
+              "code": "RV-LEAD-IMPEDANCE",
+              "display": "Right ventricular lead impedance"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:patient-brady-carelink-001"
+        },
+        "effectiveDateTime": "1996-03-14T00:00:00-05:00",
+        "valueQuantity": {
+          "value": 518,
+          "unit": "ohm",
+          "system": "http://unitsofmeasure.org",
+          "code": "Ohm"
+        },
+        "device": {
+          "reference": "urn:uuid:device-pacemaker-azure-001"
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:obs-battery-voltage-002",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-battery-voltage-002",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "vital-signs"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "urn:device:medtronic-carelink:codes",
+              "code": "BATTERY-VOLTAGE",
+              "display": "Device battery voltage"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:patient-brady-carelink-001"
+        },
+        "effectiveDateTime": "1996-03-14T00:00:00-05:00",
+        "valueQuantity": {
+          "value": 2.73,
+          "unit": "V",
+          "system": "http://unitsofmeasure.org",
+          "code": "V"
+        },
+        "device": {
+          "reference": "urn:uuid:device-pacemaker-azure-001"
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:obs-mode-switch-002",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-mode-switch-002",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "vital-signs"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "urn:device:medtronic-carelink:codes",
+              "code": "MODE-SWITCH-COUNT",
+              "display": "Mode switch episode count"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:patient-brady-carelink-001"
+        },
+        "effectiveDateTime": "1996-03-14T00:00:00-05:00",
+        "valueInteger": 26,
+        "device": {
+          "reference": "urn:uuid:device-pacemaker-azure-001"
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:obs-atrial-pacing-003",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-atrial-pacing-003",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "vital-signs"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "79735-7",
+              "display": "Atrial pacing percentage"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:patient-brady-carelink-001"
+        },
+        "effectiveDateTime": "1996-04-18T00:00:00-04:00",
+        "valueQuantity": {
+          "value": 16.8,
+          "unit": "%",
+          "system": "http://unitsofmeasure.org",
+          "code": "%"
+        },
+        "device": {
+          "reference": "urn:uuid:device-pacemaker-azure-001"
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:obs-ventricular-pacing-003",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-ventricular-pacing-003",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "vital-signs"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "urn:device:medtronic-carelink:codes",
+              "code": "RV-PACING-PCT",
+              "display": "Right ventricular pacing percentage"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:patient-brady-carelink-001"
+        },
+        "effectiveDateTime": "1996-04-18T00:00:00-04:00",
+        "valueQuantity": {
+          "value": 17.3,
+          "unit": "%",
+          "system": "http://unitsofmeasure.org",
+          "code": "%"
+        },
+        "device": {
+          "reference": "urn:uuid:device-pacemaker-azure-001"
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:obs-af-burden-003",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-af-burden-003",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "vital-signs"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "urn:device:medtronic-carelink:codes",
+              "code": "AT-AF-BURDEN",
+              "display": "Atrial tachycardia/atrial fibrillation burden"
+            }
+          ],
+          "text": "AT/AF Burden %"
+        },
+        "subject": {
+          "reference": "urn:uuid:patient-brady-carelink-001"
+        },
+        "effectiveDateTime": "1996-04-18T00:00:00-04:00",
+        "valueQuantity": {
+          "value": 11.2,
+          "unit": "%",
+          "system": "http://unitsofmeasure.org",
+          "code": "%"
+        },
+        "device": {
+          "reference": "urn:uuid:device-pacemaker-azure-001"
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:obs-ra-impedance-003",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-ra-impedance-003",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "vital-signs"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "urn:device:medtronic-carelink:codes",
+              "code": "RA-LEAD-IMPEDANCE",
+              "display": "Right atrial lead impedance"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:patient-brady-carelink-001"
+        },
+        "effectiveDateTime": "1996-04-18T00:00:00-04:00",
+        "valueQuantity": {
+          "value": 497,
+          "unit": "ohm",
+          "system": "http://unitsofmeasure.org",
+          "code": "Ohm"
+        },
+        "device": {
+          "reference": "urn:uuid:device-pacemaker-azure-001"
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:obs-rv-impedance-003",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-rv-impedance-003",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "vital-signs"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "urn:device:medtronic-carelink:codes",
+              "code": "RV-LEAD-IMPEDANCE",
+              "display": "Right ventricular lead impedance"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:patient-brady-carelink-001"
+        },
+        "effectiveDateTime": "1996-04-18T00:00:00-04:00",
+        "valueQuantity": {
+          "value": 523,
+          "unit": "ohm",
+          "system": "http://unitsofmeasure.org",
+          "code": "Ohm"
+        },
+        "device": {
+          "reference": "urn:uuid:device-pacemaker-azure-001"
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:obs-battery-voltage-003",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-battery-voltage-003",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "vital-signs"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "urn:device:medtronic-carelink:codes",
+              "code": "BATTERY-VOLTAGE",
+              "display": "Device battery voltage"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:patient-brady-carelink-001"
+        },
+        "effectiveDateTime": "1996-04-18T00:00:00-04:00",
+        "valueQuantity": {
+          "value": 2.72,
+          "unit": "V",
+          "system": "http://unitsofmeasure.org",
+          "code": "V"
+        },
+        "device": {
+          "reference": "urn:uuid:device-pacemaker-azure-001"
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:obs-mode-switch-003",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-mode-switch-003",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "vital-signs"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "urn:device:medtronic-carelink:codes",
+              "code": "MODE-SWITCH-COUNT",
+              "display": "Mode switch episode count"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:patient-brady-carelink-001"
+        },
+        "effectiveDateTime": "1996-04-18T00:00:00-04:00",
+        "valueInteger": 34,
+        "device": {
+          "reference": "urn:uuid:device-pacemaker-azure-001"
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:obs-atrial-pacing-004",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-atrial-pacing-004",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "vital-signs"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "79735-7",
+              "display": "Atrial pacing percentage"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:patient-brady-carelink-001"
+        },
+        "effectiveDateTime": "1996-05-23T00:00:00-04:00",
+        "valueQuantity": {
+          "value": 19.5,
+          "unit": "%",
+          "system": "http://unitsofmeasure.org",
+          "code": "%"
+        },
+        "device": {
+          "reference": "urn:uuid:device-pacemaker-azure-001"
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:obs-ventricular-pacing-004",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-ventricular-pacing-004",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "vital-signs"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "urn:device:medtronic-carelink:codes",
+              "code": "RV-PACING-PCT",
+              "display": "Right ventricular pacing percentage"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:patient-brady-carelink-001"
+        },
+        "effectiveDateTime": "1996-05-23T00:00:00-04:00",
+        "valueQuantity": {
+          "value": 24.6,
+          "unit": "%",
+          "system": "http://unitsofmeasure.org",
+          "code": "%"
+        },
+        "device": {
+          "reference": "urn:uuid:device-pacemaker-azure-001"
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:obs-af-burden-004",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-af-burden-004",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "vital-signs"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "urn:device:medtronic-carelink:codes",
+              "code": "AT-AF-BURDEN",
+              "display": "Atrial tachycardia/atrial fibrillation burden"
+            }
+          ],
+          "text": "AT/AF Burden %"
+        },
+        "subject": {
+          "reference": "urn:uuid:patient-brady-carelink-001"
+        },
+        "effectiveDateTime": "1996-05-23T00:00:00-04:00",
+        "valueQuantity": {
+          "value": 14.7,
+          "unit": "%",
+          "system": "http://unitsofmeasure.org",
+          "code": "%"
+        },
+        "device": {
+          "reference": "urn:uuid:device-pacemaker-azure-001"
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:obs-ra-impedance-004",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-ra-impedance-004",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "vital-signs"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "urn:device:medtronic-carelink:codes",
+              "code": "RA-LEAD-IMPEDANCE",
+              "display": "Right atrial lead impedance"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:patient-brady-carelink-001"
+        },
+        "effectiveDateTime": "1996-05-23T00:00:00-04:00",
+        "valueQuantity": {
+          "value": 503,
+          "unit": "ohm",
+          "system": "http://unitsofmeasure.org",
+          "code": "Ohm"
+        },
+        "device": {
+          "reference": "urn:uuid:device-pacemaker-azure-001"
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:obs-rv-impedance-004",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-rv-impedance-004",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "vital-signs"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "urn:device:medtronic-carelink:codes",
+              "code": "RV-LEAD-IMPEDANCE",
+              "display": "Right ventricular lead impedance"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:patient-brady-carelink-001"
+        },
+        "effectiveDateTime": "1996-05-23T00:00:00-04:00",
+        "valueQuantity": {
+          "value": 529,
+          "unit": "ohm",
+          "system": "http://unitsofmeasure.org",
+          "code": "Ohm"
+        },
+        "device": {
+          "reference": "urn:uuid:device-pacemaker-azure-001"
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:obs-battery-voltage-004",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-battery-voltage-004",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "vital-signs"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "urn:device:medtronic-carelink:codes",
+              "code": "BATTERY-VOLTAGE",
+              "display": "Device battery voltage"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:patient-brady-carelink-001"
+        },
+        "effectiveDateTime": "1996-05-23T00:00:00-04:00",
+        "valueQuantity": {
+          "value": 2.71,
+          "unit": "V",
+          "system": "http://unitsofmeasure.org",
+          "code": "V"
+        },
+        "device": {
+          "reference": "urn:uuid:device-pacemaker-azure-001"
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:obs-mode-switch-004",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-mode-switch-004",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "vital-signs"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "urn:device:medtronic-carelink:codes",
+              "code": "MODE-SWITCH-COUNT",
+              "display": "Mode switch episode count"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:patient-brady-carelink-001"
+        },
+        "effectiveDateTime": "1996-05-23T00:00:00-04:00",
+        "valueInteger": 42,
+        "device": {
+          "reference": "urn:uuid:device-pacemaker-azure-001"
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:obs-atrial-pacing-005",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-atrial-pacing-005",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "vital-signs"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "79735-7",
+              "display": "Atrial pacing percentage"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:patient-brady-carelink-001"
+        },
+        "effectiveDateTime": "1996-06-27T00:00:00-04:00",
+        "valueQuantity": {
+          "value": 22.9,
+          "unit": "%",
+          "system": "http://unitsofmeasure.org",
+          "code": "%"
+        },
+        "device": {
+          "reference": "urn:uuid:device-pacemaker-azure-001"
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:obs-ventricular-pacing-005",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-ventricular-pacing-005",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "vital-signs"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "urn:device:medtronic-carelink:codes",
+              "code": "RV-PACING-PCT",
+              "display": "Right ventricular pacing percentage"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:patient-brady-carelink-001"
+        },
+        "effectiveDateTime": "1996-06-27T00:00:00-04:00",
+        "valueQuantity": {
+          "value": 31.2,
+          "unit": "%",
+          "system": "http://unitsofmeasure.org",
+          "code": "%"
+        },
+        "device": {
+          "reference": "urn:uuid:device-pacemaker-azure-001"
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:obs-af-burden-005",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-af-burden-005",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "vital-signs"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "urn:device:medtronic-carelink:codes",
+              "code": "AT-AF-BURDEN",
+              "display": "Atrial tachycardia/atrial fibrillation burden"
+            }
+          ],
+          "text": "AT/AF Burden %"
+        },
+        "subject": {
+          "reference": "urn:uuid:patient-brady-carelink-001"
+        },
+        "effectiveDateTime": "1996-06-27T00:00:00-04:00",
+        "valueQuantity": {
+          "value": 18.3,
+          "unit": "%",
+          "system": "http://unitsofmeasure.org",
+          "code": "%"
+        },
+        "device": {
+          "reference": "urn:uuid:device-pacemaker-azure-001"
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:obs-ra-impedance-005",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-ra-impedance-005",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "vital-signs"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "urn:device:medtronic-carelink:codes",
+              "code": "RA-LEAD-IMPEDANCE",
+              "display": "Right atrial lead impedance"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:patient-brady-carelink-001"
+        },
+        "effectiveDateTime": "1996-06-27T00:00:00-04:00",
+        "valueQuantity": {
+          "value": 508,
+          "unit": "ohm",
+          "system": "http://unitsofmeasure.org",
+          "code": "Ohm"
+        },
+        "device": {
+          "reference": "urn:uuid:device-pacemaker-azure-001"
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:obs-rv-impedance-005",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-rv-impedance-005",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "vital-signs"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "urn:device:medtronic-carelink:codes",
+              "code": "RV-LEAD-IMPEDANCE",
+              "display": "Right ventricular lead impedance"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:patient-brady-carelink-001"
+        },
+        "effectiveDateTime": "1996-06-27T00:00:00-04:00",
+        "valueQuantity": {
+          "value": 536,
+          "unit": "ohm",
+          "system": "http://unitsofmeasure.org",
+          "code": "Ohm"
+        },
+        "device": {
+          "reference": "urn:uuid:device-pacemaker-azure-001"
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:obs-battery-voltage-005",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-battery-voltage-005",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "vital-signs"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "urn:device:medtronic-carelink:codes",
+              "code": "BATTERY-VOLTAGE",
+              "display": "Device battery voltage"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:patient-brady-carelink-001"
+        },
+        "effectiveDateTime": "1996-06-27T00:00:00-04:00",
+        "valueQuantity": {
+          "value": 2.70,
+          "unit": "V",
+          "system": "http://unitsofmeasure.org",
+          "code": "V"
+        },
+        "device": {
+          "reference": "urn:uuid:device-pacemaker-azure-001"
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:obs-mode-switch-005",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-mode-switch-005",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "vital-signs"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "urn:device:medtronic-carelink:codes",
+              "code": "MODE-SWITCH-COUNT",
+              "display": "Mode switch episode count"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:patient-brady-carelink-001"
+        },
+        "effectiveDateTime": "1996-06-27T00:00:00-04:00",
+        "valueInteger": 51,
+        "device": {
+          "reference": "urn:uuid:device-pacemaker-azure-001"
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:obs-atrial-pacing-006",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-atrial-pacing-006",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "vital-signs"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "79735-7",
+              "display": "Atrial pacing percentage"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:patient-brady-carelink-001"
+        },
+        "effectiveDateTime": "1996-08-01T00:00:00-04:00",
+        "valueQuantity": {
+          "value": 26.7,
+          "unit": "%",
+          "system": "http://unitsofmeasure.org",
+          "code": "%"
+        },
+        "device": {
+          "reference": "urn:uuid:device-pacemaker-azure-001"
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:obs-ventricular-pacing-006",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-ventricular-pacing-006",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "vital-signs"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "urn:device:medtronic-carelink:codes",
+              "code": "RV-PACING-PCT",
+              "display": "Right ventricular pacing percentage"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:patient-brady-carelink-001"
+        },
+        "effectiveDateTime": "1996-08-01T00:00:00-04:00",
+        "valueQuantity": {
+          "value": 38.4,
+          "unit": "%",
+          "system": "http://unitsofmeasure.org",
+          "code": "%"
+        },
+        "device": {
+          "reference": "urn:uuid:device-pacemaker-azure-001"
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:obs-af-burden-006",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-af-burden-006",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "vital-signs"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "urn:device:medtronic-carelink:codes",
+              "code": "AT-AF-BURDEN",
+              "display": "Atrial tachycardia/atrial fibrillation burden"
+            }
+          ],
+          "text": "AT/AF Burden %"
+        },
+        "subject": {
+          "reference": "urn:uuid:patient-brady-carelink-001"
+        },
+        "effectiveDateTime": "1996-08-01T00:00:00-04:00",
+        "valueQuantity": {
+          "value": 22.1,
+          "unit": "%",
+          "system": "http://unitsofmeasure.org",
+          "code": "%"
+        },
+        "device": {
+          "reference": "urn:uuid:device-pacemaker-azure-001"
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:obs-ra-impedance-006",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-ra-impedance-006",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "vital-signs"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "urn:device:medtronic-carelink:codes",
+              "code": "RA-LEAD-IMPEDANCE",
+              "display": "Right atrial lead impedance"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:patient-brady-carelink-001"
+        },
+        "effectiveDateTime": "1996-08-01T00:00:00-04:00",
+        "valueQuantity": {
+          "value": 514,
+          "unit": "ohm",
+          "system": "http://unitsofmeasure.org",
+          "code": "Ohm"
+        },
+        "device": {
+          "reference": "urn:uuid:device-pacemaker-azure-001"
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:obs-rv-impedance-006",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-rv-impedance-006",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "vital-signs"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "urn:device:medtronic-carelink:codes",
+              "code": "RV-LEAD-IMPEDANCE",
+              "display": "Right ventricular lead impedance"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:patient-brady-carelink-001"
+        },
+        "effectiveDateTime": "1996-08-01T00:00:00-04:00",
+        "valueQuantity": {
+          "value": 542,
+          "unit": "ohm",
+          "system": "http://unitsofmeasure.org",
+          "code": "Ohm"
+        },
+        "device": {
+          "reference": "urn:uuid:device-pacemaker-azure-001"
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:obs-battery-voltage-006",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-battery-voltage-006",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "vital-signs"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "urn:device:medtronic-carelink:codes",
+              "code": "BATTERY-VOLTAGE",
+              "display": "Device battery voltage"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:patient-brady-carelink-001"
+        },
+        "effectiveDateTime": "1996-08-01T00:00:00-04:00",
+        "valueQuantity": {
+          "value": 2.69,
+          "unit": "V",
+          "system": "http://unitsofmeasure.org",
+          "code": "V"
+        },
+        "device": {
+          "reference": "urn:uuid:device-pacemaker-azure-001"
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:obs-mode-switch-006",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-mode-switch-006",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "vital-signs"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "urn:device:medtronic-carelink:codes",
+              "code": "MODE-SWITCH-COUNT",
+              "display": "Mode switch episode count"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:patient-brady-carelink-001"
+        },
+        "effectiveDateTime": "1996-08-01T00:00:00-04:00",
+        "valueInteger": 63,
+        "device": {
+          "reference": "urn:uuid:device-pacemaker-azure-001"
+        }
+      }
+    }
+  ]
+}

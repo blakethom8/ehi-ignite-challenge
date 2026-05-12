@@ -65,6 +65,7 @@ from lib.harmonize.models import (
     MergedMedication,
     MergedObservation,
 )
+from lib.patient_voice import patient_voice_source_bundles
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -1502,6 +1503,16 @@ def _bundles_for(collection_id: str, resource_type: str) -> list[SourceBundle]:
                     document_reference=s.document_reference,
                 )
             )
+    # T3 (LLM-CONTEXT-AUGMENTATION-PLAN §T3): append patient-voice
+    # bundles when this collection is a per-patient workspace and the
+    # patient has an exported Patient Context FHIR bundle on disk.
+    # Non-workspace collections (synthetic demos, research cohorts)
+    # have no per-patient mapping; patient-voice doesn't apply.
+    patient_id = _patient_id_from_workspace_collection(collection_id)
+    if patient_id:
+        bundles.extend(
+            patient_voice_source_bundles(patient_id, resource_type=resource_type)
+        )
     return bundles
 
 
@@ -1544,6 +1555,14 @@ def merged_medications(collection_id: str) -> list[MergedMedication]:
                     document_reference=s.document_reference,
                 )
             )
+    # T3: append patient-voice MedicationStatement-derived bundles. The
+    # ingest module handles the MedicationStatement → MedicationRequest
+    # conversion so the harmonizer sees a uniform shape.
+    patient_id = _patient_id_from_workspace_collection(collection_id)
+    if patient_id:
+        bundles.extend(
+            patient_voice_source_bundles(patient_id, resource_type="MedicationRequest")
+        )
     return merge_medications(bundles)
 
 

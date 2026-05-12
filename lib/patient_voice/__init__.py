@@ -25,12 +25,15 @@ from .classifier import (
     TurnClassification,
     TurnClassifier,
 )
+from .ingest import PATIENT_VOICE_LABEL, patient_voice_source_bundles
 from .to_fhir import session_to_fhir_bundle
 
 __all__ = [
     "FakeTurnClassifier",
     "HaikuTurnClassifier",
+    "PATIENT_VOICE_LABEL",
     "TurnClassification",
     "TurnClassifier",
+    "patient_voice_source_bundles",
     "session_to_fhir_bundle",
 ]

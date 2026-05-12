@@ -125,6 +125,56 @@ def _assert_workspace_owner(session_user_id: str | None, patient_id: str) -> Non
         )
 
 
+def list_profiles_for_user(user_id: str) -> list[AggregationProfile]:
+    """All aggregation profiles owned by ``user_id``.
+
+    Profiles with ``owner_user_id is None`` (legacy / pre-isolation rows) are
+    treated as un-owned and never matched here. Returned oldest-first.
+    """
+    return sorted(
+        (p for p in _load_profiles().values() if p.owner_user_id == user_id),
+        key=lambda p: p.created_at,
+    )
+
+
+def storage_bytes_for_user(user_id: str) -> int:
+    """Total bytes of files staged under workspaces owned by ``user_id``."""
+    total = 0
+    for profile in list_profiles_for_user(user_id):
+        root = _patient_root(profile.id)
+        if not root.exists():
+            continue
+        for child in root.rglob("*"):
+            if child.is_file():
+                try:
+                    total += child.stat().st_size
+                except OSError:
+                    continue
+    return total
+
+
+def delete_workspaces_owned_by(user_id: str) -> int:
+    """Wipe every aggregation workspace owned by ``user_id``.
+
+    Returns the count of profiles deleted. Removes both the profile registry
+    row and the on-disk upload directory. Used by admin DELETE /users/{id}
+    and by self-service DELETE /auth/me.
+    """
+    profiles = _load_profiles()
+    owned_ids = [
+        pid for pid, profile in profiles.items() if profile.owner_user_id == user_id
+    ]
+    if not owned_ids:
+        return 0
+    for pid in owned_ids:
+        workspace_root = _patient_root(pid)
+        if workspace_root.exists():
+            shutil.rmtree(workspace_root, ignore_errors=True)
+        profiles.pop(pid, None)
+    _write_profiles(profiles)
+    return len(owned_ids)
+
+
 def _ensure_profile(
     patient_id: str,
     display_name: str | None = None,

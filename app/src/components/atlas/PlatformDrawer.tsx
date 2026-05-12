@@ -4,6 +4,8 @@ import {
   HelpCircle,
   LogOut,
   MessageSquareText,
+  Settings,
+  ShieldCheck,
   UserRound,
   X,
 } from "lucide-react";
@@ -19,7 +21,9 @@ type PlatformDrawerProps = {
 
 export function PlatformDrawer({ open, onClose, user }: PlatformDrawerProps) {
   const navigate = useNavigate();
-  const { clearAccess } = useAccessContext();
+  const { clearAccess, user: authUser, isUnlocked } = useAccessContext();
+  const showAccountSettings = isUnlocked && authUser !== null;
+  const showAdmin = isUnlocked && authUser?.role === "admin";
 
   useEffect(() => {
     if (!open) return;
@@ -117,6 +121,28 @@ export function PlatformDrawer({ open, onClose, user }: PlatformDrawerProps) {
           >
             Switch chart
           </DrawerItem>
+          {showAccountSettings && (
+            <DrawerItem
+              icon={<Settings className="h-3.5 w-3.5" strokeWidth={1.5} />}
+              onClick={() => {
+                onClose();
+                navigate("/account/settings");
+              }}
+            >
+              Account settings
+            </DrawerItem>
+          )}
+          {showAdmin && (
+            <DrawerItem
+              icon={<ShieldCheck className="h-3.5 w-3.5" strokeWidth={1.5} />}
+              onClick={() => {
+                onClose();
+                navigate("/admin/users");
+              }}
+            >
+              Admin
+            </DrawerItem>
+          )}
         </DrawerSection>
         <div
           className="mx-3.5 my-1.5 h-px"

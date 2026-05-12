@@ -205,12 +205,20 @@ def query_events(
     if workspace_kind is not None:
         conditions.append("workspace_kind = ?")
         params.append(workspace_kind)
+    # Normalize to second-precision Z-suffixed strings so lexicographic SQL
+    # compare matches the canonical _now_iso() format. Without this, an
+    # `until` with microseconds (e.g. `...55.561415Z`) sorts BEFORE a
+    # whole-second event (`...55Z`) because '.' < 'Z'.
     if since is not None:
         conditions.append("ts >= ?")
-        params.append(since.isoformat().replace("+00:00", "Z"))
+        params.append(
+            since.replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        )
     if until is not None:
         conditions.append("ts <= ?")
-        params.append(until.isoformat().replace("+00:00", "Z"))
+        params.append(
+            until.replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        )
     where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
     sql = f"SELECT * FROM events {where} ORDER BY ts ASC, event_id ASC LIMIT ?"
     params.append(limit)

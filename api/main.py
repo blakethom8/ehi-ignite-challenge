@@ -22,6 +22,7 @@ from api.core.auth import init_auth_store
 from api.core.loader import warm_patient_indexes
 from api.core.sof_materialize import materialize_from_env
 from api.middleware.tracing import TracingMiddleware
+from api.routers import audit
 from api.routers import auth
 from api.routers import patients
 from api.routers import corpus
@@ -126,6 +127,7 @@ app.include_router(patients.router, prefix="/api")
 app.include_router(corpus.router, prefix="/api")
 app.include_router(assistant.router, prefix="/api")
 app.include_router(traces.router, prefix="/api")
+app.include_router(audit.router, prefix="/api")
 app.include_router(classifications.router, prefix="/api")
 app.include_router(patient_context.router, prefix="/api")
 app.include_router(aggregation.router, prefix="/api")

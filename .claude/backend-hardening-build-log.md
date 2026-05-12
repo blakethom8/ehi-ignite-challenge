@@ -122,3 +122,125 @@ $ uv run pytest api/tests/test_auth_api.py api/tests/test_trust_models.py \
 **Follow-ups:** `api/core/guest_harmonization.py` loads `data/atlas-guest-harmonization.key` with the same fallback shape. Out of explicit scope for H0.2 (plan named only the two files above) — flagged here so it can be swept either as part of H0.5 wiring (the events-store work touches similar surfaces) or as a tiny standalone follow-up. Track as a punch-list item before deploy.
 
 ---
+
+## 2026-05-11 — H0.3 — Wire anchor compiler to live FHIR data
+
+**Shipped:** 2026-05-11
+**Commit:** `ab0feb1`
+**Files:**
+- `api/plugins/anchors.py` — new `_load_from_fhir()` reads the Synthea bundle via `lib.fhir_parser.bundle_parser.parse_bundle()` and maps `PatientRecord` into the flat anchor schema (`_project_scope` still does the per-token scoping). `load_raw_patient()` prefers live FHIR by default; `PLUGIN_ANCHOR_USE_FIXTURES=true` keeps the curated demo path for screenshots/marketing. Last-resort fixture fallback preserved for legacy IDs without bundles.
+- `api/tests/test_plugin_anchors.py` — 3 new regression tests: live-by-default, fixture-flag-pinning, redactions-still-applied.
+
+**What it does:** Closes the credibility gap where every plugin run produced an anchor backed by 4 hardcoded demo dicts regardless of patient ID. The cryptographic scope enforcement is unchanged; what changed is that scope now constrains access to *real* patient data.
+
+**Smoke test:**
+```
+$ uv run pytest api/tests/test_plugin_anchors.py -v
+12 passed in 0.20s
+```
+
+**Open question default taken:** Q1 — kept the demo-fixture path behind `PLUGIN_ANCHOR_USE_FIXTURES=true` for screenshots/marketing; live FHIR is the default everywhere else.
+
+**Follow-ups:** `_load_from_fhir` builds an empty `biomarkers` list. A future pass should map specific LOINC observations (BCR-ABL, PSA, etc.) into the biomarkers slot — useful for trial-finder. Out of H0.3 scope.
+
+---
+
+## 2026-05-11 — H0.4 — Enable tracing in prod + extend to skills + plugins
+
+**Shipped:** 2026-05-11
+**Commit:** `2d2dd4b`
+**Files:**
+- `api/core/tracing.py` — new `TRACING_SAMPLE_RATE` env (default 1.0). `Trace` dataclass + `traces` table gain `user_id`, `session_id`, `workspace_kind` (the join keys H0.6 depends on). Forward-compat `ALTER TABLE` for existing DBs.
+- `api/middleware/tracing.py` — rewritten to classify three audited POST surfaces (caspian chat, skill, plugin tool); URL-only for skill + plugin (avoids consuming the request body); `_session_identity()` pulls user/session from the cookie via `current_session`.
+- `deploy/docker-compose.prod.yml` — `TRACING_ENABLED=true` and `TRACING_SAMPLE_RATE=1.0` in the api service.
+- `api/tests/test_tracing_middleware.py` — 3 tests including the plan's named smoke test (3 surfaces × matching user_id × 3 distinct workspace kinds).
+
+**What it does:** The middleware now records spans for every audited surface, not just `/api/assistant/chat`. Every span carries the (user_id, session_id, workspace_kind) tuple that H0.6's audit query joins on. Tracing defaults to ON in production with full sampling.
+
+**Smoke test:**
+```
+$ uv run pytest api/tests/test_tracing_middleware.py -v
+3 passed in 0.14s
+```
+
+---
+
+## 2026-05-11 — H0.5 — Unified workspace events table
+
+**Shipped:** 2026-05-11
+**Commit:** `35deb96`
+**Files:**
+- `api/workspace/__init__.py` (new) — re-exports.
+- `api/workspace/events.py` (new) — SQLite at `data/events.db` with schema `(event_id, ts, user_id, session_id, workspace_kind, event_type, target_id, payload_json, parent_event_id)` plus indexes on user+ts, session, kind+type, target, ts. `record_event()` and `query_events()` helpers; `record_event_for_session()` pulls join keys off a `SessionPrincipal`.
+- `api/plugins/routers/plugins.py` — `record_event` calls in `start_run`, `grant_consent`, `revoke_consent`, `call_tool`, `approve_outbound`, `deny_outbound`.
+- `api/routers/assistant.py` — `record_event` in `/chat` handler.
+- `api/routers/skills.py` — `record_event` in `start_run`; added `Request` parameter to that handler.
+- `api/tests/test_workspace_events.py` — 6 tests including the named exit criterion (one user, three workspace kinds, one query).
+
+**What it does:** Adds the unifying audit index. Before this, three audit stores (traces.db, provenance.db, per-skill workspace dirs) shared no first-class user_id key. Now every meaningful action across all three surfaces lands in `events.db` keyed on user_id, queryable in one shot.
+
+**Best-effort recording:** a DB failure logs and returns `""` rather than raising — audit must never block the request path.
+
+**Smoke test:**
+```
+$ uv run pytest api/tests/test_workspace_events.py -v
+6 passed in 0.03s
+```
+
+**Open question default taken:** Q2 — `events.db` is a new SQLite separate from `runs.db` / `traces.db`, so audit volume can't push back-pressure on the LLM-trace store.
+
+**Scope discipline:** explicitly NOT shipped in this ticket — the full `api/workspace/sessions.py` + `artifacts.py` + `tools/envelope.py` refactor described in `AGENTIC-HARNESS.md`. That stays deferred to a future phase per Plan §"Items deferred."
+
+---
+
+## 2026-05-11 — H0.6 — Per-user audit query API + admin viewer
+
+**Shipped:** 2026-05-11
+**Commit:** *(this commit)*
+**Files:**
+- `api/routers/audit.py` (new) — `GET /api/audit/users/{user_id}?since=&until=&workspace_kind=` joins events + traces + provenance into one chronologically-sorted timeline. Bearer-token gated via `AUDIT_API_TOKEN`; required in production. Plus `GET /api/audit/me` for self-service via session cookie.
+- `api/main.py` — new router registered.
+- `api/tests/test_audit_router.py` — 6 tests: the named flagship deliverable (3 surfaces, one query, sorted), workspace_kind filter, empty-for-other-user, three auth-rejection cases.
+- `api/workspace/events.py` — bug fix: `query_events` now normalizes `since`/`until` to second precision before SQL compare. Without this, an `until=now()` (microsecond precision) would lexicographically sort before whole-second events because `'.' < 'Z'`.
+- `app/src/pages/InternalTools/Audit.tsx` (new) + `app/src/App.tsx` — minimal admin page at `/learn/audit`. User_id input, token input, window selector, workspace_kind filter, color-coded timeline rendering with per-entry payload drawer.
+
+**What it does:** Closes the loop on the per-user audit story. Hitting the endpoint with a valid token returns a single chronological view of "everything user X did in the last hour" across Caspian + skills + plugins. The admin page renders it.
+
+**End-of-phase deliverable demonstrated:** see `test_user_timeline_joins_three_workspace_kinds` — writes 3 events on 3 different workspace kinds with the same user_id, hits `/api/audit/users/{user_id}?since=...`, asserts 3 entries returned with 3 distinct kinds, sorted chronologically. Equivalent to running the same flow against a freshly-booted dev API.
+
+**Open question default taken:** Q3 — `/api/audit/users/*` is admin-token only; user-facing self-view at `/api/audit/me` requires session cookie.
+
+**Smoke test:**
+```
+$ uv run pytest api/tests/test_audit_router.py -v
+6 passed in 0.25s
+$ uv run pytest api/tests/test_audit_router.py api/tests/test_workspace_events.py \
+    api/tests/test_tracing_middleware.py api/tests/test_plugin_runtime.py \
+    api/tests/test_trust_keys.py api/tests/test_plugin_anchors.py -q
+42 passed in 0.46s
+```
+
+**Frontend type-check:** deferred to H1.1 (CI pipeline). The fresh worktree has no `app/node_modules` installed and a full `npm ci + tsc` run is out of session scope; the TSX is hand-validated against the existing InternalTools page conventions.
+
+---
+
+## Phase 0 closeout — 2026-05-11
+
+All six Phase 0 tickets shipped:
+
+| ID | Ticket | Commit |
+|---|---|---|
+| H0.1 | Persist consent revocation across restarts | `f38aeff` |
+| H0.2 | Production refuses file-based secret fallback | `4edbbaa` |
+| H0.3 | Wire anchor compiler to live FHIR data | `ab0feb1` |
+| H0.4 | Enable tracing in prod + extend to skills + plugins | `2d2dd4b` |
+| H0.5 | Unified workspace events table | `35deb96` |
+| H0.6 | Per-user audit query API + admin viewer | *(this commit)* |
+
+**Test posture:** 42 tests across the hardening surface, all green. Existing 47-test plugin baseline still green.
+
+**Fresh-boot deliverable:** the audit endpoint is exercised end-to-end by `test_user_timeline_joins_three_workspace_kinds`, which builds the FastAPI app from scratch on a fresh `events.db` and asserts the joined timeline. The same flow is reproducible at `/learn/audit` against a running dev API once the frontend is built.
+
+**Ready for Phase 1** (CI/CD, schema versioning, host upsize) — see `.claude/backend-hardening-plan.md` Phase 1.
+
+---

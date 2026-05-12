@@ -386,9 +386,30 @@ $ uv run pytest api/tests/test_workspace_events.py -v
 
 ---
 
+## 2026-05-12 — H0.14 — Sweep guest-harmonization key plaintext fallback
+
+**Shipped:** 2026-05-12
+**Commit:** *(this commit)*
+**Files:**
+- `api/core/guest_harmonization.py` — `_is_production()` helper; `_guest_secret()` raises `RuntimeError` when `ENVIRONMENT=production` and `GUEST_HARMONIZATION_SECRET` is unset, instead of falling back to `data/atlas-guest-harmonization.key`.
+- `api/tests/test_trust_keys.py` — 3 new tests mirroring the H0.2 shape: production-fail, development-fallback, env-supplied.
+- `docs/architecture/PROD-SECRETS.md` — `GUEST_HARMONIZATION_SECRET` added to the required-env table and the failure-mode reference. Closed-out the "known gap" callout that pointed to this file.
+
+**What it does:** Closes the third plaintext-key fallback that H0.2 explicitly scoped out. Internal consistency on master — all three Atlas signing/session secrets now refuse the file fallback in production. Operators who don't set `GUEST_HARMONIZATION_SECRET` get a fast boot failure with an actionable message instead of a key silently materializing on disk in the data bind mount.
+
+**Smoke test:**
+```
+$ uv run pytest api/tests/test_trust_keys.py api/tests/test_guest_harmonization_api.py -q
+15 passed in 0.53s
+```
+
+**Operator note:** Before next prod deploy, generate `GUEST_HARMONIZATION_SECRET` (one-liner in PROD-SECRETS.md) and add to the prod `.env`. Without it, `/api/guest-harmonization/*` cookie verification will fail at boot.
+
+---
+
 ## Phase 0+ closeout — 2026-05-12
 
-All seven tickets shipped:
+All eight tickets shipped:
 
 | ID | Ticket | Commit |
 |---|---|---|
@@ -399,6 +420,7 @@ All seven tickets shipped:
 | H0.11 | Index provenance.approver_id for audit query | `71ce8f9` |
 | H0.12 | Production secrets runbook | `6e36428` |
 | H0.13 | events.db retention policy | `7070365` |
+| H0.14 | Sweep guest-harmonization key fallback | *(this commit)* |
 
 **Test posture:** 326 of 327 tests green across the API surface (1 pre-existing CCDA failure unrelated to this work — missing sample XML file). Phase 0+ added: 4 (H0.7) + 3 (H0.8) + 4 (H0.9) + 3 (H0.10) + 4 (H0.11) + 3 (H0.13) = 21 new tests.
 

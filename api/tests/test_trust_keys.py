@@ -107,3 +107,51 @@ def test_session_secret_uses_env_in_production(monkeypatch, tmp_path):
 
     assert secret == b"prod-supplied-secret-value"
     assert not fresh_path.exists()
+
+
+# ============================================================
+# Guest harmonization secret (H0.14 — mirror of H0.2 for the third key)
+# ============================================================
+
+
+def test_guest_secret_raises_when_production_and_no_env(monkeypatch, tmp_path):
+    from api.core import guest_harmonization as guest_mod
+
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.delenv("GUEST_HARMONIZATION_SECRET", raising=False)
+    fresh_path = tmp_path / "atlas-guest-harmonization.key"
+    monkeypatch.setattr(guest_mod, "GUEST_SECRET_PATH", fresh_path)
+
+    with pytest.raises(RuntimeError, match="GUEST_HARMONIZATION_SECRET"):
+        guest_mod._guest_secret()
+
+    assert not fresh_path.exists()
+
+
+def test_guest_secret_falls_back_in_development(monkeypatch, tmp_path):
+    from api.core import guest_harmonization as guest_mod
+
+    monkeypatch.setenv("ENVIRONMENT", "development")
+    monkeypatch.delenv("GUEST_HARMONIZATION_SECRET", raising=False)
+    fresh_path = tmp_path / "atlas-guest-harmonization.key"
+    monkeypatch.setattr(guest_mod, "GUEST_SECRET_PATH", fresh_path)
+
+    secret = guest_mod._guest_secret()
+
+    assert isinstance(secret, bytes)
+    assert len(secret) >= 16
+    assert fresh_path.exists()
+
+
+def test_guest_secret_uses_env_in_production(monkeypatch, tmp_path):
+    from api.core import guest_harmonization as guest_mod
+
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.setenv("GUEST_HARMONIZATION_SECRET", "prod-supplied-guest-secret")
+    fresh_path = tmp_path / "atlas-guest-harmonization.key"
+    monkeypatch.setattr(guest_mod, "GUEST_SECRET_PATH", fresh_path)
+
+    secret = guest_mod._guest_secret()
+
+    assert secret == b"prod-supplied-guest-secret"
+    assert not fresh_path.exists()

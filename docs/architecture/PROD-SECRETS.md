@@ -13,6 +13,7 @@ H0.2 made several env vars **strictly required in production**: missing values r
 | `ENVIRONMENT` | Selects strict prod paths | n/a — must be `production` | n/a, set literal |
 | `ATLAS_SIGNING_KEY` | Root of plugin trust chain (signs anchors + provenance) | `atlas_keypair()` first call | `python -c "from api.trust.signatures import generate_keypair, private_key_to_b64; sk, _ = generate_keypair(); print(private_key_to_b64(sk))"` |
 | `EHI_SESSION_SECRET` | HMAC key for session cookies | `_session_secret()` first call | `python -c "import secrets; print(secrets.token_urlsafe(32))"` |
+| `GUEST_HARMONIZATION_SECRET` | HMAC key for guest harmonization session cookies | `_guest_secret()` first call | `python -c "import secrets; print(secrets.token_urlsafe(32))"` |
 | `ANTHROPIC_API_KEY` | LLM access for context + agent-SDK + cursor sidecar | First Claude call (per-request) | Issued by Anthropic console |
 | `AUDIT_API_TOKEN` | Bearer for `/api/audit/users/{id}` | First admin call | `python -c "import secrets; print(secrets.token_urlsafe(32))"` |
 | `TRACES_API_TOKEN` | Bearer for `/api/traces/*` (only if `TRACES_API_ENABLED=true`) | First trace API call | `python -c "import secrets; print(secrets.token_urlsafe(32))"` |
@@ -106,6 +107,7 @@ Pure bearer tokens — replace and restart. Operators using `/learn/audit` will 
 | `ENVIRONMENT=production` | Silently falls back to dev paths (file fallbacks, `/docs` exposed, etc.) | `api/main.py:45` and many call sites |
 | `ATLAS_SIGNING_KEY` | `RuntimeError` on first plugin run start | `api/trust/keys.py:_load_or_create_atlas_key` |
 | `EHI_SESSION_SECRET` | `RuntimeError` on first session cookie sign/verify | `api/core/auth.py:_session_secret` |
+| `GUEST_HARMONIZATION_SECRET` | `RuntimeError` on first guest-harmonization cookie sign/verify | `api/core/guest_harmonization.py:_guest_secret` |
 | `ANTHROPIC_API_KEY` | `RuntimeError` on first context/agent-SDK call | `api/core/provider_assistant_context.py`, `_agent_sdk.py` |
 | `AUDIT_API_TOKEN` | `503` from `/api/audit/users/*` (with explanation) | `api/routers/audit.py:_assert_authorized` |
 | `TRACES_API_TOKEN` | `503` from `/api/traces/*` (only if `TRACES_API_ENABLED=true`) | `api/routers/traces.py` |
@@ -147,6 +149,6 @@ If step 5 finds anything, delete it and verify the env var path still works. The
 
 ## Known gaps tracked elsewhere
 
-- `atlas-guest-harmonization.key` — same plaintext fallback as the two H0.2 closed (see `api/core/guest_harmonization.py:29`). Out of explicit H0.2 scope; logged as a punch-list item in the H0.2 build-log entry. **Sweep before signing pilot #1.**
+- ~~`atlas-guest-harmonization.key` — same plaintext fallback as the two H0.2 closed.~~ **Closed in H0.14** — production now requires `GUEST_HARMONIZATION_SECRET` env (mirrors the H0.2 pattern).
 - Per-org key federation — v2 in `api/trust/keys.py`. Tracked in `BACKEND-REPORT-2026-05-11.html` BR#13.
 - WORM provenance storage — moves provenance off SQLite onto S3 + object lock. Tracked in `api/plugins/provenance.py:1`.

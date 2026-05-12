@@ -58,10 +58,42 @@ def _conn(db_path: Path | None = None) -> sqlite3.Connection:
           responseStatus INTEGER NOT NULL,
           responseSummary TEXT NOT NULL,
           ts TEXT NOT NULL,
-          signature TEXT NOT NULL
+          signature TEXT NOT NULL,
+          approver_id TEXT NOT NULL DEFAULT ''
         )
         """
     )
+    # Forward-compat for DBs created before approver_id existed (H0.11).
+    # NOT part of the signed payload — denormalized index column only.
+    try:
+        conn.execute(
+            "ALTER TABLE provenance ADD COLUMN approver_id TEXT NOT NULL DEFAULT ''"
+        )
+    except sqlite3.OperationalError:
+        pass
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_provenance_approver_id "
+        "ON provenance(approver_id)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_provenance_ts ON provenance(ts)"
+    )
+    # Backfill any pre-existing rows whose approver_id is empty (rows
+    # written before the column existed). Reads the JSON `approver` blob
+    # and pulls the id. Idempotent and cheap on small DBs.
+    rows = conn.execute(
+        "SELECT id, approver FROM provenance WHERE approver_id = ''"
+    ).fetchall()
+    for row_id, approver_json in rows:
+        try:
+            approver_id = (json.loads(approver_json) or {}).get("id", "")
+        except (TypeError, ValueError, json.JSONDecodeError):
+            approver_id = ""
+        if approver_id:
+            conn.execute(
+                "UPDATE provenance SET approver_id = ? WHERE id = ?",
+                (approver_id, row_id),
+            )
     return conn
 
 
@@ -133,8 +165,8 @@ def write_record(
                 INSERT INTO provenance
                   (id, runId, pluginId, pluginVersion, vendor, action,
                    approver, redactionPreset, artifactId, endpoint,
-                   responseStatus, responseSummary, ts, signature)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                   responseStatus, responseSummary, ts, signature, approver_id)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 """,
                 (
                     record.id,
@@ -151,6 +183,7 @@ def write_record(
                     record.responseSummary,
                     payload["ts"],
                     record.signature,
+                    approver.id,
                 ),
             )
     return record
@@ -160,11 +193,24 @@ def list_records(
     *,
     plugin_id: str | None = None,
     run_id: str | None = None,
+    approver_id: str | None = None,
+    since: str | None = None,
+    until: str | None = None,
     db_path: Path | None = None,
 ) -> list[ProvenanceRecord]:
+    """Query the provenance log. ``approver_id`` filters at SQL via the
+    indexed column added in H0.11 — replaces the previous full-scan +
+    Python-filter the audit endpoint had to do."""
     with _lock:
         with _conn(db_path) as conn:
-            q = "SELECT * FROM provenance"
+            # SELECT only the original columns (approver_id is a denormalized
+            # index, not part of the record shape returned to callers).
+            q = (
+                "SELECT id, runId, pluginId, pluginVersion, vendor, action, "
+                "approver, redactionPreset, artifactId, endpoint, "
+                "responseStatus, responseSummary, ts, signature "
+                "FROM provenance"
+            )
             params: list = []
             wheres: list[str] = []
             if plugin_id:
@@ -173,6 +219,15 @@ def list_records(
             if run_id:
                 wheres.append("runId = ?")
                 params.append(run_id)
+            if approver_id:
+                wheres.append("approver_id = ?")
+                params.append(approver_id)
+            if since:
+                wheres.append("ts >= ?")
+                params.append(since)
+            if until:
+                wheres.append("ts <= ?")
+                params.append(until)
             if wheres:
                 q += " WHERE " + " AND ".join(wheres)
             q += " ORDER BY ts DESC"

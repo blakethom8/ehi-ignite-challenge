@@ -138,30 +138,20 @@ def _provenance_to_timeline_entry(p) -> dict[str, Any]:
 def _provenance_for_user(
     user_id: str, since_dt: datetime, until_dt: datetime
 ) -> list[dict[str, Any]]:
-    """Filter the global provenance log down to records this user approved
-    inside the time window. Provenance is small, so a full scan + filter is
-    fine for v1."""
+    """Pull records this user approved inside the time window. H0.11 added
+    an approver_id index + ts filter so this is now a constant-time SQL
+    lookup keyed on indexed columns, not a full-scan + Python filter."""
     out: list[dict[str, Any]] = []
+    since_str = since_dt.replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    until_str = until_dt.replace(microsecond=0).isoformat().replace("+00:00", "Z")
     try:
-        records = prov_log.list_records()
+        records = prov_log.list_records(
+            approver_id=user_id, since=since_str, until=until_str
+        )
     except Exception:
         return out
     for r in records:
-        approver = getattr(r, "approver", None)
-        if approver is None or getattr(approver, "id", "") != user_id:
-            continue
-        try:
-            ts = (
-                r.ts
-                if isinstance(r.ts, datetime)
-                else datetime.fromisoformat(str(r.ts).replace("Z", "+00:00"))
-            )
-        except Exception:
-            continue
-        if ts.tzinfo is None:
-            ts = ts.replace(tzinfo=timezone.utc)
-        if since_dt <= ts <= until_dt:
-            out.append(_provenance_to_timeline_entry(r))
+        out.append(_provenance_to_timeline_entry(r))
     return out
 
 

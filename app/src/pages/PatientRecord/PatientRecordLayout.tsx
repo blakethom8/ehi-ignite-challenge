@@ -7,7 +7,6 @@ import {
   ChevronRight,
   Database,
   FileSearch,
-  FolderKanban,
   Layers3,
   MessageSquareText,
   ShieldCheck,
@@ -44,18 +43,11 @@ export function PatientRecordLayout({ children }: PatientRecordLayoutProps) {
   const items = useMemo<PatientNavItem[]>(
     () => [
       {
-        label: "Prepared Chart",
-        description: "Overview and chart posture",
+        label: "Overview",
+        description: "Current state and history",
         to: withPatient("/patient-record", patientId),
         icon: Database,
         match: (pathname) => pathname === "/patient-record",
-      },
-      {
-        label: "Workspace Library",
-        description: "Profiles and containers",
-        to: withPatient("/patient-record/workspaces", patientId),
-        icon: FolderKanban,
-        match: (pathname) => pathname.startsWith("/patient-record/workspaces"),
       },
       {
         label: "Source Intake",
@@ -97,8 +89,6 @@ export function PatientRecordLayout({ children }: PatientRecordLayoutProps) {
     ],
     [patientId],
   );
-
-  const activeItem = items.find((item) => item.match(location.pathname)) ?? items[0];
 
   const toggleCollapsed = () => {
     setCollapsed((current) => {
@@ -143,7 +133,7 @@ export function PatientRecordLayout({ children }: PatientRecordLayoutProps) {
         </div>
 
         <nav className="flex-1 space-y-1 overflow-auto px-2 py-3">
-          {items.map((item, index) => {
+          {items.map((item) => {
             const active = item.match(location.pathname);
             const Icon = item.icon;
             return (
@@ -170,9 +160,6 @@ export function PatientRecordLayout({ children }: PatientRecordLayoutProps) {
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <p className="text-sm font-semibold">{item.label}</p>
-                      <span className="text-[11px] font-semibold text-[#9aa3b2]">
-                        {index + 1}
-                      </span>
                     </div>
                     <p className="mt-1 text-xs leading-5 text-[#7b8597]">
                       {item.description}
@@ -183,22 +170,6 @@ export function PatientRecordLayout({ children }: PatientRecordLayoutProps) {
             );
           })}
         </nav>
-
-        {!collapsed && (
-          <div className="border-t border-[#eef0f4] px-3 py-3">
-            <div className="rounded-xl bg-[#f7f9fc] px-3 py-3">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#667085]">
-                Current Step
-              </p>
-              <p className="mt-1 text-sm font-semibold text-[#1c1c1e]">
-                {activeItem.label}
-              </p>
-              <p className="mt-1 text-xs leading-5 text-[#667085]">
-                {activeItem.description}
-              </p>
-            </div>
-          </div>
-        )}
       </aside>
 
       <div className="min-h-0 min-w-0 flex-1 overflow-auto">{children}</div>

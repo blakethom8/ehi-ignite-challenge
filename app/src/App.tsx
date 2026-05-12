@@ -7,6 +7,7 @@ import { ChatProvider } from "./context/ChatContext";
 import { AccessProvider, useAccessContext } from "./context/AccessContext";
 import { ChatWidget } from "./components/ChatWidget";
 import { AccountAccessPage } from "./pages/AccountAccess";
+import { DemoPatientSelection } from "./pages/DemoPatientSelection";
 import { Landing } from "./pages/Landing";
 import { GuestHarmonization } from "./pages/GuestHarmonization";
 import { PlatformArchitecture } from "./pages/PlatformArchitecture";
@@ -62,7 +63,6 @@ const PatientRecordMethodology = lazyNamed(() => import("./pages/PatientRecord/M
 const PatientRecordContext = lazyNamed(() => import("./pages/PatientRecord/Context"), "PatientContext");
 const PatientRecordPublish = lazyNamed(() => import("./pages/PatientRecord/aggregator/PublishReadinessPage"), "PublishReadinessPage");
 const PatientRecordSources = lazyNamed(() => import("./pages/PatientRecord/aggregator/SourceIntakePage"), "SourceIntakePage");
-const PatientRecordWorkspaces = lazyNamed(() => import("./pages/PatientRecord/aggregator/WorkspaceLibraryPage"), "WorkspaceLibraryPage");
 // FHIR Charts module — FHIR resource browser (former Explorer)
 const FhirChartsOverview = lazyNamed(() => import("./pages/FhirCharts/Overview"), "FhirChartsOverview");
 const FhirChartsTimeline = lazyNamed(() => import("./pages/FhirCharts/Timeline"), "FhirChartsTimeline");
@@ -213,7 +213,7 @@ function AppShellRoutes() {
     { path: "/patient-record/sources", element: <PatientRecordSources /> },
     { path: "/patient-record/harmonize", element: <PatientRecordHarmonize /> },
     { path: "/patient-record/cleaning", element: <PatientRecordHarmonize /> },
-    { path: "/patient-record/workspaces", element: <PatientRecordWorkspaces /> },
+    { path: "/patient-record/workspaces", element: <PatientRecordWorkspaceRedirect /> },
     { path: "/patient-record/publish", element: <PatientRecordPublish /> },
     { path: "/patient-record/context", element: <PatientRecordContext /> },
 
@@ -256,6 +256,7 @@ function AppShellRoutes() {
     <>
       <Routes>
         <Route path="/" element={<Landing />} />
+        <Route path="/demo" element={<DemoPatientSelection />} />
         <Route path="/account" element={<AccountAccessPage />} />
         <Route path="/guest-harmonization" element={<GuestHarmonization />} />
         <Route path="/architecture" element={<PlatformArchitecture />} />
@@ -348,6 +349,11 @@ function AppShellRoutes() {
       {!isFullscreenWorkspace && <ChatWidget />}
     </>
   );
+}
+
+function PatientRecordWorkspaceRedirect() {
+  const location = useLocation();
+  return <Navigate to={`/patient-record${location.search}`} replace />;
 }
 
 function LegacyGroundTruthReviewRedirect() {

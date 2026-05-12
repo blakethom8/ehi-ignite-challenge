@@ -7,6 +7,60 @@ describe("useWorkspaceState", () => {
     window.localStorage.clear();
   });
 
+  it("defaults Caspian to sessions and chat only", () => {
+    const { result } = renderHook(() => useWorkspaceState("caspian"));
+
+    expect(result.current.panes).toEqual({
+      sessions: true,
+      chat: true,
+      workbench: false,
+      files: false,
+      inspector: false,
+    });
+  });
+
+  it("does not inherit the legacy global pane preset for first-load Caspian", () => {
+    window.localStorage.setItem(
+      "atlas:panes",
+      JSON.stringify({
+        sessions: true,
+        chat: true,
+        workbench: true,
+        files: true,
+        inspector: true,
+      }),
+    );
+
+    const { result } = renderHook(() => useWorkspaceState("caspian"));
+
+    expect(result.current.panes.workbench).toBe(false);
+    expect(result.current.panes.files).toBe(false);
+    expect(result.current.panes.inspector).toBe(false);
+  });
+
+  it("migrates the old all-open Caspian pane preset to the calmer default", () => {
+    window.localStorage.setItem(
+      "atlas:panes:caspian",
+      JSON.stringify({
+        sessions: true,
+        chat: true,
+        workbench: true,
+        files: true,
+        inspector: true,
+      }),
+    );
+
+    const { result } = renderHook(() => useWorkspaceState("caspian"));
+
+    expect(result.current.panes).toEqual({
+      sessions: true,
+      chat: true,
+      workbench: false,
+      files: false,
+      inspector: false,
+    });
+  });
+
   it("opens the inspector when a citation is selected", () => {
     const { result } = renderHook(() => useWorkspaceState("caspian"));
 

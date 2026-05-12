@@ -6,7 +6,7 @@ import json
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 
-from api.core.auth import authorize_patient_access, require_authenticated_session
+from api.core.auth import authorize_patient_access, require_access_session, require_authenticated_session
 from api.core.aggregation import (
     cleaning_queue,
     create_profile,
@@ -38,7 +38,7 @@ router = APIRouter(prefix="/aggregation", tags=["aggregation"])
 @router.get("/sources/{patient_id}", response_model=AggregationEnvironmentResponse)
 def get_source_inventory(patient_id: str, request: Request) -> AggregationEnvironmentResponse:
     resolved_patient_id = authorize_patient_access(
-        require_authenticated_session(request),
+        require_access_session(request),
         patient_id,
         event_type="aggregation.sources",
     )
@@ -48,7 +48,7 @@ def get_source_inventory(patient_id: str, request: Request) -> AggregationEnviro
 @router.get("/cleaning-queue/{patient_id}", response_model=AggregationCleaningQueueResponse)
 def get_cleaning_queue(patient_id: str, request: Request) -> AggregationCleaningQueueResponse:
     resolved_patient_id = authorize_patient_access(
-        require_authenticated_session(request),
+        require_access_session(request),
         patient_id,
         event_type="aggregation.cleaning_queue",
     )
@@ -58,7 +58,7 @@ def get_cleaning_queue(patient_id: str, request: Request) -> AggregationCleaning
 @router.get("/readiness/{patient_id}", response_model=AggregationReadinessResponse)
 def get_readiness(patient_id: str, request: Request) -> AggregationReadinessResponse:
     resolved_patient_id = authorize_patient_access(
-        require_authenticated_session(request),
+        require_access_session(request),
         patient_id,
         event_type="aggregation.readiness",
     )
@@ -104,7 +104,7 @@ def delete_patient_profile(patient_id: str, request: Request) -> AggregationDele
 @router.get("/uploads/{patient_id}/{file_id}/preview", response_model=AggregationPreparedPreviewResponse)
 def get_upload_preview(patient_id: str, file_id: str, request: Request) -> AggregationPreparedPreviewResponse:
     resolved_patient_id = authorize_patient_access(
-        require_authenticated_session(request),
+        require_access_session(request),
         patient_id,
         event_type="aggregation.upload_preview",
     )
@@ -117,7 +117,7 @@ def get_upload_preview(patient_id: str, file_id: str, request: Request) -> Aggre
 @router.get("/uploads/{patient_id}/{file_id}/prepared-json")
 def get_upload_prepared_json(patient_id: str, file_id: str, request: Request) -> dict:
     resolved_patient_id = authorize_patient_access(
-        require_authenticated_session(request),
+        require_access_session(request),
         patient_id,
         event_type="aggregation.prepared_json",
     )

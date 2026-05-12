@@ -13,6 +13,13 @@ export interface DemoPatientOption {
   id: string;
   name: string;
   description: string;
+  short_journey?: string;
+  metadata?: {
+    care_setting?: string;
+    clinical_focus?: string;
+    complexity?: string;
+    tags?: string[];
+  };
 }
 
 export interface AuthSessionResponse {
@@ -20,6 +27,7 @@ export interface AuthSessionResponse {
   user: AuthUser | null;
   active_patient_id: string | null;
   active_patient_name: string | null;
+  active_demo_patient?: DemoPatientOption | null;
   expires_at: string | null;
   available_demo_patients: DemoPatientOption[];
 }

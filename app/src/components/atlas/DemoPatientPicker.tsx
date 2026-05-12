@@ -1,5 +1,5 @@
 import { Activity, ArrowRight, ShieldCheck } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAccessContext } from "../../context/AccessContext";
 
@@ -7,17 +7,28 @@ type DemoPatientPickerProps = {
   destination: (patientId: string) => string;
   title?: string;
   body?: string;
+  prioritizedPatientId?: string | null;
 };
 
 export function DemoPatientPicker({
   destination,
   title = "Continue with a sample chart",
   body = "Open a prepared synthetic record. No real patient data is used.",
+  prioritizedPatientId = null,
 }: DemoPatientPickerProps) {
   const navigate = useNavigate();
   const { availableDemoPatients, enterDemoPatient, activePatientId } = useAccessContext();
   const [pendingPatientId, setPendingPatientId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const orderedPatients = useMemo(() => {
+    if (!prioritizedPatientId) return availableDemoPatients;
+    const prioritized = availableDemoPatients.find((patient) => patient.id === prioritizedPatientId);
+    if (!prioritized) return availableDemoPatients;
+    return [
+      prioritized,
+      ...availableDemoPatients.filter((patient) => patient.id !== prioritizedPatientId),
+    ];
+  }, [availableDemoPatients, prioritizedPatientId]);
 
   return (
     <div>
@@ -30,7 +41,7 @@ export function DemoPatientPicker({
         <p className="mt-3 text-sm text-[#b42318]">{error}</p>
       )}
       <div className="mt-4 space-y-3">
-        {availableDemoPatients.map((patient) => (
+        {orderedPatients.map((patient) => (
           <button
             key={patient.id}
             type="button"
@@ -62,7 +73,9 @@ export function DemoPatientPicker({
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="text-sm font-semibold text-[#1c1c1e]">{patient.name}</div>
-                <div className="mt-1 text-xs text-[#667085]">{patient.description}</div>
+                <div className="mt-1 text-xs text-[#667085]">
+                  {patient.short_journey || patient.description}
+                </div>
                 <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-[#f7f8fb] px-2 py-1 text-[11px] font-medium text-[#52627f]">
                   <Activity size={12} />
                   Sample chart

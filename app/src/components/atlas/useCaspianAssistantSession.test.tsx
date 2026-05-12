@@ -101,6 +101,9 @@ describe("useCaspianAssistantSession", () => {
     expect(assistantMessage.engine).toBe("anthropic-agent-sdk");
     expect(assistantMessage.citations[0]?.id).toBe("e_1");
     expect(result.current.inspector.citations["e_1"]?.title).toBe("Apixaban 5 mg BID");
+    expect(result.current.inspector.citations["e_1"]?.source).toBe("MedicationStatement/med-1");
+    expect(result.current.inspector.citations["e_1"]?.sourceType).toBe("MedicationStatement");
+    expect(result.current.inspector.citations["e_1"]?.sourceId).toBe("med-1");
     expect(result.current.inspector.traceByCitationId["e_1"]?.trace_id).toBe("trace_live_1");
 
     const stored = window.localStorage.getItem("atlas:caspian:assistant:patient-123:s_live");

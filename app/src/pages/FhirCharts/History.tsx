@@ -316,7 +316,7 @@ function resourceSummary(encounter: EncounterEvent): string {
     encounter.linked_medication_count ? `${encounter.linked_medication_count} Med` : null,
     encounter.linked_clinical_note_count ? `${encounter.linked_clinical_note_count} Notes` : null,
   ].filter(Boolean);
-  return parts.length > 0 ? parts.join(" / ") : "No linked resources";
+  return parts.length > 0 ? parts.join(" / ") : "—";
 }
 
 function encounterTypeLabel(encounter: EncounterEvent): string {
@@ -525,11 +525,6 @@ function EncounterHistoryTable({
               <td className="px-4 py-3 text-[#475467]">
                 <div className="font-medium text-[#1c1c1e]">{providerPrimaryLabel(encounter)}</div>
                 <div className="mt-0.5 text-xs text-[#667085]">{providerSecondaryLabel(encounter)}</div>
-                {(encounter.specialty || encounter.source_category) && (
-                  <div className="mt-1 text-xs text-[#4157d8]">
-                    {[encounter.specialty, encounter.source_category].filter(Boolean).join(" · ")}
-                  </div>
-                )}
               </td>
               <td className="px-4 py-3">
                 <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#5b76fe]">

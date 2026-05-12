@@ -66,7 +66,30 @@ describe("ModuleBar", () => {
         "href",
         "/workspaces?patient=demo-high-risk",
       );
-      expect(screen.getByRole("link", { name: "Home" })).toHaveAttribute("href", "/");
+      expect(screen.queryByRole("link", { name: "Home" })).not.toBeInTheDocument();
+    });
+  });
+
+  it("keeps the active demo chip concise", async () => {
+    render(
+      <MemoryRouter initialEntries={["/patient-record?patient=demo-high-risk"]}>
+        <AccessProvider>
+          <ModuleBar
+            activeModule="patient-record"
+            onSelect={vi.fn()}
+            workspaceId="caspian"
+            onSwitchWorkspace={vi.fn()}
+            onOpenDrawer={vi.fn()}
+            user={{ initials: "RP", name: "R. Patel", org: "Mercy Medical Group" }}
+          />
+        </AccessProvider>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Demo Patient - Surgical Review")).toBeInTheDocument();
+      expect(screen.getByText("Demo")).toBeInTheDocument();
+      expect(screen.queryByText("Synthetic sample chart")).not.toBeInTheDocument();
     });
   });
 });

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ArrowRight, Download, FileJson, Loader2, Trash2, Upload } from "lucide-react";
 import { api } from "../api/client";
@@ -35,11 +35,16 @@ export function GuestHarmonization() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const deletedRunIdRef = useRef<string | null>(null);
   const existingRunId = params.get("run");
   const canProcess = Boolean(run && run.uploaded_files.length > 0 && busy === null);
   const factCount = output?.facts.length ?? 0;
   const sourceCount = output?.source_files.length ?? run?.uploaded_files.length ?? 0;
   const issueCount = output?.quality_issues.length ?? 0;
+  const uploadHint = selectedFile
+    ? `Selected ${selectedFile.name}. Click "Upload selected file" to add it to this workspace.`
+    : "Choose a JSON, PDF, XML, or TXT file, then upload it into this temporary workspace.";
 
   const statusLabel = useMemo(() => {
     if (!run) return "Not started";
@@ -51,6 +56,7 @@ export function GuestHarmonization() {
   }, [run]);
 
   useEffect(() => {
+    if (existingRunId && deletedRunIdRef.current === existingRunId) return;
     if (!existingRunId || run) return;
     let cancelled = false;
     setBusy("Loading temporary workspace");
@@ -69,12 +75,34 @@ export function GuestHarmonization() {
     };
   }, [existingRunId, run]);
 
+  useEffect(() => {
+    if (!existingRunId || !run || output || run.status !== "completed" || run.outputs.length === 0) return;
+    let cancelled = false;
+    api.getGuestHarmonizationOutput(existingRunId)
+      .then((payload) => {
+        if (!cancelled) setOutput(payload);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Temporary workspace loaded, but the portable output could not be restored.",
+          );
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [existingRunId, output, run]);
+
   async function startRun() {
     setBusy("Starting temporary workspace");
     setError(null);
     setOutput(null);
     try {
       const next = await api.createGuestHarmonizationRun();
+      deletedRunIdRef.current = null;
       setRun(next);
       setParams({ run: next.run_id }, { replace: true });
     } catch (err) {
@@ -93,6 +121,9 @@ export function GuestHarmonization() {
       setRun(next);
       setSelectedFile(null);
       setOutput(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not upload that file.");
     } finally {
@@ -122,10 +153,14 @@ export function GuestHarmonization() {
     setError(null);
     try {
       await api.deleteGuestHarmonizationRun(run.run_id);
+      deletedRunIdRef.current = run.run_id;
+      setParams({}, { replace: true });
       setRun(null);
       setOutput(null);
       setSelectedFile(null);
-      setParams({}, { replace: true });
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not delete this temporary workspace.");
     } finally {
@@ -221,11 +256,16 @@ export function GuestHarmonization() {
             {run && (
               <div className="mt-5 grid gap-5">
                 <div className="rounded-lg border border-[#e1e7f0] bg-[#fbfcff] p-4">
-                  <label className="block text-xs font-semibold uppercase tracking-[0.14em] text-[#6f7e98]">
+                  <label
+                    htmlFor="guest-harmonization-file"
+                    className="block text-xs font-semibold uppercase tracking-[0.14em] text-[#6f7e98]"
+                  >
                     Upload file
                   </label>
                   <div className="mt-3 flex flex-col gap-3 sm:flex-row">
                     <input
+                      id="guest-harmonization-file"
+                      ref={fileInputRef}
                       type="file"
                       accept=".json,.pdf,.xml,.txt,application/json,application/pdf,text/xml,text/plain"
                       onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)}
@@ -238,9 +278,12 @@ export function GuestHarmonization() {
                       className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#18202b] px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {busy === "Uploading file" ? <Loader2 className="animate-spin" size={15} /> : <Upload size={15} />}
-                      Upload
+                      Upload selected file
                     </button>
                   </div>
+                  <p className="mt-3 text-xs leading-5 text-[#667085]">
+                    {uploadHint}
+                  </p>
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-3">
@@ -256,7 +299,9 @@ export function GuestHarmonization() {
                   </div>
                   <div className="divide-y divide-[#edf1f6]">
                     {run.uploaded_files.length === 0 ? (
-                      <p className="px-4 py-5 text-sm text-[#667085]">No files uploaded yet.</p>
+                      <p className="px-4 py-5 text-sm text-[#667085]">
+                        No files uploaded yet. Selecting a file does not upload it until you press "Upload selected file".
+                      </p>
                     ) : (
                       run.uploaded_files.map((file) => (
                         <div key={file.file_id} className="flex items-center justify-between gap-4 px-4 py-3">
@@ -292,6 +337,13 @@ export function GuestHarmonization() {
                     </button>
                   )}
                 </div>
+                {!canProcess && (
+                  <p className="text-xs leading-5 text-[#667085]">
+                    {selectedFile
+                      ? "Finish uploading the selected file before building output."
+                      : "Build output becomes available after at least one file is uploaded."}
+                  </p>
+                )}
               </div>
             )}
           </div>

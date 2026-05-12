@@ -59,6 +59,7 @@ export function PluginWorkspace() {
     try {
       const run = await pluginsApi.startRun({
         pluginId: manifestQuery.data.id,
+        patientId,
         workflowId,
         title: workflowId
           ? `${workflowId} — ${manifestQuery.data.displayName}`

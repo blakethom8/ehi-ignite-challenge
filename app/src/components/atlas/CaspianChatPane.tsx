@@ -266,8 +266,34 @@ export function CaspianChatPane({
             <div className="grid h-[26px] w-[26px] place-items-center rounded-md bg-[var(--action-tint)] text-[var(--action)]">
               <Bot className="h-3.5 w-3.5" strokeWidth={1.5} />
             </div>
-            <div className="rounded-[14px] border px-4 py-3 text-[13px] text-[var(--ink-3)]" style={{ borderColor: "var(--line-1)" }}>
-              Thinking across the chart…
+            <div
+              className="rounded-[14px] border px-4 py-3"
+              style={{ borderColor: "var(--line-1)", background: "var(--surface-0)" }}
+            >
+              <div className="flex items-center gap-2 text-[13px] font-medium text-[var(--ink-2)]">
+                <span className="inline-flex gap-1">
+                  <span
+                    className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--action)]"
+                    style={{ animationDelay: "0ms" }}
+                  />
+                  <span
+                    className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--action)]"
+                    style={{ animationDelay: "150ms" }}
+                  />
+                  <span
+                    className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--action)]"
+                    style={{ animationDelay: "300ms" }}
+                  />
+                </span>
+                Thinking across the chart…
+              </div>
+              <div className="mt-1 text-[11.5px] leading-[1.5] text-[var(--ink-4)]">
+                Pulling evidence, weighing risk, and assembling citations for the next answer.
+              </div>
+              <div className="mt-3 space-y-1.5">
+                <div className="h-2.5 w-[72%] animate-pulse rounded-full bg-[var(--surface-2)]" />
+                <div className="h-2.5 w-[58%] animate-pulse rounded-full bg-[var(--surface-2)]" />
+              </div>
             </div>
           </div>
         )}

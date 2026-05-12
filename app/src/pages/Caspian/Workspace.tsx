@@ -102,6 +102,7 @@ export function CaspianWorkspace() {
             />
           ),
           inspector: {
+            patientId,
             citations: assistant.inspector.citations,
             trace: assistant.inspector.latestTrace,
             traceByCitationId: assistant.inspector.traceByCitationId,

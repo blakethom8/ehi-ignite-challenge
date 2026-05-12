@@ -18,7 +18,12 @@ class AuthApiTests(unittest.TestCase):
         client = TestClient(app)
         response = client.get("/api/auth/session")
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["mode"], "anonymous")
+        body = response.json()
+        self.assertEqual(body["mode"], "anonymous")
+        self.assertIsNone(body["active_demo_patient"])
+        self.assertGreaterEqual(len(body["available_demo_patients"]), 3)
+        self.assertIn("short_journey", body["available_demo_patients"][0])
+        self.assertIn("metadata", body["available_demo_patients"][0])
 
     def test_patient_list_requires_session(self) -> None:
         client = TestClient(app)
@@ -35,6 +40,7 @@ class AuthApiTests(unittest.TestCase):
         body = login.json()
         self.assertEqual(body["mode"], "authenticated")
         self.assertEqual(body["user"]["email"], "clinician@atlas.local")
+        self.assertIsNone(body["active_demo_patient"])
 
         session = client.get("/api/auth/session")
         self.assertEqual(session.status_code, 200)
@@ -96,8 +102,13 @@ class AuthApiTests(unittest.TestCase):
         client = TestClient(app)
         start = client.post("/api/auth/demo", json={"patient_id": "demo-high-risk"})
         self.assertEqual(start.status_code, 200)
-        self.assertEqual(start.json()["mode"], "demo")
-        self.assertEqual(start.json()["active_patient_id"], "demo-high-risk")
+        body = start.json()
+        self.assertEqual(body["mode"], "demo")
+        self.assertEqual(body["active_patient_id"], "demo-high-risk")
+        self.assertEqual(body["active_demo_patient"]["id"], "demo-high-risk")
+        self.assertTrue(body["active_demo_patient"]["short_journey"])
+        self.assertEqual(body["active_demo_patient"]["metadata"]["care_setting"], "Pre-op surgical review")
+        self.assertIn("Peri-op", body["active_demo_patient"]["metadata"]["tags"])
 
         listing = client.get("/api/patients")
         self.assertEqual(listing.status_code, 200)

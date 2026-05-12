@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import {
-  Activity,
   Bot,
   CalendarDays,
   ChevronLeft,
@@ -115,8 +114,6 @@ export function FhirChartsLayout({ children }: FhirChartsLayoutProps) {
     [patientId],
   );
 
-  const activeItem = items.find((item) => item.match(location.pathname)) ?? items[0];
-
   const toggleCollapsed = () => {
     setCollapsed((current) => {
       const next = !current;
@@ -160,7 +157,7 @@ export function FhirChartsLayout({ children }: FhirChartsLayoutProps) {
         </div>
 
         <nav className="flex-1 space-y-1 overflow-auto px-2 py-3">
-          {items.map((item, index) => {
+          {items.map((item) => {
             const active = item.match(location.pathname);
             const Icon = item.icon;
             return (
@@ -185,12 +182,7 @@ export function FhirChartsLayout({ children }: FhirChartsLayoutProps) {
                 </div>
                 {!collapsed && (
                   <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-semibold">{item.label}</p>
-                      <span className="text-[11px] font-semibold text-[#9aa3b2]">
-                        {index + 1}
-                      </span>
-                    </div>
+                    <p className="text-sm font-semibold">{item.label}</p>
                     <p className="mt-1 text-xs leading-5 text-[#7b8597]">
                       {item.description}
                     </p>
@@ -200,30 +192,6 @@ export function FhirChartsLayout({ children }: FhirChartsLayoutProps) {
             );
           })}
         </nav>
-
-        {!collapsed && (
-          <div className="border-t border-[#eef0f4] px-3 py-3">
-            <div className="rounded-xl bg-[#f7f9fc] px-3 py-3">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#667085]">
-                Default View
-              </p>
-              <p className="mt-1 text-sm font-semibold text-[#1c1c1e]">
-                {activeItem.label}
-              </p>
-              <p className="mt-1 text-xs leading-5 text-[#667085]">
-                {patientId
-                  ? `${activeItem.description} for the selected prepared chart.`
-                  : "Pick a sample chart or account workspace to open the prepared chart surfaces."}
-              </p>
-              {!patientId && (
-                <div className="mt-3 flex items-center gap-2 rounded-lg bg-white px-2.5 py-2 text-xs text-[#5b76fe]">
-                  <Activity size={14} />
-                  Sample charts can launch directly into this workspace.
-                </div>
-              )}
-            </div>
-          </div>
-        )}
       </aside>
 
       <div className="min-h-0 min-w-0 flex-1 overflow-auto">{children}</div>

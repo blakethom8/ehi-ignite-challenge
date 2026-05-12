@@ -63,6 +63,7 @@ type WorkspaceFrameProps = {
       startHint?: string;
     };
     inspector?: {
+      patientId?: string | null;
       citations?: Record<string, Citation>;
       trace?: TraceDetail | null;
       traceByCitationId?: Record<string, TraceDetail | null>;
@@ -364,6 +365,7 @@ export function WorkspaceFrame({
                     citationId={state.citationId}
                     activeTab={state.inspectorTab}
                     onTabChange={state.setInspectorTab}
+                    patientId={surface?.inspector?.patientId}
                     citations={surface?.inspector?.citations}
                     trace={surface?.inspector?.trace}
                     traceByCitationId={surface?.inspector?.traceByCitationId}

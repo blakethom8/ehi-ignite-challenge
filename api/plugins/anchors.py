@@ -12,6 +12,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+from api.core.auth import DEMO_PATIENT_BY_ALIAS
 from api.trust.keys import REPO_ROOT, atlas_keypair
 from api.trust.models import AnchorPackage, PluginManifest
 from api.trust.redactions import apply_preset
@@ -114,11 +115,191 @@ def _hollister_record() -> dict:
     }
 
 
+def _demo_high_risk_record() -> dict:
+    return {
+        "patientId": "81e1b4cb-6817-4bdc-97cd-c1f3ac960345",
+        "name": "Demo Patient - Surgical Review",
+        "mrn": "demo-high-risk",
+        "dob": "1932-11-14",
+        "demographics": {
+            "age": 93,
+            "sex": "M",
+            "geography": {"zip": "02108", "city": "Boston", "state": "MA"},
+        },
+        "diagnoses": {
+            "active": [
+                {"code": "I25.10", "system": "ICD-10", "display": "Coronary Heart Disease", "onsetYear": 1992},
+                {"code": "I48.91", "system": "ICD-10", "display": "Atrial fibrillation", "onsetYear": 2019},
+                {"code": "I50.9", "system": "ICD-10", "display": "Heart failure", "onsetYear": 2021},
+                {"code": "I63.9", "system": "ICD-10", "display": "Prior ischemic stroke", "onsetYear": 2020},
+                {"code": "C61", "system": "ICD-10", "display": "Prostate cancer", "onsetYear": 2023},
+            ],
+            "history": [
+                {"code": "K40.90", "display": "Inguinal hernia", "onsetYear": 2025},
+                {"code": "E11.22", "display": "Type 2 diabetes mellitus with diabetic chronic kidney disease", "onsetYear": 2013},
+            ],
+        },
+        "medications": {
+            "active": [
+                {"rxnorm": "1364430", "display": "apixaban 5 MG Oral Tablet", "dose": "5 mg BID", "startDate": "2023-06-14"},
+                {"rxnorm": "860975", "display": "metformin 500 MG Oral Tablet", "dose": "500 mg BID", "startDate": "2014-04-01"},
+                {"rxnorm": "617320", "display": "furosemide 20 MG Oral Tablet", "dose": "20 mg daily", "startDate": "2021-03-20"},
+            ],
+            "history": [
+                {"rxnorm": "83367", "display": "warfarin sodium 5 MG Oral Tablet", "discontinuedDate": "2023-06-13", "reason": "switched to DOAC"},
+            ],
+        },
+        "allergies": [
+            {"substance": "penicillin", "reaction": "rash", "severity": "moderate"},
+        ],
+        "biomarkers": [
+            {"marker": "PSA", "status": "elevated", "method": "serum", "lastTested": "2026-04-02"},
+        ],
+        "labs": {
+            "recent": [
+                {"code": "718-7", "system": "LOINC", "display": "Hemoglobin [Mass/volume] in Blood", "value": 11.9, "unit": "g/dL", "date": "2026-04-22"},
+                {"code": "33914-3", "system": "LOINC", "display": "Glomerular filtration rate/1.73 sq M.predicted", "value": 44, "unit": "mL/min/1.73m2", "date": "2026-04-22"},
+                {"code": "6301-6", "system": "LOINC", "display": "INR in Platelet poor plasma by Coagulation assay", "value": 1.3, "unit": "", "date": "2026-04-22"},
+            ],
+        },
+        "encounters": {
+            "recent": [
+                {"id": "Enc/2026-04-22", "type": "pre-op review", "provider": "M. Gibber, MD", "date": "2026-04-22"},
+                {"id": "Enc/2026-04-18", "type": "cardiology clearance", "provider": "Patel, A.", "date": "2026-04-18"},
+            ],
+        },
+        "performance-status": {"scale": "ECOG", "value": 2, "date": "2026-04-18"},
+    }
+
+
+def _demo_trial_match_record() -> dict:
+    return {
+        "patientId": "8143897c-e650-4e55-b08d-8306e2f424bb",
+        "name": "Demo Patient - Trial Match",
+        "mrn": "demo-trial-match",
+        "dob": "1931-09-18",
+        "demographics": {
+            "age": 95,
+            "sex": "M",
+            "geography": {"zip": "02332", "city": "Duxbury", "state": "MA"},
+        },
+        "diagnoses": {
+            "active": [
+                {"code": "C61", "system": "ICD-10", "display": "Prostate neoplasm", "onsetYear": 2022},
+                {"code": "N18.9", "system": "ICD-10", "display": "Chronic kidney disease", "onsetYear": 2019},
+                {"code": "I25.10", "system": "ICD-10", "display": "Coronary Heart Disease", "onsetYear": 1992},
+                {"code": "E11.22", "system": "ICD-10", "display": "Diabetic renal disease", "onsetYear": 2014},
+            ],
+            "history": [
+                {"code": "I48.91", "display": "Atrial fibrillation", "onsetYear": 2019},
+                {"code": "K40.90", "display": "Inguinal hernia", "onsetYear": 2025},
+            ],
+        },
+        "medications": {
+            "active": [
+                {"rxnorm": "197361", "display": "clopidogrel 75 MG Oral Tablet", "dose": "75 mg daily", "startDate": "2023-08-10"},
+                {"rxnorm": "860975", "display": "metformin 500 MG Oral Tablet", "dose": "500 mg BID", "startDate": "2014-04-01"},
+                {"rxnorm": "1364430", "display": "apixaban 5 MG Oral Tablet", "dose": "5 mg BID", "startDate": "2024-01-14"},
+            ],
+            "history": [
+                {"rxnorm": "83367", "display": "warfarin sodium 5 MG Oral Tablet", "discontinuedDate": "2024-01-13", "reason": "unstable monitoring"},
+            ],
+        },
+        "allergies": [
+            {"substance": "ACE inhibitors", "reaction": "cough", "severity": "mild"},
+        ],
+        "biomarkers": [
+            {"marker": "PSA", "status": "elevated", "method": "serum", "lastTested": "2026-04-20"},
+        ],
+        "labs": {
+            "recent": [
+                {"code": "33914-3", "system": "LOINC", "display": "Glomerular filtration rate/1.73 sq M.predicted", "value": 39, "unit": "mL/min/1.73m2", "date": "2026-04-20"},
+                {"code": "4548-4", "system": "LOINC", "display": "Hemoglobin A1c/Hemoglobin.total in Blood", "value": 7.5, "unit": "%", "date": "2026-04-20"},
+                {"code": "6301-6", "system": "LOINC", "display": "INR in Platelet poor plasma by Coagulation assay", "value": 1.1, "unit": "", "date": "2026-04-20"},
+            ],
+        },
+        "encounters": {
+            "recent": [
+                {"id": "Enc/2026-04-20", "type": "oncology referral review", "provider": "Serrato62, C.", "date": "2026-04-20"},
+                {"id": "Enc/2026-04-18", "type": "cardiology follow-up", "provider": "Brown30, R.", "date": "2026-04-18"},
+            ],
+        },
+        "performance-status": {"scale": "ECOG", "value": 1, "date": "2026-04-20"},
+    }
+
+
+def _demo_med_access_record() -> dict:
+    return {
+        "patientId": "eec393be-2569-46db-a974-33d7c853d690",
+        "name": "Demo Patient - Medication Access",
+        "mrn": "demo-med-access",
+        "dob": "1934-02-03",
+        "demographics": {
+            "age": 91,
+            "sex": "F",
+            "geography": {"zip": "02860", "city": "Pawtucket", "state": "RI"},
+        },
+        "diagnoses": {
+            "active": [
+                {"code": "E11.40", "system": "ICD-10", "display": "Type 2 diabetes mellitus with neuropathy", "onsetYear": 2010},
+                {"code": "N18.32", "system": "ICD-10", "display": "Chronic kidney disease stage 3b", "onsetYear": 2018},
+                {"code": "G89.29", "system": "ICD-10", "display": "Chronic pain", "onsetYear": 2017},
+                {"code": "I69.30", "system": "ICD-10", "display": "Stroke history", "onsetYear": 2021},
+            ],
+            "history": [
+                {"code": "H35.00", "display": "Diabetic retinopathy", "onsetYear": 2019},
+                {"code": "C50.919", "display": "Breast cancer history", "onsetYear": 2022},
+            ],
+        },
+        "medications": {
+            "active": [
+                {"rxnorm": "1364430", "display": "apixaban 5 MG Oral Tablet", "dose": "5 mg BID", "startDate": "2024-06-11"},
+                {"rxnorm": "860975", "display": "metformin 500 MG Oral Tablet", "dose": "500 mg BID", "startDate": "2010-04-01"},
+                {"rxnorm": "847230", "display": "insulin glargine 100 UNT/ML Injectable Solution", "dose": "22 units nightly", "startDate": "2018-02-01"},
+            ],
+            "history": [
+                {"rxnorm": "617314", "display": "gabapentin 300 MG Oral Capsule", "discontinuedDate": "2025-11-04", "reason": "sedation"},
+            ],
+        },
+        "allergies": [
+            {"substance": "sulfa drugs", "reaction": "hives", "severity": "moderate"},
+        ],
+        "biomarkers": [],
+        "labs": {
+            "recent": [
+                {"code": "33914-3", "system": "LOINC", "display": "Glomerular filtration rate/1.73 sq M.predicted", "value": 36, "unit": "mL/min/1.73m2", "date": "2026-04-18"},
+                {"code": "4548-4", "system": "LOINC", "display": "Hemoglobin A1c/Hemoglobin.total in Blood", "value": 8.1, "unit": "%", "date": "2026-04-18"},
+            ],
+        },
+        "encounters": {
+            "recent": [
+                {"id": "Enc/2026-04-18", "type": "medication access review", "provider": "Care coordination", "date": "2026-04-18"},
+                {"id": "Enc/2026-04-10", "type": "endocrinology follow-up", "provider": "Nguyen, T.", "date": "2026-04-10"},
+            ],
+        },
+        "performance-status": {"scale": "ECOG", "value": 2, "date": "2026-04-18"},
+    }
+
+
+PLUGIN_DEMO_RECORDS_BY_PATIENT_ID = {
+    "81e1b4cb-6817-4bdc-97cd-c1f3ac960345": _demo_high_risk_record(),
+    "8143897c-e650-4e55-b08d-8306e2f424bb": _demo_trial_match_record(),
+    "eec393be-2569-46db-a974-33d7c853d690": _demo_med_access_record(),
+}
+
+
 def load_raw_patient(patient_id: str) -> dict:
+    demo_patient = DEMO_PATIENT_BY_ALIAS.get(patient_id)
+    if demo_patient is not None:
+        patient_id = demo_patient.actual_patient_id
+
     if DEFAULT_PATIENT_PATH.exists():
         record = json.loads(DEFAULT_PATIENT_PATH.read_text())
         if record.get("patientId") == patient_id:
             return record
+    demo_record = PLUGIN_DEMO_RECORDS_BY_PATIENT_ID.get(patient_id)
+    if demo_record is not None:
+        return demo_record
     record = _hollister_record()
     if record["patientId"] != patient_id:
         raise AnchorError(f"unknown patient: {patient_id}")

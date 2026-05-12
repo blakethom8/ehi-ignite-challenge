@@ -19,10 +19,19 @@ class AuthUserResponse(BaseModel):
     role: AuthRole = "clinician"
 
 
+class DemoPatientMetadata(BaseModel):
+    care_setting: str = ""
+    clinical_focus: str = ""
+    complexity: str = ""
+    tags: list[str] = Field(default_factory=list)
+
+
 class DemoPatientOption(BaseModel):
     id: str
     name: str
     description: str = ""
+    short_journey: str = ""
+    metadata: DemoPatientMetadata = Field(default_factory=DemoPatientMetadata)
 
 
 class AuthSessionResponse(BaseModel):
@@ -30,6 +39,7 @@ class AuthSessionResponse(BaseModel):
     user: AuthUserResponse | None = None
     active_patient_id: str | None = None
     active_patient_name: str | None = None
+    active_demo_patient: DemoPatientOption | None = None
     expires_at: datetime | None = None
     available_demo_patients: list[DemoPatientOption] = Field(default_factory=list)
 

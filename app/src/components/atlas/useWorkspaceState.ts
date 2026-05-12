@@ -21,6 +21,14 @@ const DEFAULT_PANES: PaneVisibility = {
   inspector: true,
 };
 
+const CASPIAN_DEFAULT_PANES: PaneVisibility = {
+  sessions: true,
+  chat: true,
+  workbench: false,
+  files: false,
+  inspector: false,
+};
+
 const DEFAULT_SIZES: PaneSizes = {
   sessionsW: 248,
   chatW: 480,
@@ -53,6 +61,41 @@ type UseWorkspaceStateOptions = {
   getFileTab?: (fileId: string) => WorkbenchTab | null;
   getActionTab?: (target: string) => WorkbenchTab | null;
 };
+
+function defaultPanesForWorkspace(workspaceId: WorkspaceId): PaneVisibility {
+  return workspaceId === "caspian" ? CASPIAN_DEFAULT_PANES : DEFAULT_PANES;
+}
+
+function paneStorageKeys(workspaceId: WorkspaceId, panesStorageKey: string): string[] {
+  // Caspian now opens in a calmer chat-first layout. Keep honoring any
+  // workspace-specific saved state, but do not resurrect the old global pane
+  // preset when this workspace has never been opened before.
+  return workspaceId === "caspian"
+    ? [panesStorageKey]
+    : [panesStorageKey, LEGACY_PANES_STORAGE_KEY];
+}
+
+function isPaneStateEqual(a: PaneVisibility, b: PaneVisibility): boolean {
+  return (
+    a.sessions === b.sessions &&
+    a.chat === b.chat &&
+    a.workbench === b.workbench &&
+    a.files === b.files &&
+    a.inspector === b.inspector
+  );
+}
+
+function loadPaneState(workspaceId: WorkspaceId, panesStorageKey: string): PaneVisibility {
+  const fallback = defaultPanesForWorkspace(workspaceId);
+  const loaded = loadJson<PaneVisibility>(paneStorageKeys(workspaceId, panesStorageKey), fallback);
+  // Migrate Caspian away from the old everything-open factory layout.
+  // If the stored state still exactly matches that historical preset, treat it
+  // as uncustomized and adopt the calmer chat-first default instead.
+  if (workspaceId === "caspian" && isPaneStateEqual(loaded, DEFAULT_PANES)) {
+    return CASPIAN_DEFAULT_PANES;
+  }
+  return loaded;
+}
 
 function loadJson<T>(keys: string[], fallback: T): T {
   if (typeof window === "undefined") return fallback;
@@ -131,7 +174,7 @@ export function useWorkspaceState(
   const seededTabs = options.seedTabs ?? INITIAL_TABS[workspaceId] ?? [];
   const fileTree = options.filesTree ?? FILE_TREES[workspaceId] ?? [];
   const [panes, setPanes] = useState<PaneVisibility>(() =>
-    loadJson<PaneVisibility>([panesStorageKey, LEGACY_PANES_STORAGE_KEY], DEFAULT_PANES),
+    loadPaneState(workspaceId, panesStorageKey),
   );
   const [sizes, setSizes] = useState<PaneSizes>(() =>
     loadJson<PaneSizes>([sizesStorageKey, LEGACY_SIZES_STORAGE_KEY], DEFAULT_SIZES),

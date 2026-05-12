@@ -17,7 +17,13 @@ from typing import Literal
 
 from fastapi import Depends, HTTPException, Request, Response, status
 
-from api.auth_models import AuthRole, AuthSessionResponse, AuthUserResponse, DemoPatientOption
+from api.auth_models import (
+    AuthRole,
+    AuthSessionResponse,
+    AuthUserResponse,
+    DemoPatientMetadata,
+    DemoPatientOption,
+)
 from api.core.aggregation import list_upload_workspaces
 from api.core.loader import path_from_patient_id
 from api.trust.models import UserIdentity
@@ -39,26 +45,60 @@ class DemoPatientConfig:
     name: str
     actual_patient_id: str
     description: str
+    short_journey: str
+    care_setting: str
+    clinical_focus: str
+    complexity: str
+    tags: tuple[str, ...]
+
+    def to_option(self) -> DemoPatientOption:
+        return DemoPatientOption(
+            id=self.alias_id,
+            name=self.name,
+            description=self.description,
+            short_journey=self.short_journey,
+            metadata=DemoPatientMetadata(
+                care_setting=self.care_setting,
+                clinical_focus=self.clinical_focus,
+                complexity=self.complexity,
+                tags=list(self.tags),
+            ),
+        )
 
 
 DEMO_PATIENTS: tuple[DemoPatientConfig, ...] = (
     DemoPatientConfig(
         alias_id="demo-high-risk",
         name="Demo Patient - Surgical Review",
-        actual_patient_id="763b6101-133a-44bb-ac60-3c097d6c0ba1",
-        description="High-signal pre-op review demo with active medication and condition burden.",
+        actual_patient_id="81e1b4cb-6817-4bdc-97cd-c1f3ac960345",
+        description="Curated pre-op chart with cardiology, anticoagulation, heart-failure, stroke, and oncology context in one record.",
+        short_journey="A 93-year-old man with coronary disease, atrial fibrillation, CHF, prior stroke, and prostate cancer who needs a fast surgical-safety review.",
+        care_setting="Pre-op surgical review",
+        clinical_focus="Medication safety and longitudinal risk review",
+        complexity="high",
+        tags=("FHIR-only", "Polypharmacy", "Peri-op", "Risk flags"),
     ),
     DemoPatientConfig(
         alias_id="demo-trial-match",
         name="Demo Patient - Trial Match",
-        actual_patient_id="5cbc121b-cd71-4428-b8b7-31e53eba8184",
-        description="Curated oncology-style demo for trial-finding and referral workflows.",
+        actual_patient_id="8143897c-e650-4e55-b08d-8306e2f424bb",
+        description="Curated oncology referral chart with active cancer treatment, chronic disease burden, and trial-screening style review needs.",
+        short_journey="A 95-year-old man with prostate neoplasm, CKD, coronary disease, diabetes, and active oncology treatment for referral and eligibility review.",
+        care_setting="Specialty referral review",
+        clinical_focus="Trial matching and evidence-backed referral prep",
+        complexity="medium",
+        tags=("FHIR-only", "Oncology", "Referral", "Trial matching"),
     ),
     DemoPatientConfig(
         alias_id="demo-med-access",
         name="Demo Patient - Medication Access",
         actual_patient_id="eec393be-2569-46db-a974-33d7c853d690",
-        description="Medication-access demo with a heavier longitudinal record and care burden.",
+        description="Curated longitudinal chart for polypharmacy, diabetes, CKD, chronic pain, and treatment-continuity review.",
+        short_journey="A 91-year-old woman with diabetes, CKD, neuropathy, retinopathy, chronic pain, stroke history, and insulin plus oncology medications.",
+        care_setting="Care coordination",
+        clinical_focus="Medication access and ongoing treatment management",
+        complexity="medium",
+        tags=("FHIR-only", "Longitudinal", "Coverage", "Adherence"),
     ),
 )
 DEMO_PATIENT_BY_ALIAS = {item.alias_id: item for item in DEMO_PATIENTS}
@@ -98,6 +138,7 @@ class SessionPrincipal:
             user=user,
             active_patient_id=self.active_patient_id,
             active_patient_name=self.active_patient_name,
+            active_demo_patient=demo_patient_option(self.active_patient_id),
             expires_at=self.expires_at,
             available_demo_patients=demo_patient_options(),
         )
@@ -269,10 +310,14 @@ def _seed_bootstrap_user() -> None:
 
 
 def demo_patient_options() -> list[DemoPatientOption]:
-    return [
-        DemoPatientOption(id=item.alias_id, name=item.name, description=item.description)
-        for item in DEMO_PATIENTS
-    ]
+    return [item.to_option() for item in DEMO_PATIENTS]
+
+
+def demo_patient_option(patient_id: str | None) -> DemoPatientOption | None:
+    if patient_id is None:
+        return None
+    item = DEMO_PATIENT_BY_ALIAS.get(patient_id)
+    return item.to_option() if item is not None else None
 
 
 def is_demo_alias(patient_id: str) -> bool:

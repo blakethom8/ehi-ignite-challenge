@@ -224,7 +224,7 @@ function CorpusContent({ stats }: { stats: CorpusStats }) {
         <div>
           <h1 className="text-2xl font-semibold text-[#1c1c1e]">Patient Corpus</h1>
           <p className="text-sm text-[#555a6a] mt-1">
-            1,180 Synthea R4 FHIR bundles · EHI Ignite dataset
+            1,180 Synthea R4 FHIR bundles · EHI Atlas dataset
           </p>
         </div>
         <a

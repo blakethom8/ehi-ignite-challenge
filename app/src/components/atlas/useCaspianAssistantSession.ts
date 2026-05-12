@@ -105,12 +105,14 @@ export function buildCaspianInspectorData(
     for (const citation of message.citations) {
       citations[citation.id] = {
         id: citation.id,
-        type: citation.source_type,
+        type: normalizeResourceType(citation.source_type),
         title: citation.label,
         snippet: citation.detail,
-        source: citation.resource_id,
+        source: normalizeResourceRef(citation.source_type, citation.resource_id),
+        sourceType: normalizeResourceType(citation.source_type),
+        sourceId: normalizeResourceId(citation.resource_id),
         encounter: citation.event_date ? `Observed ${citation.event_date}` : "—",
-        author: citation.source_type,
+        author: normalizeResourceType(citation.source_type),
         date: citation.event_date ?? "—",
         related: message.citations
           .filter((candidate) => candidate.id !== citation.id)
@@ -135,6 +137,42 @@ export function buildCaspianInspectorData(
       { label: "Latest engine", value: latestEngine },
     ],
   };
+}
+
+function normalizeResourceRef(sourceType: string, resourceId: string): string {
+  const normalizedType = normalizeResourceType(sourceType);
+  const trimmed = resourceId.trim();
+  if (!trimmed) return normalizedType;
+  if (trimmed.includes("/")) return trimmed;
+  return `${normalizedType}/${trimmed}`;
+}
+
+function normalizeResourceId(resourceId: string): string {
+  const trimmed = resourceId.trim();
+  if (!trimmed) return trimmed;
+  if (!trimmed.includes("/")) return trimmed;
+  return trimmed.split("/").pop() ?? trimmed;
+}
+
+function normalizeResourceType(sourceType: string): string {
+  const trimmed = sourceType.trim();
+  if (!trimmed) return trimmed;
+  const normalized = trimmed.toLowerCase();
+  const known: Record<string, string> = {
+    condition: "Condition",
+    observation: "Observation",
+    medicationstatement: "MedicationStatement",
+    medicationrequest: "MedicationRequest",
+    servicerequest: "ServiceRequest",
+    documentreference: "DocumentReference",
+    diagnosticreport: "DiagnosticReport",
+    encounter: "Encounter",
+    procedure: "Procedure",
+    immunization: "Immunization",
+    patient: "Patient",
+    allergyintolerance: "AllergyIntolerance",
+  };
+  return known[normalized] ?? trimmed;
 }
 
 export function useCaspianAssistantSession(

@@ -2774,16 +2774,12 @@ export function HarmonizeView() {
     collections.find((collection) => collection.id === "synthea-demo") ?? collections[0] ?? null;
   const autoCollectionId =
     patientWorkspace?.id || patientUploadCollection?.id || requestedValidCollection || defaultFixtureCollection?.id || "";
-  const [manualCollectionId, setManualCollectionId] = useState<string>("");
-  const [developerPickerOpen, setDeveloperPickerOpen] = useState(false);
   const [activeExtractJobId, setActiveExtractJobId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     queueMicrotask(() => {
       if (cancelled) return;
-      setManualCollectionId(requestedValidCollection);
-      setDeveloperPickerOpen(false);
       setActiveExtractJobId(null);
     });
     return () => {
@@ -2791,8 +2787,7 @@ export function HarmonizeView() {
     };
   }, [patientId, requestedValidCollection, collectionIdsKey]);
 
-  const activeId =
-    manualCollectionId || autoCollectionId;
+  const activeId = autoCollectionId;
   const activeCollection =
     activeId === patientWorkspace?.id ? patientWorkspace : collections.find((c) => c.id === activeId) ?? null;
   const isPatientWorkspace = activeId === patientWorkspace?.id && !!patientWorkspace;
@@ -2942,18 +2937,12 @@ export function HarmonizeView() {
       <div className="rounded-lg border border-[#dfe4ea] bg-white px-4 py-3">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-wider text-[#5b76fe]">
-              {isDeveloperFixture ? "Developer fixture" : "Workspace sources"}
-            </p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-[#5b76fe]">Workspace sources</p>
             <h2 className="mt-1 text-base font-semibold text-[#1c1c1e]">
-              {isDeveloperFixture
-                ? activeCollection?.name ?? "No source set selected"
-                : selectedPatient?.name ?? activeCollection?.name ?? "Selected patient workspace"}
+              {selectedPatient?.name ?? activeCollection?.name ?? "Selected patient workspace"}
             </h2>
             <p className="mt-1 max-w-4xl text-sm leading-6 text-[#667085]">
-              {isDeveloperFixture
-                ? "No upload-backed harmonize collection is available for the selected patient workspace yet, so this view is using a curated development fixture. Add files in Source Intake to create a patient-specific harmonized record."
-                : activeCollection?.description ?? "The selected patient's baseline and uploaded source files are feeding this harmonized record."}
+              {activeCollection?.description ?? "The selected patient's baseline and uploaded source files are feeding this harmonized record."}
             </p>
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-2">
@@ -2978,50 +2967,8 @@ export function HarmonizeView() {
               <FileUp size={14} />
               Manage sources
             </Link>
-            <button
-              type="button"
-              onClick={() => setDeveloperPickerOpen((open) => !open)}
-              className="rounded-lg border border-[#dfe4ea] bg-white px-3 py-2 text-sm font-semibold text-[#555a6a] hover:border-[#5b76fe] hover:text-[#5b76fe]"
-            >
-              Developer dataset
-            </button>
           </div>
         </div>
-        {developerPickerOpen && (
-          <div className="mt-3 rounded-lg border border-[#dfe4ea] bg-[#f7f9fc] p-3">
-            <label className="text-xs font-semibold uppercase tracking-wider text-[#667085]">
-              Development fixture
-            </label>
-            <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
-              <select
-                value={manualCollectionId || defaultFixtureCollection?.id || ""}
-                onChange={(e) => {
-                  setManualCollectionId(e.target.value);
-                  extractMutation.reset();
-                  setActiveExtractJobId(null);
-                }}
-                className="min-w-0 rounded-lg border border-[#dfe4ea] bg-white px-3 py-2 text-sm text-[#1c1c1e] sm:min-w-[360px]"
-              >
-                {collections.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                onClick={() => {
-                  setManualCollectionId("");
-                  extractMutation.reset();
-                  setActiveExtractJobId(null);
-                }}
-                className="rounded-lg border border-[#dfe4ea] bg-white px-3 py-2 text-sm font-semibold text-[#667085]"
-              >
-                Use selected patient workspace
-              </button>
-            </div>
-          </div>
-        )}
         {extractJob?.status === "complete" && (
           <div className="mt-3 rounded-lg border border-[#dfe4ea] bg-[#f7f9fc] p-3 text-sm">
             <p className="font-semibold text-[#1c1c1e]">
@@ -3086,10 +3033,10 @@ export function HarmonizeView() {
                 Add sources
               </Link>
               <Link
-                to="/patient-record/workspaces"
+                to={`/patient-record${patientId ? `?patient=${encodeURIComponent(patientId)}` : ""}`}
                 className="inline-flex items-center gap-2 rounded-lg border border-[#dfe4ea] bg-white px-4 py-2 text-sm font-semibold text-[#555a6a] hover:border-[#5b76fe] hover:text-[#5b76fe]"
               >
-                Workspace library
+                Workspace overview
               </Link>
             </div>
           </div>

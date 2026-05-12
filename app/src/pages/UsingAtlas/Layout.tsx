@@ -1,9 +1,11 @@
 import { Outlet } from "react-router-dom";
+import { MarketingHeader } from "../../components/marketing/MarketingHeader";
 import { SectionNav } from "./components/SectionNav";
 
 export function UsingAtlasLayout() {
   return (
     <div className="min-h-screen bg-[#f5f6f8]">
+      <MarketingHeader activeNav="about" />
       <div className="mx-auto max-w-5xl px-6 py-10">
         <div className="flex gap-10">
           {/* Sidebar */}

@@ -62,7 +62,7 @@ export function PlatformDrawer({ open, onClose, user }: PlatformDrawerProps) {
             >
               EI
             </div>
-            <strong>EHI Ignite</strong>
+            <strong>EHI Atlas</strong>
           </div>
           <button
             onClick={onClose}

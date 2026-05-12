@@ -328,6 +328,8 @@ export type Citation = {
   title: string;
   snippet: string;
   source: string;
+  sourceType?: string;
+  sourceId?: string;
   encounter: string;
   author: string;
   date: string;
@@ -342,6 +344,8 @@ export const CITATIONS: Record<string, Citation> = {
     snippet:
       "Active since 2023-06-14. Indication: atrial fibrillation. Last refilled 2025-04-02. Surgical hold guidance per institutional protocol: hold ≥48 h pre-op for moderate-bleed-risk procedures, ≥72 h for high-bleed-risk.",
     source: "MedicationStatement/med-8841",
+    sourceType: "MedicationStatement",
+    sourceId: "med-8841",
     encounter: "Enc/2025-04-02",
     author: "Patel, A. (PharmD)",
     date: "2023-06-14",
@@ -358,6 +362,8 @@ export const CITATIONS: Record<string, Citation> = {
     snippet:
       "Hgb 12.4 g/dL · WBC 6.8 × 10^9/L · Platelets 218 × 10^9/L. Within acceptable preoperative range. No active bleeding signs.",
     source: "Observation/obs-21477",
+    sourceType: "Observation",
+    sourceId: "obs-21477",
     encounter: "Enc/2025-04-22",
     author: "Lab 7720",
     date: "2025-04-22",
@@ -373,6 +379,8 @@ export const CITATIONS: Record<string, Citation> = {
     snippet:
       "INR repeat ordered 2025-05-06 in anticipation of OR date 2025-05-12. No result yet. Surgical team to confirm value < 1.4 before clearance.",
     source: "ServiceRequest/req-9981",
+    sourceType: "ServiceRequest",
+    sourceId: "req-9981",
     encounter: "Enc/2025-05-06",
     author: "Hernandez, M. (MD)",
     date: "2025-05-06",
@@ -385,6 +393,8 @@ export const CITATIONS: Record<string, Citation> = {
     snippet:
       "Scheduled: open inguinal hernia repair (CPT 49505). Estimated blood loss moderate. Anesthesia consult cleared 2025-04-18. No prior airway complication on file.",
     source: "DocumentReference/doc-44012",
+    sourceType: "DocumentReference",
+    sourceId: "doc-44012",
     encounter: "Enc/2025-04-18",
     author: "Chen, R. (MD)",
     date: "2025-04-18",

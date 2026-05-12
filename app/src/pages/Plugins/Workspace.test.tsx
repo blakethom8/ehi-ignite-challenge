@@ -1,10 +1,11 @@
 import type { ReactNode } from "react";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PluginWorkspace } from "./Workspace";
 
 const workspaceFrameSpy = vi.fn();
+const startRunMock = vi.fn();
 
 vi.mock("../../components/atlas/AppShell", () => ({
   AppShell: ({ children }: { children: ReactNode }) => <div data-testid="app-shell">{children}</div>,
@@ -19,6 +20,12 @@ vi.mock("../../components/atlas/WorkspaceFrame", () => ({
 
 vi.mock("../../components/atlas/PluginRunChatPane", () => ({
   PluginRunChatPane: () => <div data-testid="plugin-run-chat" />,
+}));
+
+vi.mock("../../api/plugins", () => ({
+  pluginsApi: {
+    startRun: (...args: unknown[]) => startRunMock(...args),
+  },
 }));
 
 vi.mock("../../components/atlas/manifests", async (importOriginal) => {
@@ -110,6 +117,7 @@ vi.mock("../../components/atlas/usePluginRun", () => ({
 describe("PluginWorkspace", () => {
   beforeEach(() => {
     workspaceFrameSpy.mockReset();
+    startRunMock.mockReset();
   });
 
   it("routes live plugin runs through WorkspaceFrame with a live surface", () => {
@@ -129,5 +137,32 @@ describe("PluginWorkspace", () => {
     expect(props.activeSessionId).toBe("r_live123");
     expect(props.surface?.runId).toBe("r_live123");
     expect(props.surface?.chatPane).toBeTruthy();
+  });
+
+  it("passes the selected patient into plugin run creation", async () => {
+    startRunMock.mockResolvedValue({ id: "r_new123" });
+
+    render(
+      <MemoryRouter initialEntries={["/workspaces/trial-finder?patient=demo-trial-match"]}>
+        <Routes>
+          <Route path="/workspaces/:pluginId" element={<PluginWorkspace />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    const props = workspaceFrameSpy.mock.calls.at(-1)?.[0] as {
+      onStartRun?: (workflowId?: string) => void;
+    };
+    props.onStartRun?.("shortlist");
+
+    await waitFor(() =>
+      expect(startRunMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          pluginId: "trial-finder",
+          patientId: "demo-trial-match",
+          workflowId: "shortlist",
+        }),
+      ),
+    );
   });
 });

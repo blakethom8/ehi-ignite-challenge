@@ -89,6 +89,24 @@ def test_start_run_then_grant_then_call_tool(client):
     assert tool_events[0]["payload"]["result"] == res.json()
 
 
+def test_demo_session_start_run_uses_active_demo_patient_when_patient_omitted(client):
+    demo_response = client.post("/api/auth/demo", json={"patient_id": "demo-trial-match"})
+    assert demo_response.status_code == 200
+
+    res = client.post(
+        "/api/plugins/runs",
+        json={
+            "pluginId": "trial-finder",
+            "workflowId": "shortlist",
+            "title": "x",
+        },
+    )
+    assert res.status_code == 200
+    run = res.json()
+    assert run["patientId"] == "8143897c-e650-4e55-b08d-8306e2f424bb"
+    assert run["state"] == "awaiting-consent"
+
+
 def test_undeclared_connector_returns_403(client):
     enter_authenticated_session(client)
     run = client.post(

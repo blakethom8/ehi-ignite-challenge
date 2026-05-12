@@ -17,6 +17,7 @@ type AccessState = {
   user: AuthUser | null;
   activePatientId: string | null;
   activePatientName: string | null;
+  activeDemoPatient: DemoPatientOption | null;
   expiresAt: string | null;
   availableDemoPatients: DemoPatientOption[];
 };
@@ -39,6 +40,7 @@ const DEFAULT_STATE: AccessState = {
   user: null,
   activePatientId: null,
   activePatientName: null,
+  activeDemoPatient: null,
   expiresAt: null,
   availableDemoPatients: [],
 };
@@ -47,10 +49,25 @@ const STORAGE_KEY = "atlas:access";
 const useMockData = import.meta.env.VITE_USE_MOCK_DATA === "true";
 
 function mockDemoOptions(): DemoPatientOption[] {
-  return mockPatients.map((patient) => ({
+  return mockPatients.map((patient, index) => ({
     id: patient.id,
     name: patient.name,
-    description: "Frontend mock sample chart.",
+    description: "Prepared synthetic demo chart for the public Atlas experience.",
+    short_journey: [
+      "Pre-op chart with medication safety and surgical-risk signals.",
+      "Referral-style chart for trial-matching and specialty review.",
+      "Longitudinal medication-burden chart with access and continuity questions.",
+    ][index] ?? "Prepared synthetic demo chart.",
+    metadata: {
+      care_setting: ["Pre-op review", "Specialty referral", "Care coordination"][index] ?? "Prepared demo",
+      clinical_focus: ["Surgical safety", "Trial matching", "Medication access"][index] ?? "Chart review",
+      complexity: ["high", "medium", "medium"][index] ?? "medium",
+      tags: [
+        ["FHIR-only", "Risk flags"],
+        ["FHIR-only", "Referral"],
+        ["FHIR-only", "Polypharmacy"],
+      ][index] ?? ["FHIR-only"],
+    },
   }));
 }
 
@@ -76,6 +93,7 @@ function mockSessionFromStorage(): AccessState {
         : null,
       activePatientId: patientId,
       activePatientName,
+      activeDemoPatient: mockDemoOptions().find((patient) => patient.id === patientId) ?? null,
       expiresAt: null,
       availableDemoPatients: mockDemoOptions(),
     };
@@ -95,6 +113,7 @@ function mapSession(session: AuthSessionResponse): AccessState {
     user: session.user,
     activePatientId: session.active_patient_id,
     activePatientName: session.active_patient_name,
+    activeDemoPatient: session.active_demo_patient ?? null,
     expiresAt: session.expires_at,
     availableDemoPatients: session.available_demo_patients,
   };

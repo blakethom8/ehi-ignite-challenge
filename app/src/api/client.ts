@@ -71,6 +71,8 @@ import type {
   PipelineLabLeaderboardResponse,
 } from "../types";
 import {
+  getMockAggregationCleaningQueue,
+  getMockAggregationReadiness,
   getMockAggregationSources,
   getMockAggregationUploadJson,
   getMockAggregationUploadPreview,
@@ -95,6 +97,25 @@ const useMockData = import.meta.env.VITE_USE_MOCK_DATA === "true";
 async function getOrMock<T>(request: Promise<T>, fallback: T): Promise<T> {
   if (useMockData) return fallback;
   return request;
+}
+
+async function getOrDemoFallback<T>(
+  request: Promise<T>,
+  fallbackFactory: () => T,
+  entityId?: string | null,
+): Promise<T> {
+  if (useMockData) return fallbackFactory();
+  try {
+    return await request;
+  } catch (error) {
+    if (axios.isAxiosError(error) && entityId?.startsWith("demo-")) {
+      const status = error.response?.status;
+      if (status === 401 || status === 403 || status === 404 || status === 500) {
+        return fallbackFactory();
+      }
+    }
+    throw error;
+  }
 }
 
 export const api = {
@@ -251,16 +272,25 @@ export const api = {
     http.delete<AggregationDeleteResponse>(`/aggregation/profiles/${patientId}`).then((r) => r.data),
 
   getAggregationSources: (patientId: string): Promise<AggregationEnvironmentResponse> =>
-    getOrMock(
+    getOrDemoFallback(
       http.get<AggregationEnvironmentResponse>(`/aggregation/sources/${patientId}`).then((r) => r.data),
-      getMockAggregationSources(patientId),
+      () => getMockAggregationSources(patientId),
+      patientId,
     ),
 
   getAggregationCleaningQueue: (patientId: string): Promise<AggregationCleaningQueueResponse> =>
-    http.get<AggregationCleaningQueueResponse>(`/aggregation/cleaning-queue/${patientId}`).then((r) => r.data),
+    getOrDemoFallback(
+      http.get<AggregationCleaningQueueResponse>(`/aggregation/cleaning-queue/${patientId}`).then((r) => r.data),
+      () => getMockAggregationCleaningQueue(patientId),
+      patientId,
+    ),
 
   getAggregationReadiness: (patientId: string): Promise<AggregationReadinessResponse> =>
-    http.get<AggregationReadinessResponse>(`/aggregation/readiness/${patientId}`).then((r) => r.data),
+    getOrDemoFallback(
+      http.get<AggregationReadinessResponse>(`/aggregation/readiness/${patientId}`).then((r) => r.data),
+      () => getMockAggregationReadiness(patientId),
+      patientId,
+    ),
 
   uploadAggregationFile: (patientId: string, payload: AggregationUploadPayload): Promise<AggregationUploadResponse> => {
     const form = new FormData();
@@ -306,19 +336,21 @@ export const api = {
     http.delete<GuestHarmonizationDeleteResponse>(`/guest-harmonization/runs/${encodeURIComponent(runId)}`).then((r) => r.data),
 
   getAggregationUploadPreview: (patientId: string, fileId: string): Promise<AggregationPreparedPreviewResponse> =>
-    getOrMock(
+    getOrDemoFallback(
       http
         .get<AggregationPreparedPreviewResponse>(`/aggregation/uploads/${patientId}/${fileId}/preview`)
         .then((r) => r.data),
-      getMockAggregationUploadPreview(patientId, fileId),
+      () => getMockAggregationUploadPreview(patientId, fileId),
+      patientId,
     ),
 
   getAggregationUploadJson: (patientId: string, fileId: string): Promise<Record<string, unknown>> =>
-    getOrMock(
+    getOrDemoFallback(
       http
         .get<Record<string, unknown>>(`/aggregation/uploads/${patientId}/${fileId}/prepared-json`)
         .then((r) => r.data),
-      getMockAggregationUploadJson(patientId, fileId),
+      () => getMockAggregationUploadJson(patientId, fileId),
+      patientId,
     ),
 
   /** Assistant settings — available modes, models, current config */
@@ -524,11 +556,12 @@ export const api = {
       .then((r) => r.data),
 
   getLatestHarmonizationRun: (collectionId: string): Promise<HarmonizeRunStateResponse> =>
-    getOrMock(
+    getOrDemoFallback(
       http
         .get<HarmonizeRunStateResponse>(`/harmonize/${collectionId}/runs/latest`)
         .then((r) => r.data),
-      getMockLatestHarmonizationRun(collectionId),
+      () => getMockLatestHarmonizationRun(collectionId),
+      collectionId,
     ),
 
   resolveHarmonizationReviewItem: (
@@ -541,11 +574,12 @@ export const api = {
       .then((r) => r.data),
 
   getPublishedChart: (collectionId: string): Promise<PublishedChartStateResponse> =>
-    getOrMock(
+    getOrDemoFallback(
       http
         .get<PublishedChartStateResponse>(`/harmonize/${collectionId}/published`)
         .then((r) => r.data),
-      getMockPublishedChart(collectionId),
+      () => getMockPublishedChart(collectionId),
+      collectionId,
     ),
 
   publishHarmonizationRun: (collectionId: string, runId: string): Promise<PublishedChartStateResponse> =>

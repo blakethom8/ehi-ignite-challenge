@@ -1,6 +1,8 @@
 import type {
+  AggregationCleaningQueueResponse,
   AggregationEnvironmentResponse,
   AggregationPreparedPreviewResponse,
+  AggregationReadinessResponse,
   AggregationSourceCard,
   AggregationUploadedFile,
   CanonicalPatientSummary,
@@ -275,7 +277,7 @@ export function getMockAggregationSources(patientId: string): AggregationEnviron
       record_count: patient.total_resources,
       last_updated: "2026-10-05T08:45:00Z",
       confidence: "high",
-      posture: "Structured public demo dataset",
+      posture: "Structured baseline dataset",
       next_action: "Open as the chart baseline.",
       help_title: "Prepared baseline bundle",
       help_body: "This source anchors the selected patient workspace and gives the chart a clear, inspectable baseline before additional uploads are merged.",
@@ -293,7 +295,7 @@ export function getMockAggregationSources(patientId: string): AggregationEnviron
       posture: "Structured FHIR-aligned export",
       next_action: "Attach as the baseline chart source.",
       help_title: "Best starting point",
-      help_body: "This prepared export anchors the workspace and gives downstream modules a stable baseline.",
+      help_body: "This prepared export anchors the workspace and gives the chart a stable baseline.",
       evidence: ["Demographics", "Medication list", "Encounter history"],
     },
     {
@@ -331,8 +333,8 @@ export function getMockAggregationSources(patientId: string): AggregationEnviron
   return {
     patient_id: patient.id,
     patient_label: patient.name,
-    environment_label: "Prepared demo workspace",
-    source_posture: "Frontend preview fixture for the Patient Record pipeline.",
+    environment_label: "Prepared patient workspace",
+    source_posture: "Application-backed workspace for source files and chart preparation.",
     private_blake_cedars_available: false,
     synthetic_resource_counts: {
       Observation: 128,
@@ -351,6 +353,111 @@ export function getMockAggregationSources(patientId: string): AggregationEnviron
   };
 }
 
+export function getMockAggregationCleaningQueue(patientId: string): AggregationCleaningQueueResponse {
+  const patient = mockPatient(patientId);
+  return {
+    patient_id: patient.id,
+    patient_label: patient.name,
+    issue_counts: {
+      open: 1,
+      ready_for_review: 1,
+      planned: 1,
+      resolved: 0,
+    },
+    issues: [
+      {
+        id: `${patient.id}-pdf-extraction`,
+        category: "uncoded_file",
+        severity: "high",
+        status: "open",
+        title: "Outside consult PDF still needs extraction",
+        body: "The uploaded consult note has not been converted into structured rows yet.",
+        recommended_action: "Run PDF extraction, then review the extracted facts before harmonization.",
+        source_ids: [`${patient.id}-outside-consult`],
+        evidence: ["Narrative consult note", "No structured preview rows yet"],
+        help_title: "Prepare the document",
+        help_body: "Unstructured PDFs should move through extraction before they can contribute canonical facts.",
+      },
+      {
+        id: `${patient.id}-portal-review`,
+        category: "provenance_gap",
+        severity: "medium",
+        status: "ready_for_review",
+        title: "Portal export preview is ready to review",
+        body: "Structured FHIR-aligned rows are available for preview before harmonization.",
+        recommended_action: "Confirm the parsed portal export content and proceed to Harmonized Record.",
+        source_ids: [`${patient.id}-portal-export`],
+        evidence: ["FHIR-ready export", "Preview rows available"],
+        help_title: "Review prepared source",
+        help_body: "This source is already parseable and can feed the harmonized record after review.",
+      },
+      {
+        id: `${patient.id}-lab-planned`,
+        category: "timeline_gap",
+        severity: "low",
+        status: "planned",
+        title: "Lab CSV mapping is planned",
+        body: "The demo workspace includes a staged lab source pattern, but no active mapping task is open.",
+        recommended_action: "Map columns if a tabular lab file is added to this workspace.",
+        source_ids: [],
+        evidence: ["Structured imports may require field mapping"],
+        help_title: "Optional follow-up",
+        help_body: "CSV and spreadsheet uploads can be added later if the case needs extra lab context.",
+      },
+    ],
+    guidance: [
+      "Use Source Intake to review structured previews before moving into Harmonized Record.",
+      "Only extracted and reviewed sources should feed the canonical chart.",
+    ],
+  };
+}
+
+export function getMockAggregationReadiness(patientId: string): AggregationReadinessResponse {
+  const patient = mockPatient(patientId);
+  return {
+    patient_id: patient.id,
+    patient_label: patient.name,
+    readiness_score: 78,
+    posture: "Most core chart sources are available, but one document still needs extraction before the workspace is fully review-ready.",
+    checklist: [
+      {
+        id: "baseline-source",
+        label: "Baseline source attached",
+        status: "ready",
+        score: 100,
+        body: "A structured FHIR baseline is already attached to the workspace.",
+        next_action: "Open the chart or continue refining the workspace.",
+      },
+      {
+        id: "portal-preview",
+        label: "Portal export parsed",
+        status: "ready",
+        score: 92,
+        body: "The staged portal export can be previewed as structured data.",
+        next_action: "Confirm the preview rows before harmonization.",
+      },
+      {
+        id: "pdf-extraction",
+        label: "Outside PDF prepared",
+        status: "needs_review",
+        score: 42,
+        body: "The outside consult note is staged but still needs extraction.",
+        next_action: "Run PDF extraction and review the result.",
+      },
+      {
+        id: "publish-state",
+        label: "Publish snapshot active",
+        status: "planned",
+        score: 0,
+        body: "No reviewed harmonization run has been published yet.",
+        next_action: "Publish the chart after harmonization review is complete.",
+      },
+    ],
+    blockers: ["Outside consult PDF still needs extraction before the workspace is fully prepared."],
+    export_targets: ["FHIR Charts", "Caspian", "Plugins", "Export package"],
+  };
+}
+
 export function getMockPatientContextStatus(): PatientContextStatus {
   return {
     private_blake_cedars_available: false,
@@ -363,7 +470,7 @@ export function getMockAggregationUploadPreview(
   fileId: string,
 ): AggregationPreparedPreviewResponse {
   const patient = mockPatient(patientId);
-  if (fileId.endsWith("portal-export")) {
+  if (fileId.includes("portal-export") || fileId.endsWith(".json")) {
     return {
       patient_id: patient.id,
       file_id: fileId,

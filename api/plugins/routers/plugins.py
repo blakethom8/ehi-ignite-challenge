@@ -105,7 +105,7 @@ def list_runs(plugin_id: str, request: Request) -> list[dict]:
 
 class StartRunBody(BaseModel):
     pluginId: str
-    patientId: str = "8.4127.881"
+    patientId: str | None = None
     workflowId: str | None = None
     title: str | None = None
     user: dict | None = None
@@ -132,7 +132,20 @@ def _run_to_payload(run: rt.RunRow) -> dict:
 def start_run(body: StartRunBody, request: Request) -> dict:
     session = require_access_session(request)
     user = session.to_user_identity()
-    resolved_patient_id = authorize_patient_access(session, body.patientId, event_type="plugin.run_started")
+    requested_patient_id = body.patientId or session.active_patient_id
+    if not requested_patient_id:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "PatientRequired",
+                "message": "Choose a patient before starting a plugin run.",
+            },
+        )
+    resolved_patient_id = authorize_patient_access(
+        session,
+        requested_patient_id,
+        event_type="plugin.run_started",
+    )
     try:
         run = rt.start_run(
             plugin_id=body.pluginId,

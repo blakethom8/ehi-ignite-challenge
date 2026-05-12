@@ -24,13 +24,37 @@ function signInErrorMessage(error: unknown): string {
   return "Log in failed. Check the account credentials and try again.";
 }
 
+function signUpErrorMessage(error: unknown): string {
+  if (axios.isAxiosError(error)) {
+    if (error.response?.status === 409) {
+      return "An account with this email already exists. Try logging in instead.";
+    }
+    if (error.response?.status === 422) {
+      const detail = (error.response.data as { detail?: unknown } | undefined)?.detail;
+      if (typeof detail === "string" && detail.trim()) return detail;
+      return "Check that the email is valid, the password is at least 8 characters, and a display name is set.";
+    }
+    if (!error.response) {
+      return "Atlas could not reach the account service. Try again when the API is available.";
+    }
+  }
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+  return "Account creation failed. Try again.";
+}
+
 export function AccountAccessPage() {
   const navigate = useNavigate();
-  const { activePatientId, isLoading, isUnlocked, signIn, user } = useAccessContext();
+  const { activePatientId, isLoading, isUnlocked, signIn, signUp, user } = useAccessContext();
   const [activeTab, setActiveTab] = useState<AccountTab>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [signInError, setSignInError] = useState<string | null>(null);
+  const [signUpEmail, setSignUpEmail] = useState("");
+  const [signUpPassword, setSignUpPassword] = useState("");
+  const [signUpDisplayName, setSignUpDisplayName] = useState("");
+  const [signUpError, setSignUpError] = useState<string | null>(null);
 
   const handleSignIn = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -40,6 +64,17 @@ export function AccountAccessPage() {
       navigate(activePatientId ? `/patient-record?patient=${encodeURIComponent(activePatientId)}` : "/records-pool");
     } catch (error) {
       setSignInError(signInErrorMessage(error));
+    }
+  };
+
+  const handleSignUp = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setSignUpError(null);
+    try {
+      await signUp(signUpEmail, signUpPassword, signUpDisplayName);
+      navigate("/records-pool");
+    } catch (error) {
+      setSignUpError(signUpErrorMessage(error));
     }
   };
 
@@ -120,7 +155,7 @@ export function AccountAccessPage() {
               <form onSubmit={handleSignIn} className="mt-6">
                 <h2 className="text-xl font-semibold text-[#18202b]">Account login</h2>
                 <p className="mt-2 text-sm leading-6 text-[#62728d]">
-                  Log in with an existing Atlas account. Account creation is not available in this demo release.
+                  Log in with an existing Atlas account, or switch to the Create account tab to make one.
                 </p>
                 <label className="mt-5 block text-xs font-semibold uppercase tracking-[0.12em] text-[#7a88a3]">
                   Email
@@ -162,34 +197,66 @@ export function AccountAccessPage() {
                 </button>
               </form>
             ) : (
-              <div className="mt-6">
-                <h2 className="text-xl font-semibold text-[#18202b]">Create account coming soon</h2>
+              <form onSubmit={handleSignUp} className="mt-6">
+                <h2 className="text-xl font-semibold text-[#18202b]">Create your Atlas account</h2>
                 <p className="mt-2 text-sm leading-6 text-[#62728d]">
-                  Public account creation is not wired to the backend in this release. For now, start with a sample chart or log in if you already have an account.
+                  Accounts keep your uploaded charts private to you. Your workspaces and source files are only visible to your account.
                 </p>
-                <div className="mt-5 rounded-2xl border border-[#d5deea] bg-[#f8fafc] p-4">
-                  <p className="text-sm font-semibold text-[#33415b]">Planned account workspace</p>
-                  <p className="mt-2 text-sm leading-6 text-[#62728d]">
-                    Accounts will support private saved workspaces, record uploads, and return access once signup and workspace ownership are implemented.
-                  </p>
-                </div>
-                <div className="mt-5 flex flex-wrap gap-3">
-                  <Link
-                    to="/#demo-workspaces"
-                    className="inline-flex items-center gap-2 rounded-2xl bg-[#4d68ff] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#3c57ef]"
-                  >
-                    Try demo instead
-                    <ArrowRight size={16} />
-                  </Link>
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab("login")}
-                    className="inline-flex items-center gap-2 rounded-2xl border border-[#d5deea] bg-white px-5 py-3 text-sm font-semibold text-[#33415b] transition-colors hover:border-[#4d68ff] hover:text-[#3657ff]"
-                  >
-                    Log in
-                  </button>
-                </div>
-              </div>
+                <label className="mt-5 block text-xs font-semibold uppercase tracking-[0.12em] text-[#7a88a3]">
+                  Display name
+                </label>
+                <input
+                  aria-label="Display name"
+                  value={signUpDisplayName}
+                  onChange={(event) => setSignUpDisplayName(event.target.value)}
+                  className="mt-2 w-full rounded-2xl border border-[#d5deea] bg-white px-4 py-3 text-sm text-[#18202b] outline-none transition-colors focus:border-[#4d68ff]"
+                  autoComplete="name"
+                  type="text"
+                  placeholder="Dr. Max Gibber"
+                />
+                <label className="mt-4 block text-xs font-semibold uppercase tracking-[0.12em] text-[#7a88a3]">
+                  Email
+                </label>
+                <input
+                  aria-label="Signup email"
+                  value={signUpEmail}
+                  onChange={(event) => setSignUpEmail(event.target.value)}
+                  className="mt-2 w-full rounded-2xl border border-[#d5deea] bg-white px-4 py-3 text-sm text-[#18202b] outline-none transition-colors focus:border-[#4d68ff]"
+                  autoComplete="email"
+                  type="email"
+                />
+                <label className="mt-4 block text-xs font-semibold uppercase tracking-[0.12em] text-[#7a88a3]">
+                  Password
+                </label>
+                <input
+                  aria-label="Signup password"
+                  type="password"
+                  value={signUpPassword}
+                  onChange={(event) => setSignUpPassword(event.target.value)}
+                  className="mt-2 w-full rounded-2xl border border-[#d5deea] bg-white px-4 py-3 text-sm text-[#18202b] outline-none transition-colors focus:border-[#4d68ff]"
+                  autoComplete="new-password"
+                  placeholder="At least 8 characters"
+                />
+                {signUpError && (
+                  <p className="mt-3 text-sm text-[#b42318]">{signUpError}</p>
+                )}
+                <button
+                  type="submit"
+                  disabled={
+                    isLoading ||
+                    !signUpEmail.trim() ||
+                    !signUpDisplayName.trim() ||
+                    signUpPassword.length < 8
+                  }
+                  className="mt-5 inline-flex items-center gap-2 rounded-2xl bg-[#4d68ff] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#3c57ef] disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {isLoading ? "Creating account..." : "Create account"}
+                  <ArrowRight size={16} />
+                </button>
+                <p className="mt-4 text-xs leading-5 text-[#7a88a3]">
+                  Atlas is in active development. Your uploads are stored on the application server and only visible to your account.
+                </p>
+              </form>
             )}
           </section>
         </main>

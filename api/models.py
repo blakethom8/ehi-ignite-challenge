@@ -42,6 +42,7 @@ class AggregationProfile(BaseModel):
     updated_at: datetime
     notes: str = ""
     storage_mode: str = "server-local-workspace"
+    owner_user_id: str | None = None
 
 
 class AggregationCreateProfileRequest(BaseModel):

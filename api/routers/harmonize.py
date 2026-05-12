@@ -26,10 +26,11 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse
 
 from api.core import harmonization_runs, harmonize_service, published_charts
+from api.core.auth import require_authenticated_session
 from scripts.export_workspace_package import build_package
 from api.models import (
     HarmonizeAllergiesResponse,
@@ -69,7 +70,8 @@ router = APIRouter(prefix="/harmonize", tags=["harmonize"])
 
 
 @router.get("/collections", response_model=HarmonizeCollectionsResponse)
-def get_collections() -> HarmonizeCollectionsResponse:
+def get_collections(request: Request) -> HarmonizeCollectionsResponse:
+    require_authenticated_session(request)
     return HarmonizeCollectionsResponse(
         collections=[
             HarmonizeCollection(
@@ -84,7 +86,8 @@ def get_collections() -> HarmonizeCollectionsResponse:
 
 
 @router.get("/workspaces/{patient_id}", response_model=HarmonizeCollection)
-def get_patient_workspace(patient_id: str) -> HarmonizeCollection:
+def get_patient_workspace(request: Request, patient_id: str) -> HarmonizeCollection:
+    require_authenticated_session(request)
     collection = harmonize_service.patient_workspace_collection(patient_id)
     if collection is None:
         raise HTTPException(status_code=404, detail=f"Patient workspace not found: {patient_id}")
@@ -97,7 +100,8 @@ def get_patient_workspace(patient_id: str) -> HarmonizeCollection:
 
 
 @router.get("/{collection_id}/sources", response_model=HarmonizeSourceManifestResponse)
-def get_sources(collection_id: str) -> HarmonizeSourceManifestResponse:
+def get_sources(request: Request, collection_id: str) -> HarmonizeSourceManifestResponse:
+    require_authenticated_session(request)
     manifest = harmonize_service.collection_source_manifest(collection_id)
     if manifest is None:
         raise HTTPException(status_code=404, detail=f"Collection not found: {collection_id}")
@@ -111,10 +115,11 @@ def get_sources(collection_id: str) -> HarmonizeSourceManifestResponse:
     "/{collection_id}/observations",
     response_model=HarmonizeObservationsResponse,
 )
-def get_observations(
+def get_observations(request: Request,
     collection_id: str,
     cross_source_only: bool = False,
 ) -> HarmonizeObservationsResponse:
+    require_authenticated_session(request)
     if harmonize_service.get_collection(collection_id) is None:
         raise HTTPException(status_code=404, detail=f"Collection not found: {collection_id}")
     merged = harmonize_service.merged_observations(collection_id)
@@ -135,10 +140,11 @@ def get_observations(
     "/{collection_id}/conditions",
     response_model=HarmonizeConditionsResponse,
 )
-def get_conditions(
+def get_conditions(request: Request,
     collection_id: str,
     cross_source_only: bool = False,
 ) -> HarmonizeConditionsResponse:
+    require_authenticated_session(request)
     if harmonize_service.get_collection(collection_id) is None:
         raise HTTPException(status_code=404, detail=f"Collection not found: {collection_id}")
     merged = harmonize_service.merged_conditions(collection_id)
@@ -159,10 +165,11 @@ def get_conditions(
     "/{collection_id}/medications",
     response_model=HarmonizeMedicationsResponse,
 )
-def get_medications(
+def get_medications(request: Request,
     collection_id: str,
     cross_source_only: bool = False,
 ) -> HarmonizeMedicationsResponse:
+    require_authenticated_session(request)
     if harmonize_service.get_collection(collection_id) is None:
         raise HTTPException(status_code=404, detail=f"Collection not found: {collection_id}")
     merged = harmonize_service.merged_medications(collection_id)
@@ -183,10 +190,11 @@ def get_medications(
     "/{collection_id}/allergies",
     response_model=HarmonizeAllergiesResponse,
 )
-def get_allergies(
+def get_allergies(request: Request,
     collection_id: str,
     cross_source_only: bool = False,
 ) -> HarmonizeAllergiesResponse:
+    require_authenticated_session(request)
     if harmonize_service.get_collection(collection_id) is None:
         raise HTTPException(status_code=404, detail=f"Collection not found: {collection_id}")
     merged = harmonize_service.merged_allergies(collection_id)
@@ -207,10 +215,11 @@ def get_allergies(
     "/{collection_id}/immunizations",
     response_model=HarmonizeImmunizationsResponse,
 )
-def get_immunizations(
+def get_immunizations(request: Request,
     collection_id: str,
     cross_source_only: bool = False,
 ) -> HarmonizeImmunizationsResponse:
+    require_authenticated_session(request)
     if harmonize_service.get_collection(collection_id) is None:
         raise HTTPException(status_code=404, detail=f"Collection not found: {collection_id}")
     merged = harmonize_service.merged_immunizations(collection_id)
@@ -232,7 +241,7 @@ def get_immunizations(
     response_model=HarmonizeExtractJobResponse,
     status_code=202,
 )
-def extract_collection(collection_id: str) -> HarmonizeExtractJobResponse:
+def extract_collection(request: Request, collection_id: str) -> HarmonizeExtractJobResponse:
     """Enqueue an extraction job over every uploaded PDF in this collection
     that lacks a cached extraction.
 
@@ -241,6 +250,7 @@ def extract_collection(collection_id: str) -> HarmonizeExtractJobResponse:
     ``GET /api/harmonize/extract-jobs/{job_id}`` for completion. Static demo
     collections are read-only and return 400.
     """
+    require_authenticated_session(request)
     if harmonize_service.get_collection(collection_id) is None:
         raise HTTPException(status_code=404, detail=f"Collection not found: {collection_id}")
     job = harmonize_service.start_extract_job(collection_id)
@@ -256,8 +266,9 @@ def extract_collection(collection_id: str) -> HarmonizeExtractJobResponse:
     "/extract-jobs/{job_id}",
     response_model=HarmonizeExtractJobResponse,
 )
-def get_extract_job(job_id: str) -> HarmonizeExtractJobResponse:
+def get_extract_job(request: Request, job_id: str) -> HarmonizeExtractJobResponse:
     """Poll a previously-enqueued extraction job. 404s for unknown jobs."""
+    require_authenticated_session(request)
     job = harmonize_service.get_extract_job(job_id)
     if job is None:
         raise HTTPException(status_code=404, detail=f"Extract job not found: {job_id}")
@@ -268,11 +279,12 @@ def get_extract_job(job_id: str) -> HarmonizeExtractJobResponse:
     "/{collection_id}/extract-job",
     response_model=HarmonizeExtractJobResponse,
 )
-def get_latest_extract_job(collection_id: str) -> HarmonizeExtractJobResponse:
+def get_latest_extract_job(request: Request, collection_id: str) -> HarmonizeExtractJobResponse:
     """Return the most recent extraction job for a collection.
 
     This lets the UI recover in-flight progress after navigation or reloads.
     """
+    require_authenticated_session(request)
     if harmonize_service.get_collection(collection_id) is None:
         raise HTTPException(status_code=404, detail=f"Collection not found: {collection_id}")
     job = harmonize_service.get_latest_extract_job(collection_id)
@@ -286,8 +298,9 @@ def get_latest_extract_job(collection_id: str) -> HarmonizeExtractJobResponse:
     response_model=HarmonizeRunResponse,
     status_code=201,
 )
-def run_harmonization(collection_id: str) -> HarmonizeRunResponse:
+def run_harmonization(request: Request, collection_id: str) -> HarmonizeRunResponse:
     """Create a durable scripted harmonization run for this collection."""
+    require_authenticated_session(request)
     if harmonize_service.get_collection(collection_id) is None:
         raise HTTPException(status_code=404, detail=f"Collection not found: {collection_id}")
     try:
@@ -301,8 +314,9 @@ def run_harmonization(collection_id: str) -> HarmonizeRunResponse:
     "/{collection_id}/runs/latest",
     response_model=HarmonizeRunStateResponse,
 )
-def get_latest_harmonization_run(collection_id: str) -> HarmonizeRunStateResponse:
+def get_latest_harmonization_run(request: Request, collection_id: str) -> HarmonizeRunStateResponse:
     """Return the latest persisted harmonization run, if one exists."""
+    require_authenticated_session(request)
     if harmonize_service.get_collection(collection_id) is None:
         raise HTTPException(status_code=404, detail=f"Collection not found: {collection_id}")
     latest = harmonization_runs.latest_run(collection_id)
@@ -316,8 +330,9 @@ def get_latest_harmonization_run(collection_id: str) -> HarmonizeRunStateRespons
     "/{collection_id}/runs/{run_id}",
     response_model=HarmonizeRunResponse,
 )
-def get_harmonization_run(collection_id: str, run_id: str) -> HarmonizeRunResponse:
+def get_harmonization_run(request: Request, collection_id: str, run_id: str) -> HarmonizeRunResponse:
     """Fetch one persisted harmonization run artifact by id."""
+    require_authenticated_session(request)
     if harmonize_service.get_collection(collection_id) is None:
         raise HTTPException(status_code=404, detail=f"Collection not found: {collection_id}")
     payload = harmonization_runs.get_run(collection_id, run_id)
@@ -330,12 +345,13 @@ def get_harmonization_run(collection_id: str, run_id: str) -> HarmonizeRunRespon
     "/{collection_id}/runs/{run_id}/review-items/resolve",
     response_model=HarmonizeRunResponse,
 )
-def resolve_harmonization_review_item(
+def resolve_harmonization_review_item(request: Request,
     collection_id: str,
     run_id: str,
     decision: HarmonizeReviewDecisionRequest,
 ) -> HarmonizeRunResponse:
     """Record a reviewer decision for one persisted harmonization run item."""
+    require_authenticated_session(request)
     if harmonize_service.get_collection(collection_id) is None:
         raise HTTPException(status_code=404, detail=f"Collection not found: {collection_id}")
     try:
@@ -358,8 +374,9 @@ def resolve_harmonization_review_item(
     "/{collection_id}/published",
     response_model=PublishedChartStateResponse,
 )
-def get_published_chart(collection_id: str) -> PublishedChartStateResponse:
+def get_published_chart(request: Request, collection_id: str) -> PublishedChartStateResponse:
     """Return published chart snapshots for this harmonize collection."""
+    require_authenticated_session(request)
     if harmonize_service.get_collection(collection_id) is None:
         raise HTTPException(status_code=404, detail=f"Collection not found: {collection_id}")
     return PublishedChartStateResponse(**published_charts.state(collection_id))
@@ -370,8 +387,9 @@ def get_published_chart(collection_id: str) -> PublishedChartStateResponse:
     response_model=PublishedChartStateResponse,
     status_code=201,
 )
-def publish_harmonization_run(collection_id: str, run_id: str) -> PublishedChartStateResponse:
+def publish_harmonization_run(request: Request, collection_id: str, run_id: str) -> PublishedChartStateResponse:
     """Pin a completed harmonization run as the active downstream chart."""
+    require_authenticated_session(request)
     if harmonize_service.get_collection(collection_id) is None:
         raise HTTPException(status_code=404, detail=f"Collection not found: {collection_id}")
     try:
@@ -386,8 +404,9 @@ def publish_harmonization_run(collection_id: str, run_id: str) -> PublishedChart
     "/{collection_id}/published/{snapshot_id}/activate",
     response_model=PublishedChartStateResponse,
 )
-def activate_published_snapshot(collection_id: str, snapshot_id: str) -> PublishedChartStateResponse:
+def activate_published_snapshot(request: Request, collection_id: str, snapshot_id: str) -> PublishedChartStateResponse:
     """Switch downstream modules back to a prior published snapshot."""
+    require_authenticated_session(request)
     if harmonize_service.get_collection(collection_id) is None:
         raise HTTPException(status_code=404, detail=f"Collection not found: {collection_id}")
     try:
@@ -400,8 +419,9 @@ def activate_published_snapshot(collection_id: str, snapshot_id: str) -> Publish
     "/{collection_id}/published/active",
     response_model=PublishedChartStateResponse,
 )
-def unpublish_active_snapshot(collection_id: str) -> PublishedChartStateResponse:
+def unpublish_active_snapshot(request: Request, collection_id: str) -> PublishedChartStateResponse:
     """Remove active downstream access while keeping snapshot history."""
+    require_authenticated_session(request)
     if harmonize_service.get_collection(collection_id) is None:
         raise HTTPException(status_code=404, detail=f"Collection not found: {collection_id}")
     return PublishedChartStateResponse(**published_charts.unpublish(collection_id))
@@ -496,7 +516,7 @@ def _job_to_response(job: harmonize_service.ExtractJob) -> HarmonizeExtractJobRe
     "/{collection_id}/source-diff",
     response_model=HarmonizeSourceDiffResponse,
 )
-def get_source_diff(collection_id: str) -> HarmonizeSourceDiffResponse:
+def get_source_diff(request: Request, collection_id: str) -> HarmonizeSourceDiffResponse:
     """Per-source unique vs shared contribution counts + the unique-fact lists.
 
     For each source bundle in the collection: the merged records that are
@@ -509,6 +529,7 @@ def get_source_diff(collection_id: str) -> HarmonizeSourceDiffResponse:
     structured FHIR pull never coded — see PIPELINE-LOG Move H), and
     the FHIR's unique set tends to be older / non-summary records.
     """
+    require_authenticated_session(request)
     if harmonize_service.get_collection(collection_id) is None:
         raise HTTPException(status_code=404, detail=f"Collection not found: {collection_id}")
     payload = harmonize_service.source_contribution_diff(collection_id)
@@ -555,7 +576,7 @@ def get_source_diff(collection_id: str) -> HarmonizeSourceDiffResponse:
 
 
 @router.get("/{collection_id}/export-workspace")
-def export_workspace_package(
+def export_workspace_package(request: Request,
     collection_id: str,
     include_originals: bool = False,
 ) -> FileResponse:
@@ -565,6 +586,7 @@ def export_workspace_package(
     contributions, missing-information signals, agent instructions, context
     packets, markdown/CSV exports, and a tiny package-inspection CLI.
     """
+    require_authenticated_session(request)
     if harmonize_service.get_collection(collection_id) is None:
         raise HTTPException(status_code=404, detail=f"Collection not found: {collection_id}")
 
@@ -591,7 +613,7 @@ def export_workspace_package(
     "/{collection_id}/contributions/{document_reference:path}",
     response_model=HarmonizeContributionsResponse,
 )
-def get_contributions(
+def get_contributions(request: Request,
     collection_id: str,
     document_reference: str,
 ) -> HarmonizeContributionsResponse:
@@ -604,6 +626,7 @@ def get_contributions(
     information density of one source vs another, or audit which facts
     came from a specific PDF before removing it.
     """
+    require_authenticated_session(request)
     if harmonize_service.get_collection(collection_id) is None:
         raise HTTPException(status_code=404, detail=f"Collection not found: {collection_id}")
     payload = harmonize_service.facts_for_document_reference(
@@ -639,7 +662,8 @@ def get_contributions(
     "/{collection_id}/provenance/{merged_ref:path}",
     response_model=HarmonizeProvenanceResponse,
 )
-def get_provenance(collection_id: str, merged_ref: str) -> HarmonizeProvenanceResponse:
+def get_provenance(request: Request, collection_id: str, merged_ref: str) -> HarmonizeProvenanceResponse:
+    require_authenticated_session(request)
     if harmonize_service.get_collection(collection_id) is None:
         raise HTTPException(status_code=404, detail=f"Collection not found: {collection_id}")
     prov = harmonize_service.provenance_for_ref(collection_id, merged_ref)

@@ -6,10 +6,12 @@ import { AccountAccessPage } from "./AccountAccess";
 const {
   navigateMock,
   signInMock,
+  signUpMock,
   useAccessContextMock,
 } = vi.hoisted(() => ({
   navigateMock: vi.fn(),
   signInMock: vi.fn<(email: string, password: string) => Promise<void>>(),
+  signUpMock: vi.fn<(email: string, password: string, displayName: string) => Promise<void>>(),
   useAccessContextMock: vi.fn(),
 }));
 
@@ -37,12 +39,14 @@ describe("AccountAccessPage", () => {
   beforeEach(() => {
     navigateMock.mockReset();
     signInMock.mockReset();
+    signUpMock.mockReset();
     useAccessContextMock.mockReset();
     useAccessContextMock.mockReturnValue({
       activePatientId: null,
       isLoading: false,
       isUnlocked: false,
       signIn: signInMock,
+      signUp: signUpMock,
       user: null,
     });
   });
@@ -67,13 +71,58 @@ describe("AccountAccessPage", () => {
     expect(screen.queryByText(/clinician@atlas\.local|atlas-demo-password/i)).not.toBeInTheDocument();
   });
 
-  it("shows an honest create-account placeholder", () => {
+  it("creates a new account from the signup tab", async () => {
+    signUpMock.mockResolvedValue();
     renderAccountAccess();
 
     fireEvent.click(screen.getByRole("button", { name: /create account/i }));
 
-    expect(screen.getByText("Create account coming soon")).toBeInTheDocument();
-    expect(screen.getByText(/Public account creation is not wired to the backend/i)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /create account now/i })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Display name"), {
+      target: { value: "Dr. Test" },
+    });
+    fireEvent.change(screen.getByLabelText("Signup email"), {
+      target: { value: "newuser@example.com" },
+    });
+    fireEvent.change(screen.getByLabelText("Signup password"), {
+      target: { value: "longenoughpw" },
+    });
+
+    const submitButtons = screen.getAllByRole("button", { name: /create account/i });
+    fireEvent.click(submitButtons[submitButtons.length - 1]);
+
+    await waitFor(() => {
+      expect(signUpMock).toHaveBeenCalledWith(
+        "newuser@example.com",
+        "longenoughpw",
+        "Dr. Test",
+      );
+    });
+    expect(navigateMock).toHaveBeenCalledWith("/records-pool");
+  });
+
+  it("disables the signup submit button while required fields are incomplete", () => {
+    renderAccountAccess();
+
+    fireEvent.click(screen.getByRole("button", { name: /create account/i }));
+
+    const submitButtons = screen.getAllByRole("button", { name: /create account/i });
+    const submit = submitButtons[submitButtons.length - 1];
+    expect(submit).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText("Display name"), {
+      target: { value: "Dr. Test" },
+    });
+    fireEvent.change(screen.getByLabelText("Signup email"), {
+      target: { value: "newuser@example.com" },
+    });
+    fireEvent.change(screen.getByLabelText("Signup password"), {
+      target: { value: "short" },
+    });
+    expect(submit).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText("Signup password"), {
+      target: { value: "longenough" },
+    });
+    expect(submit).not.toBeDisabled();
   });
 });

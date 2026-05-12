@@ -10,9 +10,10 @@ import statistics
 import zipfile
 from collections import defaultdict
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 
+from api.core.auth import require_authenticated_session
 from api.core.loader import list_patient_files, load_patient, patient_id_from_path
 from api.models import (
     AllergyCriticalityBreakdown,
@@ -28,7 +29,7 @@ router = APIRouter(prefix="/corpus", tags=["corpus"])
 
 
 @router.get("/stats", response_model=CorpusStats)
-def corpus_stats() -> CorpusStats:
+def corpus_stats(request: Request) -> CorpusStats:
     """
     Aggregate statistics across the entire patient corpus.
 
@@ -37,6 +38,7 @@ def corpus_stats() -> CorpusStats:
     calls are fast because load_patient() uses an LRU cache. Consider calling
     this endpoint at startup or after a warm-up delay in production.
     """
+    require_authenticated_session(request)
     files = list_patient_files()
 
     gender_breakdown: dict[str, int] = defaultdict(int)
@@ -91,7 +93,7 @@ def _coverage_label(pct: float) -> str:
 
 
 @router.get("/field-coverage", response_model=FieldCoverageResponse)
-def field_coverage() -> FieldCoverageResponse:
+def field_coverage(request: Request) -> FieldCoverageResponse:
     """
     Field coverage profiler — shows which FHIR fields are always/sometimes/rarely
     populated across the entire patient corpus.
@@ -103,6 +105,7 @@ def field_coverage() -> FieldCoverageResponse:
 
     NOTE: First call loads all bundles (~30-60 s). Subsequent calls are fast due to LRU cache.
     """
+    require_authenticated_session(request)
     files = list_patient_files()
 
     # Accumulators — keyed by field_path
@@ -295,7 +298,7 @@ def _percentile(sorted_values: list[float], pct: float) -> float:
 
 
 @router.get("/observation-distributions", response_model=ObservationDistributionsResponse)
-def observation_distributions() -> ObservationDistributionsResponse:
+def observation_distributions(request: Request) -> ObservationDistributionsResponse:
     """
     Population-level lab value distributions for quantitative LOINC observations
     across all ~1,180 patient bundles.
@@ -304,6 +307,7 @@ def observation_distributions() -> ObservationDistributionsResponse:
     the LRU cache in loader.py. Only LOINC codes with ≥20 data points are included.
     Results are capped at the top 30 codes by observation count, sorted descending.
     """
+    require_authenticated_session(request)
     files = list_patient_files()
 
     # values_by_code[loinc_code] = list of float values
@@ -433,7 +437,7 @@ _CRITICALITY_ORDER = {"high": 0, "low": 1, "unable-to-assess": 2, "unknown": 3}
 
 
 @router.get("/allergies/criticality-breakdown", response_model=AllergyCriticalityBreakdown)
-def allergy_criticality_breakdown() -> AllergyCriticalityBreakdown:
+def allergy_criticality_breakdown(request: Request) -> AllergyCriticalityBreakdown:
     """
     Population-level allergy criticality and category breakdown across all patients.
 
@@ -446,6 +450,7 @@ def allergy_criticality_breakdown() -> AllergyCriticalityBreakdown:
     NOTE: First call loads all bundles (~30–60 s). Subsequent calls are fast
     due to the LRU cache in loader.py.
     """
+    require_authenticated_session(request)
     files = list_patient_files()
 
     criticality_counts: dict[str, int] = defaultdict(int)
@@ -534,7 +539,7 @@ def allergy_criticality_breakdown() -> AllergyCriticalityBreakdown:
 # ---------------------------------------------------------------------------
 
 @router.get("/export")
-def export_corpus(format: str = "csv", limit: int = 0) -> StreamingResponse:
+def export_corpus(request: Request, format: str = "csv", limit: int = 0) -> StreamingResponse:
     """
     Download normalized tabular data from the full patient corpus as a ZIP
     file containing one CSV per resource type.
@@ -547,6 +552,7 @@ def export_corpus(format: str = "csv", limit: int = 0) -> StreamingResponse:
     Returns:
       application/zip — filename "ehi-export.zip"
     """
+    require_authenticated_session(request)
     files = list_patient_files()
     if limit > 0:
         files = files[:limit]

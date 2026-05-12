@@ -194,7 +194,17 @@ cd ehi-ignite-challenge
 
 # Set environment
 cp .env.example .env
-nano .env  # add ANTHROPIC_API_KEY
+nano .env
+
+# Minimum production keys in .env:
+# - ANTHROPIC_API_KEY
+# - EHI_SESSION_SECRET
+# - GUEST_HARMONIZATION_SECRET
+# - ATLAS_SIGNING_KEY
+#
+# Optional but recommended when you want those APIs enabled in production:
+# - AUDIT_API_TOKEN
+# - TRACES_API_TOKEN
 
 # Get SSL cert
 docker run --rm -v ./certbot/conf:/etc/letsencrypt \
@@ -245,3 +255,31 @@ API base URL in dev: `http://localhost:8000`
 API base URL in prod: `https://your-domain.com/api`
 
 Configure via `VITE_API_URL` env var in `app/.env.local`.
+
+## Production env checklist
+
+The production compose file injects some runtime config directly, but the
+following secrets still need to exist in `/opt/ehi-ignite/.env` before deploy:
+
+```bash
+ANTHROPIC_API_KEY=...
+EHI_SESSION_SECRET=...
+GUEST_HARMONIZATION_SECRET=...
+ATLAS_SIGNING_KEY=...
+```
+
+Why these matter:
+
+- `EHI_SESSION_SECRET`: required for signed auth/demo session cookies in production
+- `GUEST_HARMONIZATION_SECRET`: required for signed guest workspace cookies in production
+- `ATLAS_SIGNING_KEY`: required for the plugin trust chain and signed runtime artifacts
+
+Feature-gated production tokens:
+
+```bash
+AUDIT_API_TOKEN=...
+TRACES_API_TOKEN=...
+```
+
+- `/api/audit/*` returns `503` in production until `AUDIT_API_TOKEN` is set
+- `/api/traces/*` also requires `TRACES_API_ENABLED=true`; if enabled in production, it must have `TRACES_API_TOKEN`

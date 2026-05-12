@@ -69,6 +69,8 @@ import type {
   CcdaLabProcessorsResponse,
   PipelineEvaluationDetail,
   PipelineLabLeaderboardResponse,
+  PatientContextAugmentationResponse,
+  FhirComposition,
 } from "../types";
 import {
   getMockAggregationCleaningQueue,
@@ -595,5 +597,26 @@ export const api = {
   unpublishActiveChart: (collectionId: string): Promise<PublishedChartStateResponse> =>
     http
       .delete<PublishedChartStateResponse>(`/harmonize/${collectionId}/published/active`)
+      .then((r) => r.data),
+
+  // T8c — LLM-augmented context panels on the merged-record page.
+  // See docs/architecture/LLM-CONTEXT-AUGMENTATION-PLAN.md §T8.
+  getPatientContextAugmentation: (
+    patientId: string,
+  ): Promise<PatientContextAugmentationResponse> =>
+    http
+      .get<PatientContextAugmentationResponse>(
+        `/patient-context/${encodeURIComponent(patientId)}/augmentation`,
+      )
+      .then((r) => r.data),
+
+  getPatientContextNarrative: (
+    patientId: string,
+    episodeSlug: string,
+  ): Promise<FhirComposition> =>
+    http
+      .get<FhirComposition>(
+        `/patient-context/${encodeURIComponent(patientId)}/narratives/${encodeURIComponent(episodeSlug)}`,
+      )
       .then((r) => r.data),
 };

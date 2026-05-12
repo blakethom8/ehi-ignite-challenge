@@ -77,3 +77,86 @@ def export_patient_context(session_id: str, request: Request) -> PatientContextE
         return export_markdown(session_id)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+# ---------------------------------------------------------------------------
+# T8c read endpoints — drive the merged-record UI panels
+# ---------------------------------------------------------------------------
+
+
+@router.get("/{patient_id}/augmentation")
+def patient_context_augmentation(patient_id: str, request: Request) -> dict:
+    """Bundle the three T8 augmentation artifacts for the merged-record UI.
+
+    Returns a single payload so the React panel can fetch in one round
+    trip:
+
+    - ``patient_voice``: ``{summary, citations, generated_at}`` or null.
+    - ``episode_briefs``: list of ``{episode_id, type, period_start,
+      period_end, one_liner}`` derived from ``episodes.json`` + each
+      episode's ``current.json`` Summary section.
+    - ``caveats``: list of ``{fact_path, verdict, confidence,
+      rationale, dissenting_sources, blocker}`` parsed from
+      ``caveats.json``.
+
+    All three default to empty-but-shaped responses when their
+    on-disk artifact is missing, so the UI renders a single shape.
+    """
+    require_access_session(request)
+    from api.core.context_builder import (
+        _load_caveats,
+        _load_episode_briefs,
+        _load_patient_voice_context,
+    )
+
+    voice = _load_patient_voice_context(patient_id)
+    briefs = _load_episode_briefs(patient_id)
+    caveats = _load_caveats(patient_id)
+    return {
+        "patient_voice": (
+            {"summary": voice.summary, "citations": list(voice.citations)}
+            if voice is not None
+            else None
+        ),
+        "episode_briefs": [
+            {
+                "episode_id": b.episode_id,
+                "type": b.type,
+                "period_start": b.period_start,
+                "period_end": b.period_end,
+                "one_liner": b.one_liner,
+            }
+            for b in briefs
+        ],
+        "caveats": [
+            {
+                "fact_path": c.fact_path,
+                "verdict": c.verdict,
+                "confidence": c.confidence,
+                "rationale": c.rationale,
+                "dissenting_sources": list(c.dissenting_sources),
+            }
+            for c in caveats
+        ],
+    }
+
+
+@router.get("/{patient_id}/narratives/{episode_slug}")
+def patient_context_narrative(
+    patient_id: str, episode_slug: str, request: Request
+) -> dict:
+    """Return the FHIR Composition for one episode's narrative.
+
+    Reads ``data/narratives/<patient>/<slug>/current.json``. 404 if
+    not yet generated.
+    """
+    require_access_session(request)
+    from lib.narratives import load_current_narrative
+
+    composition = load_current_narrative(patient_id, episode_slug)
+    if composition is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"narrative for {patient_id}/{episode_slug} not yet generated",
+        )
+    return composition

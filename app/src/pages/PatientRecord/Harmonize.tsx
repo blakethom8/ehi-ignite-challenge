@@ -38,6 +38,7 @@ import type {
   HarmonizeReviewDecisionPayload,
 } from "../../types";
 import { formatDisplayNumber, formatMeasurement } from "../../utils/format";
+import { PatientContextPanels } from "./PatientContextPanels";
 
 type ResourceTab =
   | "labs"
@@ -2883,6 +2884,10 @@ export function HarmonizeView() {
             </p>
         </div>
       </header>
+
+      {/* T8c — patient voice / care episodes / conflicts. Hides itself when
+          no augmentation artifacts exist on disk for this patient. */}
+      {patientId && <PatientContextPanels patientId={patientId} />}
 
       {isLoadingCollections && (
         <div className="rounded-lg border border-[#dfe4ea] bg-white p-5">

@@ -22,6 +22,7 @@ from api.core.auth import init_auth_store
 from api.core.loader import warm_patient_indexes
 from api.core.sof_materialize import materialize_from_env
 from api.middleware.tracing import TracingMiddleware
+from api.routers import admin
 from api.routers import auth
 from api.routers import patients
 from api.routers import corpus
@@ -115,6 +116,7 @@ app.add_middleware(
 app.add_middleware(TracingMiddleware)
 
 app.include_router(auth.router, prefix="/api")
+app.include_router(admin.router, prefix="/api")
 app.include_router(patients.router, prefix="/api")
 app.include_router(corpus.router, prefix="/api")
 app.include_router(assistant.router, prefix="/api")

@@ -7,6 +7,10 @@ import { ChatProvider } from "./context/ChatContext";
 import { AccessProvider, useAccessContext } from "./context/AccessContext";
 import { ChatWidget } from "./components/ChatWidget";
 import { AccountAccessPage } from "./pages/AccountAccess";
+import { AdminUsersPage } from "./pages/Admin/Users";
+import { AdminUserDetailPage } from "./pages/Admin/UserDetail";
+import { AdminSessionsPage } from "./pages/Admin/Sessions";
+import { AccountSettingsPage } from "./pages/AccountSettings";
 import { DemoPatientSelection } from "./pages/DemoPatientSelection";
 import { Landing } from "./pages/Landing";
 import { GuestHarmonization } from "./pages/GuestHarmonization";
@@ -258,6 +262,11 @@ function AppShellRoutes() {
         <Route path="/" element={<Landing />} />
         <Route path="/demo" element={<DemoPatientSelection />} />
         <Route path="/account" element={<AccountAccessPage />} />
+        <Route path="/account/settings" element={<AccountSettingsPage />} />
+        <Route path="/admin" element={<Navigate to="/admin/users" replace />} />
+        <Route path="/admin/users" element={<AdminUsersPage />} />
+        <Route path="/admin/users/:userId" element={<AdminUserDetailPage />} />
+        <Route path="/admin/sessions" element={<AdminSessionsPage />} />
         <Route path="/guest-harmonization" element={<GuestHarmonization />} />
         <Route path="/architecture" element={<PlatformArchitecture />} />
         <Route path="/records-pool" element={<PatientRecordPool />} />

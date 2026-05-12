@@ -54,6 +54,12 @@ import type {
   AggregationUpdateProfilePayload,
   AggregationUploadPayload,
   AggregationUploadResponse,
+  AdminActionResponse,
+  AdminAuditListResponse,
+  AdminPatchUserPayload,
+  AdminSessionSummary,
+  AdminUserDetail,
+  AdminUserSummary,
   CanonicalPatientSummary,
   GuestHarmonizationDeleteResponse,
   GuestHarmonizationOutputPackage,
@@ -596,4 +602,68 @@ export const api = {
     http
       .delete<PublishedChartStateResponse>(`/harmonize/${collectionId}/published/active`)
       .then((r) => r.data),
+
+  // -------------------------------------------------------------------------
+  // Admin — user, session, and activity management
+  // -------------------------------------------------------------------------
+
+  adminListUsers: (): Promise<AdminUserSummary[]> =>
+    http.get<AdminUserSummary[]>("/admin/users").then((r) => r.data),
+
+  adminGetUser: (userId: string): Promise<AdminUserDetail> =>
+    http
+      .get<AdminUserDetail>(`/admin/users/${encodeURIComponent(userId)}`)
+      .then((r) => r.data),
+
+  adminGetUserActivity: (userId: string, limit = 100): Promise<AdminAuditListResponse> =>
+    http
+      .get<AdminAuditListResponse>(
+        `/admin/users/${encodeURIComponent(userId)}/activity`,
+        { params: { limit } },
+      )
+      .then((r) => r.data),
+
+  adminPatchUser: (
+    userId: string,
+    payload: AdminPatchUserPayload,
+  ): Promise<AdminUserDetail> =>
+    http
+      .patch<AdminUserDetail>(`/admin/users/${encodeURIComponent(userId)}`, payload)
+      .then((r) => r.data),
+
+  adminDeleteUser: (userId: string): Promise<AdminActionResponse> =>
+    http
+      .delete<AdminActionResponse>(`/admin/users/${encodeURIComponent(userId)}`)
+      .then((r) => r.data),
+
+  adminListSessions: (): Promise<AdminSessionSummary[]> =>
+    http.get<AdminSessionSummary[]>("/admin/sessions").then((r) => r.data),
+
+  adminRevokeSession: (sessionId: string): Promise<AdminActionResponse> =>
+    http
+      .delete<AdminActionResponse>(`/admin/sessions/${encodeURIComponent(sessionId)}`)
+      .then((r) => r.data),
+
+  // -------------------------------------------------------------------------
+  // Self-service account
+  // -------------------------------------------------------------------------
+
+  updateAccountProfile: (displayName: string): Promise<AuthSessionResponse> =>
+    http
+      .patch<AuthSessionResponse>("/auth/me", { display_name: displayName })
+      .then((r) => r.data),
+
+  changeAccountPassword: (
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<AdminActionResponse> =>
+    http
+      .post<AdminActionResponse>("/auth/change-password", {
+        current_password: currentPassword,
+        new_password: newPassword,
+      })
+      .then((r) => r.data),
+
+  deleteAccount: (): Promise<AuthSessionResponse> =>
+    http.delete<AuthSessionResponse>("/auth/me").then((r) => r.data),
 };

@@ -33,6 +33,9 @@ type AccessContextValue = AccessState & {
   setActivePatient: (patientId: string | null) => Promise<void>;
   clearAccess: () => Promise<void>;
   refreshSession: () => Promise<void>;
+  updateDisplayName: (displayName: string) => Promise<void>;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
+  deleteAccount: () => Promise<void>;
 };
 
 const AccessContext = createContext<AccessContextValue | null>(null);
@@ -197,6 +200,28 @@ export function AccessProvider({ children }: { children: ReactNode }) {
           return;
         }
         applySession(await api.logout());
+      },
+      updateDisplayName: async (displayName: string) => {
+        if (useMockData) {
+          setState((prev) => ({
+            ...prev,
+            user: prev.user ? { ...prev.user, display_name: displayName } : prev.user,
+          }));
+          return;
+        }
+        applySession(await api.updateAccountProfile(displayName));
+      },
+      changePassword: async (currentPassword: string, newPassword: string) => {
+        if (useMockData) return;
+        await api.changeAccountPassword(currentPassword, newPassword);
+      },
+      deleteAccount: async () => {
+        if (useMockData) {
+          writeMockSession("anonymous", null);
+          setState(mockSessionFromStorage());
+          return;
+        }
+        applySession(await api.deleteAccount());
       },
       refreshSession,
     }),

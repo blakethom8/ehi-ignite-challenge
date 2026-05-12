@@ -32,6 +32,72 @@ export interface AuthSessionResponse {
   available_demo_patients: DemoPatientOption[];
 }
 
+export type AuthRole = AuthUser["role"];
+export type AuthAccountStatus = "active" | "disabled";
+
+export interface AdminUserSummary {
+  id: string;
+  email: string;
+  display_name: string;
+  role: AuthRole;
+  status: AuthAccountStatus;
+  created_at: string;
+  last_login_at: string | null;
+  workspace_count: number;
+  storage_bytes: number;
+}
+
+export interface AdminWorkspaceSummary {
+  id: string;
+  display_name: string;
+  created_at: string;
+  updated_at: string;
+  source_count: number;
+  storage_bytes: number;
+}
+
+export interface AdminUserDetail extends AdminUserSummary {
+  workspaces: AdminWorkspaceSummary[];
+}
+
+export interface AdminAuditEvent {
+  id: string;
+  created_at: string;
+  session_id: string | null;
+  user_id: string | null;
+  mode: string | null;
+  patient_id: string | null;
+  event_type: string;
+  payload: Record<string, unknown>;
+}
+
+export interface AdminAuditListResponse {
+  events: AdminAuditEvent[];
+}
+
+export interface AdminSessionSummary {
+  id: string;
+  mode: string;
+  user_id: string | null;
+  user_email: string | null;
+  user_display_name: string | null;
+  active_patient_id: string | null;
+  active_patient_name: string | null;
+  created_at: string;
+  last_seen_at: string;
+  expires_at: string;
+  user_agent: string | null;
+}
+
+export interface AdminPatchUserPayload {
+  role?: AuthRole;
+  status?: AuthAccountStatus;
+}
+
+export interface AdminActionResponse {
+  ok: boolean;
+}
+
 export interface PatientListItem {
   id: string;
   name: string;

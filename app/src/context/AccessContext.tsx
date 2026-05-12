@@ -29,6 +29,7 @@ type AccessContextValue = AccessState & {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, displayName: string) => Promise<void>;
   enterDemoPatient: (patientId: string) => Promise<void>;
+  exitDemo: () => Promise<void>;
   setActivePatient: (patientId: string | null) => Promise<void>;
   clearAccess: () => Promise<void>;
   refreshSession: () => Promise<void>;
@@ -172,6 +173,14 @@ export function AccessProvider({ children }: { children: ReactNode }) {
           return;
         }
         applySession(await api.enterDemo(patientId));
+      },
+      exitDemo: async () => {
+        if (useMockData) {
+          writeMockSession("anonymous", null);
+          setState(mockSessionFromStorage());
+          return;
+        }
+        applySession(await api.exitDemo());
       },
       setActivePatient: async (patientId: string | null) => {
         if (useMockData) {

@@ -624,21 +624,22 @@ function PreparedPreviewPane({
   const baselineRows = baselineSampleRows(overview);
   const safeBaselineCounts = baselineCounts ?? {};
   const baselineTotal = baselineSource?.record_count ?? Object.values(safeBaselineCounts).reduce((sum, count) => sum + count, 0);
+  const selectedSourceName = selectedIsBaseline ? "Synthea FHIR patient bundle" : file?.file_name ?? "Select a source";
 
   return (
     <>
     <section className="rounded-lg border border-[#dfe4ea] bg-white">
       <div className="flex flex-col gap-3 border-b border-[#eef0f5] px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-[#5b76fe]">Data Parsing</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-[#5b76fe]">Selected source details</p>
           <h3 className="mt-1 truncate text-base font-semibold text-[#1c1c1e]">
-            {selectedIsBaseline ? "Synthea FHIR patient bundle" : file?.file_name ?? "Select a source"}
+            {selectedSourceName}
           </h3>
         </div>
         <div className="flex flex-col gap-2 lg:items-end">
           <p className="max-w-2xl text-sm leading-5 text-[#667085]">
             {selectedSource
-              ? "Preview how the selected source was converted into structured data before it feeds the harmonized record."
+              ? "This panel shows the parsing output for the source selected in the table above before it feeds the harmonized record."
               : "Choose a source above to inspect parsed output."}
           </p>
           {((selectedIsBaseline && baselineSource) || preview?.json_preview) && (
@@ -1349,8 +1350,29 @@ function SourceInventoryPage({
         </div>
       )}
 
-      <section className="rounded-lg border border-[#dfe4ea] bg-white px-4 py-2.5">
-        <div className="grid gap-3 lg:grid-cols-[minmax(180px,1fr)_minmax(0,620px)] lg:items-center">
+      <section
+        className={cls(
+          "rounded-lg border bg-white transition-colors",
+          isSourceDropActive ? "border-[#5b76fe]" : "border-[#dfe4ea]",
+        )}
+        onDragEnter={(event) => {
+          if (!dragIncludesFiles(event)) return;
+          event.preventDefault();
+          setIsSourceDropActive(true);
+        }}
+        onDragOver={(event) => {
+          if (!dragIncludesFiles(event)) return;
+          event.preventDefault();
+          event.dataTransfer.dropEffect = "copy";
+          setIsSourceDropActive(true);
+        }}
+        onDragLeave={(event) => {
+          if (event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget)) return;
+          setIsSourceDropActive(false);
+        }}
+        onDrop={handleSourceDrop}
+      >
+        <div className="grid gap-3 px-4 py-2.5 lg:grid-cols-[minmax(180px,1fr)_minmax(0,620px)] lg:items-center">
           <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-wider text-[#5b76fe]">Sources</p>
             <h2 className="truncate text-base font-semibold text-[#1c1c1e]">{sources.patient_label}</h2>
@@ -1359,6 +1381,22 @@ function SourceInventoryPage({
             <CompactMetric label="Sources" value={sourceCount} detail={`${sources.uploaded_files.length} staged`} />
             <CompactMetric label="Prepared" value={`${preparedFiles}/${sourceCount}`} detail={`${pendingExtraction} need prep`} />
             <CompactMetric label="Needs context" value={needsContext} detail="missing" />
+          </div>
+        </div>
+        <div className="border-t border-[#eef0f5] px-4 py-3">
+          <div className="flex flex-col gap-3 rounded-lg border border-dashed border-[#cfd7e6] bg-[#fafbff] px-4 py-3 md:flex-row md:items-center md:justify-between">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-[#1c1c1e]">
+                {isSourceDropActive ? "Drop to add this file" : sourceCount ? "Add another source file" : "Add your first source file"}
+              </p>
+              <p className="mt-1 text-xs leading-5 text-[#667085]">
+                Drag a PDF, FHIR JSON, C-CDA/XML, lab report, CSV, image, or text file here, or use Add file.
+              </p>
+            </div>
+            <button type="button" onClick={() => openUpload()} className="inline-flex items-center justify-center gap-2 self-start rounded-lg bg-[#5b76fe] px-3 py-2 text-sm font-semibold text-white md:self-auto">
+              <FileUp size={15} />
+              Add file
+            </button>
           </div>
         </div>
       </section>
@@ -1411,38 +1449,15 @@ function SourceInventoryPage({
               <FileText size={18} className="text-[#5b76fe]" />
               <h2 className="text-base font-semibold text-[#1c1c1e]">Source files</h2>
             </div>
-            <button type="button" onClick={() => openUpload()} className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#5b76fe] px-3 py-2 text-sm font-semibold text-white">
-              <FileUp size={15} />
-              Add file
-            </button>
-          </div>
-          <div
-            role="button"
-            tabIndex={0}
-            onClick={() => openUpload()}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault();
-                openUpload();
-              }
-            }}
-            className={cls(
-              "m-4 flex min-h-24 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed px-4 py-5 text-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#5b76fe]",
-              isSourceDropActive
-                ? "border-[#5b76fe] bg-[#eef2ff] text-[#4157d8]"
-                : "border-[#cfd7e6] bg-[#fafbff] text-[#667085] hover:border-[#5b76fe] hover:bg-[#f8faff]",
-            )}
-          >
-            <FileUp size={22} className={isSourceDropActive ? "text-[#5b76fe]" : "text-[#667085]"} />
-            <p className="mt-2 text-sm font-semibold text-[#1c1c1e]">
-              {isSourceDropActive ? "Drop to add this file" : "Drag and drop a file here"}
-            </p>
-            <p className="mt-1 max-w-xl text-xs leading-5">
-              PDFs, FHIR JSON, C-CDA/XML, lab reports, CSVs, images, and text files open the same source details form before saving.
-            </p>
           </div>
           {sourceCount ? (
             <div className="divide-y divide-[#eef0f4]">
+              <div className="hidden grid-cols-[minmax(0,1fr)_210px_180px_96px] gap-3 border-t border-[#eef0f5] bg-[#f7f9fc] px-4 py-2 text-[11px] font-semibold uppercase tracking-wider text-[#667085] lg:grid">
+                <p>Source</p>
+                <p>Format</p>
+                <p>Status</p>
+                <p className="text-right">Action</p>
+              </div>
               {baselineSource && (
                 <div
                   role="button"
@@ -1459,16 +1474,19 @@ function SourceInventoryPage({
                   }`}
                 >
                   <div className="min-w-0">
+                    <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-[#98a2b3] lg:hidden">Source</p>
                     <p className="truncate text-sm font-semibold text-[#1c1c1e]">Synthea FHIR patient bundle</p>
                     <p className="mt-1 text-xs text-[#8d92a3]">
                       {baselineSource.record_count.toLocaleString()} resources · selected patient baseline
                     </p>
                   </div>
                   <div className="min-w-0">
+                    <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-[#98a2b3] lg:hidden">Format</p>
                     <p className="text-sm font-medium text-[#555a6a]">FHIR JSON export</p>
                     <p className="mt-1 truncate text-xs text-[#8d92a3]">Synthea public demo data</p>
                   </div>
                   <div className="flex flex-wrap items-center gap-1.5">
+                    <p className="mb-1 w-full text-[11px] font-semibold uppercase tracking-wider text-[#98a2b3] lg:hidden">Status</p>
                     <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-800">
                       FHIR ready
                     </span>
@@ -1479,7 +1497,7 @@ function SourceInventoryPage({
                   <Link
                     to={`/fhir-charts?patient=${patientId}`}
                     onClick={(event) => event.stopPropagation()}
-                    className="inline-flex items-center justify-center gap-1 rounded-lg border border-[#dfe4ea] px-2.5 py-1.5 text-xs font-semibold text-[#667085] hover:border-[#5b76fe] hover:text-[#5b76fe]"
+                    className="inline-flex items-center justify-center gap-1 self-start rounded-lg border border-[#dfe4ea] px-2.5 py-1.5 text-xs font-semibold text-[#667085] hover:border-[#5b76fe] hover:text-[#5b76fe] lg:self-auto"
                   >
                     Open chart
                   </Link>
@@ -1504,16 +1522,19 @@ function SourceInventoryPage({
                     }`}
                   >
                     <div className="min-w-0">
+                      <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-[#98a2b3] lg:hidden">Source</p>
                       <p className="truncate text-sm font-semibold text-[#1c1c1e]">{file.file_name}</p>
                       <p className="mt-1 text-xs text-[#8d92a3]">
                         {bytesLabel(file.size_bytes)} · {file.content_type} · {new Date(file.uploaded_at).toLocaleDateString()}
                       </p>
                     </div>
                     <div className="min-w-0">
+                      <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-[#98a2b3] lg:hidden">Format</p>
                       <p className="text-sm font-medium text-[#555a6a]">{file.data_type}</p>
                       {file.source_name && <p className="mt-1 truncate text-xs text-[#8d92a3]">{file.source_name}</p>}
                     </div>
                     <div className="flex flex-wrap items-center gap-1.5">
+                      <p className="mb-1 w-full text-[11px] font-semibold uppercase tracking-wider text-[#98a2b3] lg:hidden">Status</p>
                       <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${parseStatusClass(file.parse_status)}`}>
                         {parseStatusLabel(file.parse_status)}
                       </span>
@@ -1546,7 +1567,7 @@ function SourceInventoryPage({
                           deleteFile(file);
                         }
                       }}
-                      className="inline-flex items-center justify-center gap-1 rounded-lg border border-[#dfe4ea] px-2.5 py-1.5 text-xs font-semibold text-[#667085] hover:border-red-200 hover:bg-red-50 hover:text-red-700"
+                      className="inline-flex items-center justify-center gap-1 self-start rounded-lg border border-[#dfe4ea] px-2.5 py-1.5 text-xs font-semibold text-[#667085] hover:border-red-200 hover:bg-red-50 hover:text-red-700 lg:self-auto"
                     >
                       <Trash2 size={13} />
                       Remove

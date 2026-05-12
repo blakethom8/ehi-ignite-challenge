@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, Compass, Database, HelpCircle, Menu, Pill, Play, Search, Send, Telescope } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { hrefForModule } from "./navigation";
 import type { Crumb } from "./Titlebar";
 import type {
@@ -75,13 +75,29 @@ export function ModuleBar({
   showPaneToggles = false,
 }: ModuleBarProps) {
   const [wsOpen, setWsOpen] = useState(false);
+  const [demoOpen, setDemoOpen] = useState(false);
+  const [pendingDemoPatientId, setPendingDemoPatientId] = useState<string | null>(null);
   const wsRef = useRef<HTMLDivElement>(null);
-  const { activePatientId, activePatientName, isDemo, isUnlocked } = useAccessContext();
+  const demoRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const {
+    activePatientId,
+    activePatientName,
+    availableDemoPatients,
+    enterDemoPatient,
+    exitDemo,
+    isDemo,
+    isUnlocked,
+  } = useAccessContext();
 
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
       if (wsRef.current && !wsRef.current.contains(e.target as Node)) {
         setWsOpen(false);
+      }
+      if (demoRef.current && !demoRef.current.contains(e.target as Node)) {
+        setDemoOpen(false);
       }
     };
     document.addEventListener("mousedown", onClick);
@@ -92,9 +108,8 @@ export function ModuleBar({
     if (!activePatientId) return null;
     return {
       label: activePatientName ?? activePatientId,
-      subtitle: isDemo ? null : "Active chart context",
     };
-  }, [activePatientId, activePatientName, isDemo]);
+  }, [activePatientId, activePatientName]);
 
   const contextCrumbs = useMemo(() => {
     if (!crumbs?.length) return [];
@@ -109,7 +124,6 @@ export function ModuleBar({
   const reloadModuleNav =
     activeModule === "caspian" || activeModule === "workspaces";
   const isDenseWorkspaceChrome = showPaneToggles || Boolean(onRunWorkflow);
-
   return (
     <div
       className="grid h-11 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 px-3.5 text-[12px]"
@@ -316,41 +330,135 @@ export function ModuleBar({
       <div className="flex min-w-0 items-center justify-end gap-2 overflow-hidden pl-2">
         {activeBundle ? (
           <div
-            className={`min-w-0 items-center gap-2 rounded-md border px-3 py-1.5 ${
+            ref={demoRef}
+            className={`relative ${
               isDenseWorkspaceChrome
-                ? "hidden 2xl:flex 2xl:max-w-[220px]"
-                : "hidden xl:flex xl:max-w-[280px]"
+                ? "hidden 2xl:block 2xl:max-w-[260px]"
+                : "hidden xl:block xl:max-w-[320px]"
             }`}
-            style={{
-              borderColor: "rgba(255,255,255,0.1)",
-              background: "rgba(255,255,255,0.05)",
-            }}
-            title={
-              activeBundle.subtitle
-                ? `${activeBundle.label} · ${activeBundle.subtitle}`
-                : activeBundle.label
-            }
           >
-            <div className="grid h-7 w-7 shrink-0 place-items-center rounded-[6px] bg-white/10 text-white/80">
-              <Database className="h-3.5 w-3.5" strokeWidth={1.5} />
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-1.5">
-                <div className="truncate text-[12px] font-semibold text-white">
-                  {activeBundle.label}
+            <button
+              type="button"
+              onClick={() => setDemoOpen((open) => !open)}
+              className="flex w-full min-w-0 max-w-full items-center justify-between gap-2 rounded-md border px-3 py-1.5 text-left transition-colors hover:bg-white/[0.08]"
+              style={{
+                borderColor: "rgba(255,255,255,0.1)",
+                background: "rgba(255,255,255,0.05)",
+              }}
+              title={activeBundle.label}
+              aria-label={isDemo ? `Demo patient menu: ${activeBundle.label}` : activeBundle.label}
+              aria-expanded={demoOpen}
+              aria-haspopup={isDemo ? "menu" : undefined}
+            >
+              <div className="flex min-w-0 flex-1 items-center gap-2">
+                <div className="grid h-7 w-7 shrink-0 place-items-center rounded-[6px] bg-white/10 text-white/80">
+                  <Database className="h-3.5 w-3.5" strokeWidth={1.5} />
                 </div>
-                {isDemo && (
-                  <span className="rounded-full bg-white/10 px-1.5 py-0.5 text-[9.5px] font-bold uppercase tracking-[0.12em] text-white/78">
-                    Demo
-                  </span>
-                )}
+                <div className="flex min-w-0 items-center gap-1.5">
+                  <div className="truncate text-[12px] font-semibold text-white">
+                    {activeBundle.label}
+                  </div>
+                  {isDemo && (
+                    <span className="rounded-full bg-white/10 px-1.5 py-0.5 text-[9.5px] font-bold uppercase tracking-[0.12em] text-white/78">
+                      Demo
+                    </span>
+                  )}
+                </div>
               </div>
-              {activeBundle.subtitle ? (
-                <div className="truncate text-[10.5px] text-white/58">
-                  {activeBundle.subtitle}
-                </div>
+              {isDemo ? (
+                <ChevronDown className="h-4 w-4 shrink-0 text-white/55" strokeWidth={1.5} />
               ) : null}
-            </div>
+            </button>
+            {isDemo && demoOpen ? (
+              <div
+                className="absolute right-0 top-[calc(100%+6px)] z-[110] min-w-[320px] max-w-[360px] rounded-lg p-1.5"
+                style={{
+                  background: "var(--surface-1)",
+                  border: "1px solid var(--line-2)",
+                  boxShadow: "0 12px 32px rgb(15 23 42 / 0.16)",
+                }}
+                role="menu"
+              >
+                <div className="px-2.5 py-1.5">
+                  <div className="text-[10px] font-bold tracking-wider text-[var(--ink-4)]">
+                    DEMO PATIENTS
+                  </div>
+                  <div className="mt-1 text-[11px] text-[var(--ink-3)]">
+                    Choose a synthetic patient or leave demo mode.
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  {availableDemoPatients.map((patient) => {
+                    const isActive = patient.id === activePatientId;
+                    return (
+                      <button
+                        key={patient.id}
+                        type="button"
+                        disabled={pendingDemoPatientId !== null}
+                        onClick={async () => {
+                          if (isActive) {
+                            setDemoOpen(false);
+                            return;
+                          }
+                          setPendingDemoPatientId(patient.id);
+                          try {
+                            await enterDemoPatient(patient.id);
+                            navigate(withPatientContext(`${location.pathname}${location.search}`, patient.id));
+                            setDemoOpen(false);
+                          } finally {
+                            setPendingDemoPatientId(null);
+                          }
+                        }}
+                        className={`w-full rounded-[7px] px-2.5 py-2 text-left transition-colors ${
+                          isActive ? "bg-[var(--action-tint)]" : "hover:bg-[var(--surface-2)]"
+                        } disabled:cursor-not-allowed disabled:opacity-70`}
+                        role="menuitem"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="truncate text-[12.5px] font-medium text-[var(--ink-1)]">
+                              {patient.name}
+                            </div>
+                            <div className="mt-0.5 line-clamp-2 text-[11px] text-[var(--ink-3)]">
+                              {patient.short_journey || patient.description}
+                            </div>
+                          </div>
+                          <span className="shrink-0 text-[11px] font-medium text-[var(--action)]">
+                            {isActive ? "Current" : pendingDemoPatientId === patient.id ? "Opening..." : "Open"}
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div
+                  className="my-1 h-px"
+                  style={{ background: "var(--line-1)" }}
+                />
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await exitDemo();
+                    setDemoOpen(false);
+                    navigate("/");
+                  }}
+                  className="flex w-full items-center justify-between rounded-[7px] px-2.5 py-2 text-left transition-colors hover:bg-[var(--surface-2)]"
+                  role="menuitem"
+                >
+                  <div>
+                    <div className="text-[12.5px] font-medium text-[var(--ink-1)]">
+                      Exit demo space
+                    </div>
+                    <div className="mt-0.5 text-[11px] text-[var(--ink-3)]">
+                      Return to the public Atlas home page.
+                    </div>
+                  </div>
+                  <span className="text-[11px] font-medium text-[var(--action)]">
+                    Leave
+                  </span>
+                </button>
+              </div>
+            ) : null}
           </div>
         ) : null}
         {onRunWorkflow && (

@@ -1,11 +1,13 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AuthSessionResponse } from "../../types";
 import { AccessProvider } from "../../context/AccessContext";
 import { ModuleBar } from "./ModuleBar";
 
-const { getAuthSessionMock } = vi.hoisted(() => ({
+const { enterDemoMock, exitDemoMock, getAuthSessionMock } = vi.hoisted(() => ({
+  enterDemoMock: vi.fn(),
+  exitDemoMock: vi.fn(),
   getAuthSessionMock: vi.fn<() => Promise<AuthSessionResponse>>(),
 }));
 
@@ -14,7 +16,8 @@ vi.mock("../../api/client", () => ({
     getAuthSession: getAuthSessionMock,
     login: vi.fn(),
     logout: vi.fn(),
-    enterDemo: vi.fn(),
+    enterDemo: enterDemoMock,
+    exitDemo: exitDemoMock,
     selectActivePatient: vi.fn(),
   },
 }));
@@ -33,7 +36,39 @@ describe("ModuleBar", () => {
           name: "Demo Patient - Surgical Review",
           description: "High-signal pre-op review demo.",
         },
+        {
+          id: "demo-trial-match",
+          name: "Demo Patient - Trial Match",
+          description: "Referral and oncology review demo.",
+        },
       ],
+    });
+    enterDemoMock.mockResolvedValue({
+      mode: "demo",
+      user: null,
+      active_patient_id: "demo-trial-match",
+      active_patient_name: "Demo Patient - Trial Match",
+      expires_at: null,
+      available_demo_patients: [
+        {
+          id: "demo-high-risk",
+          name: "Demo Patient - Surgical Review",
+          description: "High-signal pre-op review demo.",
+        },
+        {
+          id: "demo-trial-match",
+          name: "Demo Patient - Trial Match",
+          description: "Referral and oncology review demo.",
+        },
+      ],
+    });
+    exitDemoMock.mockResolvedValue({
+      mode: "anonymous",
+      user: null,
+      active_patient_id: null,
+      active_patient_name: null,
+      expires_at: null,
+      available_demo_patients: [],
     });
   });
 
@@ -91,5 +126,32 @@ describe("ModuleBar", () => {
       expect(screen.getByText("Demo")).toBeInTheDocument();
       expect(screen.queryByText("Synthetic sample chart")).not.toBeInTheDocument();
     });
+  });
+
+  it("opens a demo switcher from the active demo chip", async () => {
+    render(
+      <MemoryRouter initialEntries={["/patient-record?patient=demo-high-risk"]}>
+        <AccessProvider>
+          <ModuleBar
+            activeModule="patient-record"
+            onSelect={vi.fn()}
+            workspaceId="caspian"
+            onSwitchWorkspace={vi.fn()}
+            onOpenDrawer={vi.fn()}
+            user={{ initials: "RP", name: "R. Patel", org: "Mercy Medical Group" }}
+          />
+        </AccessProvider>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Demo Patient - Surgical Review")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Demo Patient - Surgical Review/i }));
+
+    expect(screen.getByText("DEMO PATIENTS")).toBeInTheDocument();
+    expect(screen.getByText("Demo Patient - Trial Match")).toBeInTheDocument();
+    expect(screen.getByText("Exit demo space")).toBeInTheDocument();
   });
 });

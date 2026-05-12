@@ -1,8 +1,8 @@
-import type { ReactNode } from "react";
+import type { ReactElement, ReactNode } from "react";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { useCaspianFiles } from "./useCaspianFiles";
+import { useCaspianFiles, type CaspianFileBlob } from "./useCaspianFiles";
 
 const {
   listCaspianFiles,
@@ -25,7 +25,7 @@ vi.mock("../../api/client", () => ({
   },
 }));
 
-function makeWrapper(): (props: { children: ReactNode }) => JSX.Element {
+function makeWrapper(): (props: { children: ReactNode }) => ReactElement {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
@@ -79,10 +79,11 @@ describe("useCaspianFiles", () => {
     });
     await waitFor(() => expect(listCaspianFiles).toHaveBeenCalledTimes(1));
 
-    let blob: Awaited<ReturnType<typeof result.current.openFile>> = null;
+    const blobs: Array<CaspianFileBlob | null> = [];
     await act(async () => {
-      blob = await result.current.openFile("notes/scratch.md");
+      blobs.push(await result.current.openFile("notes/scratch.md"));
     });
+    const blob = blobs[0];
     expect(blob?.fileKind).toBe("user");
     expect(blob?.content).toBe("hello");
   });

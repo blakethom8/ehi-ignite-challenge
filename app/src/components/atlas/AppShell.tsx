@@ -10,7 +10,7 @@ import type {
   User,
   WorkspaceId,
 } from "./types";
-import { useAccessContext } from "../../context/AccessContext";
+import { useAccessContext, type AccessMode } from "../../context/AccessContext";
 import { resolveSessionHomePath } from "../../sessionRouting";
 
 const DEFAULT_USER: User = {
@@ -164,8 +164,8 @@ export function AppShell({
   );
 }
 
-function withPatientContext(path: string, patientId: string | null, mode: "anonymous" | "demo" | "authenticated") {
-  if (!patientId || path === "/" || mode === "anonymous") return path;
+function withPatientContext(path: string, patientId: string | null, mode: AccessMode) {
+  if (!patientId || path === "/" || mode === "anonymous" || mode === "guest") return path;
   const url = new URL(path, "http://atlas.local");
   url.searchParams.set("patient", patientId);
   return `${url.pathname}${url.search}`;

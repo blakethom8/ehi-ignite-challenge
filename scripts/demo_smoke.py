@@ -258,6 +258,68 @@ def beat_4_narratives_regenerated(tmp_root: Path) -> list[Path]:
     return written
 
 
+def beat_6_caveats_written(tmp_root: Path) -> None:
+    """§6 beat 6: conflicts panel — caveats.json has the lisinopril override."""
+    from lib.harmonize.adjudicator import (
+        FakeConflictAdjudicator,
+        adjudicate_merged_record,
+        write_caveats,
+    )
+    from lib.harmonize.medications import merge_medications
+    from lib.harmonize.observations import SourceBundle
+    from lib.patient_voice import patient_voice_source_bundles
+
+    cedars = SourceBundle(
+        label="Cedars-Sinai",
+        observations=[
+            {
+                "resourceType": "MedicationRequest",
+                "id": "mr-cedars-lisinopril-beat6",
+                "status": "active",
+                "authoredOn": "2025-09-01T00:00:00+00:00",
+                "medicationCodeableConcept": {
+                    "text": "Lisinopril 10 MG Oral Tablet",
+                    "coding": [
+                        {"system": "http://www.nlm.nih.gov/research/umls/rxnorm", "code": "29046"}
+                    ],
+                },
+            }
+        ],
+    )
+    patient_bundles = patient_voice_source_bundles(
+        DEMO_PATIENT_ID,
+        resource_type="MedicationRequest",
+        store_root=tmp_root / "patient-context",
+    )
+    merged = merge_medications([cedars, *patient_bundles])
+    caveats = adjudicate_merged_record(
+        DEMO_PATIENT_ID,
+        merged_medications=merged,
+        adjudicator=FakeConflictAdjudicator(),
+    )
+    if not caveats:
+        _fail("6", "no caveats produced for lisinopril override")
+    status_caveats = [c for c in caveats if c.fact_path.endswith(".status")]
+    if not status_caveats:
+        _fail("6", "no status caveat found")
+    c = status_caveats[0]
+    if c.verdict != "stopped":
+        _fail("6", f"expected verdict=stopped, got {c.verdict}")
+    if c.confidence != "high":
+        _fail("6", f"expected confidence=high, got {c.confidence}")
+
+    # Persist to tmp so beat 5 also reads them when ClinicalContext loads.
+    os.environ["PATIENT_CONTEXT_STORE_PATH"] = str(tmp_root / "patient-context")
+    import importlib
+    import lib.harmonize.adjudicator as adjudicator_mod
+
+    importlib.reload(adjudicator_mod)
+    path = adjudicator_mod.write_caveats(DEMO_PATIENT_ID, caveats)
+    if not path.exists():
+        _fail("6", f"caveats.json not written to {path}")
+    _ok("6", f"caveats written ({len(caveats)} entries), lisinopril verdict=stopped")
+
+
 def beat_5_clinical_context_leads_with_patient_voice(tmp_root: Path) -> None:
     """§6 beat 5: Caspian's prompt opens with the patient's words."""
     import importlib
@@ -334,11 +396,12 @@ def main() -> int:
         beat_2_patient_voice_to_fhir(tmp_root)
         beat_3_harmonize_with_status_override(tmp_root)
         beat_4_narratives_regenerated(tmp_root)
+        beat_6_caveats_written(tmp_root)
         beat_5_clinical_context_leads_with_patient_voice(tmp_root)
     print("\n✓ all data-layer beats pass")
     print(
-        "Frontend beats (UI render of patient-words card, episode drawer, "
-        "conflicts panel) require the running app and are NOT covered by this smoke."
+        "Frontend rendering (UI cards/drawer/panel) requires the running "
+        "app; the data shapes for those panels are validated above."
     )
     return 0
 

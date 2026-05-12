@@ -43,16 +43,19 @@ def regenerate_all_episodes(
     collection_id: str | None = None,
     generator=None,
     voice_summarizer=None,
+    adjudicator=None,
 ) -> list[Path]:
     """Regenerate every episode narrative for ``patient_id``.
 
-    Also regenerates ``voice_summary.json`` (T8a) so the next request
-    to Caspian / the merged-record UI sees a fresh first-sentence
-    summary. Voice-summary failures are caught and logged so they
-    don't block narrative regen.
+    Also regenerates:
+      - ``voice_summary.json`` (T8a) so the patient-voice card stays fresh.
+      - ``caveats.json`` (T7) so the conflicts panel reflects the
+        current merged record.
 
-    Returns the list of paths written. Errors per episode are logged
-    and skipped — one bad episode doesn't block the others.
+    Returns the list of paths written. Errors in voice summary or
+    caveats are logged but never block narrative regen. Per-episode
+    narrative failures are tolerated so one bad episode doesn't block
+    the others.
     """
     # T8a: voice summary regen runs first so even if no episodes exist
     # we still refresh the patient-voice card.
@@ -62,6 +65,13 @@ def regenerate_all_episodes(
         regenerate_voice_summary(patient_id, summarizer=voice_summarizer)
     except Exception as exc:  # noqa: BLE001 — best-effort
         _logger.warning("voice summary regen failed for %s: %s", patient_id, exc)
+
+    # T7: conflict adjudicator. Run before narratives so the narrative
+    # generator can cite caveats if it ever needs to (Phase 2 P4).
+    try:
+        _regenerate_caveats(patient_id, collection_id=collection_id, adjudicator=adjudicator)
+    except Exception as exc:  # noqa: BLE001 — best-effort
+        _logger.warning("caveats regen failed for %s: %s", patient_id, exc)
 
     episodes_path = NARRATIVE_STORE_ROOT / patient_id / "episodes.json"
     if not episodes_path.exists():
@@ -229,3 +239,41 @@ def _merged_id(merged_ref: str | None) -> str | None:
     if "/" in merged_ref:
         return merged_ref.rsplit("/", 1)[-1]
     return merged_ref
+
+
+def _regenerate_caveats(
+    patient_id: str,
+    *,
+    collection_id: str | None,
+    adjudicator,
+) -> None:
+    """Scan the harmonized record for conflicts; write caveats.json (T7).
+
+    When the workspace collection exists, walks its merged medications
+    / observations / allergies. Falls back to writing an empty bundle
+    when there's nothing to scan (so the UI sees a stable file shape).
+    """
+    from lib.harmonize.adjudicator import adjudicate_merged_record, write_caveats
+
+    merged_meds: list = []
+    merged_obs: list = []
+    merged_allergies: list = []
+    cid = collection_id or f"workspace-{patient_id}"
+    try:
+        from api.core import harmonize_service
+
+        if harmonize_service.get_collection(cid) is not None:
+            merged_meds = list(harmonize_service.merged_medications(cid))
+            merged_obs = list(harmonize_service.merged_observations(cid))
+            merged_allergies = list(harmonize_service.merged_allergies(cid))
+    except Exception as exc:  # noqa: BLE001
+        _logger.debug("harmonize_service unavailable for caveats: %s", exc)
+
+    caveats = adjudicate_merged_record(
+        patient_id,
+        merged_medications=merged_meds,
+        merged_observations=merged_obs,
+        merged_allergies=merged_allergies,
+        adjudicator=adjudicator,
+    )
+    write_caveats(patient_id, caveats)

@@ -25,6 +25,11 @@ from api.plugins.manifest import (
     load_manifest,
 )
 from api.plugins.tools import ApprovalRequired, PermissionDenied, UnknownTool
+from api.workspace.events import (
+    WORKSPACE_PLUGIN,
+    record_event_for_session,
+)
+
 router = APIRouter(prefix="/plugins", tags=["plugins"])
 
 
@@ -156,6 +161,18 @@ def start_run(body: StartRunBody, request: Request) -> dict:
         )
     except Exception as e:
         raise _wrap_runtime_error(e)
+    record_event_for_session(
+        session,
+        workspace_kind=WORKSPACE_PLUGIN,
+        event_type="run.started",
+        target_id=run.id,
+        payload={
+            "pluginId": run.pluginId,
+            "pluginVersion": run.pluginVersion,
+            "patientId": run.patientId,
+            "workflowId": run.workflowId,
+        },
+    )
     return _run_to_payload(run)
 
 
@@ -174,11 +191,19 @@ class ConsentBody(BaseModel):
 
 @router.post("/runs/{run_id}/consent")
 def grant_consent(run_id: str, body: ConsentBody, request: Request) -> dict:
-    user = require_access_session(request).to_user_identity()
+    session = require_access_session(request)
+    user = session.to_user_identity()
     try:
         token = rt.grant_consent(run_id, approver=user)
     except Exception as e:
         raise _wrap_runtime_error(e)
+    record_event_for_session(
+        session,
+        workspace_kind=WORKSPACE_PLUGIN,
+        event_type="consent.granted",
+        target_id=run_id,
+        payload={"approverId": user.id, "approverRole": user.role},
+    )
     return {
         "runId": run_id,
         "consentToken": token.model_dump(mode="json"),
@@ -187,11 +212,19 @@ def grant_consent(run_id: str, body: ConsentBody, request: Request) -> dict:
 
 @router.post("/runs/{run_id}/revoke-consent")
 def revoke_consent(run_id: str, body: ConsentBody, request: Request) -> dict:
-    user = require_access_session(request).to_user_identity()
+    session = require_access_session(request)
+    user = session.to_user_identity()
     try:
         rt.revoke_consent(run_id, approver=user)
     except Exception as e:
         raise _wrap_runtime_error(e)
+    record_event_for_session(
+        session,
+        workspace_kind=WORKSPACE_PLUGIN,
+        event_type="consent.revoked",
+        target_id=run_id,
+        payload={"approverId": user.id},
+    )
     return {"runId": run_id, "state": "revoked"}
 
 
@@ -206,13 +239,21 @@ class ToolCallBody(BaseModel):
 
 @router.post("/runs/{run_id}/tool/{tool_id}")
 def call_tool(run_id: str, tool_id: str, body: ToolCallBody, request: Request) -> dict:
-    require_access_session(request)
+    session = require_access_session(request)
     try:
-        return rt.call_tool(
+        result = rt.call_tool(
             run_id=run_id, tool_id=tool_id, payload=body.payload or {}
         )
     except Exception as e:
         raise _wrap_runtime_error(e)
+    record_event_for_session(
+        session,
+        workspace_kind=WORKSPACE_PLUGIN,
+        event_type="tool.called",
+        target_id=tool_id,
+        payload={"runId": run_id},
+    )
+    return result
 
 
 # ============================================================
@@ -232,7 +273,7 @@ class ApprovalRequestBody(BaseModel):
 
 @router.post("/runs/{run_id}/approvals")
 def request_approval(run_id: str, body: ApprovalRequestBody, request: Request) -> dict:
-    require_access_session(request)
+    session = require_access_session(request)
     try:
         request = rt.request_outbound_approval(
             run_id=run_id,
@@ -261,20 +302,37 @@ class ApprovalDecisionBody(BaseModel):
 
 @router.post("/runs/{run_id}/approvals/{approval_id}/approve")
 def approve_outbound(run_id: str, approval_id: str, body: ApprovalDecisionBody, request: Request) -> dict:
-    user = require_access_session(request).to_user_identity()
+    session = require_access_session(request)
+    user = session.to_user_identity()
     try:
-        return rt.approve_outbound(approval_id=approval_id, approver=user)
+        result = rt.approve_outbound(approval_id=approval_id, approver=user)
     except Exception as e:
         raise _wrap_runtime_error(e)
+    record_event_for_session(
+        session,
+        workspace_kind=WORKSPACE_PLUGIN,
+        event_type="approval.granted",
+        target_id=approval_id,
+        payload={"runId": run_id, "approverId": user.id},
+    )
+    return result
 
 
 @router.post("/runs/{run_id}/approvals/{approval_id}/deny")
 def deny_outbound(run_id: str, approval_id: str, body: ApprovalDecisionBody, request: Request) -> dict:
-    user = require_access_session(request).to_user_identity()
+    session = require_access_session(request)
+    user = session.to_user_identity()
     try:
         rt.deny_outbound(approval_id=approval_id, approver=user)
     except Exception as e:
         raise _wrap_runtime_error(e)
+    record_event_for_session(
+        session,
+        workspace_kind=WORKSPACE_PLUGIN,
+        event_type="approval.denied",
+        target_id=approval_id,
+        payload={"runId": run_id, "approverId": user.id},
+    )
     return {"approvalId": approval_id, "status": "denied"}
 
 

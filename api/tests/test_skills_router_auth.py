@@ -99,7 +99,7 @@ def test_authenticated_run_writes_non_empty_user_id_to_events(
         pass
 
     class _StubPool:
-        async def submit(self, *, skill, patient_id, brief):
+        async def submit(self, *, skill, patient_id, brief, user_id="", session_id=""):
             return ("r_test_run_42", _StubTask())
 
     monkeypatch.setattr(skills_router, "get_pool", lambda: _StubPool())

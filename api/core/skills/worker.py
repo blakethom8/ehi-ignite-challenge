@@ -30,8 +30,50 @@ class _RunState:
     runner: SkillRunner
     task: asyncio.Task[RunResult]
     event_hub: EventHub
+    user_id: str = ""
+    session_id: str = ""
     started_at: str = ""
     extra: dict[str, Any] = field(default_factory=dict)
+
+
+def _emit_lifecycle_event(
+    *,
+    user_id: str,
+    session_id: str,
+    skill_name: str,
+    patient_id: str,
+    result: RunResult,
+) -> None:
+    """Translate a SkillRunner.RunResult into a workspace audit event.
+
+    H0.9 — H0.5 only shipped run.started. Completion, escalation, and
+    failure transitions also need to land in events.db so the per-user
+    timeline shows the full lifecycle of every skill run.
+    """
+    # Lazy import keeps the worker module importable in tests that
+    # monkeypatch the events module.
+    from api.workspace.events import WORKSPACE_SKILL, record_event
+
+    event_type = {
+        "escalated": "run.escalated",
+        "finished": "run.completed",
+        "failed": "run.failed",
+    }.get(result.status)
+    if event_type is None:
+        return
+    record_event(
+        user_id=user_id,
+        session_id=session_id,
+        workspace_kind=WORKSPACE_SKILL,
+        event_type=event_type,
+        target_id=result.run_id,
+        payload={
+            "skill_name": skill_name,
+            "patient_id": patient_id,
+            "status": result.status,
+            "failure_reason": result.failure_reason,
+        },
+    )
 
 
 class WorkerPool:
@@ -55,6 +97,9 @@ class WorkerPool:
         skill: Skill,
         patient_id: str,
         brief: dict[str, Any],
+        *,
+        user_id: str = "",
+        session_id: str = "",
     ) -> tuple[str, asyncio.Task[RunResult]]:
         run_dir = allocate_run_dir(patient_id, skill.name)
         run_id = run_dir.name
@@ -78,7 +123,15 @@ class WorkerPool:
         async def _execute() -> RunResult:
             try:
                 async with self._semaphore:
-                    return await runner.run()
+                    result = await runner.run()
+                _emit_lifecycle_event(
+                    user_id=user_id,
+                    session_id=session_id,
+                    skill_name=skill.name,
+                    patient_id=patient_id,
+                    result=result,
+                )
+                return result
             finally:
                 # End-of-stream signal — connected SSE clients complete
                 # cleanly. Disk replay still serves any future readers.
@@ -87,7 +140,11 @@ class WorkerPool:
         task = asyncio.create_task(_execute(), name=f"skill_run:{run_id}")
         async with self._lock:
             self._runs[self._key(patient_id, skill.name, run_id)] = _RunState(
-                runner=runner, task=task, event_hub=event_hub
+                runner=runner,
+                task=task,
+                event_hub=event_hub,
+                user_id=user_id,
+                session_id=session_id,
             )
         return run_id, task
 
@@ -139,6 +196,12 @@ class WorkerPool:
         else:
             event_hub = state.event_hub
 
+        # Preserve the originator's identity across resumes — process
+        # restarts (state is None) lose it, but in-memory resumes keep it
+        # so the next lifecycle event still carries the right user_id.
+        user_id = state.user_id if state else ""
+        session_id = state.session_id if state else ""
+
         if state is None:
             workspace = load_workspace(skill, patient_id, run_id)
             memory = PatientMemory(patient_id)
@@ -156,14 +219,26 @@ class WorkerPool:
         async def _continue() -> RunResult:
             try:
                 async with self._semaphore:
-                    return await runner.resume()
+                    result = await runner.resume()
+                _emit_lifecycle_event(
+                    user_id=user_id,
+                    session_id=session_id,
+                    skill_name=skill.name,
+                    patient_id=patient_id,
+                    result=result,
+                )
+                return result
             finally:
                 await event_hub.close()
 
         task = asyncio.create_task(_continue(), name=f"skill_run_resume:{run_id}")
         async with self._lock:
             self._runs[key] = _RunState(
-                runner=runner, task=task, event_hub=event_hub
+                runner=runner,
+                task=task,
+                event_hub=event_hub,
+                user_id=user_id,
+                session_id=session_id,
             )
         return runner, task
 

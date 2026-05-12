@@ -380,7 +380,11 @@ async def start_run(
     skill = _resolve_skill(skill_name)
     pool = get_pool()
     run_id, _task = await pool.submit(
-        skill=skill, patient_id=payload.patient_id, brief=payload.brief
+        skill=skill,
+        patient_id=payload.patient_id,
+        brief=payload.brief,
+        user_id=session.user_id or "",
+        session_id=session.session_id,
     )
     record_event_for_session(
         session,

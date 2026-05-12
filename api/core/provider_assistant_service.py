@@ -72,6 +72,7 @@ def answer_provider_question(
     max_tokens_override: int | None = None,
     cursor_model: str | None = None,
     session=None,  # type: ignore[no-untyped-def]  # api.core.auth.SessionPrincipal | None
+    progress_hook=None,  # type: ignore[no-untyped-def]  # Callable[[dict], None] | None — agent tool-call events
 ) -> AssistantResult:
     """
     Unified provider-assistant entry point.
@@ -181,6 +182,7 @@ def answer_provider_question(
                 question=question,
                 history=history,
                 stance=stance,
+                progress_hook=progress_hook,
             )
             _record_trace_metadata(result)
             return result

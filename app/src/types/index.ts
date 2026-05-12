@@ -740,6 +740,35 @@ export interface ProviderAssistantRequest {
   max_tokens?: number;
 }
 
+/**
+ * Live streaming events emitted by POST /assistant/chat/stream as the agent runs.
+ * `tool_start`/`tool_end` arrive in real time per tool call; `done` carries the
+ * full ProviderAssistantResponse; `error` is terminal. `stream_closed` is the
+ * end-of-stream sentinel.
+ */
+export type AssistantStreamEvent =
+  | {
+      type: "tool_start";
+      id: string;
+      tool: string;
+      input_summary: string;
+    }
+  | {
+      type: "tool_end";
+      id: string;
+      tool: string;
+      output_summary: string;
+      duration_ms: number;
+      error: string | null;
+    }
+  | { type: "done"; response: ProviderAssistantResponse }
+  | { type: "error"; status?: number; message: string }
+  | { type: "stream_closed" };
+
+export interface AssistantStreamCallbacks {
+  onEvent: (event: AssistantStreamEvent) => void;
+}
+
 export interface ProviderAssistantContextPackage {
   id: string;
   title: string;

@@ -11,10 +11,30 @@ import asyncio
 import json
 import os
 import re
+import time
+import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable, Optional
+
+# Callback signature: receives a dict event payload. Safe to no-op if None.
+# Events:
+#   {"type": "tool_start", "id": str, "tool": str, "input_summary": str}
+#   {"type": "tool_end",   "id": str, "tool": str, "output_summary": str,
+#                          "duration_ms": float, "error": str | None}
+ProgressHook = Optional[Callable[[dict[str, Any]], None]]
+
+
+def _emit(hook: ProgressHook, event: dict[str, Any]) -> None:
+    """Best-effort publish — never raise into the agent loop."""
+    if hook is None:
+        return
+    try:
+        hook(event)
+    except Exception:
+        # Progress reporting must never break execution.
+        pass
 
 from claude_agent_sdk import (
     AssistantMessage,
@@ -207,7 +227,16 @@ async def _run_agent(
     history: list[dict[str, str]] | None,
     stance: str,
     config: AgentSDKConfig,
+    progress_hook: ProgressHook = None,
 ) -> AssistantResult:
+    baseline_id = uuid.uuid4().hex[:12]
+    _emit(progress_hook, {
+        "type": "tool_start",
+        "id": baseline_id,
+        "tool": "baseline_evidence",
+        "input_summary": f"Building baseline for: {question}",
+    })
+    baseline_started = time.monotonic()
     with start_span(SpanKind.RETRIEVAL, "baseline_evidence", input_data={"patient_id": patient_id, "question": question}) as _baseline_span:
         baseline = get_relevant_provider_evidence(
             patient_id=patient_id,
@@ -218,6 +247,14 @@ async def _run_agent(
         )
         if _baseline_span:
             _baseline_span.output_data = json.dumps({"intent": baseline.get("intent"), "fact_count": len(baseline.get("evidence_lines", []))}, default=str)
+    _emit(progress_hook, {
+        "type": "tool_end",
+        "id": baseline_id,
+        "tool": "baseline_evidence",
+        "output_summary": f"{len(baseline.get('evidence_lines', []))} facts, {len(baseline.get('citations', []))} citations",
+        "duration_ms": (time.monotonic() - baseline_started) * 1000,
+        "error": None,
+    })
 
     retrieved_citations: dict[tuple[str, str], AssistantCitationPayload] = {}
 
@@ -236,6 +273,14 @@ async def _run_agent(
         {},
     )
     async def get_patient_snapshot(_args: dict[str, Any]) -> dict[str, Any]:
+        snap_id = uuid.uuid4().hex[:12]
+        _emit(progress_hook, {
+            "type": "tool_start",
+            "id": snap_id,
+            "tool": "get_patient_snapshot",
+            "input_summary": "Fetching patient safety + chart snapshot",
+        })
+        started = time.monotonic()
         with start_span(SpanKind.TOOL, "get_patient_snapshot") as _snap_span:
             snapshot = get_relevant_provider_evidence(
                 patient_id=patient_id,
@@ -255,7 +300,15 @@ async def _run_agent(
             }
             if _snap_span:
                 _snap_span.output_data = json.dumps({"fact_count": len(snapshot.get("evidence_lines", [])), "citation_count": len(snapshot.get("citations", []))}, default=str)
-            return result
+        _emit(progress_hook, {
+            "type": "tool_end",
+            "id": snap_id,
+            "tool": "get_patient_snapshot",
+            "output_summary": f"{len(snapshot.get('evidence_lines', []))} facts, {len(snapshot.get('citations', []))} citations",
+            "duration_ms": (time.monotonic() - started) * 1000,
+            "error": None,
+        })
+        return result
 
     @tool(
         "query_chart_evidence",
@@ -280,6 +333,14 @@ async def _run_agent(
             max_facts_int = 8
         max_facts_int = max(3, min(max_facts_int, 12))
 
+        ev_id = uuid.uuid4().hex[:12]
+        _emit(progress_hook, {
+            "type": "tool_start",
+            "id": ev_id,
+            "tool": "query_chart_evidence",
+            "input_summary": f"Query: {query_text}",
+        })
+        started = time.monotonic()
         with start_span(SpanKind.TOOL, "query_chart_evidence", input_data={"query": query_text, "max_facts": max_facts_int}) as _ev_span:
             evidence = get_relevant_provider_evidence(
                 patient_id=patient_id,
@@ -291,6 +352,14 @@ async def _run_agent(
             remember_citations(evidence.get("citations", []))
             if _ev_span:
                 _ev_span.output_data = json.dumps({"fact_count": len(evidence.get("evidence_lines", [])), "citation_count": len(evidence.get("citations", []))}, default=str)
+        _emit(progress_hook, {
+            "type": "tool_end",
+            "id": ev_id,
+            "tool": "query_chart_evidence",
+            "output_summary": f"{len(evidence.get('evidence_lines', []))} facts, {len(evidence.get('citations', []))} citations",
+            "duration_ms": (time.monotonic() - started) * 1000,
+            "error": None,
+        })
 
         return {
             "content": [
@@ -322,6 +391,14 @@ async def _run_agent(
         except (TypeError, ValueError):
             limit_int = 50
 
+        sql_id = uuid.uuid4().hex[:12]
+        _emit(progress_hook, {
+            "type": "tool_start",
+            "id": sql_id,
+            "tool": "run_sql",
+            "input_summary": query_text,
+        })
+        started = time.monotonic()
         with start_span(
             SpanKind.TOOL,
             "run_sql",
@@ -337,6 +414,18 @@ async def _run_agent(
                     },
                     default=str,
                 )
+        truncated_suffix = " (truncated)" if result.truncated else ""
+        _emit(progress_hook, {
+            "type": "tool_end",
+            "id": sql_id,
+            "tool": "run_sql",
+            "output_summary": (
+                f"Error: {result.error}" if result.error
+                else f"{result.row_count} rows returned{truncated_suffix}"
+            ),
+            "duration_ms": (time.monotonic() - started) * 1000,
+            "error": result.error,
+        })
         return _sof_tool_result_payload(result)
 
     mcp_server = create_sdk_mcp_server(
@@ -537,6 +626,7 @@ def answer_provider_question_with_agent_sdk(
     question: str,
     history: list[dict[str, str]] | None,
     stance: str,
+    progress_hook: ProgressHook = None,
 ) -> AssistantResult:
     """Entry point for Anthropic Agent SDK mode."""
     api_key = _resolve_anthropic_api_key()
@@ -557,6 +647,7 @@ def answer_provider_question_with_agent_sdk(
                 history=history,
                 stance=stance,
                 config=config,
+                progress_hook=progress_hook,
             )
         )
     except RuntimeError as exc:
@@ -570,6 +661,7 @@ def answer_provider_question_with_agent_sdk(
                         history=history,
                         stance=stance,
                         config=config,
+                        progress_hook=progress_hook,
                     )
                 )
             finally:

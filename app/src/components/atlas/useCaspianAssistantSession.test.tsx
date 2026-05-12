@@ -5,15 +5,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useCaspianAssistantSession } from "./useCaspianAssistantSession";
 import { AccessProvider } from "../../context/AccessContext";
 
-const { chatProviderAssistant, getAuthSession, getCapabilities } = vi.hoisted(() => ({
-  chatProviderAssistant: vi.fn(),
+const { chatProviderAssistantStream, getAuthSession, getCapabilities } = vi.hoisted(() => ({
+  chatProviderAssistantStream: vi.fn(),
   getAuthSession: vi.fn(),
   getCapabilities: vi.fn(),
 }));
 
 vi.mock("../../api/client", () => ({
   api: {
-    chatProviderAssistant: (...args: unknown[]) => chatProviderAssistant(...args),
+    chatProviderAssistantStream: (...args: unknown[]) =>
+      chatProviderAssistantStream(...args),
     getAuthSession: (...args: unknown[]) => getAuthSession(...args),
     getCapabilities: (...args: unknown[]) => getCapabilities(...args),
   },
@@ -54,7 +55,7 @@ const trace = {
 describe("useCaspianAssistantSession", () => {
   beforeEach(() => {
     window.localStorage.clear();
-    chatProviderAssistant.mockReset();
+    chatProviderAssistantStream.mockReset();
     getAuthSession.mockReset();
     getCapabilities.mockReset();
     // Default the AccessContext to an anonymous session so the hook can
@@ -85,7 +86,7 @@ describe("useCaspianAssistantSession", () => {
   });
 
   it("submits to the live assistant API and builds inspector-ready citations", async () => {
-    chatProviderAssistant.mockResolvedValue({
+    const assistantResponse = {
       patient_id: "patient-123",
       answer: "Active apixaban is the main pre-op medication risk.",
       confidence: "high",
@@ -102,7 +103,33 @@ describe("useCaspianAssistantSession", () => {
       ],
       follow_ups: ["Should it be held before surgery?"],
       trace,
-    });
+    };
+
+    // The mock plays back a realistic stream: one tool_start/tool_end pair and
+    // then a `done` event carrying the final response, exactly as the SSE
+    // endpoint emits.
+    chatProviderAssistantStream.mockImplementation(
+      async (
+        _payload: unknown,
+        callbacks: { onEvent: (event: Record<string, unknown>) => void },
+      ) => {
+        callbacks.onEvent({
+          type: "tool_start",
+          id: "t1",
+          tool: "query_chart_evidence",
+          input_summary: "Query: active anticoagulants",
+        });
+        callbacks.onEvent({
+          type: "tool_end",
+          id: "t1",
+          tool: "query_chart_evidence",
+          output_summary: "3 facts, 2 citations",
+          duration_ms: 12,
+          error: null,
+        });
+        callbacks.onEvent({ type: "done", response: assistantResponse });
+      },
+    );
 
     const { result } = renderHook(
       () => useCaspianAssistantSession("patient-123", "s_live"),
@@ -114,12 +141,13 @@ describe("useCaspianAssistantSession", () => {
     });
 
     await waitFor(() => {
-      expect(chatProviderAssistant).toHaveBeenCalledWith({
-        patient_id: "patient-123",
-        question: "Any pre-op medication risks?",
-        history: [],
-        stance: "opinionated",
-      });
+      expect(chatProviderAssistantStream).toHaveBeenCalled();
+    });
+    expect(chatProviderAssistantStream.mock.calls[0][0]).toMatchObject({
+      patient_id: "patient-123",
+      question: "Any pre-op medication risks?",
+      history: [],
+      stance: "opinionated",
     });
 
     await waitFor(() => {

@@ -2,14 +2,19 @@
 /api/assistant — provider-facing conversational chart assistant.
 """
 
+import asyncio
 import json
+from typing import Any, AsyncIterator
 
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import StreamingResponse
 
 from api.core.auth import authorize_patient_access, require_access_session
 from api.workspace.events import WORKSPACE_CASPIAN, record_event_for_session
+from api.core.provider_assistant import AssistantResult
 from api.core.provider_assistant_cursor import CursorSidecarConfigurationError, CursorSidecarExecutionError
 from api.core.provider_assistant_service import answer_provider_question
+from api.core.skills.event_hub import EventHub
 from api.core.tracing import get_current_trace, SpanKind
 from api.models import (
     ProviderAssistantRequest,
@@ -22,6 +27,9 @@ from api.models import (
 import os
 
 router = APIRouter(prefix="/assistant", tags=["assistant"])
+
+# How often to emit SSE keepalives (browsers/proxies otherwise close idle streams).
+_SSE_KEEPALIVE_INTERVAL_S = 15.0
 
 
 def _env_bool(name: str, default: bool) -> bool:
@@ -249,7 +257,13 @@ def provider_chat(payload: ProviderAssistantRequest, request: Request) -> Provid
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
-    # Capture trace detail for transparency
+    return _build_chat_response(payload, result)
+
+
+def _build_chat_response(
+    payload: ProviderAssistantRequest, result: AssistantResult
+) -> ProviderAssistantResponse:
+    """Assemble the public chat response (trace + citations) from an AssistantResult."""
     trace_detail = _build_trace_detail()
 
     # If tracing didn't produce a trace, build one from the result's transparency fields
@@ -289,7 +303,6 @@ def provider_chat(payload: ProviderAssistantRequest, request: Request) -> Provid
     if result.history_turns_sent is not None:
         trace_detail.history_turns_sent = result.history_turns_sent
 
-    # Include retrieved facts from the engine
     if result.retrieved_facts:
         trace_detail.retrieved_facts = result.retrieved_facts
 
@@ -312,4 +325,135 @@ def provider_chat(payload: ProviderAssistantRequest, request: Request) -> Provid
         follow_ups=result.follow_ups,
         trace=trace_detail,
         files_created=result.files_created or [],
+    )
+
+
+def _format_sse(event: dict[str, Any]) -> bytes:
+    return f"data: {json.dumps(event, default=str)}\n\n".encode("utf-8")
+
+
+@router.post("/chat/stream")
+async def provider_chat_stream(payload: ProviderAssistantRequest, request: Request) -> StreamingResponse:
+    """
+    Streaming variant of /chat. Emits server-sent events as the agent runs:
+
+    - `tool_start` / `tool_end` for each tool invocation (baseline_evidence,
+      get_patient_snapshot, query_chart_evidence, run_sql).
+    - `done` with the full ProviderAssistantResponse payload when the run finishes.
+    - `error` if the run fails.
+    - `stream_closed` sentinel at end-of-stream.
+
+    Clients use fetch with a streaming reader (EventSource cannot POST).
+    """
+    session = require_access_session(request)
+    if not payload.patient_id:
+        raise HTTPException(status_code=422, detail="patient_id is required")
+    if not payload.question.strip():
+        raise HTTPException(status_code=422, detail="question is required")
+    resolved_patient_id = authorize_patient_access(
+        session,
+        payload.patient_id,
+        event_type="assistant.question",
+    )
+    record_event_for_session(
+        session,
+        workspace_kind=WORKSPACE_CASPIAN,
+        event_type="chat.turn",
+        target_id=resolved_patient_id,
+        payload={
+            "question_preview": payload.question[:200],
+            "stance": payload.stance,
+            "mode": payload.mode,
+            "stream": True,
+        },
+    )
+
+    hub = EventHub()
+    loop = asyncio.get_running_loop()
+
+    def publish_from_thread(event: dict[str, Any]) -> None:
+        # The agent loop runs in a worker thread; asyncio.Queue inside the hub
+        # is not thread-safe, so marshal back onto the main loop.
+        loop.call_soon_threadsafe(hub.publish_nowait, event)
+
+    async def run_agent() -> None:
+        try:
+            result = await asyncio.to_thread(
+                answer_provider_question,
+                patient_id=resolved_patient_id,
+                question=payload.question,
+                history=[turn.model_dump() for turn in payload.history],
+                context_packages=[package.model_dump() for package in payload.context_packages],
+                stance=payload.stance,
+                model_override=payload.model,
+                mode_override=payload.mode,
+                max_tokens_override=payload.max_tokens,
+                cursor_model=payload.cursor_model,
+                session=session,
+                progress_hook=publish_from_thread,
+            )
+            response = _build_chat_response(payload, result)
+            hub.publish_nowait({"type": "done", "response": response.model_dump(mode="json")})
+        except ValueError as exc:
+            hub.publish_nowait({"type": "error", "status": 404, "message": str(exc)})
+        except CursorSidecarConfigurationError as exc:
+            hub.publish_nowait({"type": "error", "status": 503, "message": str(exc)})
+        except CursorSidecarExecutionError as exc:
+            hub.publish_nowait({"type": "error", "status": 502, "message": str(exc)})
+        except RuntimeError as exc:
+            hub.publish_nowait({"type": "error", "status": 503, "message": str(exc)})
+        except Exception as exc:  # pragma: no cover - defensive
+            hub.publish_nowait({"type": "error", "status": 500, "message": str(exc)})
+        finally:
+            await hub.close()
+
+    worker = asyncio.create_task(run_agent())
+
+    async def event_stream() -> AsyncIterator[bytes]:
+        try:
+            sub_iter = hub.subscribe().__aiter__()
+            sub_task: asyncio.Task[Any] = asyncio.create_task(sub_iter.__anext__())
+            keep_task: asyncio.Task[Any] = asyncio.create_task(
+                asyncio.sleep(_SSE_KEEPALIVE_INTERVAL_S)
+            )
+            try:
+                while True:
+                    done, _pending = await asyncio.wait(
+                        {sub_task, keep_task},
+                        return_when=asyncio.FIRST_COMPLETED,
+                    )
+                    if sub_task in done:
+                        try:
+                            event = sub_task.result()
+                        except StopAsyncIteration:
+                            break
+                        yield _format_sse(event)
+                        sub_task = asyncio.create_task(sub_iter.__anext__())
+                    if keep_task in done:
+                        yield b": keepalive\n\n"
+                        keep_task = asyncio.create_task(
+                            asyncio.sleep(_SSE_KEEPALIVE_INTERVAL_S)
+                        )
+            finally:
+                for t in (sub_task, keep_task):
+                    if not t.done():
+                        t.cancel()
+            yield _format_sse({"type": "stream_closed"})
+        finally:
+            if not worker.done():
+                worker.cancel()
+                try:
+                    await worker
+                except (asyncio.CancelledError, Exception):
+                    pass
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            # nginx — disable response buffering so events flush in real time
+            "X-Accel-Buffering": "no",
+        },
     )

@@ -7,12 +7,23 @@ import type { AgentSettings } from "../../context/ChatContext";
 import { migrateLegacyKey, storageNamespace } from "../../storage";
 import type {
   ProviderAssistantCitation,
+  ProviderAssistantResponse,
   ProviderAssistantTurn,
   TraceDetail,
   WorkflowArtifact,
   WorkflowId,
 } from "../../types";
 import type { Citation, WorkbenchTab } from "./data";
+
+export type LiveToolCall = {
+  id: string;
+  tool: string;
+  input_summary: string;
+  status: "running" | "done" | "error";
+  output_summary?: string;
+  duration_ms?: number;
+  error?: string | null;
+};
 
 const LEGACY_STORAGE_PREFIX = "atlas:caspian:assistant";
 
@@ -296,6 +307,8 @@ export function useCaspianAssistantSession(
     migratedKeyRef.current = key;
   }
   const [messages, setMessages] = useState<CaspianAssistantMessage[]>(() => readMessages(key));
+  const [liveToolCalls, setLiveToolCalls] = useState<LiveToolCall[]>([]);
+  const streamAbortRef = useRef<AbortController | null>(null);
   const [workflow, setWorkflow] = useState<CaspianWorkflowState>(() => ({
     tabs: [],
     canvas: {},
@@ -307,6 +320,11 @@ export function useCaspianAssistantSession(
 
   useEffect(() => {
     setMessages(readMessages(key));
+    setLiveToolCalls([]);
+    if (streamAbortRef.current) {
+      streamAbortRef.current.abort();
+      streamAbortRef.current = null;
+    }
     setWorkflow({
       tabs: [],
       canvas: {},
@@ -332,21 +350,87 @@ export function useCaspianAssistantSession(
         throw new Error("Select a patient before using Caspian.");
       }
       const agentSettings = agentSettingsRef.current;
-      return api.chatProviderAssistant({
-        patient_id: patientId,
-        question: payload.question,
-        history: payload.history,
-        stance: "opinionated",
-        mode: agentSettings?.mode || undefined,
-        model: agentSettings?.model || undefined,
-        max_tokens: agentSettings?.maxTokens || undefined,
-      });
+      const controller = new AbortController();
+      streamAbortRef.current = controller;
+      setLiveToolCalls([]);
+
+      // Wrap in object refs so flow analysis doesn't narrow the closure-mutated
+      // values to `null` at the outer scope.
+      const finalRef: { value: ProviderAssistantResponse | null } = { value: null };
+      const errorRef: { value: { message: string; status?: number } | null } = { value: null };
+
+      await api.chatProviderAssistantStream(
+        {
+          patient_id: patientId,
+          question: payload.question,
+          history: payload.history,
+          stance: "opinionated",
+          mode: agentSettings?.mode || undefined,
+          model: agentSettings?.model || undefined,
+          max_tokens: agentSettings?.maxTokens || undefined,
+        },
+        {
+          onEvent: (event) => {
+            switch (event.type) {
+              case "tool_start":
+                setLiveToolCalls((prev) => [
+                  ...prev,
+                  {
+                    id: event.id,
+                    tool: event.tool,
+                    input_summary: event.input_summary,
+                    status: "running",
+                  },
+                ]);
+                break;
+              case "tool_end":
+                setLiveToolCalls((prev) =>
+                  prev.map((call) =>
+                    call.id === event.id
+                      ? {
+                          ...call,
+                          status: event.error ? "error" : "done",
+                          output_summary: event.output_summary,
+                          duration_ms: event.duration_ms,
+                          error: event.error,
+                        }
+                      : call,
+                  ),
+                );
+                break;
+              case "done":
+                finalRef.value = event.response;
+                break;
+              case "error":
+                errorRef.value = { message: event.message, status: event.status };
+                break;
+              case "stream_closed":
+                break;
+            }
+          },
+        },
+        controller.signal,
+      );
+
+      if (errorRef.value) {
+        throw new Error(errorRef.value.message);
+      }
+      if (!finalRef.value) {
+        throw new Error("Stream ended without a response.");
+      }
+      return finalRef.value;
     },
     onSuccess: (data) => {
+      streamAbortRef.current = null;
+      setLiveToolCalls([]);
       setMessages((current) => [...current, buildAssistantMessage(data, current)]);
       if (data.files_created && data.files_created.length > 0) {
         options.onFilesChanged?.();
       }
+    },
+    onError: () => {
+      streamAbortRef.current = null;
+      // Leave liveToolCalls in place — the inspector can show what ran before the failure.
     },
   });
 
@@ -373,7 +457,12 @@ export function useCaspianAssistantSession(
   }, [messages, mutation, patientId, sessionId]);
 
   const resetConversation = useCallback(() => {
+    if (streamAbortRef.current) {
+      streamAbortRef.current.abort();
+      streamAbortRef.current = null;
+    }
     setMessages([]);
+    setLiveToolCalls([]);
     setWorkflow({
       tabs: [],
       canvas: {},
@@ -475,6 +564,7 @@ export function useCaspianAssistantSession(
     workflow,
     runWorkflow,
     acknowledgeLatestWorkflow,
+    liveToolCalls,
   };
 }
 

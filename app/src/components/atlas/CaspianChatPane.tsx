@@ -1,9 +1,21 @@
 import { useEffect, useRef, useState } from "react";
 import axios from "axios";
-import { AlertTriangle, ArrowUp, Bot, FileText, GitBranch, RotateCcw, Sparkles, User } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowUp,
+  Bot,
+  CheckCircle2,
+  FileText,
+  GitBranch,
+  Loader2,
+  RotateCcw,
+  Sparkles,
+  User,
+  XCircle,
+} from "lucide-react";
 import { CitationChip } from "./CitationChip";
 import { CaspianAgentSettingsPopover } from "./CaspianAgentSettingsPopover";
-import type { CaspianAssistantMessage } from "./useCaspianAssistantSession";
+import type { CaspianAssistantMessage, LiveToolCall } from "./useCaspianAssistantSession";
 import type { AgentSettings } from "../../context/ChatContext";
 
 type CaspianChatPaneProps = {
@@ -22,7 +34,30 @@ type CaspianChatPaneProps = {
   /** Caspian agent settings (mode/model/maxTokens). */
   agentSettings?: AgentSettings;
   onUpdateAgentSettings?: (next: AgentSettings) => void;
+  /** Live tool-call events for the in-flight agent turn (empty between turns). */
+  liveToolCalls?: LiveToolCall[];
 };
+
+const TOOL_LABELS: Record<string, string> = {
+  baseline_evidence: "Building baseline chart evidence",
+  get_patient_snapshot: "Pulling patient safety snapshot",
+  query_chart_evidence: "Querying chart evidence",
+  run_sql: "Running SQL over the chart",
+};
+
+function toolLabel(tool: string): string {
+  return TOOL_LABELS[tool] ?? tool;
+}
+
+function ToolCallIcon({ status }: { status: LiveToolCall["status"] }) {
+  if (status === "running") {
+    return <Loader2 className="mt-0.5 h-3 w-3 animate-spin text-[var(--action)]" strokeWidth={1.5} />;
+  }
+  if (status === "error") {
+    return <XCircle className="mt-0.5 h-3 w-3 text-red-500" strokeWidth={1.5} />;
+  }
+  return <CheckCircle2 className="mt-0.5 h-3 w-3 text-emerald-500" strokeWidth={1.5} />;
+}
 
 const STARTER_PROMPTS = [
   "What should I review first in this chart?",
@@ -197,6 +232,7 @@ export function CaspianChatPane({
   onOpenFile,
   agentSettings,
   onUpdateAgentSettings,
+  liveToolCalls = [],
 }: CaspianChatPaneProps) {
   const [text, setText] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -329,15 +365,66 @@ export function CaspianChatPane({
                     style={{ animationDelay: "300ms" }}
                   />
                 </span>
-                Thinking across the chart…
+                {liveToolCalls.length === 0
+                  ? "Thinking across the chart…"
+                  : "Working across the chart…"}
               </div>
               <div className="mt-1 text-[11.5px] leading-[1.5] text-[var(--ink-4)]">
                 Pulling evidence, weighing risk, and assembling citations for the next answer.
               </div>
-              <div className="mt-3 space-y-1.5">
-                <div className="h-2.5 w-[72%] animate-pulse rounded-full bg-[var(--surface-2)]" />
-                <div className="h-2.5 w-[58%] animate-pulse rounded-full bg-[var(--surface-2)]" />
-              </div>
+              {liveToolCalls.length > 0 ? (
+                <ul className="mt-3 space-y-1.5">
+                  {liveToolCalls.map((call) => (
+                    <li
+                      key={call.id}
+                      className="grid grid-cols-[14px_1fr_auto] items-start gap-2 rounded-md border px-2.5 py-1.5 text-[11.5px]"
+                      style={{
+                        background: "var(--surface-1)",
+                        borderColor: "var(--line-1)",
+                        color: "var(--ink-2)",
+                      }}
+                    >
+                      <ToolCallIcon status={call.status} />
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-baseline gap-1.5">
+                          <span className="font-medium text-[var(--ink-1)]">
+                            {toolLabel(call.tool)}
+                          </span>
+                          <span
+                            className="text-[10.5px]"
+                            style={{ color: "var(--ink-4)", fontFamily: "var(--font-mono)" }}
+                          >
+                            {call.tool}
+                          </span>
+                        </div>
+                        <div
+                          className="mt-0.5 truncate text-[11px]"
+                          style={{ color: "var(--ink-3)" }}
+                        >
+                          {call.status === "running"
+                            ? call.input_summary
+                            : call.output_summary || call.input_summary}
+                        </div>
+                      </div>
+                      <span
+                        className="text-[10.5px]"
+                        style={{ color: "var(--ink-4)", fontFamily: "var(--font-mono)" }}
+                      >
+                        {call.status === "running"
+                          ? "…"
+                          : call.duration_ms != null
+                            ? `${Math.max(1, Math.round(call.duration_ms))}ms`
+                            : ""}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="mt-3 space-y-1.5">
+                  <div className="h-2.5 w-[72%] animate-pulse rounded-full bg-[var(--surface-2)]" />
+                  <div className="h-2.5 w-[58%] animate-pulse rounded-full bg-[var(--surface-2)]" />
+                </div>
+              )}
             </div>
           </div>
         )}

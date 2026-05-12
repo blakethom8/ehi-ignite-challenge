@@ -198,6 +198,7 @@ export function CaspianWorkspace() {
               onReset={assistant.resetConversation}
               agentSettings={agentSettings.settings}
               onUpdateAgentSettings={agentSettings.setSettings}
+              liveToolCalls={assistant.liveToolCalls}
               onCitationClick={(id) => {
                 paneControls?.focusCitation(id);
                 paneControls?.setInspectorTab("evidence");

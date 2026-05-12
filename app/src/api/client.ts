@@ -19,6 +19,8 @@ import type {
   AllergyCriticalityBreakdown,
   ProceduresResponse,
   ClinicalNotesResponse,
+  AssistantStreamCallbacks,
+  AssistantStreamEvent,
   ProviderAssistantRequest,
   ProviderAssistantResponse,
   WorkflowRunRequest,
@@ -255,6 +257,64 @@ export const api = {
   /** Provider-facing chart Q&A */
   chatProviderAssistant: (payload: ProviderAssistantRequest): Promise<ProviderAssistantResponse> =>
     http.post<ProviderAssistantResponse>("/assistant/chat", payload).then((r) => r.data),
+
+  /**
+   * Streaming variant of /assistant/chat. Emits tool_start / tool_end events as
+   * each agent tool runs, then a `done` event with the full response. Aborts
+   * cleanly if the AbortSignal fires.
+   */
+  chatProviderAssistantStream: async (
+    payload: ProviderAssistantRequest,
+    callbacks: AssistantStreamCallbacks,
+    signal?: AbortSignal,
+  ): Promise<void> => {
+    const response = await fetch("/api/assistant/chat/stream", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(payload),
+      signal,
+    });
+    if (!response.ok || !response.body) {
+      throw new Error(
+        `Chat stream failed (${response.status}). ${
+          response.statusText ?? ""
+        }`.trim(),
+      );
+    }
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    try {
+      // SSE frames are separated by a blank line. Each frame contains one or
+      // more `data: ...` lines; we only emit `data:` payloads.
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        let frameEnd = buffer.indexOf("\n\n");
+        while (frameEnd !== -1) {
+          const frame = buffer.slice(0, frameEnd);
+          buffer = buffer.slice(frameEnd + 2);
+          frameEnd = buffer.indexOf("\n\n");
+          const dataLines = frame
+            .split("\n")
+            .filter((line) => line.startsWith("data:"))
+            .map((line) => line.slice(5).trimStart());
+          if (dataLines.length === 0) continue;
+          const json = dataLines.join("\n");
+          try {
+            const event = JSON.parse(json) as AssistantStreamEvent;
+            callbacks.onEvent(event);
+          } catch {
+            // Malformed frame — skip silently; transport keepalives etc.
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+  },
 
   /** Run a prepared Caspian workflow packet and get back a structured artifact for the workbench. */
   runCaspianWorkflow: (payload: WorkflowRunRequest): Promise<WorkflowRunResponse> =>

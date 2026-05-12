@@ -31,7 +31,7 @@ def test_record_event_writes_row(db):
         workspace_kind=WORKSPACE_CASPIAN,
         event_type="chat.turn",
         target_id="patient_42",
-        payload={"question_preview": "what allergies?"},
+        payload={"question_preview": "what allergies?", "stance": "opinionated"},
         db_path=db,
     )
     assert eid.startswith("e_")
@@ -41,7 +41,10 @@ def test_record_event_writes_row(db):
     assert row["workspace_kind"] == "caspian"
     assert row["event_type"] == "chat.turn"
     assert row["target_id"] == "patient_42"
-    assert row["payload"] == {"question_preview": "what allergies?"}
+    # Default preset (events-strict) redacts free-text fields; non-PHI metadata
+    # like `stance` survives.
+    assert row["payload"]["question_preview"] == "[redacted]"
+    assert row["payload"]["stance"] == "opinionated"
 
 
 def test_per_user_query_joins_three_workspace_kinds(db):
@@ -130,6 +133,89 @@ def test_workspace_kind_filter(db):
     rows = query_events(user_id="u_1", workspace_kind="plugin", db_path=db)
     assert len(rows) == 1
     assert rows[0]["event_type"] == "tool.called"
+
+
+def test_payload_redaction_strips_patient_name_from_freetext(monkeypatch, db):
+    """H0.8 regression: a clinician question that embeds a patient name
+    must not survive in the audit log."""
+    monkeypatch.setenv("EVENTS_REDACTION_PRESET", "events-strict")
+    # Reload events to pick up the env var.
+    import importlib
+    import api.workspace.events as events_mod
+
+    importlib.reload(events_mod)
+
+    events_mod.record_event(
+        user_id="u_1",
+        session_id="s",
+        workspace_kind="caspian",
+        event_type="chat.turn",
+        target_id="patient_42",
+        payload={
+            "question_preview": "what allergies does John Hollister have?",
+            "stance": "opinionated",
+        },
+        db_path=db,
+    )
+    rows = events_mod.query_events(user_id="u_1", db_path=db)
+    assert len(rows) == 1
+    payload = rows[0]["payload"]
+    # Free-text field replaced; non-PHI metadata preserved.
+    assert payload["question_preview"] == "[redacted]"
+    assert payload["stance"] == "opinionated"
+    # Belt-and-suspenders: the name string must not appear anywhere.
+    assert "Hollister" not in str(payload)
+
+
+def test_payload_redaction_strips_direct_identifier_keys(monkeypatch, db):
+    """H0.8: keys named like direct identifiers (name, mrn, dob...) get
+    stripped entirely, not just their string values."""
+    monkeypatch.setenv("EVENTS_REDACTION_PRESET", "events-strict")
+    import importlib
+    import api.workspace.events as events_mod
+
+    importlib.reload(events_mod)
+
+    events_mod.record_event(
+        user_id="u_2",
+        session_id="s",
+        workspace_kind="plugin",
+        event_type="run.started",
+        target_id="r_1",
+        payload={
+            "patient_name": "Jane Doe",
+            "mrn": "12345",
+            "pluginId": "trial-finder",  # not PII; survives
+        },
+        db_path=db,
+    )
+    rows = events_mod.query_events(user_id="u_2", db_path=db)
+    payload = rows[0]["payload"]
+    assert "patient_name" not in payload
+    assert "mrn" not in payload
+    assert payload["pluginId"] == "trial-finder"
+
+
+def test_minimal_preset_disables_redaction_for_dev(monkeypatch, db):
+    """Operators can flip EVENTS_REDACTION_PRESET=minimal in dev to see
+    raw payloads when debugging."""
+    monkeypatch.setenv("EVENTS_REDACTION_PRESET", "minimal")
+    import importlib
+    import api.workspace.events as events_mod
+
+    importlib.reload(events_mod)
+
+    events_mod.record_event(
+        user_id="u_3",
+        session_id="s",
+        workspace_kind="caspian",
+        event_type="chat.turn",
+        target_id="p",
+        payload={"question_preview": "raw text with patient name"},
+        db_path=db,
+    )
+    rows = events_mod.query_events(user_id="u_3", db_path=db)
+    assert rows[0]["payload"]["question_preview"] == "raw text with patient name"
 
 
 def test_record_event_failure_returns_empty_string(monkeypatch, db):

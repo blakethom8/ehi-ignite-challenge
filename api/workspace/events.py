@@ -34,6 +34,13 @@ DEFAULT_DB_PATH = Path(
     os.getenv("EVENTS_DB_PATH", str(REPO_ROOT / "data" / "events.db"))
 )
 
+# PII-by-default: every payload runs through this redaction preset before
+# the row is written. ``events-strict`` strips direct identifiers and
+# scrubs free-text fields (question_preview, message, brief...) where
+# clinician-typed PHI tends to land. Set to ``minimal`` in dev when you
+# need to see what got logged.
+EVENTS_REDACTION_PRESET = os.getenv("EVENTS_REDACTION_PRESET", "events-strict").strip()
+
 # Workspace-kind tags, mirrored from api.core.tracing so callers can import
 # from a single place.
 WORKSPACE_CASPIAN = "caspian"
@@ -99,6 +106,25 @@ def _now_iso() -> str:
     )
 
 
+def _redact_payload(payload: dict[str, Any] | None) -> dict[str, Any]:
+    """Apply EVENTS_REDACTION_PRESET. If the preset misfires, drop the
+    payload rather than leaking it — the event row still gets recorded."""
+    if not payload:
+        return {}
+    try:
+        from api.trust.redactions import apply_preset
+
+        return apply_preset(EVENTS_REDACTION_PRESET, payload)
+    except Exception:
+        import logging
+
+        logging.getLogger(__name__).warning(
+            "events redaction preset %r failed; dropping payload",
+            EVENTS_REDACTION_PRESET,
+        )
+        return {"_redaction_error": "preset-failed"}
+
+
 def record_event(
     *,
     user_id: str,
@@ -118,6 +144,7 @@ def record_event(
     try:
         _ensure_schema(db_path)
         event_id = "e_" + uuid.uuid4().hex[:14]
+        redacted = _redact_payload(payload)
         conn = _conn(db_path)
         try:
             conn.execute(
@@ -133,7 +160,7 @@ def record_event(
                     workspace_kind,
                     event_type,
                     target_id or "",
-                    json.dumps(payload or {}, default=str),
+                    json.dumps(redacted, default=str),
                     parent_event_id,
                 ),
             )

@@ -6,56 +6,60 @@ import { useAccessContext } from "../context/AccessContext";
 import { buildDemoSelectionPath, withPatientContext } from "../routing";
 import { resolveAccountPath, resolveSessionHomePath } from "../sessionRouting";
 
-const moduleCards = [
+const surfaceCards = [
   {
-    title: "Patient Record",
-    body: "Consolidate source files into a source-backed patient record, review what was extracted, and publish a canonical chart that is optimized for LLM-powered review.",
-    caption: "Consolidated EHI pipeline",
+    title: "Data harmonizer",
+    body: "Admit FHIR bundles, C-CDA packets, PDFs, and portal exports into one workspace, then harmonize them into an enhanced FHIR extraction layer optimized for LLM use before publishing a canonical chart.",
+    caption: "Source-of-truth pipeline",
     to: "/patient-record",
     icon: FileSearch,
     accent: "from-[#eff3ff] via-[#f8faff] to-[#ffffff]",
     edge: "border-[#cad6ff]",
     glow: "shadow-[0_22px_70px_rgba(77,104,255,0.10)]",
-    detail: "Ingest • harmonize • canonical publish",
+    detail: "Ingest • reconcile • canonical publish",
+    supporting: "The shared patient layer that downstream charts, guided review, and consented tools all read from.",
   },
   {
     title: "FHIR Charts",
-    body: "Open prepared chart surfaces for summary, history, safety, patient data, and chart-grounded review.",
-    caption: "Working environment",
+    body: "Browse the prepared record through timeline, labs, safety, conditions, medications, and chart-grounded assistant views built for rapid review.",
+    caption: "Chart workspace",
     to: "/fhir-charts",
     icon: Database,
     accent: "from-[#edf8ff] via-[#f7fcff] to-[#ffffff]",
     edge: "border-[#c8e2f1]",
     glow: "shadow-[0_22px_70px_rgba(30,120,185,0.10)]",
     detail: "Summary • timeline • labs • grounded assistant",
+    supporting: "Open the same chart through focused visual surfaces instead of scanning raw resource dumps.",
   },
   {
     title: "Caspian",
-    body: "A private workspace for guided review, approvals, and citation-backed reasoning.",
-    caption: "Working environment",
+    body: "Run guided review workflows inside a private workspace where approvals, notes, and evidence-backed reasoning stay attached to the chart.",
+    caption: "Guided review workspace",
     to: "/caspian",
     icon: ShieldCheck,
     accent: "from-[#eefaf4] via-[#f8fcfa] to-[#ffffff]",
     edge: "border-[#cbe5d8]",
     glow: "shadow-[0_22px_70px_rgba(54,128,94,0.10)]",
     detail: "Private boundary • approvals • evidence trace",
+    supporting: "Designed for high-trust clinical review where every answer needs a visible trail back to record evidence.",
   },
   {
     title: "Plugins",
-    body: "Consented tools can work from the chart while keeping every trust boundary visible.",
-    caption: "Working environment",
+    body: "Bring in scoped tools that work from the harmonized chart while preserving clear consent, run boundaries, and audit visibility.",
+    caption: "Scoped tool surface",
     to: "/workspaces",
     icon: Boxes,
     accent: "from-[#f4efff] via-[#fbf8ff] to-[#ffffff]",
     edge: "border-[#ddd0ff]",
     glow: "shadow-[0_22px_70px_rgba(113,79,196,0.10)]",
     detail: "Trial finder • med access • second opinion",
+    supporting: "Extensions can act on the chart, but Atlas keeps the tool scope and patient-data boundary explicit.",
   },
 ];
 
 export function Landing() {
   const { activePatientId, isUnlocked, mode, user } = useAccessContext();
-  const moduleCardsForState = moduleCards.map((card) => ({
+  const surfaceCardsForState = surfaceCards.map((card) => ({
     ...card,
     to: withPatientContext(card.to, activePatientId),
   }));
@@ -82,7 +86,7 @@ export function Landing() {
               <p className="mt-6 max-w-3xl text-lg leading-8 text-[#5f6f89]">
                 {isAuthenticated
                   ? `Signed in as ${user?.display_name}. Open your workspace, continue chart review, or manage your account.`
-                  : "Try Atlas with a prepared sample chart, or use an account to save private record workspaces and return later."}
+                  : "Upload any of your health documents to create a harmonized data bundle, use Atlas for insights, or export it for your own use."}
               </p>
               <div className="mt-8 flex flex-wrap justify-center gap-3">
                 {isAuthenticated ? (
@@ -137,68 +141,80 @@ export function Landing() {
             <div className="mx-auto mt-8 flex max-w-5xl flex-col items-center gap-3 text-center">
               <div className="max-w-3xl">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#4d68ff]">
-                  {isUnlocked ? "Workspace surfaces" : "Next step"}
+                  Workspace surfaces
                 </p>
                 <h2 className="mt-2 text-3xl font-semibold tracking-[-0.03em] text-[#18202b] sm:text-4xl">
-                  {isUnlocked ? "One consolidated EHI pipeline, three working environments, and a portable export bundle." : "Choose a sample or account before opening chart tools."}
+                  One harmonized patient record, four ways to work from it.
                 </h2>
               </div>
               <p className="max-w-3xl text-sm leading-7 text-[#62728d]">
-                {isUnlocked
-                  ? "Patient Record is the source-of-truth pipeline. FHIR Charts, Caspian, Plugins, and the export bundle all work from that prepared record."
-                  : "Atlas keeps patient-specific routes closed until there is an explicit sample chart or account workspace."}
+                Atlas prepares a shared patient layer first, then opens focused surfaces for chart review, guided workflows, and consented tools while preserving a portable record the patient can use wherever they go next.
               </p>
             </div>
 
-            {isUnlocked ? (
-              <div className="mt-6 grid gap-5 xl:grid-cols-2">
-                {moduleCardsForState.map((card) => {
-                  const Icon = card.icon;
+            <div className="mt-6 grid gap-5 xl:grid-cols-2">
+              {surfaceCardsForState.map((card) => {
+                const Icon = card.icon;
+                const cardBody = (
+                  <>
+                    <div className="absolute inset-y-0 right-0 w-[44%] bg-[linear-gradient(135deg,rgba(255,255,255,0.04),rgba(255,255,255,0.44))]" />
+                    <div className="absolute right-6 top-6 h-24 w-24 rounded-full border border-[rgba(77,104,255,0.10)] bg-[radial-gradient(circle,rgba(255,255,255,0.9),rgba(255,255,255,0))]" />
+
+                    <div className="relative">
+                      <div className="flex items-start justify-between gap-6">
+                        <div className="flex h-14 w-14 items-center justify-center rounded-[18px] border border-[rgba(77,104,255,0.12)] bg-[rgba(255,255,255,0.72)] text-[#3558ff]">
+                          <Icon size={24} />
+                        </div>
+                        <div className="rounded-full border border-[rgba(24,32,43,0.08)] bg-[rgba(255,255,255,0.65)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#6f7e98]">
+                          {card.caption}
+                        </div>
+                      </div>
+
+                      <h3 className="mt-10 text-[30px] font-semibold tracking-[-0.04em] text-[#18202b]">
+                        {card.title}
+                      </h3>
+                      <p className="mt-3 max-w-xl text-base leading-7 text-[#556784]">
+                        {card.body}
+                      </p>
+                      <p className="mt-4 max-w-xl text-sm leading-6 text-[#73829c]">
+                        {card.supporting}
+                      </p>
+
+                      <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                        <p className="text-[12px] font-medium uppercase tracking-[0.16em] text-[#7887a1]">
+                          {card.detail}
+                        </p>
+                        <span className="inline-flex items-center gap-2 text-sm font-semibold text-[#3558ff] transition-all group-hover:gap-3">
+                          {isUnlocked ? "Open surface" : "Available after opening a workspace"}
+                          {isUnlocked ? <ArrowRight size={15} /> : null}
+                        </span>
+                      </div>
+                    </div>
+                  </>
+                );
+
+                if (isUnlocked) {
                   return (
                     <Link
                       key={card.title}
                       to={card.to}
                       className={`group relative overflow-hidden rounded-[30px] border ${card.edge} bg-gradient-to-br ${card.accent} p-6 ${card.glow} transition-transform duration-200 hover:-translate-y-1`}
                     >
-                      <div className="absolute inset-y-0 right-0 w-[44%] bg-[linear-gradient(135deg,rgba(255,255,255,0.04),rgba(255,255,255,0.44))]" />
-                      <div className="absolute right-6 top-6 h-24 w-24 rounded-full border border-[rgba(77,104,255,0.10)] bg-[radial-gradient(circle,rgba(255,255,255,0.9),rgba(255,255,255,0))]" />
-
-                      <div className="relative">
-                        <div className="flex items-start justify-between gap-6">
-                          <div className="flex h-14 w-14 items-center justify-center rounded-[18px] border border-[rgba(77,104,255,0.12)] bg-[rgba(255,255,255,0.72)] text-[#3558ff]">
-                            <Icon size={24} />
-                          </div>
-                          <div className="rounded-full border border-[rgba(24,32,43,0.08)] bg-[rgba(255,255,255,0.65)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#6f7e98]">
-                            {card.caption}
-                          </div>
-                        </div>
-
-                        <h3 className="mt-10 text-[30px] font-semibold tracking-[-0.04em] text-[#18202b]">
-                          {card.title}
-                        </h3>
-                        <p className="mt-3 max-w-xl text-base leading-7 text-[#556784]">
-                          {card.body}
-                        </p>
-
-                        <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-                          <p className="text-[12px] font-medium uppercase tracking-[0.16em] text-[#7887a1]">
-                            {card.detail}
-                          </p>
-                          <span className="inline-flex items-center gap-2 text-sm font-semibold text-[#3558ff] transition-all group-hover:gap-3">
-                            Open surface
-                            <ArrowRight size={15} />
-                          </span>
-                        </div>
-                      </div>
+                      {cardBody}
                     </Link>
                   );
-                })}
-              </div>
-            ) : (
-              <div className="mt-6 rounded-[24px] border border-[#d8e0eb] bg-white/70 p-5 text-sm leading-7 text-[#556784]">
-                Open one of the sample cards above, or log in to an account, then Atlas will show the chart, workflow, and plugin surfaces for that workspace.
-              </div>
-            )}
+                }
+
+                return (
+                  <div
+                    key={card.title}
+                    className={`group relative overflow-hidden rounded-[30px] border ${card.edge} bg-gradient-to-br ${card.accent} p-6 ${card.glow}`}
+                  >
+                    {cardBody}
+                  </div>
+                );
+              })}
+            </div>
           </section>
         </section>
       </main>

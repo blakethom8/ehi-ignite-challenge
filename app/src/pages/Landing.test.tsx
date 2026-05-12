@@ -42,10 +42,17 @@ describe("Landing", () => {
     expect(screen.getByText("Atlas data flow")).toBeInTheDocument();
     expect(screen.getAllByText("Harmonize + prepare").length).toBeGreaterThan(0);
     expect(screen.getByText("One patient record. Multiple downstream environments.")).toBeInTheDocument();
+    expect(screen.getByText("One harmonized patient record, four ways to work from it.")).toBeInTheDocument();
+    expect(screen.getByText("Data harmonizer")).toBeInTheDocument();
+    expect(screen.getAllByText("FHIR Charts").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Caspian").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Plugins").length).toBeGreaterThan(0);
     expect(screen.queryByText("Choose a curated patient journey first.")).not.toBeInTheDocument();
     expect(screen.queryByText(/distinct review stories, not a giant browseable sample corpus/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/clinician/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/atlas-demo-password|clinician@atlas\.local/i)).not.toBeInTheDocument();
+    expect(screen.queryByText("Choose a sample or account before opening chart tools.")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Open one of the sample cards above, or log in to an account/i)).not.toBeInTheDocument();
   });
 
   it("routes the primary try demo CTAs through the dedicated chooser", () => {
@@ -94,5 +101,6 @@ describe("Landing", () => {
     );
     expect(screen.queryByRole("link", { name: /log in \/ sign up/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /try demo/i })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: /open surface/i }).length).toBe(4);
   });
 });

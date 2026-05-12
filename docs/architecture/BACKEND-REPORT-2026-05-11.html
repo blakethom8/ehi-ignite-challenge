@@ -1,0 +1,991 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Atlas Backend Architecture Report — May 2026</title>
+<style>
+  :root {
+    --blue: #1d4ed8;
+    --blue-light: #dbeafe;
+    --blue-mid: #3b82f6;
+    --green: #15803d;
+    --green-light: #dcfce7;
+    --amber: #b45309;
+    --amber-light: #fef3c7;
+    --red: #b91c1c;
+    --red-light: #fee2e2;
+    --purple: #6d28d9;
+    --purple-light: #ede9fe;
+    --slate: #334155;
+    --slate-light: #f1f5f9;
+    --border: #e2e8f0;
+    --mono: 'IBM Plex Mono', 'Fira Mono', monospace;
+    --sans: 'Inter', system-ui, sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--slate);
+    background: #eef2f6;
+    padding: 2rem 1rem;
+  }
+
+  .page {
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  /* Header */
+  .header {
+    background: var(--blue);
+    color: white;
+    border-radius: 12px;
+    padding: 2.5rem 3rem;
+    margin-bottom: 2rem;
+  }
+  .header h1 {
+    font-size: 1.75rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin-bottom: 0.5rem;
+  }
+  .header .subtitle {
+    opacity: 0.8;
+    font-size: 0.9rem;
+  }
+  .header .meta {
+    display: flex;
+    gap: 2rem;
+    margin-top: 1.5rem;
+    font-size: 0.8rem;
+    opacity: 0.7;
+  }
+
+  /* Section */
+  .section {
+    background: white;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    padding: 2rem 2.5rem;
+    margin-bottom: 1.5rem;
+  }
+  .section h2 {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--blue);
+    margin-bottom: 1.25rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 2px solid var(--blue-light);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .section h3 {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--slate);
+    margin: 1.5rem 0 0.75rem;
+  }
+  .section h3:first-child { margin-top: 0; }
+
+  /* Status badges */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+  }
+  .badge.green  { background: var(--green-light); color: var(--green); }
+  .badge.amber  { background: var(--amber-light); color: var(--amber); }
+  .badge.red    { background: var(--red-light);   color: var(--red); }
+  .badge.blue   { background: var(--blue-light);  color: var(--blue); }
+  .badge.purple { background: var(--purple-light);color: var(--purple); }
+
+  /* Architecture diagram */
+  .arch-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin: 1rem 0;
+  }
+  .arch-box {
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+  }
+  .arch-box.caspian { border-color: var(--blue); background: #f8faff; }
+  .arch-box.plugin  { border-color: #f59e0b; background: #fffbeb; }
+  .arch-box.shared  { border-color: var(--border); background: var(--slate-light); grid-column: 1 / -1; }
+  .arch-box h4 {
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 0.6rem;
+  }
+  .arch-box.caspian h4 { color: var(--blue); }
+  .arch-box.plugin h4  { color: var(--amber); }
+  .arch-box.shared h4  { color: var(--slate); }
+  .arch-box ul {
+    list-style: none;
+    font-size: 0.8rem;
+    color: #475569;
+  }
+  .arch-box ul li { padding: 0.15rem 0; }
+  .arch-box ul li::before { content: "→ "; color: #94a3b8; }
+
+  /* Subsystem inventory table */
+  .inventory {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+    margin: 0.75rem 0;
+  }
+  .inventory th {
+    background: var(--slate-light);
+    text-align: left;
+    padding: 0.5rem 0.75rem;
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #64748b;
+    border-bottom: 1px solid var(--border);
+  }
+  .inventory td {
+    padding: 0.55rem 0.75rem;
+    border-bottom: 1px solid #f1f5f9;
+    vertical-align: top;
+  }
+  .inventory tr:last-child td { border-bottom: none; }
+  .inventory tr:hover td { background: #fafbfc; }
+  .inventory code {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    background: #f1f5f9;
+    padding: 0.1rem 0.3rem;
+    border-radius: 3px;
+  }
+
+  /* Recommendation cards */
+  .rec-grid {
+    display: grid;
+    gap: 1rem;
+    margin-top: 1rem;
+  }
+  .rec-card {
+    border-radius: 8px;
+    padding: 1.25rem 1.5rem;
+    border-left: 4px solid;
+  }
+  .rec-card.critical { background: #fff5f5; border-color: var(--red); }
+  .rec-card.high     { background: #fffbeb; border-color: #f59e0b; }
+  .rec-card.medium   { background: #f0f9ff; border-color: var(--blue-mid); }
+  .rec-card.low      { background: #f9fafb; border-color: #94a3b8; }
+
+  .rec-card .rec-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.5rem;
+  }
+  .rec-card h4 {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--slate);
+  }
+  .rec-card p {
+    font-size: 0.82rem;
+    color: #475569;
+    line-height: 1.55;
+  }
+  .rec-card .path {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: #94a3b8;
+    margin-top: 0.4rem;
+  }
+  .rec-card .why {
+    margin-top: 0.5rem;
+    font-size: 0.78rem;
+    color: #64748b;
+    font-style: italic;
+  }
+
+  /* Priority tag */
+  .priority {
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 0.2rem 0.5rem;
+    border-radius: 3px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .priority.critical { background: #fee2e2; color: #b91c1c; }
+  .priority.high     { background: #fef3c7; color: #b45309; }
+  .priority.medium   { background: #dbeafe; color: #1d4ed8; }
+  .priority.low      { background: #f1f5f9; color: #475569; }
+
+  /* Exec summary */
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+    margin: 1.25rem 0;
+  }
+  .summary-stat {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    text-align: center;
+  }
+  .summary-stat .num {
+    font-size: 2rem;
+    font-weight: 800;
+    line-height: 1;
+    margin-bottom: 0.35rem;
+  }
+  .summary-stat .label {
+    font-size: 0.72rem;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  /* Code block */
+  pre {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    background: #0f172a;
+    color: #e2e8f0;
+    border-radius: 6px;
+    padding: 1rem 1.25rem;
+    overflow-x: auto;
+    margin: 0.75rem 0;
+    line-height: 1.5;
+  }
+
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.25rem;
+  }
+
+  .note {
+    background: var(--blue-light);
+    color: #1e40af;
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+    font-size: 0.82rem;
+    margin: 0.75rem 0;
+  }
+
+  .warn {
+    background: var(--amber-light);
+    color: #92400e;
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+    font-size: 0.82rem;
+    margin: 0.75rem 0;
+  }
+
+  /* Gap list */
+  .gap-list {
+    list-style: none;
+    margin: 0.5rem 0;
+  }
+  .gap-list li {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #f1f5f9;
+    font-size: 0.82rem;
+  }
+  .gap-list li:last-child { border-bottom: none; }
+  .gap-icon {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.65rem;
+    font-weight: 700;
+    margin-top: 1px;
+  }
+  .gap-icon.red { background: var(--red-light); color: var(--red); }
+  .gap-icon.amber { background: var(--amber-light); color: var(--amber); }
+  .gap-icon.blue { background: var(--blue-light); color: var(--blue); }
+
+  .toc {
+    background: var(--slate-light);
+    border-radius: 8px;
+    padding: 1rem 1.5rem;
+    font-size: 0.82rem;
+    margin-bottom: 2rem;
+  }
+  .toc h3 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.06em; color: #64748b; margin-bottom: 0.5rem; }
+  .toc ol { padding-left: 1.25rem; line-height: 2; }
+  .toc a { color: var(--blue); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+
+  @media (max-width: 720px) {
+    .arch-grid, .two-col, .summary-grid { grid-template-columns: 1fr; }
+    .arch-box.shared { grid-column: 1; }
+    .section { padding: 1.25rem; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="header">
+    <h1>Atlas Backend Architecture Report</h1>
+    <div class="subtitle">Caspian &amp; Plugin System — Current Infrastructure + Production Recommendations</div>
+    <div class="meta">
+      <span>Generated: May 11, 2026</span>
+      <span>Branch: master @ f4265e3</span>
+      <span>Scope: api/ · lib/ · deploy/ · data/plugins/</span>
+      <span>Phase 1 deadline: May 13, 2026</span>
+    </div>
+  </div>
+
+  <div class="toc">
+    <h3>Contents</h3>
+    <ol>
+      <li><a href="#exec">Executive Summary</a></li>
+      <li><a href="#arch">Architecture Overview</a></li>
+      <li><a href="#caspian">Caspian Backend — Current State</a></li>
+      <li><a href="#plugins">Plugin System — Current State</a></li>
+      <li><a href="#data">Data Layer — Current State</a></li>
+      <li><a href="#deploy">Deployment &amp; Observability — Current State</a></li>
+      <li><a href="#recs">Production Recommendations</a></li>
+    </ol>
+  </div>
+
+  <!-- EXECUTIVE SUMMARY -->
+  <div class="section" id="exec">
+    <h2>1. Executive Summary</h2>
+
+    <div class="summary-grid">
+      <div class="summary-stat">
+        <div class="num" style="color: var(--green)">18</div>
+        <div class="label">Real API Routers</div>
+      </div>
+      <div class="summary-stat">
+        <div class="num" style="color: var(--blue)">12</div>
+        <div class="label">Plugin HTTP Endpoints</div>
+      </div>
+      <div class="summary-stat">
+        <div class="num" style="color: var(--amber)">4</div>
+        <div class="label">Assistant Modes</div>
+      </div>
+      <div class="summary-stat">
+        <div class="num" style="color: var(--purple)">6+2</div>
+        <div class="label">SOF Views + Derivations</div>
+      </div>
+    </div>
+
+    <p>The Atlas backend is substantially more complete than the architecture docs suggest. As of commit <code>f4265e3</code>, 18 routers are fully implemented (no stubs), the plugin runtime enforces cryptographic trust boundaries end-to-end, and the SQL-on-FHIR warehouse is live with enrichment and derivation layers. The codebase is production-grade <em>in depth</em>.</p>
+
+    <p style="margin-top: 0.75rem;">The primary gaps for production are operational, not functional: no CI/CD pipeline, LLM tracing disabled by default, plugin connectors running on fixtures instead of real HTTP adapters, and the anchor compiler reading demo patient fixtures rather than live FHIR data. The context engineering Layer 2 (LLM batch enrichment) — the product's core differentiator — is also explicitly deferred to Phase 2 and should be the first engineering investment post-submission.</p>
+
+    <div class="warn" style="margin-top: 1rem;">
+      <strong>Phase 1 deadline in 2 days.</strong> No new features should be started before submission. The 15 recommendations below are sequenced for the post-submission window, not the immediate sprint.
+    </div>
+  </div>
+
+  <!-- ARCHITECTURE OVERVIEW -->
+  <div class="section" id="arch">
+    <h2>2. Architecture Overview</h2>
+    <p>Atlas is a shared agentic harness with two distinct workspace families. The backend enforces the trust contract that the UI's boundary pills advertise.</p>
+
+    <div class="arch-grid" style="margin-top: 1.25rem;">
+      <div class="arch-box caspian">
+        <h4>Caspian — First-Party Clinical</h4>
+        <ul>
+          <li>Direct SQL-on-FHIR access (full chart)</li>
+          <li>4 assistant modes: deterministic, context, agent_sdk, cursor</li>
+          <li>5-layer context engineering pipeline (Layers 0–1, 3–4 live; Layer 2 deferred)</li>
+          <li>Skills runtime with workspace + agent loop</li>
+          <li>Clinical audit log via tracing.py</li>
+          <li>Harmonization + provenance graph</li>
+        </ul>
+      </div>
+      <div class="arch-box plugin">
+        <h4>Plugins — Consented External</h4>
+        <ul>
+          <li>Signed manifest verification (ed25519)</li>
+          <li>Scope-projected, redacted anchor packages</li>
+          <li>Run-level consent gate + per-action approvals</li>
+          <li>22 tool handlers across 3 installed plugins</li>
+          <li>Append-only provenance log (signed)</li>
+          <li>3 installed: trial-finder, med-access, second-opinion</li>
+        </ul>
+      </div>
+      <div class="arch-box shared">
+        <h4>Shared Infrastructure</h4>
+        <ul style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.1rem 2rem;">
+          <li>FastAPI + uvicorn (port 8000)</li>
+          <li>Session-based auth (SQLite auth.db)</li>
+          <li>SQL-on-FHIR warehouse (data/sof.db)</li>
+          <li>lib/fhir_parser — PatientRecord model</li>
+          <li>lib/clinical — drug classifier + episodes</li>
+          <li>Tracing spans (SQLite + Langfuse opt-in)</li>
+          <li>Docker Compose + nginx (Hetzner)</li>
+          <li>ed25519 signing (Atlas key + vendor keys)</li>
+          <li>1,180 Synthea FHIR bundles</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>Request Path — Caspian Assistant</h3>
+    <pre>Browser POST /api/assistant/chat
+  → TracingMiddleware (opens trace, captures patient_id + question)
+  → require_access_session() (validates session cookie)
+  → provider_assistant_service.answer_provider_question()
+      ↳ mode=context      → context_builder.build_clinical_context() → Claude API (single turn)
+      ↳ mode=agent_sdk    → sof_tools.run_sql() + FHIR tools → Agent SDK loop
+      ↳ mode=deterministic → keyword ranking + FHIR facts (no LLM)
+      ↳ mode=cursor       → cursor_sidecar HTTP client
+  → TracingMiddleware (flushes trace + optional Langfuse export)
+  ← AssistantResult {answer, confidence, citations, follow_ups, engine}</pre>
+
+    <h3>Request Path — Plugin Tool Call</h3>
+    <pre>Browser POST /api/plugins/runs/{run_id}/tool/{tool_id}
+  → require_access_session()
+  → plugin_runtime.call_tool(run_id, tool_id, payload)
+      → _require_consent(ctx)              # consent token valid + not revoked?
+      → _manifest_declares(manifest, tool_id)  # tool in manifest?
+      → dispatch_tool(tool_id, ctx, payload)
+          ↳ read-anchor:    verify scope → read_anchor_field() [OutOfScope → 403]
+          ↳ call-external:  verify connector declared → connector.call()
+          ↳ send-outbound:  approved_outbound=True required → write ProvenanceRecord
+  ← tool result dict</pre>
+  </div>
+
+  <!-- CASPIAN BACKEND -->
+  <div class="section" id="caspian">
+    <h2>3. Caspian Backend — Current State</h2>
+
+    <div class="two-col">
+      <div>
+        <h3>Assistant Modes</h3>
+        <table class="inventory">
+          <thead><tr><th>Mode</th><th>Engine</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><code>context</code></td>
+              <td>Single-turn Claude + pre-built ClinicalContext</td>
+              <td><span class="badge green">Live</span></td>
+            </tr>
+            <tr>
+              <td><code>deterministic</code></td>
+              <td>Keyword ranking + FHIR fact synthesis (no LLM)</td>
+              <td><span class="badge green">Live</span></td>
+            </tr>
+            <tr>
+              <td><code>agent_sdk</code></td>
+              <td>Claude Agent SDK multi-turn loop w/ run_sql tool</td>
+              <td><span class="badge amber">Partial</span></td>
+            </tr>
+            <tr>
+              <td><code>cursor</code></td>
+              <td>Cursor sidecar (Node @cursor/sdk) via HTTP</td>
+              <td><span class="badge green">Live</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div>
+        <h3>Context Engineering Pipeline</h3>
+        <table class="inventory">
+          <thead><tr><th>Layer</th><th>What It Does</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td>Layer 0</td><td>Hard filters — billing noise, routine vitals</td><td><span class="badge green">Live</span></td></tr>
+            <tr><td>Layer 1</td><td>Episode compression — deduplicate meds, cluster encounters</td><td><span class="badge green">Live</span></td></tr>
+            <tr><td>Layer 2</td><td>LLM batch enrichment — relevance scoring, clinical narratives</td><td><span class="badge red">TODO</span></td></tr>
+            <tr><td>Layer 3</td><td>Format optimization — markdown tables, temporal markers</td><td><span class="badge green">Live</span></td></tr>
+            <tr><td>Layer 4</td><td>Persona selection — surgical pre-op, general review</td><td><span class="badge green">Live</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <h3>All API Routers (18 total — all real, none stubbed)</h3>
+    <table class="inventory">
+      <thead><tr><th>Router</th><th>Prefix</th><th>Key Endpoints</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td>auth.py</td><td><code>/api/auth</code></td><td>session, login, signup, logout, demo, demo/exit</td><td><span class="badge green">Live</span></td></tr>
+        <tr><td>assistant.py</td><td><code>/api/assistant</code></td><td>settings, chat (streaming)</td><td><span class="badge green">Live</span></td></tr>
+        <tr><td>patients.py</td><td><code>/api/patients</code></td><td>list, families, upload, upload-context</td><td><span class="badge green">Live</span></td></tr>
+        <tr><td>harmonize.py</td><td><code>/api/harmonize</code></td><td>collections, observations, conditions, medications, provenance, runs, extract</td><td><span class="badge green">Live</span></td></tr>
+        <tr><td>skills.py</td><td><code>/api/skills</code></td><td>list, run, streaming transcript, escalation, artifacts</td><td><span class="badge green">Live</span></td></tr>
+        <tr><td>patient-context.py</td><td><code>/api/patient-context</code></td><td>sessions, turn, export, status</td><td><span class="badge green">Live</span></td></tr>
+        <tr><td>canonical.py</td><td><code>/api/canonical</code></td><td>workspace summary per patient</td><td><span class="badge green">Live</span></td></tr>
+        <tr><td>aggregation.py</td><td><code>/api/aggregation</code></td><td>sources, cleaning-queue, readiness, profiles</td><td><span class="badge green">Live</span></td></tr>
+        <tr><td>corpus.py</td><td><code>/api/corpus</code></td><td>stats, field-coverage, observation-distributions</td><td><span class="badge green">Live</span></td></tr>
+        <tr><td>classifications.py</td><td><code>/api/classifications</code></td><td>index, raw FHIR per patient</td><td><span class="badge green">Live</span></td></tr>
+        <tr><td>traces.py</td><td><code>/api/traces</code></td><td>list, detail, summary stats</td><td><span class="badge green">Live</span></td></tr>
+        <tr><td>pipeline-lab.py</td><td><code>/api/pipeline-lab</code></td><td>pipelines, runs, streaming logs</td><td><span class="badge green">Live</span></td></tr>
+        <tr><td>ccda-lab.py</td><td><code>/internal/ccda-lab</code></td><td>convert C-CDA/PDF to FHIR, options</td><td><span class="badge green">Live</span></td></tr>
+        <tr><td>cursor-internal-tools.py</td><td><code>/internal/cursor-tools</code></td><td>query-chart-evidence, patient-snapshot, run-sql</td><td><span class="badge green">Live</span></td></tr>
+        <tr><td>ground-truth-review.py</td><td><code>/api/ground-truth-review</code></td><td>review state, versions, publish</td><td><span class="badge green">Live</span></td></tr>
+        <tr><td>guest-harmonization.py</td><td><code>/api/guest-harmonization</code></td><td>guest runs, status, delete</td><td><span class="badge green">Live</span></td></tr>
+        <tr><td>harmonization-runs</td><td><code>/api/harmonize/runs</code></td><td>durable scripted harmonization + clinician decisions</td><td><span class="badge green">Live</span></td></tr>
+        <tr><td>plugins.py</td><td><code>/api/plugins</code></td><td>see Plugin System section</td><td><span class="badge green">Live</span></td></tr>
+      </tbody>
+    </table>
+
+    <h3>Skills Runtime</h3>
+    <p>The skills runtime (<code>api/core/skills/</code>) is the most sophisticated subsystem in the codebase. It is a two-layer architecture:</p>
+    <ul class="gap-list" style="margin-top: 0.5rem;">
+      <li>
+        <span class="gap-icon blue">1</span>
+        <div><strong>Workspace layer</strong> (<code>workspace.py</code>, ~1200 LOC) — per-run directory at <code>data/cases/{patient_id}/{skill}/{run_id}/</code>. Mediated writes, citation tracking (c_XXXX IDs), escalation gates (a_XXXX approvals), save destinations (run / patient memory / package). Enforces full audit trail of every agent action.</div>
+      </li>
+      <li>
+        <span class="gap-icon blue">2</span>
+        <div><strong>Agent loop layer</strong> (<code>agent_loop.py</code>, ~600 LOC) — multi-turn Claude loop. Tool registry with workspace_write, workspace_cite, workspace_escalate, clinicaltrials_search, submit_final_artifact, canvas_upsert. Configurable max_turns (30) and tokens per turn (4096).</div>
+      </li>
+    </ul>
+
+    <div class="note">
+      <strong>api/workspace/ is absent.</strong> The AGENTIC-HARNESS.md spec defines a shared workspace module at <code>api/workspace/</code> (sessions, events, artifacts, tool envelope). This directory does not exist. Caspian and plugins each maintain their own session/event/artifact systems separately. This is the largest structural divergence from the spec, and the right time to unify is before Phase 2 adds more plugins.
+    </div>
+  </div>
+
+  <!-- PLUGIN SYSTEM -->
+  <div class="section" id="plugins">
+    <h2>4. Plugin System — Current State</h2>
+    <p>The plugin runtime is the most cryptographically complete subsystem. Every trust boundary documented in <code>AGENTIC-HARNESS.md</code> is enforced in code.</p>
+
+    <div class="two-col">
+      <div>
+        <h3>Trust Enforcement Layer</h3>
+        <table class="inventory">
+          <thead><tr><th>Component</th><th>File</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td>Manifest verification</td><td><code>manifest.py</code></td><td><span class="badge green">Full</span></td></tr>
+            <tr><td>Anchor compilation</td><td><code>anchors.py</code></td><td><span class="badge green">Full</span></td></tr>
+            <tr><td>Consent gate</td><td><code>consent.py</code></td><td><span class="badge green">Full</span></td></tr>
+            <tr><td>Tool dispatch / Rule 1+2</td><td><code>tools.py</code></td><td><span class="badge green">Full</span></td></tr>
+            <tr><td>Run state machine</td><td><code>runtime.py</code></td><td><span class="badge green">Full</span></td></tr>
+            <tr><td>Provenance log</td><td><code>provenance.py</code></td><td><span class="badge green">Full</span></td></tr>
+            <tr><td>ed25519 signatures</td><td><code>trust/signatures.py</code></td><td><span class="badge green">Full</span></td></tr>
+            <tr><td>De-id redaction (5 presets)</td><td><code>trust/redactions.py</code></td><td><span class="badge green">Full</span></td></tr>
+            <tr><td>HTTP process sandbox</td><td>(not yet)</td><td><span class="badge red">Absent</span></td></tr>
+            <tr><td>Per-org key management</td><td>(not yet)</td><td><span class="badge red">Absent</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div>
+        <h3>Installed Plugins (3)</h3>
+        <table class="inventory">
+          <thead><tr><th>Plugin</th><th>Vendor</th><th>Version</th><th>Tools</th></tr></thead>
+          <tbody>
+            <tr><td>trial-finder</td><td>Helix Clinical</td><td>2.4.1</td><td>5 (search, score_fit, packet.draft, packet.send, fetch_detail)</td></tr>
+            <tr><td>med-access</td><td>RxBridge</td><td>1.7.0</td><td>6 (formulary, pap.match, pap.enroll, pa.compose, pa.submit, identify_barriers)</td></tr>
+            <tr><td>second-opinion</td><td>ConferMD</td><td>0.9.0-beta</td><td>4 (compose_packet, apply_redactions, route, fetch_response)</td></tr>
+          </tbody>
+        </table>
+
+        <h3 style="margin-top: 1rem;">Anchor Scope Fields (12)</h3>
+        <table class="inventory">
+          <thead><tr><th>Scope Field</th><th>Type</th></tr></thead>
+          <tbody>
+            <tr><td><code>demographics.age-band</code>, <code>demographics.sex</code>, <code>demographics.geography</code></td><td>De-id'd</td></tr>
+            <tr><td><code>diagnoses.active</code>, <code>diagnoses.history</code></td><td>Condition list</td></tr>
+            <tr><td><code>medications.active</code>, <code>medications.history</code></td><td>Med list</td></tr>
+            <tr><td><code>allergies</code>, <code>biomarkers</code>, <code>performance-status</code></td><td>Safety-critical</td></tr>
+            <tr><td><code>labs.recent</code>, <code>encounters.recent</code></td><td>Recency-gated</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <h3>Security Model — Two Gate Enforcement</h3>
+    <pre>Rule 1: "A plugin reads nothing outside its anchor scope"
+  Gate A (manifest-level): tool declared? permission = read-anchor? field in manifest.anchor.fields?
+  Gate B (anchor-level):   read_anchor_field(pkg, field) → raises OutOfScope if field not in pkg.scope
+  Both gates must pass. Belt-and-suspenders.
+
+Rule 2: "A plugin writes nothing outbound without consent + per-action approval"
+  Consent token: minted at run start, TTL-checked on every call, revocable mid-run.
+  Per-action: send-outbound tools require approved_outbound=True → dispatched only after ApprovalCard.
+  Provenance row written after every outbound action (vendor, version, approver, redaction preset, endpoint).</pre>
+
+    <h3>Run State Machine</h3>
+    <pre>start_run() → [awaiting-consent] → grant_consent() → [running]
+                                                           ↓
+                                              request_outbound_approval() → [waiting]
+                                                           ↓
+                              approve_outbound() → [running]   deny_outbound() → [running]
+                                                           ↓
+                                              complete_run() → [complete]
+* ─────────────────── revoke_consent() → [revoked] (voids all pending approvals, any state)</pre>
+
+    <div class="warn">
+      <strong>Anchor v1 limitation:</strong> <code>anchors.py</code> compiles from 4 demo patient fixtures (canned JSON), not live FHIR data. The scope enforcement is cryptographically real — but the patient data behind the anchor is synthetic. This is the most critical plugin gap before any real-world clinical use.
+    </div>
+  </div>
+
+  <!-- DATA LAYER -->
+  <div class="section" id="data">
+    <h2>5. Data Layer — Current State</h2>
+
+    <div class="two-col">
+      <div>
+        <h3>SQL-on-FHIR Warehouse</h3>
+        <table class="inventory">
+          <thead><tr><th>Artifact</th><th>Kind</th><th>Key Columns</th></tr></thead>
+          <tbody>
+            <tr><td><code>patient</code></td><td>Pure view</td><td>id, gender, birth_date, deceased, name</td></tr>
+            <tr><td><code>medication_request</code></td><td>Enriched view</td><td>+ drug_class (from RxNorm + keywords)</td></tr>
+            <tr><td><code>condition</code></td><td>Pure view</td><td>id, patient_ref, clinical_status, onset_date, display</td></tr>
+            <tr><td><code>condition_active</code></td><td>Filtered subset</td><td>WHERE status IN (active, recurrence, relapse)</td></tr>
+            <tr><td><code>observation</code></td><td>Pure view</td><td>loinc_code, effective_date, value_quantity, value_unit</td></tr>
+            <tr><td><code>encounter</code></td><td>Pure view</td><td>class_code, type_text, period_start, period_end</td></tr>
+            <tr><td><code>medication_episode</code></td><td>Derived table</td><td>is_active, start_date, end_date, request_count, duration_days</td></tr>
+            <tr><td><code>observation_latest</code></td><td>Derived view</td><td>Most recent per (patient, loinc_code) via ROW_NUMBER()</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div>
+        <h3>Clinical Library (lib/clinical/)</h3>
+        <table class="inventory">
+          <thead><tr><th>Module</th><th>What It Does</th></tr></thead>
+          <tbody>
+            <tr><td><code>drug_classifier.py</code></td><td>Maps RxNorm + keywords → drug class (critical/warning/info). Generates SafetyFlag list sorted by severity.</td></tr>
+            <tr><td><code>episode_detector.py</code></td><td>Groups MedicationRequests into MedicationEpisode (start, end, is_active, duration_days). Links conditions to encounters/meds.</td></tr>
+            <tr><td><code>interaction_checker.py</code></td><td>13 hardcoded interaction rules (anticoag+antiplatelet, opioid+psych, JAK+immunosuppressant). Returns InteractionReport.</td></tr>
+            <tr><td><code>drug_classes.json</code></td><td>Static keyword + RxNorm mapping for 12 surgical-risk drug classes.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <h3>FHIR Parser — Resource Coverage (12 types)</h3>
+    <table class="inventory">
+      <thead><tr><th>Resource</th><th>Model Class</th><th>Key Capabilities</th></tr></thead>
+      <tbody>
+        <tr><td>Patient</td><td>PatientSummary</td><td>Demographics, race, ethnicity, MRN, SSN, DALY/QALY scores</td></tr>
+        <tr><td>Encounter</td><td>EncounterRecord</td><td>Linked obs, conditions, procedures, meds, reports, immunizations, imaging (full cross-index)</td></tr>
+        <tr><td>Observation</td><td>ObservationRecord</td><td>LOINC code, value_type (quantity/codeable/component), reference ranges, components</td></tr>
+        <tr><td>Condition</td><td>ConditionRecord</td><td>clinical_status, onset/abatement dates, is_active (derived)</td></tr>
+        <tr><td>MedicationRequest</td><td>MedicationRecord</td><td>RxNorm code, dosage_text, reason_display</td></tr>
+        <tr><td>Procedure</td><td>ProcedureRecord</td><td>CPT/SNOMED code, performed_period</td></tr>
+        <tr><td>DiagnosticReport</td><td>DiagnosticReportRecord</td><td>Category, result_refs, presented_form_text</td></tr>
+        <tr><td>AllergyIntolerance</td><td>AllergyRecord</td><td>Type, categories, criticality, onset</td></tr>
+        <tr><td>Immunization</td><td>ImmunizationRecord</td><td>CVX code, occurrence_dt</td></tr>
+        <tr><td>Claim / EOB</td><td>ClaimRecord</td><td>Insurer, total_billed, total_paid</td></tr>
+        <tr><td>ImagingStudy</td><td>ImagingStudyRecord</td><td>Modality, series_count, instance_count</td></tr>
+        <tr><td>DocumentReference</td><td>DocumentReferenceRecord</td><td>Type, content_text, encounter_references</td></tr>
+      </tbody>
+    </table>
+
+    <h3>PDF Extraction Pipeline (lib/extract/)</h3>
+    <table class="inventory">
+      <thead><tr><th>Pipeline</th><th>Architecture</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td><code>multipass_fhir</code></td><td>K.4 schema-direct multi-pass (production default)</td><td><span class="badge green">Live</span></td></tr>
+        <tr><td><code>single_pass_vision</code></td><td>K.2 single LLM call (baseline)</td><td><span class="badge green">Live</span></td></tr>
+        <tr><td><code>medgemma_ollama</code></td><td>Local MedGemma via Ollama</td><td><span class="badge blue">Lab</span></td></tr>
+        <tr><td><code>text_first</code></td><td>pdfplumber text-first (additive extraction)</td><td><span class="badge blue">Lab</span></td></tr>
+      </tbody>
+    </table>
+    <p style="margin-top: 0.5rem; font-size: 0.82rem; color: #475569;">Cache: SHA-256(file + prompt_version + schema_version + model_name) → deterministic content-hash key. Write-once atomic rename. No TTL in Phase 1.</p>
+  </div>
+
+  <!-- DEPLOYMENT -->
+  <div class="section" id="deploy">
+    <h2>6. Deployment &amp; Observability — Current State</h2>
+
+    <div class="two-col">
+      <div>
+        <h3>Infrastructure</h3>
+        <table class="inventory">
+          <thead><tr><th>Component</th><th>Spec</th></tr></thead>
+          <tbody>
+            <tr><td>Host</td><td>Hetzner CX21 — 2 vCPU, 4 GB RAM, 40 GB SSD (~€4.85/mo)</td></tr>
+            <tr><td>Orchestration</td><td>Docker Compose v1 workaround (preserves data/ bind mount)</td></tr>
+            <tr><td>TLS</td><td>Let's Encrypt (certbot, auto-renewed)</td></tr>
+            <tr><td>Domain</td><td>ehi.healthcaredataai.com</td></tr>
+            <tr><td>Reverse proxy</td><td>nginx (host-level + app container)</td></tr>
+            <tr><td>CI/CD</td><td><strong>None</strong> — manual SSH to deploy-prod.sh</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div>
+        <h3>Docker Services</h3>
+        <table class="inventory">
+          <thead><tr><th>Service</th><th>Image</th><th>Port</th></tr></thead>
+          <tbody>
+            <tr><td>api</td><td>python:3.13-slim + uv</td><td>8000 (Docker)</td></tr>
+            <tr><td>app</td><td>node:20-alpine → nginx:alpine</td><td>80 (Docker)</td></tr>
+            <tr><td>cursor-sidecar</td><td>node:22-alpine (Fastify)</td><td>3040 (internal)</td></tr>
+            <tr><td>fhir-converter</td><td>Microsoft FHIR Converter v1.0.0-preview</td><td>18080 (localhost only)</td></tr>
+            <tr><td>nginx</td><td>nginx:alpine (host proxy)</td><td>80 + 443</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <h3>nginx Security Configuration</h3>
+    <table class="inventory">
+      <thead><tr><th>Config</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td>Rate limit — general API</td><td>120 req/min (burst 80)</td></tr>
+        <tr><td>Rate limit — assistant chat</td><td>12 req/min (burst 4)</td></tr>
+        <tr><td>Body size limit</td><td>32 MB general; 64 KB for /api/assistant/chat</td></tr>
+        <tr><td>Security headers</td><td>X-Frame-Options, X-Content-Type-Options, CSP, HSTS, COOP, CORP, Permissions-Policy</td></tr>
+        <tr><td>Timeout</td><td>120s read/send (handles streaming responses)</td></tr>
+        <tr><td>HTTP → HTTPS</td><td>Yes, permanent 301 redirect</td></tr>
+      </tbody>
+    </table>
+
+    <h3>LLM Observability</h3>
+    <table class="inventory">
+      <thead><tr><th>Feature</th><th>Implementation</th><th>Default State</th></tr></thead>
+      <tbody>
+        <tr><td>Span recording</td><td>SQLite traces.db — LLM, TOOL, RETRIEVAL kinds</td><td><span class="badge amber">Off</span> (TRACING_ENABLED)</td></tr>
+        <tr><td>Token + cost capture</td><td>Per span: input_tokens, output_tokens, cache_read_tokens, total_cost_usd</td><td><span class="badge amber">Off</span></td></tr>
+        <tr><td>Langfuse export</td><td>Background thread, non-blocking; maps to Generations + Spans</td><td><span class="badge amber">Off</span> (env keys required)</td></tr>
+        <tr><td>Traces API</td><td><code>/api/traces/*</code> with bearer token auth (timing-safe compare)</td><td><span class="badge amber">Off</span> (TRACES_API_ENABLED)</td></tr>
+        <tr><td>Middleware coverage</td><td>TracingMiddleware wraps POST /api/assistant/chat only</td><td>Partial</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Critical Environment Variables for Production</h3>
+    <table class="inventory">
+      <thead><tr><th>Variable</th><th>Production Value</th><th>Risk if Wrong</th></tr></thead>
+      <tbody>
+        <tr><td><code>ENVIRONMENT</code></td><td>production</td><td>API docs (openapi.json) exposed publicly</td></tr>
+        <tr><td><code>PROVIDER_ASSISTANT_ALLOW_CLIENT_OVERRIDES</code></td><td>false</td><td>Model/cost abuse via client-supplied params</td></tr>
+        <tr><td><code>TRACES_API_TOKEN</code></td><td>Strong random token</td><td>Patient data exposure via /api/traces</td></tr>
+        <tr><td><code>ATLAS_SIGNING_KEY</code></td><td>Via env (not file)</td><td>Plugin trust chain compromise</td></tr>
+        <tr><td><code>ANTHROPIC_API_KEY</code></td><td>Org-scoped key with spend limits</td><td>Unbounded billing</td></tr>
+        <tr><td><code>CURSOR_INTERNAL_TOOL_SECRET</code></td><td>Strong random</td><td>Unauthorized internal tool access</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- RECOMMENDATIONS -->
+  <div class="section" id="recs">
+    <h2>7. Production Recommendations</h2>
+    <p>Sequenced by risk and impact. Critical items block production readiness. High items should be resolved in the first two weeks post-submission. Nothing below should be started before Phase 1 ships on May 13.</p>
+
+    <h3 style="margin-top: 1.5rem; color: var(--red);">Critical — Block Production</h3>
+    <div class="rec-grid">
+
+      <div class="rec-card critical">
+        <div class="rec-header">
+          <h4>1. Wire anchor compiler to live FHIR data</h4>
+          <span class="priority critical">Critical</span>
+        </div>
+        <p>The plugin anchor compiler (<code>anchors.py → _load_patient_slice()</code>) reads 4 canned demo patient fixtures. Every real plugin run produces an anchor backed by synthetic data, not the actual patient record. The scope enforcement is cryptographically sound — but it's enforcing access to fake data. Wire <code>compile_anchor_package()</code> to load from <code>lib/fhir_parser.bundle_parser.parse_bundle()</code> using the real patient ID.</p>
+        <div class="path">api/plugins/anchors.py → compile_anchor_package() → replace fixture lookup with parse_bundle(patient_id)</div>
+        <div class="why">Why critical: plugins are the flagship marketplace story. A demo running on fake data is a demo — real clinical value requires real data.</div>
+      </div>
+
+      <div class="rec-card critical">
+        <div class="rec-header">
+          <h4>2. Add CI/CD pipeline</h4>
+          <span class="priority critical">Critical</span>
+        </div>
+        <p>All deployments are manual SSH to <code>deploy-prod.sh</code>. There are no automated tests running on push, no build validation, no rollback strategy. A broken commit merged to master can silently break production. At minimum: run <code>pytest</code> + <code>npm run build</code> on every PR (block merges on failure), and gate the production deploy on passing health checks.</p>
+        <div class="path">.github/workflows/ci.yml (pytest + tsc + build) · .github/workflows/deploy.yml (ssh + health gate)</div>
+        <div class="why">Why critical: one broken push can take down the demo during the judge review window.</div>
+      </div>
+
+      <div class="rec-card critical">
+        <div class="rec-header">
+          <h4>3. Move secrets out of plaintext key files</h4>
+          <span class="priority critical">Critical</span>
+        </div>
+        <p>Three signing/session keys live as plaintext files in <code>data/</code> (<code>atlas-signing.key</code>, <code>atlas-session.key</code>, <code>atlas-guest-harmonization.key</code>). Any backup, log collection, or Docker volume exposure that touches <code>data/</code> can leak these. Load them exclusively from environment variables (<code>ATLAS_SIGNING_KEY</code>, <code>EHI_SESSION_SECRET</code>) in production with no file fallback.</p>
+        <div class="path">api/trust/keys.py → atlas_keypair() · api/core/auth.py → init_auth_store()</div>
+        <div class="why">Why critical: the Atlas signing key is the root of the plugin trust chain. Compromise = forged vendor manifests.</div>
+      </div>
+
+      <div class="rec-card critical">
+        <div class="rec-header">
+          <h4>4. Persist consent revocation across restarts</h4>
+          <span class="priority critical">Critical</span>
+        </div>
+        <p>The <code>_revoked_ids: set[str]</code> in <code>runtime.py</code> is in-memory. An API restart (deploy, crash) silently forgets all revocations. A clinician who revoked a plugin's consent mid-run would have that revocation erased — the plugin could call tools again as if consent was never withdrawn. Add a <code>revoked_at</code> column to the <code>runs</code> table in <code>data/runs.db</code> and reload into the in-memory set on startup.</p>
+        <div class="path">api/plugins/runtime.py → _revoked_ids · persist to data/runs.db · reload on init</div>
+        <div class="why">Why critical: consent revocation is a patient safety control. Making it transient defeats the design.</div>
+      </div>
+
+    </div>
+
+    <h3 style="margin-top: 1.75rem; color: var(--amber);">High — First Two Weeks Post-Submission</h3>
+    <div class="rec-grid">
+
+      <div class="rec-card high">
+        <div class="rec-header">
+          <h4>5. Build Layer 2: LLM Batch Enrichment</h4>
+          <span class="priority high">High</span>
+        </div>
+        <p>The context engineering pipeline (Layers 0–1, 3–4) is live but Layer 2 — the product's core competitive differentiator — is explicitly TODO. This is where an LLM pre-processes clinical episodes to produce relevance scores, clinical narratives, cross-episode relationship detection, and reclassified markdown rows that make the "right 5 facts in 30 seconds" promise real. The economic model is compelling: ~$0.01–$0.05 per patient one-time via Haiku, cached and reused across all conversations.</p>
+        <div class="path">api/core/temporal.py (temporal metadata) → api/core/batch_enrichment.py (Haiku batch calls) → wire into context_builder.py Layer 2 slot</div>
+        <div class="why">Why high: without Layer 2, Caspian gives a good briefing. With it, Caspian gives a clinically differentiated briefing that rules can't replicate.</div>
+      </div>
+
+      <div class="rec-card high">
+        <div class="rec-header">
+          <h4>6. Create api/workspace/ — shared session and event primitives</h4>
+          <span class="priority high">High</span>
+        </div>
+        <p>The AGENTIC-HARNESS.md spec defines a shared workspace module at <code>api/workspace/</code> (sessions.py, events.py, artifacts.py, tools/envelope.py) used by both Caspian and plugins. This directory does not exist. Both families maintain separate session/event/artifact implementations. Before a fourth or fifth plugin is added, extract the shared protocol into a dedicated module so all workspaces build on the same primitives and the tool-call envelope is consistent.</p>
+        <div class="path">Create api/workspace/ · refactor api/plugins/runtime.py + api/core/skills/ to share sessions + events</div>
+        <div class="why">Why high: structural debt compounds with every new plugin. Three plugins is the right inflection point.</div>
+      </div>
+
+      <div class="rec-card high">
+        <div class="rec-header">
+          <h4>7. Enable tracing in production with sampling</h4>
+          <span class="priority high">High</span>
+        </div>
+        <p>LLM tracing is off by default. In production this means zero cost visibility, no latency data, no quality monitoring. Enable with a configurable sample rate (start at 100%, drop to 20% when traffic grows). Also extend <code>TracingMiddleware</code> beyond <code>/api/assistant/chat</code> to cover skill runs and plugin tool calls — those are the most expensive operations and currently completely unobserved.</p>
+        <div class="path">Set TRACING_ENABLED=true · add TRACING_SAMPLE_RATE env var · extend TracingMiddleware to skills + plugins</div>
+        <div class="why">Why high: you can't optimize token costs or catch hallucinations without data. This should be on from day one of real use.</div>
+      </div>
+
+      <div class="rec-card high">
+        <div class="rec-header">
+          <h4>8. Replace fixture-based plugin connectors with HTTP adapters</h4>
+          <span class="priority high">High</span>
+        </div>
+        <p>Plugin connectors (<code>api/plugins/connectors.py</code>) route calls to fixture JSON files. The code comments label this "v1" with "v2: real HTTP adapters" deferred. Real-world plugin use requires actual HTTP calls to ClinicalTrials.gov, payer formulary APIs, and referral networks. The connector registry architecture is solid — just swap fixture reads for <code>httpx</code> async calls with proper timeout and error mapping.</p>
+        <div class="path">api/plugins/connectors.py → replace _load_fixture() calls with async httpx.get/post</div>
+        <div class="why">Why high: trial-finder "sends to ClinicalTrials.gov" is currently fiction. The demo works; production doesn't.</div>
+      </div>
+
+      <div class="rec-card high">
+        <div class="rec-header">
+          <h4>9. Add SQLite schema versioning</h4>
+          <span class="priority high">High</span>
+        </div>
+        <p>Five SQLite databases auto-create their schema on first use with no version tracking (<code>sof.db</code>, <code>traces.db</code>, <code>auth.db</code>, <code>runs.db</code>, <code>provenance.db</code>). Any column addition requires either a migration script or a destructive reset. Add a <code>schema_version</code> table and a minimal migration runner per database. Start with <code>runs.db</code> and <code>traces.db</code> — they evolve most frequently as new features ship.</p>
+        <div class="path">data/migrations/ folder per db · schema_version table · apply on startup before app init</div>
+        <div class="why">Why high: production databases accumulate data. Schema drift without migrations means destructive resets or silent bugs.</div>
+      </div>
+
+    </div>
+
+    <h3 style="margin-top: 1.75rem; color: var(--blue);">Medium — Before Phase 2 GA</h3>
+    <div class="rec-grid">
+
+      <div class="rec-card medium">
+        <div class="rec-header">
+          <h4>10. Complete Agent SDK assistant mode</h4>
+          <span class="priority medium">Medium</span>
+        </div>
+        <p>The <code>agent_sdk</code> mode has infrastructure wired (imports, tool shims, SDK config, <code>claude-agent-sdk 3.4.7</code> in lockfile) but the main agent loop is partially implemented. This is the most powerful mode — multi-turn reasoning with <code>run_sql</code> access — and where complex clinical questions get properly answered. Complete <code>provider_assistant_agent_sdk.py → answer_with_agent_sdk()</code> and add a trace-level eval harness to benchmark against the context mode baseline.</p>
+        <div class="path">api/core/provider_assistant_agent_sdk.py</div>
+      </div>
+
+      <div class="rec-card medium">
+        <div class="rec-header">
+          <h4>11. Add plugin sandbox (process-level isolation)</h4>
+          <span class="priority medium">Medium</span>
+        </div>
+        <p>Plugin tools currently run in-process. A buggy or malicious plugin handler could read process memory, import internal modules, or corrupt shared state. Add subprocess-level isolation (separate Python process per run, IPC over JSON) or a capability-checked in-process sandbox (restricted builtins + import blocking via <code>RestrictedPython</code>). The latter is simpler for Phase 2 and buys 80% of the isolation guarantee.</p>
+        <div class="path">api/plugins/sandbox.py (does not exist) · wrap dispatch_tool() call</div>
+      </div>
+
+      <div class="rec-card medium">
+        <div class="rec-header">
+          <h4>12. Upgrade Hetzner to CX31 and add uptime monitoring</h4>
+          <span class="priority medium">Medium</span>
+        </div>
+        <p>The production server is CX21 (4 GB RAM). Running 5 containers — including a FHIR converter at ~1.5 GB RSS and SOF warehouse materialization at startup — is tight. A memory OOM during a judge demo would be catastrophic. Upgrade to CX31 (8 GB, ~€9/mo). Also add an uptime monitor (UptimeRobot free tier) watching <code>/api/health</code> so any downtime during the review window is caught immediately.</p>
+        <div class="path">Hetzner console → resize · UptimeRobot → monitor /api/health every 5 min</div>
+      </div>
+
+      <div class="rec-card medium">
+        <div class="rec-header">
+          <h4>13. Per-org plugin registry + vendor key rotation</h4>
+          <span class="priority medium">Medium</span>
+        </div>
+        <p>All installed plugins are currently available to all users and the vendor allowlist is a static JSON file. The AGENTIC-HARNESS.md spec requires per-org enable/disable and versionable upgrades. Add an org-scoped plugin registry table in <code>runs.db</code> and a key rotation flow so vendor keys can be replaced without redeploying. Required before the marketplace story scales to multiple organizations.</p>
+        <div class="path">api/plugins/registry.py (does not exist) · vendor keys → DB-backed lookup</div>
+      </div>
+
+      <div class="rec-card medium">
+        <div class="rec-header">
+          <h4>14. Add FHIR Provenance edges to the gold layer</h4>
+          <span class="priority medium">Medium</span>
+        </div>
+        <p>The Atlas data model (Decision 5) declares Provenance as the competitive wedge. The harmonization system produces provenance records, but the SQL-on-FHIR gold layer derivations (<code>medication_episode</code>, <code>observation_latest</code>) do not carry <code>bronze_source</code> or <code>bronze_path</code> columns. Without these, the "click any fact → see lineage" UI promise can't be honored from the warehouse. Add provenance columns to <code>lib/sql_on_fhir/derived.py</code>.</p>
+        <div class="path">lib/sql_on_fhir/derived.py → build_medication_episodes() → add source_bundle_path column</div>
+      </div>
+
+      <div class="rec-card medium">
+        <div class="rec-header">
+          <h4>15. Evaluate and decide on Cursor sidecar</h4>
+          <span class="priority medium">Medium</span>
+        </div>
+        <p>The Cursor sidecar (<code>cursor-sidecar/</code>, <code>@cursor/sdk v1.0.12</code>) is a live Docker service in production with its own billing and API surface. Decide before Phase 2 whether it's a core path or a development experiment. If core: add the same tracing, rate limiting, and health monitoring as other assistant modes. If experimental: remove from <code>docker-compose.prod.yml</code> to reduce attack surface and resource consumption.</p>
+        <div class="path">deploy/docker-compose.prod.yml → cursor-sidecar service</div>
+      </div>
+
+    </div>
+
+    <!-- Summary matrix -->
+    <h3 style="margin-top: 2rem;">Prioritization Matrix</h3>
+    <table class="inventory" style="margin-top: 0.75rem;">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Recommendation</th>
+          <th>Priority</th>
+          <th>Effort</th>
+          <th>Impact Area</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>1</td><td>Wire anchor compiler to live FHIR data</td><td><span class="badge red">Critical</span></td><td>M</td><td>Plugin clinical correctness</td></tr>
+        <tr><td>2</td><td>Add CI/CD pipeline</td><td><span class="badge red">Critical</span></td><td>M</td><td>Deploy safety</td></tr>
+        <tr><td>3</td><td>Move secrets out of plaintext key files</td><td><span class="badge red">Critical</span></td><td>S</td><td>Security — trust chain</td></tr>
+        <tr><td>4</td><td>Persist consent revocation across restarts</td><td><span class="badge red">Critical</span></td><td>S</td><td>Patient safety control</td></tr>
+        <tr><td>5</td><td>Build Layer 2: LLM Batch Enrichment</td><td><span class="badge amber">High</span></td><td>L</td><td>Core product differentiator</td></tr>
+        <tr><td>6</td><td>Create api/workspace/ shared primitives</td><td><span class="badge amber">High</span></td><td>M</td><td>Architectural debt</td></tr>
+        <tr><td>7</td><td>Enable tracing in production with sampling</td><td><span class="badge amber">High</span></td><td>S</td><td>Observability + cost control</td></tr>
+        <tr><td>8</td><td>Replace fixture connectors with HTTP adapters</td><td><span class="badge amber">High</span></td><td>M</td><td>Plugin real-world use</td></tr>
+        <tr><td>9</td><td>Add SQLite schema versioning</td><td><span class="badge amber">High</span></td><td>S</td><td>Production reliability</td></tr>
+        <tr><td>10</td><td>Complete Agent SDK assistant mode</td><td><span class="badge blue">Medium</span></td><td>M</td><td>Caspian power queries</td></tr>
+        <tr><td>11</td><td>Add plugin sandbox (process isolation)</td><td><span class="badge blue">Medium</span></td><td>L</td><td>Plugin marketplace trust</td></tr>
+        <tr><td>12</td><td>Upgrade to CX31 + uptime monitoring</td><td><span class="badge blue">Medium</span></td><td>S</td><td>Demo reliability</td></tr>
+        <tr><td>13</td><td>Per-org plugin registry + key rotation</td><td><span class="badge blue">Medium</span></td><td>M</td><td>Multi-org readiness</td></tr>
+        <tr><td>14</td><td>FHIR Provenance edges in gold layer</td><td><span class="badge blue">Medium</span></td><td>M</td><td>Competitive wedge</td></tr>
+        <tr><td>15</td><td>Decide on Cursor sidecar</td><td><span class="badge blue">Medium</span></td><td>S</td><td>Attack surface + resources</td></tr>
+      </tbody>
+    </table>
+
+  </div>
+
+  <div style="text-align: center; color: #94a3b8; font-size: 0.75rem; margin-top: 2rem; padding-bottom: 2rem;">
+    Generated by Claude Sonnet 4.6 · Atlas Backend Architecture Report · May 11, 2026
+  </div>
+
+</div>
+</body>
+</html>

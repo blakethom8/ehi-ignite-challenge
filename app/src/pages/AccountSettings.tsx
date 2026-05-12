@@ -1,11 +1,22 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
-import { ArrowLeft, Trash2 } from "lucide-react";
+import { ArrowLeft, LogOut, Trash2 } from "lucide-react";
 import { useAccessContext } from "../context/AccessContext";
+import { resolveSessionHomePath } from "../sessionRouting";
 
 export function AccountSettingsPage() {
   const navigate = useNavigate();
-  const { isLoading, isUnlocked, user, updateDisplayName, changePassword, deleteAccount } = useAccessContext();
+  const {
+    activePatientId,
+    clearAccess,
+    isLoading,
+    isUnlocked,
+    mode,
+    user,
+    updateDisplayName,
+    changePassword,
+    deleteAccount,
+  } = useAccessContext();
   const [displayName, setDisplayName] = useState("");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -13,6 +24,9 @@ export function AccountSettingsPage() {
   const [profileMsg, setProfileMsg] = useState<{ tone: "info" | "error"; text: string } | null>(null);
   const [passwordMsg, setPasswordMsg] = useState<{ tone: "info" | "error"; text: string } | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [signOutError, setSignOutError] = useState<string | null>(null);
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  const backToAtlasHref = resolveSessionHomePath(mode, activePatientId);
 
   useEffect(() => {
     if (user) {
@@ -31,6 +45,19 @@ export function AccountSettingsPage() {
   if (!isUnlocked || !user) {
     return <Navigate to="/account" replace />;
   }
+
+  const handleSignOut = async () => {
+    setSignOutError(null);
+    setIsSigningOut(true);
+    try {
+      await clearAccess();
+      navigate("/", { replace: true });
+    } catch (error) {
+      setSignOutError(extractErrorMessage(error));
+    } finally {
+      setIsSigningOut(false);
+    }
+  };
 
   const handleProfile = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -85,13 +112,27 @@ export function AccountSettingsPage() {
   return (
     <div className="min-h-screen bg-[#eef2f6] px-6 py-8 text-[#18202b]">
       <div className="mx-auto max-w-3xl">
-        <Link
-          to="/"
-          className="inline-flex items-center gap-2 text-sm font-semibold text-[#52627f] transition-colors hover:text-[#3657ff]"
-        >
-          <ArrowLeft size={16} />
-          Back to Atlas
-        </Link>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <Link
+            to={backToAtlasHref}
+            className="inline-flex items-center gap-2 text-sm font-semibold text-[#52627f] transition-colors hover:text-[#3657ff]"
+          >
+            <ArrowLeft size={16} />
+            Back to Atlas
+          </Link>
+          <button
+            type="button"
+            onClick={() => {
+              void handleSignOut();
+            }}
+            disabled={isSigningOut}
+            className="inline-flex items-center gap-2 rounded-2xl border border-[#d5deea] bg-white px-4 py-2 text-sm font-semibold text-[#33415b] transition-colors hover:border-[#4d68ff] hover:text-[#3657ff] disabled:cursor-not-allowed disabled:opacity-70"
+          >
+            <LogOut size={15} />
+            {isSigningOut ? "Signing out..." : "Sign out"}
+          </button>
+        </div>
+        {signOutError && <Message tone="error" text={signOutError} />}
 
         <header className="mt-6">
           <h1 className="text-3xl font-semibold tracking-[-0.03em] text-[#171b24]">Account settings</h1>

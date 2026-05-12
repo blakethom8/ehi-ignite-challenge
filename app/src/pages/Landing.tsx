@@ -4,6 +4,7 @@ import { HeroPipelineDiagram } from "../components/marketing/HeroPipelineDiagram
 import { MarketingHeader } from "../components/marketing/MarketingHeader";
 import { useAccessContext } from "../context/AccessContext";
 import { buildDemoSelectionPath, withPatientContext } from "../routing";
+import { resolveAccountPath, resolveSessionHomePath } from "../sessionRouting";
 
 const moduleCards = [
   {
@@ -53,11 +54,15 @@ const moduleCards = [
 ];
 
 export function Landing() {
-  const { activePatientId, isUnlocked } = useAccessContext();
+  const { activePatientId, isUnlocked, mode, user } = useAccessContext();
   const moduleCardsForState = moduleCards.map((card) => ({
     ...card,
     to: withPatientContext(card.to, activePatientId),
   }));
+  const accountHref = resolveAccountPath(mode, Boolean(user));
+  const sessionHomeHref = resolveSessionHomePath(mode, activePatientId);
+  const isAuthenticated = mode === "authenticated" && Boolean(user);
+  const primaryWorkspaceLabel = activePatientId ? "Resume workspace" : "Upload files";
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,#f6f9ff_0%,#eef3f8_42%,#e9eef4_100%)] text-[#18202b]">
@@ -75,29 +80,51 @@ export function Landing() {
                 Bring scattered health records into one reviewable workspace.
               </h1>
               <p className="mt-6 max-w-3xl text-lg leading-8 text-[#5f6f89]">
-                Try Atlas with a prepared sample chart, or use an account to save private record workspaces and return later.
+                {isAuthenticated
+                  ? `Signed in as ${user?.display_name}. Open your workspace, continue chart review, or manage your account.`
+                  : "Try Atlas with a prepared sample chart, or use an account to save private record workspaces and return later."}
               </p>
               <div className="mt-8 flex flex-wrap justify-center gap-3">
-                <Link
-                  to={buildDemoSelectionPath()}
-                  className="inline-flex items-center gap-2 rounded-2xl bg-[#4d68ff] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#3c57ef] disabled:cursor-not-allowed disabled:opacity-70"
-                >
-                  Try demo
-                  <ArrowRight size={16} />
-                </Link>
-                <Link
-                  to="/guest-harmonization"
-                  className="inline-flex items-center gap-2 rounded-2xl border border-[#d5deea] bg-[rgba(255,255,255,0.76)] px-5 py-3 text-sm font-semibold text-[#33415b] transition-colors hover:border-[#4d68ff] hover:text-[#3657ff]"
-                >
-                  Try with my files
-                  <Upload size={16} />
-                </Link>
-                <Link
-                  to="/account"
-                  className="inline-flex items-center gap-2 rounded-2xl border border-[#d5deea] bg-[rgba(255,255,255,0.76)] px-5 py-3 text-sm font-semibold text-[#33415b] transition-colors hover:border-[#4d68ff] hover:text-[#3657ff]"
-                >
-                  Log in / Sign up
-                </Link>
+                {isAuthenticated ? (
+                  <>
+                    <Link
+                      to={sessionHomeHref}
+                      className="inline-flex items-center gap-2 rounded-2xl bg-[#4d68ff] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#3c57ef] disabled:cursor-not-allowed disabled:opacity-70"
+                    >
+                      {primaryWorkspaceLabel}
+                      <ArrowRight size={16} />
+                    </Link>
+                    <Link
+                      to={accountHref}
+                      className="inline-flex items-center gap-2 rounded-2xl border border-[#d5deea] bg-[rgba(255,255,255,0.76)] px-5 py-3 text-sm font-semibold text-[#33415b] transition-colors hover:border-[#4d68ff] hover:text-[#3657ff]"
+                    >
+                      Account settings
+                    </Link>
+                  </>
+                ) : (
+                  <>
+                    <Link
+                      to={buildDemoSelectionPath()}
+                      className="inline-flex items-center gap-2 rounded-2xl bg-[#4d68ff] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#3c57ef] disabled:cursor-not-allowed disabled:opacity-70"
+                    >
+                      Try demo
+                      <ArrowRight size={16} />
+                    </Link>
+                    <Link
+                      to="/guest-harmonization"
+                      className="inline-flex items-center gap-2 rounded-2xl border border-[#d5deea] bg-[rgba(255,255,255,0.76)] px-5 py-3 text-sm font-semibold text-[#33415b] transition-colors hover:border-[#4d68ff] hover:text-[#3657ff]"
+                    >
+                      Try with my files
+                      <Upload size={16} />
+                    </Link>
+                    <Link
+                      to={accountHref}
+                      className="inline-flex items-center gap-2 rounded-2xl border border-[#d5deea] bg-[rgba(255,255,255,0.76)] px-5 py-3 text-sm font-semibold text-[#33415b] transition-colors hover:border-[#4d68ff] hover:text-[#3657ff]"
+                    >
+                      Log in / Sign up
+                    </Link>
+                  </>
+                )}
               </div>
             </div>
 

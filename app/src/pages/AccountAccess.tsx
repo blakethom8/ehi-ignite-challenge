@@ -1,8 +1,9 @@
 import axios from "axios";
 import { useState, type FormEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, Navigate, useNavigate } from "react-router-dom";
 import { ArrowLeft, ArrowRight, CheckCircle2, LockKeyhole, UserPlus } from "lucide-react";
 import { useAccessContext } from "../context/AccessContext";
+import { resolveSessionHomePath } from "../sessionRouting";
 
 type AccountTab = "login" | "signup";
 
@@ -55,9 +56,11 @@ export function AccountAccessPage() {
   const [signUpPassword, setSignUpPassword] = useState("");
   const [signUpDisplayName, setSignUpDisplayName] = useState("");
   const [signUpError, setSignUpError] = useState<string | null>(null);
-  const defaultAuthenticatedDestination = activePatientId
-    ? `/patient-record?patient=${encodeURIComponent(activePatientId)}`
-    : "/patient-record/sources";
+  const defaultAuthenticatedDestination = resolveSessionHomePath("authenticated", activePatientId);
+
+  if (!isLoading && isUnlocked && user) {
+    return <Navigate to="/account/settings" replace />;
+  }
 
   const handleSignIn = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();

@@ -1,0 +1,31 @@
+import { describe, expect, it } from "vitest";
+import {
+  resolveAccountPath,
+  resolveSessionHomePath,
+  resolveSessionWorkspaceHubPath,
+} from "./sessionRouting";
+
+describe("sessionRouting", () => {
+  it("routes anonymous users to the public home", () => {
+    expect(resolveSessionHomePath("anonymous", null)).toBe("/");
+    expect(resolveSessionWorkspaceHubPath("anonymous", null)).toBe("/");
+    expect(resolveAccountPath("anonymous", false)).toBe("/account");
+  });
+
+  it("routes authenticated users without an active patient to file intake", () => {
+    expect(resolveSessionHomePath("authenticated", null)).toBe("/patient-record/sources");
+    expect(resolveSessionWorkspaceHubPath("authenticated", null)).toBe("/patient-record/sources");
+    expect(resolveAccountPath("authenticated", true)).toBe("/account/settings");
+  });
+
+  it("routes authenticated users with an active patient back into the workspace", () => {
+    expect(resolveSessionHomePath("authenticated", "patient-123")).toBe("/patient-record?patient=patient-123");
+    expect(resolveSessionWorkspaceHubPath("authenticated", "patient-123")).toBe("/records-pool?patient=patient-123");
+  });
+
+  it("routes demo users back into their demo chart context", () => {
+    expect(resolveSessionHomePath("demo", "demo-high-risk")).toBe("/patient-record?patient=demo-high-risk");
+    expect(resolveSessionWorkspaceHubPath("demo", "demo-high-risk")).toBe("/records-pool?patient=demo-high-risk");
+    expect(resolveSessionHomePath("demo", null)).toBe("/demo");
+  });
+});

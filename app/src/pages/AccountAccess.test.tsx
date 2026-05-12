@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AccountAccessPage } from "./AccountAccess";
 
@@ -45,6 +45,7 @@ describe("AccountAccessPage", () => {
       activePatientId: null,
       isLoading: false,
       isUnlocked: false,
+      mode: "anonymous",
       signIn: signInMock,
       signUp: signUpMock,
       user: null,
@@ -151,5 +152,33 @@ describe("AccountAccessPage", () => {
       target: { value: "longenough" },
     });
     expect(submit).not.toBeDisabled();
+  });
+
+  it("redirects authenticated users away from the login/signup form", () => {
+    useAccessContextMock.mockReturnValue({
+      activePatientId: null,
+      isLoading: false,
+      isUnlocked: true,
+      mode: "authenticated",
+      signIn: signInMock,
+      signUp: signUpMock,
+      user: {
+        id: "user-1",
+        email: "test@example.com",
+        display_name: "Dr. Test",
+        role: "consumer",
+      },
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/account"]}>
+        <Routes>
+          <Route path="/account" element={<AccountAccessPage />} />
+          <Route path="/account/settings" element={<div>Account settings</div>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText("Account settings")).toBeInTheDocument();
   });
 });

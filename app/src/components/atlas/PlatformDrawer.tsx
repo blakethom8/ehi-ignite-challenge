@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
   FileText,
   HelpCircle,
@@ -12,6 +12,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import type { User } from "./types";
 import { useAccessContext } from "../../context/AccessContext";
+import { resolveSessionHomePath, resolveSessionWorkspaceHubPath } from "../../sessionRouting";
 
 type PlatformDrawerProps = {
   open: boolean;
@@ -21,9 +22,19 @@ type PlatformDrawerProps = {
 
 export function PlatformDrawer({ open, onClose, user }: PlatformDrawerProps) {
   const navigate = useNavigate();
-  const { clearAccess, user: authUser, isUnlocked } = useAccessContext();
+  const {
+    activePatientId,
+    clearAccess,
+    isUnlocked,
+    mode,
+    user: authUser,
+  } = useAccessContext();
   const showAccountSettings = isUnlocked && authUser !== null;
   const showAdmin = isUnlocked && authUser?.role === "admin";
+  const [sessionActionError, setSessionActionError] = useState<string | null>(null);
+  const [isSessionActionPending, setIsSessionActionPending] = useState(false);
+  const homeHref = resolveSessionHomePath(mode, activePatientId);
+  const workspaceHubHref = resolveSessionWorkspaceHubPath(mode, activePatientId);
 
   useEffect(() => {
     if (!open) return;
@@ -33,6 +44,13 @@ export function PlatformDrawer({ open, onClose, user }: PlatformDrawerProps) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
+
+  useEffect(() => {
+    if (!open) {
+      setSessionActionError(null);
+      setIsSessionActionPending(false);
+    }
+  }, [open]);
 
   if (!open) return null;
 
@@ -107,7 +125,7 @@ export function PlatformDrawer({ open, onClose, user }: PlatformDrawerProps) {
             icon={<UserRound className="h-3.5 w-3.5" strokeWidth={1.5} />}
             onClick={() => {
               onClose();
-              navigate("/");
+              navigate(homeHref);
             }}
           >
             Home
@@ -116,7 +134,7 @@ export function PlatformDrawer({ open, onClose, user }: PlatformDrawerProps) {
             icon={<FileText className="h-3.5 w-3.5" strokeWidth={1.5} />}
             onClick={() => {
               onClose();
-              navigate("/records-pool");
+              navigate(workspaceHubHref);
             }}
           >
             Switch chart
@@ -178,22 +196,40 @@ export function PlatformDrawer({ open, onClose, user }: PlatformDrawerProps) {
           </DrawerItem>
         </DrawerSection>
         <div className="flex-1" />
-        <div
-          className="border-t px-1.5 pb-3 pt-1.5"
-          style={{ borderColor: "var(--line-1)" }}
-        >
-          <DrawerItem
-            icon={<LogOut className="h-3.5 w-3.5" strokeWidth={1.5} />}
-            muted
-            onClick={() => {
-              clearAccess();
-              onClose();
-              navigate("/");
-            }}
+        {mode !== "anonymous" ? (
+          <div
+            className="border-t px-1.5 pb-3 pt-1.5"
+            style={{ borderColor: "var(--line-1)" }}
           >
-            Exit sample / sign out
-          </DrawerItem>
-        </div>
+            {sessionActionError ? (
+              <p className="px-2.5 pb-2 text-[11px] text-[#b42318]" role="alert">
+                {sessionActionError}
+              </p>
+            ) : null}
+            <DrawerItem
+              icon={<LogOut className="h-3.5 w-3.5" strokeWidth={1.5} />}
+              muted={false}
+              disabled={isSessionActionPending}
+              onClick={async () => {
+                setSessionActionError(null);
+                setIsSessionActionPending(true);
+                try {
+                  await clearAccess();
+                  onClose();
+                  navigate("/", { replace: true });
+                } catch (error) {
+                  setSessionActionError(error instanceof Error && error.message ? error.message : "Session action failed.");
+                } finally {
+                  setIsSessionActionPending(false);
+                }
+              }}
+            >
+              {mode === "authenticated"
+                ? isSessionActionPending ? "Signing out..." : "Sign out"
+                : isSessionActionPending ? "Leaving demo..." : "Exit demo"}
+            </DrawerItem>
+          </div>
+        ) : null}
       </aside>
       <style>{`
         @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
@@ -211,17 +247,20 @@ function DrawerItem({
   icon,
   children,
   muted = false,
+  disabled = false,
   onClick,
 }: {
   icon: React.ReactNode;
   children: React.ReactNode;
   muted?: boolean;
+  disabled?: boolean;
   onClick?: () => void;
 }) {
   return (
     <button
       onClick={onClick}
-      className="flex w-full cursor-pointer items-center gap-2.5 rounded-[5px] px-2.5 py-2 text-[12.5px] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--ink-1)]"
+      disabled={disabled}
+      className="flex w-full cursor-pointer items-center gap-2.5 rounded-[5px] px-2.5 py-2 text-[12.5px] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--ink-1)] disabled:cursor-not-allowed disabled:opacity-70"
       style={{ color: muted ? "var(--ink-3)" : "var(--ink-2)" }}
     >
       {icon}

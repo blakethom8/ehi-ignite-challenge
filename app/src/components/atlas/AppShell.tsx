@@ -11,6 +11,7 @@ import type {
   WorkspaceId,
 } from "./types";
 import { useAccessContext } from "../../context/AccessContext";
+import { resolveSessionHomePath } from "../../sessionRouting";
 
 const DEFAULT_USER: User = {
   initials: "AT",
@@ -102,6 +103,8 @@ export function AppShell({
     }
   };
 
+  const sessionHomeHref = resolveSessionHomePath(mode, activePatientId);
+
   const handleSwitchWorkspace = (w: WorkspaceId) => {
     setWorkspaceId(w);
     const patientId = searchParams.get("patient") ?? activePatientId;
@@ -134,6 +137,7 @@ export function AppShell({
         workspaceId={workspaceId}
         onSwitchWorkspace={handleSwitchWorkspace}
         onOpenDrawer={() => setDrawerOpen(true)}
+        homeHref={sessionHomeHref}
         user={shellUser}
         crumbs={showTitlebar ? resolvedCrumbs : undefined}
         panes={panes ?? DEFAULT_PANES}

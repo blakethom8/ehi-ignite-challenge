@@ -5,17 +5,18 @@ import type { AuthSessionResponse } from "../../types";
 import { AccessProvider } from "../../context/AccessContext";
 import { ModuleBar } from "./ModuleBar";
 
-const { enterDemoMock, exitDemoMock, getAuthSessionMock } = vi.hoisted(() => ({
+const { enterDemoMock, exitDemoMock, getAuthSessionMock, logoutMock } = vi.hoisted(() => ({
   enterDemoMock: vi.fn(),
   exitDemoMock: vi.fn(),
   getAuthSessionMock: vi.fn<() => Promise<AuthSessionResponse>>(),
+  logoutMock: vi.fn(),
 }));
 
 vi.mock("../../api/client", () => ({
   api: {
     getAuthSession: getAuthSessionMock,
     login: vi.fn(),
-    logout: vi.fn(),
+    logout: logoutMock,
     enterDemo: enterDemoMock,
     exitDemo: exitDemoMock,
     selectActivePatient: vi.fn(),
@@ -63,6 +64,14 @@ describe("ModuleBar", () => {
       ],
     });
     exitDemoMock.mockResolvedValue({
+      mode: "anonymous",
+      user: null,
+      active_patient_id: null,
+      active_patient_name: null,
+      expires_at: null,
+      available_demo_patients: [],
+    });
+    logoutMock.mockResolvedValue({
       mode: "anonymous",
       user: null,
       active_patient_id: null,
@@ -153,5 +162,50 @@ describe("ModuleBar", () => {
     expect(screen.getByText("DEMO PATIENTS")).toBeInTheDocument();
     expect(screen.getByText("Demo Patient - Trial Match")).toBeInTheDocument();
     expect(screen.getByText("Exit demo space")).toBeInTheDocument();
+  });
+
+  it("routes the app title to the authenticated home destination and exposes sign out", async () => {
+    getAuthSessionMock.mockResolvedValue({
+      mode: "authenticated",
+      user: {
+        id: "user-1",
+        email: "test@example.com",
+        display_name: "Dr. Test",
+        role: "consumer",
+      },
+      active_patient_id: null,
+      active_patient_name: null,
+      expires_at: null,
+      available_demo_patients: [],
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/patient-record/sources"]}>
+        <AccessProvider>
+          <ModuleBar
+            homeHref="/patient-record/sources"
+            activeModule="patient-record"
+            onSelect={vi.fn()}
+            workspaceId="caspian"
+            onSwitchWorkspace={vi.fn()}
+            onOpenDrawer={vi.fn()}
+            user={{ initials: "DT", name: "Dr. Test", org: "test@example.com" }}
+          />
+        </AccessProvider>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("link", { name: /ehi atlas/i })).toHaveAttribute(
+        "href",
+        "/patient-record/sources",
+      );
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /sign out/i }));
+
+    await waitFor(() => {
+      expect(logoutMock).toHaveBeenCalledTimes(1);
+    });
   });
 });

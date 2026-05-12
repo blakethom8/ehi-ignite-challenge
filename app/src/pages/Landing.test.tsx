@@ -25,6 +25,7 @@ describe("Landing", () => {
   beforeEach(() => {
     useAccessContextMock.mockReset();
     useAccessContextMock.mockReturnValue({
+      mode: "anonymous",
       activePatientId: null,
       activePatientName: null,
       isDemo: false,
@@ -63,5 +64,35 @@ describe("Landing", () => {
     expect(screen.queryByRole("link", { name: /surgical review sample/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /trial match sample/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /medication access sample/i })).not.toBeInTheDocument();
+  });
+
+  it("shows signed-in workspace actions for authenticated users", () => {
+    useAccessContextMock.mockReturnValue({
+      mode: "authenticated",
+      activePatientId: null,
+      activePatientName: null,
+      isDemo: false,
+      isUnlocked: true,
+      user: {
+        id: "user-1",
+        email: "test@example.com",
+        display_name: "Dr. Test",
+        role: "consumer",
+      },
+    });
+
+    renderLanding();
+
+    expect(screen.getAllByText(/signed in as dr\. test/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("link", { name: /upload files/i })[0]).toHaveAttribute(
+      "href",
+      "/patient-record/sources",
+    );
+    expect(screen.getAllByRole("link", { name: /account settings/i })[0]).toHaveAttribute(
+      "href",
+      "/account/settings",
+    );
+    expect(screen.queryByRole("link", { name: /log in \/ sign up/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /try demo/i })).not.toBeInTheDocument();
   });
 });

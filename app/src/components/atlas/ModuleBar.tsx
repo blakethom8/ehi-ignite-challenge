@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, Compass, Database, HelpCircle, Menu, Pill, Play, Search, Send, Telescope } from "lucide-react";
+import { ChevronDown, Compass, Database, HelpCircle, LogOut, Menu, Pill, Play, Search, Send, Telescope } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { hrefForModule } from "./navigation";
 import type { Crumb } from "./Titlebar";
@@ -11,6 +11,7 @@ import type {
   WorkspaceId,
 } from "./types";
 import { useAccessContext } from "../../context/AccessContext";
+import { resolveSessionWorkspaceHubPath } from "../../sessionRouting";
 
 const RECENT: RecentWorkspace[] = [
   { id: "trial-finder", label: "Trial Finder", vendor: "Helix Clinical", icon: "Telescope" },
@@ -32,6 +33,7 @@ const MODULES: { id: ModuleId; label: string; hasMenu?: boolean }[] = [
 ];
 
 type ModuleBarProps = {
+  homeHref?: string;
   activeModule: ModuleId;
   onSelect: (module: ModuleId) => void;
   workspaceId: WorkspaceId;
@@ -62,6 +64,7 @@ const PANE_TITLES: Record<keyof PaneVisibility, string> = {
 };
 
 export function ModuleBar({
+  homeHref = "/",
   activeModule,
   onSelect,
   workspaceId,
@@ -85,11 +88,15 @@ export function ModuleBar({
     activePatientId,
     activePatientName,
     availableDemoPatients,
+    clearAccess,
     enterDemoPatient,
     exitDemo,
     isDemo,
     isUnlocked,
+    mode,
   } = useAccessContext();
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  const [signOutError, setSignOutError] = useState<string | null>(null);
 
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
@@ -124,6 +131,19 @@ export function ModuleBar({
   const reloadModuleNav =
     activeModule === "caspian" || activeModule === "workspaces";
   const isDenseWorkspaceChrome = showPaneToggles || Boolean(onRunWorkflow);
+  const handleSignOut = async () => {
+    setSignOutError(null);
+    setIsSigningOut(true);
+    try {
+      await clearAccess();
+      navigate("/", { replace: true });
+    } catch {
+      setSignOutError("Sign out failed. Try again.");
+    } finally {
+      setIsSigningOut(false);
+    }
+  };
+
   return (
     <div
       className="grid h-11 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 px-3.5 text-[12px]"
@@ -142,7 +162,7 @@ export function ModuleBar({
           <Menu className="h-3.5 w-3.5" strokeWidth={1.5} />
         </button>
         <div className="flex items-center gap-2 border-r border-white/10 pr-3.5">
-          <Link to="/" className="flex items-center gap-2 no-underline">
+          <Link to={homeHref} className="flex items-center gap-2 no-underline">
             <div
               className="grid h-[22px] w-[22px] place-items-center rounded-[5px] text-[10px] font-bold tracking-wide text-white"
               style={{
@@ -328,6 +348,11 @@ export function ModuleBar({
         </div>
       </div>
       <div className="flex min-w-0 items-center justify-end gap-2 overflow-hidden pl-2">
+        {signOutError ? (
+          <span className="hidden text-[11px] font-medium text-[#ffb4b4] xl:inline">
+            {signOutError}
+          </span>
+        ) : null}
         {activeBundle ? (
           <div
             ref={demoRef}
@@ -438,10 +463,19 @@ export function ModuleBar({
                 <button
                   type="button"
                   onClick={async () => {
-                    await exitDemo();
-                    setDemoOpen(false);
-                    navigate("/");
+                    setPendingDemoPatientId("exit-demo");
+                    setSignOutError(null);
+                    try {
+                      await exitDemo();
+                      setDemoOpen(false);
+                      navigate("/", { replace: true });
+                    } catch {
+                      setSignOutError("Exit demo failed. Try again.");
+                    } finally {
+                      setPendingDemoPatientId(null);
+                    }
                   }}
+                  disabled={pendingDemoPatientId !== null}
                   className="flex w-full items-center justify-between rounded-[7px] px-2.5 py-2 text-left transition-colors hover:bg-[var(--surface-2)]"
                   role="menuitem"
                 >
@@ -454,12 +488,30 @@ export function ModuleBar({
                     </div>
                   </div>
                   <span className="text-[11px] font-medium text-[var(--action)]">
-                    Leave
+                    {pendingDemoPatientId === "exit-demo" ? "Leaving..." : "Leave"}
                   </span>
                 </button>
               </div>
             ) : null}
           </div>
+        ) : null}
+        {mode === "authenticated" ? (
+          <button
+            type="button"
+            onClick={() => {
+              void handleSignOut();
+            }}
+            disabled={isSigningOut}
+            className="hidden h-[30px] shrink-0 items-center gap-1.5 rounded-md border px-2.5 text-[12px] font-medium text-white/85 transition-colors hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-70 lg:inline-flex"
+            style={{
+              borderColor: "rgba(255,255,255,0.15)",
+              background: "rgba(255,255,255,0.04)",
+            }}
+            title="Sign out"
+          >
+            <LogOut className="h-3 w-3" strokeWidth={1.5} />
+            {isSigningOut ? "Signing out..." : "Sign out"}
+          </button>
         ) : null}
         {onRunWorkflow && (
           <button
@@ -519,7 +571,7 @@ export function ModuleBar({
         )}
         <div className="flex shrink-0 items-center gap-1">
           <Link
-            to={isUnlocked ? withPatientContext("/records-pool", activePatientId) : "/"}
+            to={resolveSessionWorkspaceHubPath(mode, activePatientId)}
             className="grid h-[30px] w-[30px] place-items-center rounded-[6px] text-white/70 hover:bg-white/8 hover:text-white"
             title={isUnlocked ? "Health-record workspaces" : "Choose a sample or account"}
           >

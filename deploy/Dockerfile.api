@@ -16,6 +16,9 @@ COPY lib/ ./lib/
 COPY api/ ./api/
 COPY scripts/ ./scripts/
 COPY ehi-atlas/ehi_atlas/ ./ehi-atlas/ehi_atlas/
+# Reference vocabulary slices (LOINC, RxNorm, CVX) — read by the PDF lab
+# pipeline's loinc_matcher and the bundle packager's terminology builder.
+COPY ehi-atlas/corpus/reference/ ./ehi-atlas/corpus/reference/
 
 EXPOSE 8000
 

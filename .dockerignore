@@ -19,8 +19,15 @@ research/
 fhir_explorer/
 patient-journey/
 
-# EHI Atlas production extraction only needs ehi-atlas/ehi_atlas.
-ehi-atlas/corpus/
+# EHI Atlas production extraction only needs ehi-atlas/ehi_atlas plus the
+# reference vocabulary slice. The PDF lab pipeline's loinc_matcher and the
+# bundle packager's terminology slices both read from corpus/reference/
+# at runtime, so it must reach the image. Heavy dev artifacts under
+# corpus/_sources, corpus/bronze, etc. stay excluded.
+ehi-atlas/corpus/_sources/
+ehi-atlas/corpus/bronze/
+ehi-atlas/corpus/silver/
+ehi-atlas/corpus/gold/
 ehi-atlas/notebooks/
 ehi-atlas/notes/
 ehi-atlas/app/

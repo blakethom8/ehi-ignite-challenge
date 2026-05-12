@@ -2,18 +2,39 @@ import type { ReactNode } from "react";
 import { useEffect } from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AccessProvider } from "../../context/AccessContext";
 import type { AuthSessionResponse } from "../../types";
 import { CaspianWorkspace } from "./Workspace";
 
+function renderWithProviders(ui: ReactNode) {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  return render(
+    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>,
+  );
+}
+
 const workspaceFrameSpy = vi.fn();
 const togglePaneSpy = vi.fn();
 const setInspectorTabSpy = vi.fn();
 const focusCitationSpy = vi.fn();
-const { getAuthSessionMock, getCapabilitiesMock } = vi.hoisted(() => ({
+const {
+  getAuthSessionMock,
+  getCapabilitiesMock,
+  listCaspianFilesMock,
+  readCaspianFileMock,
+  writeCaspianFileMock,
+  saveCaspianFileAsNoteMock,
+} = vi.hoisted(() => ({
   getAuthSessionMock: vi.fn<() => Promise<AuthSessionResponse>>(),
   getCapabilitiesMock: vi.fn(),
+  listCaspianFilesMock: vi.fn(),
+  readCaspianFileMock: vi.fn(),
+  writeCaspianFileMock: vi.fn(),
+  saveCaspianFileAsNoteMock: vi.fn(),
 }));
 
 vi.mock("../../api/client", () => ({
@@ -24,6 +45,10 @@ vi.mock("../../api/client", () => ({
     logout: vi.fn(),
     enterDemo: vi.fn(),
     selectActivePatient: vi.fn(),
+    listCaspianFiles: listCaspianFilesMock,
+    readCaspianFile: readCaspianFileMock,
+    writeCaspianFile: writeCaspianFileMock,
+    saveCaspianFileAsNote: saveCaspianFileAsNoteMock,
   },
 }));
 
@@ -132,6 +157,16 @@ vi.mock("../../components/atlas/useCaspianAssistantSession", () => ({
       latestTrace: null,
       contextItems: [{ label: "Patient", value: "patient-123" }],
     },
+    workflow: {
+      tabs: [],
+      canvas: {},
+      latestTabId: null,
+      isPending: false,
+      pendingWorkflowId: null,
+      error: null,
+    },
+    runWorkflow: vi.fn(),
+    acknowledgeLatestWorkflow: vi.fn(),
   }),
 }));
 
@@ -141,6 +176,23 @@ describe("CaspianWorkspace", () => {
     togglePaneSpy.mockReset();
     setInspectorTabSpy.mockReset();
     focusCitationSpy.mockReset();
+    listCaspianFilesMock.mockReset();
+    readCaspianFileMock.mockReset();
+    writeCaspianFileMock.mockReset();
+    saveCaspianFileAsNoteMock.mockReset();
+    listCaspianFilesMock.mockResolvedValue({
+      workspace_key: "test-key",
+      tree: [],
+      capabilities: null,
+    });
+    readCaspianFileMock.mockResolvedValue({
+      path: "",
+      content: "",
+      mtime: null,
+      editable: false,
+      kind: "markdown",
+      file_kind: "user",
+    });
     getAuthSessionMock.mockResolvedValue({
       mode: "authenticated",
       user: {
@@ -171,7 +223,7 @@ describe("CaspianWorkspace", () => {
   });
 
   it("routes the canonical /caspian shell through WorkspaceFrame with a live assistant surface", async () => {
-    render(
+    renderWithProviders(
       <MemoryRouter initialEntries={["/caspian/sessions/s2?patient=patient-123"]}>
         <AccessProvider>
           <Routes>
@@ -206,7 +258,7 @@ describe("CaspianWorkspace", () => {
       expires_at: null,
       available_demo_patients: [],
     });
-    render(
+    renderWithProviders(
       <MemoryRouter initialEntries={["/caspian"]}>
         <AccessProvider>
           <Routes>
@@ -225,7 +277,7 @@ describe("CaspianWorkspace", () => {
   });
 
   it("opens the trace tab without toggling the inspector closed when it is already visible", async () => {
-    render(
+    renderWithProviders(
       <MemoryRouter initialEntries={["/caspian/sessions/s2?patient=patient-123"]}>
         <AccessProvider>
           <Routes>

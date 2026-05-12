@@ -266,6 +266,11 @@ def _ensure_db() -> None:
         DB_PATH.parent.mkdir(parents=True, exist_ok=True)
         conn = sqlite3.connect(str(DB_PATH))
         try:
+            # Step 1: create tables idempotently. Splitting the schema from the
+            # index creation lets the forward-compat ALTER TABLE block below
+            # run before any CREATE INDEX that references a newly-added column
+            # (otherwise sqlite errors with "no such column: user_id" when the
+            # CREATE TABLE no-ops against an older schema).
             conn.executescript("""
                 CREATE TABLE IF NOT EXISTS traces (
                     trace_id       TEXT PRIMARY KEY,
@@ -304,15 +309,10 @@ def _ensure_db() -> None:
                     started_at       TEXT NOT NULL,
                     FOREIGN KEY (trace_id) REFERENCES traces(trace_id)
                 );
-
-                CREATE INDEX IF NOT EXISTS idx_traces_created_at ON traces(created_at);
-                CREATE INDEX IF NOT EXISTS idx_traces_patient_id ON traces(patient_id);
-                CREATE INDEX IF NOT EXISTS idx_traces_user_id ON traces(user_id);
-                CREATE INDEX IF NOT EXISTS idx_traces_workspace_kind ON traces(workspace_kind);
-                CREATE INDEX IF NOT EXISTS idx_spans_trace_id ON spans(trace_id);
             """)
-            # Forward-compat for traces.db files created before the audit
-            # join keys existed. H1.2 will replace with a real migration runner.
+            # Step 2: forward-compat ALTERs for traces.db files created before
+            # the audit join keys existed. H1.2 will replace with a real
+            # migration runner.
             for column, ddl in [
                 ("user_id", "ALTER TABLE traces ADD COLUMN user_id TEXT NOT NULL DEFAULT ''"),
                 ("session_id", "ALTER TABLE traces ADD COLUMN session_id TEXT NOT NULL DEFAULT ''"),
@@ -323,6 +323,15 @@ def _ensure_db() -> None:
                     conn.execute(ddl)
                 except sqlite3.OperationalError:
                     pass
+            # Step 3: create indexes AFTER any ALTERs so referenced columns
+            # are guaranteed to exist.
+            conn.executescript("""
+                CREATE INDEX IF NOT EXISTS idx_traces_created_at ON traces(created_at);
+                CREATE INDEX IF NOT EXISTS idx_traces_patient_id ON traces(patient_id);
+                CREATE INDEX IF NOT EXISTS idx_traces_user_id ON traces(user_id);
+                CREATE INDEX IF NOT EXISTS idx_traces_workspace_kind ON traces(workspace_kind);
+                CREATE INDEX IF NOT EXISTS idx_spans_trace_id ON spans(trace_id);
+            """)
         finally:
             conn.close()
 

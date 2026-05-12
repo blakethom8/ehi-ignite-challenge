@@ -42,12 +42,14 @@ class ProviderAssistantApiTests(unittest.TestCase):
 
         cls.patient_id = files[0].stem
         cls.client = TestClient(app)
-        login = cls.client.post(
-            "/api/auth/login",
-            json={"email": "clinician@atlas.local", "password": "atlas-demo-password"},
-        )
-        if login.status_code != 200:
-            raise RuntimeError(f"Failed to bootstrap authenticated test client: {login.text}")
+        # Phase 1 of the four-mode refactor removed the curated-Synthea
+        # fallback for authenticated sessions. The assistant chat route
+        # honors `require_access_session`, which demo satisfies — and the
+        # demo alias resolves to a Synthea bundle internally.
+        demo = cls.client.post("/api/auth/demo", json={"patient_id": "demo-high-risk"})
+        if demo.status_code != 200:
+            raise RuntimeError(f"Failed to bootstrap demo test client: {demo.text}")
+        cls.patient_id = "demo-high-risk"
 
     def _payload(self, question: str = "Any active blood thinner risk?") -> dict[str, object]:
         return {

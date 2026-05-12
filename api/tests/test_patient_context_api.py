@@ -43,12 +43,15 @@ class PatientContextApiTests(unittest.TestCase):
             raise RuntimeError(f"No patient bundles found in {FHIR_DIR}")
         cls.patient_id = files[0].stem
         cls.client = TestClient(app)
-        login = cls.client.post(
-            "/api/auth/login",
-            json={"email": "clinician@atlas.local", "password": "atlas-demo-password"},
-        )
-        if login.status_code != 200:
-            raise RuntimeError(f"Failed to bootstrap authenticated test client: {login.text}")
+        # Phase 1 of the four-mode refactor removed the curated-Synthea
+        # fallback for authenticated sessions. Patient-context endpoints
+        # honor `require_access_session`, which demo satisfies — so flip the
+        # bootstrap to a demo session and exercise the routes through the
+        # demo alias (which resolves to a Synthea bundle server-side).
+        demo = cls.client.post("/api/auth/demo", json={"patient_id": "demo-high-risk"})
+        if demo.status_code != 200:
+            raise RuntimeError(f"Failed to bootstrap demo test client: {demo.text}")
+        cls.patient_id = "demo-high-risk"
 
     def _create_session(self, tmpdir: str) -> dict:
         with patch("api.core.patient_context.STORE_ROOT", Path(tmpdir)):
@@ -62,7 +65,9 @@ class PatientContextApiTests(unittest.TestCase):
     def test_session_creation_persists_local_artifacts(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             body = self._create_session(tmpdir)
-            root = Path(tmpdir) / self.patient_id / body["session_id"]
+            # The route resolves demo aliases server-side, so files land under
+            # the underlying bundle id.
+            root = Path(tmpdir) / body["patient_id"] / body["session_id"]
 
             self.assertTrue((root / "session.json").exists())
             self.assertTrue((root / "gap_cards.json").exists())
@@ -122,7 +127,7 @@ class PatientContextApiTests(unittest.TestCase):
             answered = {gap["id"]: gap["status"] for gap in body["gap_cards"]}
             self.assertEqual(answered["sources-missing"], "answered")
 
-            answer_log = Path(tmpdir) / self.patient_id / session["session_id"] / "answers.jsonl"
+            answer_log = Path(tmpdir) / session["patient_id"] / session["session_id"] / "answers.jsonl"
             self.assertIn("cardiologist", answer_log.read_text(encoding="utf-8"))
 
     def test_export_writes_four_markdown_files(self) -> None:
@@ -134,7 +139,7 @@ class PatientContextApiTests(unittest.TestCase):
                 )
 
             self.assertEqual(response.status_code, 200)
-            root = Path(tmpdir) / self.patient_id / session["session_id"]
+            root = Path(tmpdir) / session["patient_id"] / session["session_id"]
             for name in ("PATIENT_CONTEXT.md", "QUESTIONS.md", "SOURCES.md", "AGENT.md"):
                 self.assertTrue((root / name).exists(), name)
                 self.assertGreater(len((root / name).read_text(encoding="utf-8")), 50)

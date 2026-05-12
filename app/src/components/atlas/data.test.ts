@@ -4,6 +4,10 @@ import { FILE_TABS_BY_WORKSPACE, FILE_TREES } from "./data";
 describe("atlas fixture file routing", () => {
   it("maps every visible fixture file to a workbench tab in its workspace", () => {
     for (const [workspaceId, nodes] of Object.entries(FILE_TREES)) {
+      // Caspian's static fixture file tree is intentionally empty — workflow
+      // runs populate the workbench at request time. There is nothing static
+      // to map for it, so skip the per-file assertion.
+      if (workspaceId === "caspian") continue;
       const tabs = FILE_TABS_BY_WORKSPACE[workspaceId as keyof typeof FILE_TABS_BY_WORKSPACE];
       const fileIds = nodes.flatMap((node) =>
         node.type === "folder"

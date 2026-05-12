@@ -22,21 +22,37 @@ class AggregationApiTests(unittest.TestCase):
             raise RuntimeError(f"No patient bundles found in {FHIR_DIR}")
         cls.patient_id = files[0].stem
         cls.client = TestClient(app)
-        login = cls.client.post(
+        # Demo sessions can resolve the curated demo aliases to their backing
+        # Synthea bundles. Authenticated users no longer see Synthea workspaces
+        # in their list (Phase 1 of the four-mode refactor), so the read-only
+        # aggregation routes are exercised through a demo session for the
+        # synthea-style assertions and through auth for the upload/profile
+        # surfaces below.
+        demo = cls.client.post("/api/auth/demo", json={"patient_id": "demo-high-risk"})
+        if demo.status_code != 200:
+            raise RuntimeError(f"Failed to bootstrap demo test client: {demo.text}")
+        # The demo alias resolves server-side to a curated Synthea bundle; tests
+        # that don't care about the underlying file can use the alias directly.
+        cls.demo_patient_id = "demo-high-risk"
+
+    def _auth_client(self) -> TestClient:
+        client = TestClient(app)
+        login = client.post(
             "/api/auth/login",
             json={"email": "clinician@atlas.local", "password": "atlas-demo-password"},
         )
-        if login.status_code != 200:
-            raise RuntimeError(f"Failed to bootstrap authenticated test client: {login.text}")
+        self.assertEqual(login.status_code, 200)
+        return client
 
     def test_source_inventory_returns_synthetic_environment(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch("api.core.aggregation.STORE_ROOT", Path(tmpdir)):
-                response = self.client.get(f"/api/aggregation/sources/{self.patient_id}")
+                response = self.client.get(f"/api/aggregation/sources/{self.demo_patient_id}")
 
         self.assertEqual(response.status_code, 200)
         body = response.json()
-        self.assertEqual(body["patient_id"], self.patient_id)
+        # The route resolves the demo alias to the backing Synthea bundle, so
+        # the response carries the underlying patient id, not the alias.
         self.assertIn("medications", body["synthetic_resource_counts"])
         self.assertGreaterEqual(len(body["source_cards"]), 5)
         self.assertTrue(any(card["id"] == "synthea-fhir" for card in body["source_cards"]))
@@ -44,7 +60,7 @@ class AggregationApiTests(unittest.TestCase):
     def test_cleaning_queue_returns_review_issues(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch("api.core.aggregation.STORE_ROOT", Path(tmpdir)):
-                response = self.client.get(f"/api/aggregation/cleaning-queue/{self.patient_id}")
+                response = self.client.get(f"/api/aggregation/cleaning-queue/{self.demo_patient_id}")
 
         self.assertEqual(response.status_code, 200)
         body = response.json()
@@ -54,7 +70,7 @@ class AggregationApiTests(unittest.TestCase):
     def test_readiness_returns_score_and_blockers(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch("api.core.aggregation.STORE_ROOT", Path(tmpdir)):
-                response = self.client.get(f"/api/aggregation/readiness/{self.patient_id}")
+                response = self.client.get(f"/api/aggregation/readiness/{self.demo_patient_id}")
 
         self.assertEqual(response.status_code, 200)
         body = response.json()
@@ -64,10 +80,25 @@ class AggregationApiTests(unittest.TestCase):
         self.assertIn("Proof-of-concept", body["posture"])
 
     def test_upload_stages_file_locally(self) -> None:
+        # The upload route requires an authenticated session; demo cannot
+        # upload. Switch to an auth session for this test.
+        client = TestClient(app)
+        login = client.post(
+            "/api/auth/login",
+            json={"email": "clinician@atlas.local", "password": "atlas-demo-password"},
+        )
+        self.assertEqual(login.status_code, 200)
+        profile = client.post(
+            "/api/aggregation/profiles",
+            json={"display_name": "Upload test", "notes": ""},
+        )
+        self.assertEqual(profile.status_code, 200)
+        workspace_id = profile.json()["profile"]["id"]
+
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch("api.core.aggregation.STORE_ROOT", Path(tmpdir)):
-                response = self.client.post(
-                    f"/api/aggregation/uploads/{self.patient_id}",
+                response = client.post(
+                    f"/api/aggregation/uploads/{workspace_id}",
                     files={"file": ("example.pdf", b"%PDF-1.4 demo", "application/pdf")},
                     data={
                         "data_type": "Lab report",
@@ -89,19 +120,31 @@ class AggregationApiTests(unittest.TestCase):
             self.assertTrue(any(Path(tmpdir).glob("*/*.metadata.json")))
 
     def test_multiple_uploads_are_returned_newest_first(self) -> None:
+        client = TestClient(app)
+        login = client.post(
+            "/api/auth/login",
+            json={"email": "clinician@atlas.local", "password": "atlas-demo-password"},
+        )
+        self.assertEqual(login.status_code, 200)
+        profile = client.post(
+            "/api/aggregation/profiles",
+            json={"display_name": "Newest first", "notes": ""},
+        )
+        workspace_id = profile.json()["profile"]["id"]
+
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch("api.core.aggregation.STORE_ROOT", Path(tmpdir)):
-                first = self.client.post(
-                    f"/api/aggregation/uploads/{self.patient_id}",
+                first = client.post(
+                    f"/api/aggregation/uploads/{workspace_id}",
                     files={"file": ("first.pdf", b"%PDF-1.4 demo", "application/pdf")},
                     data={"data_type": "PDF report", "description": "First upload."},
                 )
-                second = self.client.post(
-                    f"/api/aggregation/uploads/{self.patient_id}",
+                second = client.post(
+                    f"/api/aggregation/uploads/{workspace_id}",
                     files={"file": ("second.json", b'{"resourceType":"Bundle","entry":[]}', "application/json")},
                     data={"data_type": "FHIR JSON export", "description": "Second upload."},
                 )
-                inventory = self.client.get(f"/api/aggregation/sources/{self.patient_id}")
+                inventory = client.get(f"/api/aggregation/sources/{workspace_id}")
 
             self.assertEqual(first.status_code, 200)
             self.assertEqual(second.status_code, 200)
@@ -112,6 +155,7 @@ class AggregationApiTests(unittest.TestCase):
             self.assertEqual(files[1]["file_name"], "first.pdf")
 
     def test_create_profile_persists_empty_workspace(self) -> None:
+        client = self._auth_client()
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
             with (
@@ -119,11 +163,11 @@ class AggregationApiTests(unittest.TestCase):
                 patch("api.core.aggregation.PROFILE_ROOT", root / "profiles"),
                 patch("api.core.aggregation.PROFILE_REGISTRY_PATH", root / "profiles" / "profiles.json"),
             ):
-                response = self.client.post(
+                response = client.post(
                     "/api/aggregation/profiles",
                     json={"display_name": "Demo upload patient", "notes": "Synthetic PDF test."},
                 )
-                patients = self.client.get("/api/patients").json()
+                patients = client.get("/api/patients").json()
 
             self.assertEqual(response.status_code, 200)
             body = response.json()
@@ -134,6 +178,7 @@ class AggregationApiTests(unittest.TestCase):
             self.assertIn(profile["id"], {item["id"] for item in patients})
 
     def test_delete_profile_removes_workspace_and_registry_entry(self) -> None:
+        client = self._auth_client()
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
             with (
@@ -141,18 +186,18 @@ class AggregationApiTests(unittest.TestCase):
                 patch("api.core.aggregation.PROFILE_ROOT", root / "profiles"),
                 patch("api.core.aggregation.PROFILE_REGISTRY_PATH", root / "profiles" / "profiles.json"),
             ):
-                response = self.client.post(
+                response = client.post(
                     "/api/aggregation/profiles",
                     json={"display_name": "Delete me", "notes": "temporary"},
                 )
                 profile_id = response.json()["profile"]["id"]
-                self.client.post(
+                client.post(
                     f"/api/aggregation/uploads/{profile_id}",
                     files={"file": ("example.pdf", b"%PDF-1.4 demo", "application/pdf")},
                     data={"data_type": "PDF report", "description": "Temporary upload."},
                 )
-                delete_response = self.client.delete(f"/api/aggregation/profiles/{profile_id}")
-                patients = self.client.get("/api/patients").json()
+                delete_response = client.delete(f"/api/aggregation/profiles/{profile_id}")
+                patients = client.get("/api/patients").json()
 
             self.assertEqual(delete_response.status_code, 200)
             self.assertTrue(delete_response.json()["deleted"])
@@ -160,6 +205,7 @@ class AggregationApiTests(unittest.TestCase):
             self.assertNotIn(profile_id, {item["id"] for item in patients})
 
     def test_update_profile_renames_workspace(self) -> None:
+        client = self._auth_client()
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
             with (
@@ -167,16 +213,16 @@ class AggregationApiTests(unittest.TestCase):
                 patch("api.core.aggregation.PROFILE_ROOT", root / "profiles"),
                 patch("api.core.aggregation.PROFILE_REGISTRY_PATH", root / "profiles" / "profiles.json"),
             ):
-                response = self.client.post(
+                response = client.post(
                     "/api/aggregation/profiles",
                     json={"display_name": "Original name", "notes": "temporary"},
                 )
                 profile_id = response.json()["profile"]["id"]
-                update_response = self.client.patch(
+                update_response = client.patch(
                     f"/api/aggregation/profiles/{profile_id}",
                     json={"display_name": "Renamed workspace", "notes": "Demo-ready profile."},
                 )
-                patients = self.client.get("/api/patients").json()
+                patients = client.get("/api/patients").json()
 
             self.assertEqual(update_response.status_code, 200)
             self.assertEqual(update_response.json()["profile"]["display_name"], "Renamed workspace")
@@ -185,15 +231,27 @@ class AggregationApiTests(unittest.TestCase):
             self.assertEqual(matching[0]["name"], "Renamed workspace")
 
     def test_delete_upload_removes_metadata_and_file(self) -> None:
+        client = TestClient(app)
+        login = client.post(
+            "/api/auth/login",
+            json={"email": "clinician@atlas.local", "password": "atlas-demo-password"},
+        )
+        self.assertEqual(login.status_code, 200)
+        profile = client.post(
+            "/api/aggregation/profiles",
+            json={"display_name": "Delete upload", "notes": ""},
+        )
+        workspace_id = profile.json()["profile"]["id"]
+
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch("api.core.aggregation.STORE_ROOT", Path(tmpdir)):
-                upload_response = self.client.post(
-                    f"/api/aggregation/uploads/{self.patient_id}",
+                upload_response = client.post(
+                    f"/api/aggregation/uploads/{workspace_id}",
                     files={"file": ("example.csv", b"a,b\n1,2", "text/csv")},
                     data={"data_type": "Wearable export", "contains": '["Device metrics"]'},
                 )
                 file_id = upload_response.json()["file"]["file_id"]
-                delete_response = self.client.delete(f"/api/aggregation/uploads/{self.patient_id}/{file_id}")
+                delete_response = client.delete(f"/api/aggregation/uploads/{workspace_id}/{file_id}")
 
             self.assertEqual(delete_response.status_code, 200)
             self.assertTrue(delete_response.json()["deleted"])

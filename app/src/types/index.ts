@@ -1,6 +1,23 @@
 // API response types — mirrors api/models.py
 
-export type AuthMode = "anonymous" | "demo" | "authenticated";
+export type AuthMode = "anonymous" | "demo" | "authenticated" | "guest";
+
+// Server-declared capability surface. Returned by GET /api/auth/capabilities.
+// Mirrors api/core/access_policy.Capabilities exactly.
+export interface Capabilities {
+  mode: AuthMode;
+  can_use_caspian: boolean;
+  can_edit_caspian_user_files: boolean;
+  can_write_caspian_notes: boolean;
+  can_run_workflows: boolean;
+  can_use_aggregation_uploads: boolean;
+  can_use_aggregation_profiles: boolean;
+  can_use_harmonize: boolean;
+  can_use_guest_harmonization: boolean;
+  can_use_assistant_tools_write: boolean;
+  show_caspian_seed_files: boolean;
+  persistence_scope: "none" | "browser-ephemeral" | "browser-persistent" | "server-persistent";
+}
 
 export interface AuthUser {
   id: string;

@@ -1,6 +1,7 @@
 import axios from "axios";
 import type {
   AuthSessionResponse,
+  Capabilities,
   PatientListItem,
   PatientOverview,
   TimelineResponse,
@@ -135,6 +136,14 @@ async function getOrDemoFallback<T>(
 export const api = {
   getAuthSession: (): Promise<AuthSessionResponse> =>
     http.get<AuthSessionResponse>("/auth/session").then((r) => r.data),
+
+  /**
+   * Server-declared capability surface for the current session (anonymous,
+   * demo, authenticated, or guest). Always returns 200 with the appropriate
+   * mode's policy. Frontend should not re-derive capabilities locally.
+   */
+  getCapabilities: (): Promise<Capabilities> =>
+    http.get<Capabilities>("/auth/capabilities").then((r) => r.data),
 
   login: (email: string, password: string): Promise<AuthSessionResponse> =>
     http.post<AuthSessionResponse>("/auth/login", { email, password }).then((r) => r.data),

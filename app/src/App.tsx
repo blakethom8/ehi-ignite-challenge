@@ -19,7 +19,15 @@ import { PatientRecordPool } from "./pages/PatientRecordPool";
 import { PatientRecordLayout } from "./pages/PatientRecord/PatientRecordLayout";
 import { FhirChartsLayout } from "./pages/FhirCharts/FhirChartsLayout";
 import { buildGroundTruthReviewPath } from "./routing";
-import { resolveInvalidPatientRedirect } from "./sessionRouting";
+import { resolveInvalidPatientRedirect, resolveSessionHomePath } from "./sessionRouting";
+import type { AuthMode } from "./types";
+
+// Demo-alias patient ids are the synthetic charts available to the
+// anonymous + demo modes (see app/src/demoCatalog.ts). They never resolve
+// against a real authenticated workspace, so we strip them when mode flips.
+function isDemoAliasPatientId(patientId: string | null | undefined): boolean {
+  return typeof patientId === "string" && patientId.startsWith("demo-");
+}
 
 function lazyNamed<TModule extends Record<string, unknown>>(
   loader: () => Promise<TModule>,
@@ -132,7 +140,15 @@ function AppShellRoute({
   const navigate = useNavigate();
   const { activePatientId, isLoading, isUnlocked, mode, setActivePatient } = useAccessContext();
   const routeKey = `${location.pathname}${location.search}`;
-  const stripPatient = shouldStripPatient(location.pathname, location.search, isUnlocked, isLoading);
+  const requestedPatientId = new URLSearchParams(location.search).get("patient");
+  const stripPatient = shouldStripPatient(
+    location.pathname,
+    location.search,
+    isUnlocked,
+    isLoading,
+    mode,
+    requestedPatientId,
+  );
   const hydratePatient = shouldHydratePatient(
     location.pathname,
     location.search,
@@ -141,13 +157,20 @@ function AppShellRoute({
   );
   const isPatientRecordRoute = location.pathname.startsWith("/patient-record");
   const isFhirChartsRoute = location.pathname.startsWith("/fhir-charts");
-  const requestedPatientId = new URLSearchParams(location.search).get("patient");
   const [isSyncingPatient, setIsSyncingPatient] = useState(false);
 
   useEffect(() => {
     if (isLoading || !isUnlocked) return;
     if (!requestedPatientId || requestedPatientId === activePatientId) {
       setIsSyncingPatient(false);
+      return;
+    }
+    // Guard against the race where signing in while on /caspian?patient=demo-…
+    // tries to apply a demo alias to an authenticated session. Drop the param
+    // and route to the authenticated home instead.
+    if (mode === "authenticated" && isDemoAliasPatientId(requestedPatientId)) {
+      setIsSyncingPatient(false);
+      navigate(resolveSessionHomePath("authenticated", null), { replace: true });
       return;
     }
     let cancelled = false;
@@ -413,9 +436,15 @@ function shouldHydratePatient(
   return !params.has("patient");
 }
 
-function shouldStripPatient(pathname: string, search: string, isUnlocked: boolean, isLoading: boolean): boolean {
+function shouldStripPatient(
+  pathname: string,
+  search: string,
+  isUnlocked: boolean,
+  isLoading: boolean,
+  mode: AuthMode,
+  requestedPatientId: string | null,
+): boolean {
   if (isLoading) return false;
-  if (isUnlocked) return false;
   if (
     !pathname.startsWith("/patient-record") &&
     !pathname.startsWith("/fhir-charts") &&
@@ -425,7 +454,14 @@ function shouldStripPatient(pathname: string, search: string, isUnlocked: boolea
     return false;
   }
   const params = new URLSearchParams(search);
-  return params.has("patient");
+  if (!params.has("patient")) return false;
+  // Anonymous mode: never carry a patient param.
+  if (!isUnlocked) return true;
+  // Authenticated mode: strip demo aliases that survived a sign-in transition.
+  if (mode === "authenticated" && isDemoAliasPatientId(requestedPatientId)) {
+    return true;
+  }
+  return false;
 }
 
 export default function App() {

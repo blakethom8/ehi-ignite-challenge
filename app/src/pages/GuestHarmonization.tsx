@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ArrowRight, Download, FileJson, Loader2, Trash2, Upload } from "lucide-react";
 import { api } from "../api/client";
+import { useAccessContext } from "../context/AccessContext";
 import type { GuestHarmonizationOutputPackage, GuestHarmonizationRunResponse } from "../types";
 
 function formatDateTime(value: string | null | undefined) {
@@ -29,6 +30,7 @@ function downloadJson(fileName: string, payload: GuestHarmonizationOutputPackage
 }
 
 export function GuestHarmonization() {
+  const { enterGuestMode, exitGuestMode } = useAccessContext();
   const [params, setParams] = useSearchParams();
   const [run, setRun] = useState<GuestHarmonizationRunResponse | null>(null);
   const [output, setOutput] = useState<GuestHarmonizationOutputPackage | null>(null);
@@ -105,6 +107,9 @@ export function GuestHarmonization() {
       deletedRunIdRef.current = null;
       setRun(next);
       setParams({ run: next.run_id }, { replace: true });
+      // Flip AccessContext to the guest mode so capabilities + persistence
+      // namespaces follow suit. The guest cookie is already set by the API.
+      enterGuestMode(next.run_id);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not start temporary workspace.");
     } finally {
@@ -161,6 +166,9 @@ export function GuestHarmonization() {
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
+      // Drop back to anonymous; the guest cookie has been revoked server-side
+      // and we want capabilities to refetch.
+      exitGuestMode();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not delete this temporary workspace.");
     } finally {

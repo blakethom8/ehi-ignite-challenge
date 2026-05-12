@@ -11,13 +11,15 @@ const workspaceFrameSpy = vi.fn();
 const togglePaneSpy = vi.fn();
 const setInspectorTabSpy = vi.fn();
 const focusCitationSpy = vi.fn();
-const { getAuthSessionMock } = vi.hoisted(() => ({
+const { getAuthSessionMock, getCapabilitiesMock } = vi.hoisted(() => ({
   getAuthSessionMock: vi.fn<() => Promise<AuthSessionResponse>>(),
+  getCapabilitiesMock: vi.fn(),
 }));
 
 vi.mock("../../api/client", () => ({
   api: {
     getAuthSession: getAuthSessionMock,
+    getCapabilities: getCapabilitiesMock,
     login: vi.fn(),
     logout: vi.fn(),
     enterDemo: vi.fn(),
@@ -151,6 +153,20 @@ describe("CaspianWorkspace", () => {
       active_patient_name: "Patient 123",
       expires_at: null,
       available_demo_patients: [],
+    });
+    getCapabilitiesMock.mockResolvedValue({
+      mode: "authenticated",
+      can_use_caspian: true,
+      can_edit_caspian_user_files: true,
+      can_write_caspian_notes: true,
+      can_run_workflows: true,
+      can_use_aggregation_uploads: true,
+      can_use_aggregation_profiles: true,
+      can_use_harmonize: true,
+      can_use_guest_harmonization: true,
+      can_use_assistant_tools_write: true,
+      show_caspian_seed_files: false,
+      persistence_scope: "browser-persistent",
     });
   });
 

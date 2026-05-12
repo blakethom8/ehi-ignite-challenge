@@ -1,16 +1,24 @@
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
 import { api } from "../api/client";
 import { mockPatients } from "../api/mockData";
-import type { AuthSessionResponse, AuthUser, DemoPatientOption } from "../types";
+import { purgeNamespacesByPrefix, purgeWorkspaceState } from "../storage";
+import type {
+  AuthSessionResponse,
+  AuthUser,
+  Capabilities,
+  DemoPatientOption,
+} from "../types";
 
-export type AccessMode = "anonymous" | "demo" | "authenticated";
+export type AccessMode = "anonymous" | "demo" | "authenticated" | "guest";
 
 type AccessState = {
   mode: AccessMode;
@@ -18,21 +26,27 @@ type AccessState = {
   activePatientId: string | null;
   activePatientName: string | null;
   activeDemoPatient: DemoPatientOption | null;
+  activeGuestRunId: string | null;
   expiresAt: string | null;
   availableDemoPatients: DemoPatientOption[];
+  capabilities: Capabilities | null;
 };
 
 type AccessContextValue = AccessState & {
   isLoading: boolean;
   isUnlocked: boolean;
   isDemo: boolean;
+  isGuest: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, displayName: string) => Promise<void>;
   enterDemoPatient: (patientId: string) => Promise<void>;
   exitDemo: () => Promise<void>;
+  enterGuestMode: (runId: string) => void;
+  exitGuestMode: () => void;
   setActivePatient: (patientId: string | null) => Promise<void>;
   clearAccess: () => Promise<void>;
   refreshSession: () => Promise<void>;
+  refreshCapabilities: () => Promise<void>;
   updateDisplayName: (displayName: string) => Promise<void>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   deleteAccount: () => Promise<void>;
@@ -46,8 +60,10 @@ const DEFAULT_STATE: AccessState = {
   activePatientId: null,
   activePatientName: null,
   activeDemoPatient: null,
+  activeGuestRunId: null,
   expiresAt: null,
   availableDemoPatients: [],
+  capabilities: null,
 };
 
 const STORAGE_KEY = "atlas:access";
@@ -76,14 +92,15 @@ function mockDemoOptions(): DemoPatientOption[] {
   }));
 }
 
-function mockSessionFromStorage(): AccessState {
+function mockSessionFromStorage(): Omit<AccessState, "capabilities"> {
   if (typeof window === "undefined") {
     return { ...DEFAULT_STATE, availableDemoPatients: mockDemoOptions() };
   }
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     const parsed = raw ? (JSON.parse(raw) as { mode?: string; activePatientId?: string | null }) : {};
-    const mode = parsed.mode === "demo" || parsed.mode === "authenticated" ? parsed.mode : "anonymous";
+    const mode: AccessMode =
+      parsed.mode === "demo" || parsed.mode === "authenticated" ? (parsed.mode as AccessMode) : "anonymous";
     const patientId = typeof parsed.activePatientId === "string" ? parsed.activePatientId : null;
     const activePatientName = mockPatients.find((patient) => patient.id === patientId)?.name ?? null;
     return {
@@ -99,6 +116,7 @@ function mockSessionFromStorage(): AccessState {
       activePatientId: patientId,
       activePatientName,
       activeDemoPatient: mockDemoOptions().find((patient) => patient.id === patientId) ?? null,
+      activeGuestRunId: null,
       expiresAt: null,
       availableDemoPatients: mockDemoOptions(),
     };
@@ -112,7 +130,7 @@ function writeMockSession(mode: AccessMode, activePatientId: string | null) {
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ mode, activePatientId }));
 }
 
-function mapSession(session: AuthSessionResponse): AccessState {
+function mapSession(session: AuthSessionResponse): Omit<AccessState, "capabilities" | "activeGuestRunId"> {
   return {
     mode: session.mode,
     user: session.user,
@@ -127,24 +145,73 @@ function mapSession(session: AuthSessionResponse): AccessState {
 export function AccessProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AccessState>(DEFAULT_STATE);
   const [isLoading, setIsLoading] = useState(true);
+  // Track the most recent mode we've fetched capabilities for so we don't
+  // fire redundant requests on unrelated state updates.
+  const lastCapabilitiesModeRef = useRef<AccessMode | null>(null);
 
-  const applySession = (session: AuthSessionResponse) => {
-    setState(mapSession(session));
-  };
+  const applySession = useCallback((session: AuthSessionResponse) => {
+    setState((prev) => ({
+      ...prev,
+      ...mapSession(session),
+      // Returning to a real session always exits guest mode.
+      activeGuestRunId: null,
+    }));
+  }, []);
 
-  const refreshSession = async () => {
+  const refreshCapabilities = useCallback(async () => {
+    try {
+      const caps = await api.getCapabilities();
+      setState((prev) => ({ ...prev, capabilities: caps }));
+    } catch {
+      // Leave capabilities as-is; useCapabilities() falls back to anonymous.
+    }
+  }, []);
+
+  const refreshSession = useCallback(async () => {
     setIsLoading(true);
     try {
       applySession(await api.getAuthSession());
     } catch {
-      setState(useMockData ? mockSessionFromStorage() : DEFAULT_STATE);
+      const fallback = useMockData ? mockSessionFromStorage() : DEFAULT_STATE;
+      setState((prev) => ({ ...prev, ...fallback, capabilities: prev.capabilities }));
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [applySession]);
 
   useEffect(() => {
     void refreshSession();
+  }, [refreshSession]);
+
+  // Fetch capabilities on every mode transition (and once on mount).
+  useEffect(() => {
+    if (lastCapabilitiesModeRef.current === state.mode && state.capabilities !== null) {
+      return;
+    }
+    lastCapabilitiesModeRef.current = state.mode;
+    void refreshCapabilities();
+  }, [state.mode, state.capabilities, refreshCapabilities]);
+
+  const enterGuestMode = useCallback((runId: string) => {
+    setState((prev) => ({
+      ...prev,
+      mode: "guest",
+      user: null,
+      activePatientId: null,
+      activePatientName: null,
+      activeDemoPatient: null,
+      activeGuestRunId: runId,
+    }));
+  }, []);
+
+  const exitGuestMode = useCallback(() => {
+    setState((prev) => ({
+      ...prev,
+      mode: "anonymous",
+      activeGuestRunId: null,
+    }));
+    // Guest scratch (if any) lives under atlas:guest:; clear it explicitly.
+    purgeNamespacesByPrefix("atlas:guest:");
   }, []);
 
   const value = useMemo<AccessContextValue>(
@@ -153,10 +220,12 @@ export function AccessProvider({ children }: { children: ReactNode }) {
       isLoading,
       isUnlocked: state.mode !== "anonymous",
       isDemo: state.mode === "demo",
+      isGuest: state.mode === "guest",
       signIn: async (email: string, password: string) => {
         if (useMockData) {
           writeMockSession("authenticated", null);
-          setState(mockSessionFromStorage());
+          const next = mockSessionFromStorage();
+          setState((prev) => ({ ...prev, ...next, activeGuestRunId: null }));
           return;
         }
         applySession(await api.login(email, password));
@@ -164,7 +233,8 @@ export function AccessProvider({ children }: { children: ReactNode }) {
       signUp: async (email: string, password: string, displayName: string) => {
         if (useMockData) {
           writeMockSession("authenticated", null);
-          setState(mockSessionFromStorage());
+          const next = mockSessionFromStorage();
+          setState((prev) => ({ ...prev, ...next, activeGuestRunId: null }));
           return;
         }
         applySession(await api.signup(email, password, displayName));
@@ -172,31 +242,42 @@ export function AccessProvider({ children }: { children: ReactNode }) {
       enterDemoPatient: async (patientId: string) => {
         if (useMockData) {
           writeMockSession("demo", patientId);
-          setState(mockSessionFromStorage());
+          const next = mockSessionFromStorage();
+          setState((prev) => ({ ...prev, ...next, activeGuestRunId: null }));
           return;
         }
         applySession(await api.enterDemo(patientId));
       },
       exitDemo: async () => {
+        // Clear demo-scoped local state before flipping mode so we don't leak
+        // chat/messages/agent settings into the next session.
+        purgeWorkspaceState(["demo"]);
         if (useMockData) {
           writeMockSession("anonymous", null);
-          setState(mockSessionFromStorage());
+          const next = mockSessionFromStorage();
+          setState((prev) => ({ ...prev, ...next, activeGuestRunId: null }));
           return;
         }
         applySession(await api.exitDemo());
       },
+      enterGuestMode,
+      exitGuestMode,
       setActivePatient: async (patientId: string | null) => {
         if (useMockData) {
-          writeMockSession(state.mode, patientId);
-          setState(mockSessionFromStorage());
+          writeMockSession(state.mode === "guest" ? "anonymous" : state.mode, patientId);
+          const next = mockSessionFromStorage();
+          setState((prev) => ({ ...prev, ...next, activeGuestRunId: null }));
           return;
         }
         applySession(await api.selectActivePatient(patientId));
       },
       clearAccess: async () => {
+        // Wipe demo + guest cross-mode scratch on sign-out.
+        purgeWorkspaceState(["demo", "guest"]);
         if (useMockData) {
           writeMockSession("anonymous", null);
-          setState(mockSessionFromStorage());
+          const next = mockSessionFromStorage();
+          setState((prev) => ({ ...prev, ...next, activeGuestRunId: null }));
           return;
         }
         applySession(await api.logout());
@@ -216,21 +297,25 @@ export function AccessProvider({ children }: { children: ReactNode }) {
         await api.changeAccountPassword(currentPassword, newPassword);
       },
       deleteAccount: async () => {
+        purgeWorkspaceState(["demo", "guest"]);
         if (useMockData) {
           writeMockSession("anonymous", null);
-          setState(mockSessionFromStorage());
+          const next = mockSessionFromStorage();
+          setState((prev) => ({ ...prev, ...next, activeGuestRunId: null }));
           return;
         }
         applySession(await api.deleteAccount());
       },
       refreshSession,
+      refreshCapabilities,
     }),
-    [isLoading, state],
+    [isLoading, state, applySession, enterGuestMode, exitGuestMode, refreshSession, refreshCapabilities],
   );
 
   return <AccessContext.Provider value={value}>{children}</AccessContext.Provider>;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAccessContext() {
   const context = useContext(AccessContext);
   if (!context) {

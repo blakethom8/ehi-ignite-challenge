@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { AccessProvider } from "../context/AccessContext";
 import { GuestHarmonization } from "./GuestHarmonization";
 
 const {
@@ -9,12 +10,16 @@ const {
   getGuestHarmonizationOutputMock,
   getGuestHarmonizationRunMock,
   uploadGuestHarmonizationFileMock,
+  getAuthSessionMock,
+  getCapabilitiesMock,
 } = vi.hoisted(() => ({
   createGuestHarmonizationRunMock: vi.fn(),
   deleteGuestHarmonizationRunMock: vi.fn(),
   getGuestHarmonizationOutputMock: vi.fn(),
   getGuestHarmonizationRunMock: vi.fn(),
   uploadGuestHarmonizationFileMock: vi.fn(),
+  getAuthSessionMock: vi.fn(),
+  getCapabilitiesMock: vi.fn(),
 }));
 
 vi.mock("../api/client", () => ({
@@ -24,13 +29,17 @@ vi.mock("../api/client", () => ({
     getGuestHarmonizationOutput: getGuestHarmonizationOutputMock,
     getGuestHarmonizationRun: getGuestHarmonizationRunMock,
     uploadGuestHarmonizationFile: uploadGuestHarmonizationFileMock,
+    getAuthSession: getAuthSessionMock,
+    getCapabilities: getCapabilitiesMock,
   },
 }));
 
 function renderGuestHarmonization(initialEntry = "/guest-harmonization") {
   return render(
     <MemoryRouter initialEntries={[initialEntry]}>
-      <GuestHarmonization />
+      <AccessProvider>
+        <GuestHarmonization />
+      </AccessProvider>
     </MemoryRouter>,
   );
 }
@@ -42,6 +51,31 @@ describe("GuestHarmonization", () => {
     getGuestHarmonizationOutputMock.mockReset();
     getGuestHarmonizationRunMock.mockReset();
     uploadGuestHarmonizationFileMock.mockReset();
+    getAuthSessionMock.mockReset();
+    getCapabilitiesMock.mockReset();
+    getAuthSessionMock.mockResolvedValue({
+      mode: "anonymous",
+      user: null,
+      active_patient_id: null,
+      active_patient_name: null,
+      active_demo_patient: null,
+      expires_at: null,
+      available_demo_patients: [],
+    });
+    getCapabilitiesMock.mockResolvedValue({
+      mode: "anonymous",
+      can_use_caspian: false,
+      can_edit_caspian_user_files: false,
+      can_write_caspian_notes: false,
+      can_run_workflows: false,
+      can_use_aggregation_uploads: false,
+      can_use_aggregation_profiles: false,
+      can_use_harmonize: false,
+      can_use_guest_harmonization: true,
+      can_use_assistant_tools_write: false,
+      show_caspian_seed_files: false,
+      persistence_scope: "none",
+    });
 
     createGuestHarmonizationRunMock.mockResolvedValue({
       run_id: "guest_test_run",

@@ -5,16 +5,18 @@ import type { AuthSessionResponse } from "../../types";
 import { AccessProvider } from "../../context/AccessContext";
 import { ModuleBar } from "./ModuleBar";
 
-const { enterDemoMock, exitDemoMock, getAuthSessionMock, logoutMock } = vi.hoisted(() => ({
+const { enterDemoMock, exitDemoMock, getAuthSessionMock, logoutMock, getCapabilitiesMock } = vi.hoisted(() => ({
   enterDemoMock: vi.fn(),
   exitDemoMock: vi.fn(),
   getAuthSessionMock: vi.fn<() => Promise<AuthSessionResponse>>(),
   logoutMock: vi.fn(),
+  getCapabilitiesMock: vi.fn(),
 }));
 
 vi.mock("../../api/client", () => ({
   api: {
     getAuthSession: getAuthSessionMock,
+    getCapabilities: getCapabilitiesMock,
     login: vi.fn(),
     logout: logoutMock,
     enterDemo: enterDemoMock,
@@ -78,6 +80,20 @@ describe("ModuleBar", () => {
       active_patient_name: null,
       expires_at: null,
       available_demo_patients: [],
+    });
+    getCapabilitiesMock.mockResolvedValue({
+      mode: "demo",
+      can_use_caspian: true,
+      can_edit_caspian_user_files: false,
+      can_write_caspian_notes: false,
+      can_run_workflows: true,
+      can_use_aggregation_uploads: true,
+      can_use_aggregation_profiles: false,
+      can_use_harmonize: false,
+      can_use_guest_harmonization: true,
+      can_use_assistant_tools_write: false,
+      show_caspian_seed_files: true,
+      persistence_scope: "browser-ephemeral",
     });
   });
 

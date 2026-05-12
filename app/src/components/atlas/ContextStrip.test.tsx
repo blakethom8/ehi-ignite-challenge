@@ -6,13 +6,15 @@ import type { AuthSessionResponse } from "../../types";
 import type { Workspace } from "./types";
 import { ContextStrip } from "./ContextStrip";
 
-const { getAuthSessionMock } = vi.hoisted(() => ({
+const { getAuthSessionMock, getCapabilitiesMock } = vi.hoisted(() => ({
   getAuthSessionMock: vi.fn<() => Promise<AuthSessionResponse>>(),
+  getCapabilitiesMock: vi.fn(),
 }));
 
 vi.mock("../../api/client", () => ({
   api: {
     getAuthSession: getAuthSessionMock,
+    getCapabilities: getCapabilitiesMock,
     login: vi.fn(),
     logout: vi.fn(),
     enterDemo: vi.fn(),
@@ -53,6 +55,21 @@ const pluginWorkspace: Workspace = {
 describe("ContextStrip", () => {
   beforeEach(() => {
     getAuthSessionMock.mockReset();
+    getCapabilitiesMock.mockReset();
+    getCapabilitiesMock.mockResolvedValue({
+      mode: "anonymous",
+      can_use_caspian: false,
+      can_edit_caspian_user_files: false,
+      can_write_caspian_notes: false,
+      can_run_workflows: false,
+      can_use_aggregation_uploads: false,
+      can_use_aggregation_profiles: false,
+      can_use_harmonize: false,
+      can_use_guest_harmonization: true,
+      can_use_assistant_tools_write: false,
+      show_caspian_seed_files: false,
+      persistence_scope: "none",
+    });
   });
 
   it("renders access-backed Caspian patient chrome instead of fixture patient identity", async () => {

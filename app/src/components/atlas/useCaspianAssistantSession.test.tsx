@@ -3,21 +3,26 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useCaspianAssistantSession } from "./useCaspianAssistantSession";
+import { AccessProvider } from "../../context/AccessContext";
 
-const { chatProviderAssistant } = vi.hoisted(() => ({
+const { chatProviderAssistant, getAuthSession, getCapabilities } = vi.hoisted(() => ({
   chatProviderAssistant: vi.fn(),
+  getAuthSession: vi.fn(),
+  getCapabilities: vi.fn(),
 }));
 
 vi.mock("../../api/client", () => ({
   api: {
     chatProviderAssistant: (...args: unknown[]) => chatProviderAssistant(...args),
+    getAuthSession: (...args: unknown[]) => getAuthSession(...args),
+    getCapabilities: (...args: unknown[]) => getCapabilities(...args),
   },
 }));
 
 function wrapper({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={new QueryClient()}>
-      {children}
+      <AccessProvider>{children}</AccessProvider>
     </QueryClientProvider>
   );
 }
@@ -50,6 +55,33 @@ describe("useCaspianAssistantSession", () => {
   beforeEach(() => {
     window.localStorage.clear();
     chatProviderAssistant.mockReset();
+    getAuthSession.mockReset();
+    getCapabilities.mockReset();
+    // Default the AccessContext to an anonymous session so the hook can
+    // still derive a storage key for the test patient + session.
+    getAuthSession.mockResolvedValue({
+      mode: "anonymous",
+      user: null,
+      active_patient_id: null,
+      active_patient_name: null,
+      active_demo_patient: null,
+      expires_at: null,
+      available_demo_patients: [],
+    });
+    getCapabilities.mockResolvedValue({
+      mode: "anonymous",
+      can_use_caspian: false,
+      can_edit_caspian_user_files: false,
+      can_write_caspian_notes: false,
+      can_run_workflows: false,
+      can_use_aggregation_uploads: false,
+      can_use_aggregation_profiles: false,
+      can_use_harmonize: false,
+      can_use_guest_harmonization: true,
+      can_use_assistant_tools_write: false,
+      show_caspian_seed_files: false,
+      persistence_scope: "none",
+    });
   });
 
   it("submits to the live assistant API and builds inspector-ready citations", async () => {
@@ -106,7 +138,9 @@ describe("useCaspianAssistantSession", () => {
     expect(result.current.inspector.citations["e_1"]?.sourceId).toBe("med-1");
     expect(result.current.inspector.traceByCitationId["e_1"]?.trace_id).toBe("trace_live_1");
 
-    const stored = window.localStorage.getItem("atlas:caspian:assistant:patient-123:s_live");
+    const stored = window.localStorage.getItem(
+      "atlas:anon:caspian:assistant:patient-123:s_live",
+    );
     expect(stored).toContain("Any pre-op medication risks?");
     expect(stored).toContain("Apixaban 5 mg BID");
   });

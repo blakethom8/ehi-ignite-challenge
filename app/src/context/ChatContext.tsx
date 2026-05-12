@@ -1,6 +1,8 @@
-import { createContext, useCallback, useContext, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { api } from "../api/client";
+import { useAccessContext } from "./AccessContext";
+import { migrateLegacyKey, storageNamespace } from "../storage";
 import type {
   ProviderAssistantCitation,
   ProviderAssistantContextPackage,
@@ -8,6 +10,9 @@ import type {
   ProviderAssistantTurn,
   TraceDetail,
 } from "../types";
+
+const LEGACY_AGENT_SETTINGS_KEY = "ehi-agent-settings";
+const LEGACY_CONTEXT_PACKAGES_KEY = "ehi-provider-assistant-context-packages";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -80,10 +85,45 @@ const ChatContext = createContext<ChatContextInner | null>(null);
 // ── Provider ─────────────────────────────────────────────────────────────────
 
 export function ChatProvider({ children }: { children: React.ReactNode }) {
+  const { mode, user, activeDemoPatient, activePatientId, activeGuestRunId } = useAccessContext();
+
+  // Resolve the principal identity for the current mode. For authenticated
+  // users it's the user id; for demo it's the demo alias; for guest it's the
+  // run id; for anonymous it's null (only the mode segment is used).
+  const identity = useMemo<string | null>(() => {
+    if (mode === "authenticated") return user?.id ?? null;
+    if (mode === "demo") return activeDemoPatient?.id ?? activePatientId ?? null;
+    if (mode === "guest") return activeGuestRunId ?? null;
+    return null;
+  }, [mode, user?.id, activeDemoPatient?.id, activePatientId, activeGuestRunId]);
+
+  const agentSettingsKey = useMemo(
+    () => storageNamespace(mode, identity, "chat:agent-settings"),
+    [mode, identity],
+  );
+  const contextPackagesKey = useMemo(
+    () => storageNamespace(mode, identity, "chat:context-packages"),
+    [mode, identity],
+  );
+
+  // Run the legacy → mode-scoped migration once per key. We migrate the
+  // pre-Phase-2 unscoped keys into whichever mode the user is currently in
+  // so existing users don't lose state.
+  const migratedAgentKeyRef = useRef<string | null>(null);
+  if (migratedAgentKeyRef.current !== agentSettingsKey) {
+    migrateLegacyKey(LEGACY_AGENT_SETTINGS_KEY, agentSettingsKey);
+    migratedAgentKeyRef.current = agentSettingsKey;
+  }
+  const migratedContextKeyRef = useRef<string | null>(null);
+  if (migratedContextKeyRef.current !== contextPackagesKey) {
+    migrateLegacyKey(LEGACY_CONTEXT_PACKAGES_KEY, contextPackagesKey);
+    migratedContextKeyRef.current = contextPackagesKey;
+  }
+
   const [stance, setStance] = useState<"opinionated" | "balanced">("opinionated");
   const [agentSettings, setAgentSettings] = useState<AgentSettings>(() => {
     try {
-      const saved = localStorage.getItem("ehi-agent-settings");
+      const saved = localStorage.getItem(agentSettingsKey);
       if (saved) {
         const parsed = { ...DEFAULT_SETTINGS, ...JSON.parse(saved) };
         return { ...parsed, maxTokens: clampMaxTokens(parsed.maxTokens) };
@@ -93,7 +133,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   });
   const [contextPackages, setContextPackagesState] = useState<ProviderAssistantContextPackage[]>(() => {
     try {
-      const saved = localStorage.getItem("ehi-provider-assistant-context-packages");
+      const saved = localStorage.getItem(contextPackagesKey);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) return parsed;
@@ -103,25 +143,55 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   });
   const [messagesByPatient, setMessagesByPatient] = useState<Record<string, ChatMessage[]>>({});
 
+  // When the storage key changes (mode/identity flip), rehydrate from the
+  // new key so we don't continue showing the old principal's settings.
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(agentSettingsKey);
+      if (saved) {
+        const parsed = { ...DEFAULT_SETTINGS, ...JSON.parse(saved) };
+        setAgentSettings({ ...parsed, maxTokens: clampMaxTokens(parsed.maxTokens) });
+      } else {
+        setAgentSettings(DEFAULT_SETTINGS);
+      }
+    } catch {
+      setAgentSettings(DEFAULT_SETTINGS);
+    }
+  }, [agentSettingsKey]);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(contextPackagesKey);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        setContextPackagesState(Array.isArray(parsed) ? parsed : []);
+      } else {
+        setContextPackagesState([]);
+      }
+    } catch {
+      setContextPackagesState([]);
+    }
+  }, [contextPackagesKey]);
+
   const updateSettings = useCallback((next: AgentSettings) => {
     const normalized = { ...next, maxTokens: clampMaxTokens(next.maxTokens) };
     setAgentSettings(normalized);
-    try { localStorage.setItem("ehi-agent-settings", JSON.stringify(normalized)); } catch { /* noop */ }
-  }, []);
+    try { localStorage.setItem(agentSettingsKey, JSON.stringify(normalized)); } catch { /* noop */ }
+  }, [agentSettingsKey]);
 
   const setContextPackages = useCallback((packages: ProviderAssistantContextPackage[]) => {
     setContextPackagesState(packages);
-    try { localStorage.setItem("ehi-provider-assistant-context-packages", JSON.stringify(packages)); } catch { /* noop */ }
-  }, []);
+    try { localStorage.setItem(contextPackagesKey, JSON.stringify(packages)); } catch { /* noop */ }
+  }, [contextPackagesKey]);
 
   const toggleContextPackage = useCallback((contextPackage: ProviderAssistantContextPackage) => {
     setContextPackagesState((current) => {
       const exists = current.some((item) => item.id === contextPackage.id);
       const next = exists ? current.filter((item) => item.id !== contextPackage.id) : [...current, contextPackage];
-      try { localStorage.setItem("ehi-provider-assistant-context-packages", JSON.stringify(next)); } catch { /* noop */ }
+      try { localStorage.setItem(contextPackagesKey, JSON.stringify(next)); } catch { /* noop */ }
       return next;
     });
-  }, []);
+  }, [contextPackagesKey]);
 
   const mutation = useMutation({
     mutationFn: async (payload: {

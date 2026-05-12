@@ -17,6 +17,9 @@ export function resolveSessionHomePath(mode: AuthMode, activePatientId: string |
   if (mode === "demo") {
     return "/demo";
   }
+  if (mode === "guest") {
+    return "/guest-harmonization";
+  }
   return "/";
 }
 
@@ -68,5 +71,6 @@ export function resolveModulePath(
 export function resolveInvalidPatientRedirect(mode: AuthMode): string {
   if (mode === "authenticated") return "/patient-record/sources";
   if (mode === "demo") return "/demo";
+  if (mode === "guest") return "/guest-harmonization";
   return "/";
 }

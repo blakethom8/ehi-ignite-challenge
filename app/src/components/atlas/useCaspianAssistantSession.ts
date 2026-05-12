@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Activity } from "lucide-react";
 import { api } from "../../api/client";
+import { useAccessContext, type AccessMode } from "../../context/AccessContext";
+import { migrateLegacyKey, storageNamespace } from "../../storage";
 import type {
   ProviderAssistantCitation,
   ProviderAssistantTurn,
@@ -11,7 +13,7 @@ import type {
 } from "../../types";
 import type { Citation, WorkbenchTab } from "./data";
 
-const STORAGE_PREFIX = "atlas:caspian:assistant";
+const LEGACY_STORAGE_PREFIX = "atlas:caspian:assistant";
 
 type CaspianCitation = ProviderAssistantCitation & {
   id: string;
@@ -52,9 +54,42 @@ function messageId(prefix: "u" | "a"): string {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function storageKey(patientId: string | null, sessionId: string | null): string | null {
+/** Identity key (user id, demo alias, guest run id) used to scope storage to the current principal. */
+function identityKeyFor(
+  mode: AccessMode,
+  userId: string | null,
+  activeDemoPatientId: string | null,
+  activePatientId: string | null,
+  activeGuestRunId: string | null,
+): string | null {
+  switch (mode) {
+    case "authenticated":
+      return userId ?? "anon";
+    case "demo":
+      // Prefer the explicit demo alias if present; otherwise fall back to the
+      // active patient id (which is also a demo alias today).
+      return activeDemoPatientId ?? activePatientId ?? "anon";
+    case "guest":
+      return activeGuestRunId ?? "anon";
+    case "anonymous":
+    default:
+      return null;
+  }
+}
+
+function modeNamespacedStorageKey(
+  mode: AccessMode,
+  identity: string | null,
+  patientId: string | null,
+  sessionId: string | null,
+): string | null {
   if (!patientId || !sessionId) return null;
-  return `${STORAGE_PREFIX}:${patientId}:${sessionId}`;
+  return storageNamespace(mode, identity, `caspian:assistant:${patientId}:${sessionId}`);
+}
+
+function legacyStorageKey(patientId: string | null, sessionId: string | null): string | null {
+  if (!patientId || !sessionId) return null;
+  return `${LEGACY_STORAGE_PREFIX}:${patientId}:${sessionId}`;
 }
 
 function readMessages(key: string | null): CaspianAssistantMessage[] {
@@ -230,7 +265,27 @@ export function useCaspianAssistantSession(
   sessionId: string | null,
   options: CaspianAssistantSessionOptions = {},
 ) {
-  const key = useMemo(() => storageKey(patientId, sessionId), [patientId, sessionId]);
+  const { mode, user, activeDemoPatient, activePatientId, activeGuestRunId } = useAccessContext();
+  const identity = identityKeyFor(
+    mode,
+    user?.id ?? null,
+    activeDemoPatient?.id ?? null,
+    activePatientId,
+    activeGuestRunId,
+  );
+  const key = useMemo(
+    () => modeNamespacedStorageKey(mode, identity, patientId, sessionId),
+    [mode, identity, patientId, sessionId],
+  );
+  // One-shot migration of the legacy unscoped storage key into the current
+  // mode-namespaced key. Idempotent: subsequent renders no-op because the
+  // legacy key has been removed.
+  const migratedKeyRef = useRef<string | null>(null);
+  if (key && migratedKeyRef.current !== key) {
+    const legacy = legacyStorageKey(patientId, sessionId);
+    if (legacy) migrateLegacyKey(legacy, key);
+    migratedKeyRef.current = key;
+  }
   const [messages, setMessages] = useState<CaspianAssistantMessage[]>(() => readMessages(key));
   const [workflow, setWorkflow] = useState<CaspianWorkflowState>(() => ({
     tabs: [],

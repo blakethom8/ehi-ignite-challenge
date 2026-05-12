@@ -375,11 +375,31 @@ def publish_harmonization_run(collection_id: str, run_id: str) -> PublishedChart
     if harmonize_service.get_collection(collection_id) is None:
         raise HTTPException(status_code=404, detail=f"Collection not found: {collection_id}")
     try:
-        return PublishedChartStateResponse(**published_charts.publish_run(collection_id, run_id))
+        response = PublishedChartStateResponse(**published_charts.publish_run(collection_id, run_id))
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail=f"Harmonization run not found: {run_id}") from None
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    # T6 (LLM-CONTEXT-AUGMENTATION-PLAN §T6): regenerate per-episode
+    # narratives so the freshly published snapshot has up-to-date
+    # Compositions. Synchronous in Phase 1 (small patient counts);
+    # async-with-jobs is Phase 2 (§P8). Per-episode failures are
+    # tolerated so one bad narrative doesn't block the publish.
+    patient_id = harmonize_service._patient_id_from_workspace_collection(collection_id)
+    if patient_id:
+        try:
+            from api.core.narrative_service import regenerate_all_episodes
+
+            regenerate_all_episodes(patient_id, collection_id=collection_id)
+        except Exception as exc:  # noqa: BLE001 — never block publish
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "narrative regen after publish failed for %s: %s", patient_id, exc
+            )
+
+    return response
 
 
 @router.post(

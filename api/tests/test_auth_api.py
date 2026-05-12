@@ -45,6 +45,7 @@ class AuthApiTests(unittest.TestCase):
         session = client.get("/api/auth/session")
         self.assertEqual(session.status_code, 200)
         self.assertEqual(session.json()["mode"], "authenticated")
+        self.assertIsNone(session.json()["active_patient_id"])
 
     def test_signup_creates_consumer_session_and_hashes_password(self) -> None:
         client = TestClient(app)
@@ -119,6 +120,88 @@ class AuthApiTests(unittest.TestCase):
         overview = client.get("/api/patients/demo-high-risk/overview")
         self.assertEqual(overview.status_code, 200)
         self.assertEqual(overview.json()["id"], "demo-high-risk")
+
+    def test_authenticated_session_does_not_list_seeded_synthea_workspaces(self) -> None:
+        client = TestClient(app)
+        email = f"workspace-list-{uuid.uuid4().hex}@example.com"
+        signup = client.post(
+            "/api/auth/signup",
+            json={"email": email, "password": "correct-horse-battery", "display_name": "Workspace List"},
+        )
+        self.assertEqual(signup.status_code, 200)
+
+        listing = client.get("/api/patients")
+        self.assertEqual(listing.status_code, 200)
+        self.assertEqual(listing.json(), [])
+
+    def test_authenticated_session_rejects_seeded_and_demo_patient_selection(self) -> None:
+        client = TestClient(app)
+        email = f"select-guard-{uuid.uuid4().hex}@example.com"
+        signup = client.post(
+            "/api/auth/signup",
+            json={"email": email, "password": "correct-horse-battery", "display_name": "Select Guard"},
+        )
+        self.assertEqual(signup.status_code, 200)
+
+        demo_alias_attempt = client.post("/api/auth/select-patient", json={"patient_id": "demo-high-risk"})
+        self.assertEqual(demo_alias_attempt.status_code, 403)
+
+        seeded_patient_attempt = client.post(
+            "/api/auth/select-patient",
+            json={"patient_id": auth_core.DEMO_PATIENTS[0].actual_patient_id},
+        )
+        self.assertEqual(seeded_patient_attempt.status_code, 403)
+
+    def test_authenticated_session_clears_stale_seeded_patient_selection(self) -> None:
+        client = TestClient(app)
+        email = f"stale-session-{uuid.uuid4().hex}@example.com"
+        password = "correct-horse-battery"
+        signup = client.post(
+            "/api/auth/signup",
+            json={"email": email, "password": password, "display_name": "Stale Session"},
+        )
+        self.assertEqual(signup.status_code, 200)
+
+        session_id = auth_core._unsign_cookie_value(signup.cookies.get(auth_core.SESSION_COOKIE_NAME))
+        self.assertIsNotNone(session_id)
+
+        with auth_core._connect() as conn:
+            conn.execute(
+                "UPDATE sessions SET active_patient_id = ?, active_patient_name = ? WHERE id = ?",
+                (
+                    auth_core.DEMO_PATIENTS[0].actual_patient_id,
+                    "Shelly Corwin",
+                    session_id,
+                ),
+            )
+            conn.commit()
+
+        session = client.get("/api/auth/session")
+        self.assertEqual(session.status_code, 200)
+        body = session.json()
+        self.assertEqual(body["mode"], "authenticated")
+        self.assertIsNone(body["active_patient_id"])
+        self.assertIsNone(body["active_patient_name"])
+
+    def test_authenticated_session_can_select_owned_workspace(self) -> None:
+        client = TestClient(app)
+        email = f"owned-workspace-{uuid.uuid4().hex}@example.com"
+        signup = client.post(
+            "/api/auth/signup",
+            json={"email": email, "password": "correct-horse-battery", "display_name": "Owned Workspace"},
+        )
+        self.assertEqual(signup.status_code, 200)
+
+        created = client.post(
+            "/api/aggregation/profiles",
+            json={"display_name": "My Workspace", "notes": ""},
+        )
+        self.assertEqual(created.status_code, 200)
+        workspace_id = created.json()["profile"]["id"]
+
+        selected = client.post("/api/auth/select-patient", json={"patient_id": workspace_id})
+        self.assertEqual(selected.status_code, 200)
+        self.assertEqual(selected.json()["active_patient_id"], workspace_id)
 
 
 if __name__ == "__main__":

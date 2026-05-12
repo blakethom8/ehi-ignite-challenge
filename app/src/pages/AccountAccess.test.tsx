@@ -107,6 +107,7 @@ describe("AccountAccessPage", () => {
       activePatientId: "patient-123",
       isLoading: false,
       isUnlocked: false,
+      mode: "authenticated",
       signIn: signInMock,
       signUp: signUpMock,
       user: null,
@@ -126,6 +127,34 @@ describe("AccountAccessPage", () => {
       expect(signInMock).toHaveBeenCalledWith("person@example.com", "private-password");
     });
     expect(navigateMock).toHaveBeenCalledWith("/patient-record?patient=patient-123");
+  });
+
+  it("does not carry demo patient context into an authenticated login", async () => {
+    signInMock.mockResolvedValue();
+    useAccessContextMock.mockReturnValue({
+      activePatientId: "demo-high-risk",
+      isLoading: false,
+      isUnlocked: true,
+      mode: "demo",
+      signIn: signInMock,
+      signUp: signUpMock,
+      user: null,
+    });
+    renderAccountAccess();
+
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "person@example.com" },
+    });
+    fireEvent.change(screen.getByLabelText("Password"), {
+      target: { value: "private-password" },
+    });
+    const loginButtons = screen.getAllByRole("button", { name: "Log in" });
+    fireEvent.click(loginButtons[loginButtons.length - 1]);
+
+    await waitFor(() => {
+      expect(signInMock).toHaveBeenCalledWith("person@example.com", "private-password");
+    });
+    expect(navigateMock).toHaveBeenCalledWith("/patient-record/sources");
   });
 
   it("disables the signup submit button while required fields are incomplete", () => {

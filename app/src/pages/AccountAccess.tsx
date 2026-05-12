@@ -47,7 +47,7 @@ function signUpErrorMessage(error: unknown): string {
 
 export function AccountAccessPage() {
   const navigate = useNavigate();
-  const { activePatientId, isLoading, isUnlocked, signIn, signUp, user } = useAccessContext();
+  const { activePatientId, isLoading, isUnlocked, mode, signIn, signUp, user } = useAccessContext();
   const [activeTab, setActiveTab] = useState<AccountTab>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -56,7 +56,8 @@ export function AccountAccessPage() {
   const [signUpPassword, setSignUpPassword] = useState("");
   const [signUpDisplayName, setSignUpDisplayName] = useState("");
   const [signUpError, setSignUpError] = useState<string | null>(null);
-  const defaultAuthenticatedDestination = resolveSessionHomePath("authenticated", activePatientId);
+  const resumePatientId = mode === "authenticated" ? activePatientId : null;
+  const defaultAuthenticatedDestination = resolveSessionHomePath("authenticated", resumePatientId);
 
   if (!isLoading && isUnlocked && user) {
     return <Navigate to="/account/settings" replace />;

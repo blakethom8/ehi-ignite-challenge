@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, type ComponentType } from "react";
+import { Suspense, lazy, useEffect, useState, type ComponentType } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
@@ -19,6 +19,7 @@ import { PatientRecordPool } from "./pages/PatientRecordPool";
 import { PatientRecordLayout } from "./pages/PatientRecord/PatientRecordLayout";
 import { FhirChartsLayout } from "./pages/FhirCharts/FhirChartsLayout";
 import { buildGroundTruthReviewPath } from "./routing";
+import { resolveInvalidPatientRedirect } from "./sessionRouting";
 
 function lazyNamed<TModule extends Record<string, unknown>>(
   loader: () => Promise<TModule>,
@@ -129,7 +130,7 @@ function AppShellRoute({
 }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { activePatientId, isLoading, isUnlocked, setActivePatient } = useAccessContext();
+  const { activePatientId, isLoading, isUnlocked, mode, setActivePatient } = useAccessContext();
   const routeKey = `${location.pathname}${location.search}`;
   const stripPatient = shouldStripPatient(location.pathname, location.search, isUnlocked, isLoading);
   const hydratePatient = shouldHydratePatient(
@@ -140,14 +141,31 @@ function AppShellRoute({
   );
   const isPatientRecordRoute = location.pathname.startsWith("/patient-record");
   const isFhirChartsRoute = location.pathname.startsWith("/fhir-charts");
+  const requestedPatientId = new URLSearchParams(location.search).get("patient");
+  const [isSyncingPatient, setIsSyncingPatient] = useState(false);
 
   useEffect(() => {
     if (isLoading || !isUnlocked) return;
-    const params = new URLSearchParams(location.search);
-    const patientId = params.get("patient");
-    if (!patientId || patientId === activePatientId) return;
-    void setActivePatient(patientId);
-  }, [activePatientId, isLoading, isUnlocked, location.search, setActivePatient]);
+    if (!requestedPatientId || requestedPatientId === activePatientId) {
+      setIsSyncingPatient(false);
+      return;
+    }
+    let cancelled = false;
+    setIsSyncingPatient(true);
+    void setActivePatient(requestedPatientId)
+      .catch(() => {
+        if (cancelled) return;
+        navigate(resolveInvalidPatientRedirect(mode), { replace: true });
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsSyncingPatient(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activePatientId, isLoading, isUnlocked, location.search, mode, navigate, requestedPatientId, setActivePatient]);
 
   useEffect(() => {
     if (fullBleed || !hydratePatient) return;
@@ -157,6 +175,10 @@ function AppShellRoute({
   }, [activePatientId, fullBleed, hydratePatient, location.pathname, location.search, navigate]);
 
   if (isLoading) {
+    return fullBleed ? <FullscreenPageFallback /> : <PageFallback />;
+  }
+
+  if (isSyncingPatient) {
     return fullBleed ? <FullscreenPageFallback /> : <PageFallback />;
   }
 

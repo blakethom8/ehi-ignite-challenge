@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, Compass, Database, HelpCircle, LogOut, Menu, Pill, Play, Search, Send, Telescope } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { hrefForModule } from "./navigation";
 import type { Crumb } from "./Titlebar";
 import type {
   ModuleId,
@@ -11,7 +10,7 @@ import type {
   WorkspaceId,
 } from "./types";
 import { useAccessContext } from "../../context/AccessContext";
-import { resolveSessionWorkspaceHubPath } from "../../sessionRouting";
+import { resolveModulePath, resolveSessionWorkspaceHubPath } from "../../sessionRouting";
 
 const RECENT: RecentWorkspace[] = [
   { id: "trial-finder", label: "Trial Finder", vendor: "Helix Clinical", icon: "Telescope" },
@@ -199,10 +198,7 @@ export function ModuleBar({
           {MODULES.map((m) => {
             const active = m.id === activeModule;
             if (m.hasMenu) {
-              const workspaceHref = withPatientContext(
-                hrefForModule("workspaces") ?? "/workspaces",
-                activePatientId,
-              );
+              const workspaceHref = resolveModulePath("workspaces", mode, activePatientId);
               return (
                 <div key={m.id} ref={wsRef} className="relative">
                   <div className="relative flex flex-[0_0_auto] items-center">
@@ -327,7 +323,7 @@ export function ModuleBar({
             return (
               <Link
                 key={m.id}
-                to={withPatientContext(hrefForModule(m.id) ?? "/", activePatientId)}
+                to={resolveModulePath(m.id, mode, activePatientId)}
                 reloadDocument={reloadModuleNav}
                 className={`relative flex flex-[0_0_auto] cursor-pointer items-center whitespace-nowrap rounded px-3 py-2.5 text-[12px] font-medium leading-none transition-colors ${
                   active

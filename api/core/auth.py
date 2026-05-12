@@ -383,6 +383,28 @@ def patient_exists(patient_id: str) -> bool:
     return any(item.id == patient_id for item in list_upload_workspaces())
 
 
+def _accessible_authenticated_workspace_ids(user_id: str | None) -> set[str]:
+    if not user_id:
+        return set()
+    return {item.id for item in list_upload_workspaces(user_id=user_id)}
+
+
+def _authenticated_workspace_access_allowed(user_id: str | None, patient_id: str | None) -> bool:
+    if not user_id or not patient_id:
+        return False
+    return patient_id in _accessible_authenticated_workspace_ids(user_id)
+
+
+def _session_patient_allowed(mode: str, user_id: str | None, patient_id: str | None) -> bool:
+    if patient_id is None:
+        return True
+    if mode == "demo":
+        return patient_id in DEMO_PATIENT_BY_ALIAS
+    if mode == "authenticated":
+        return _authenticated_workspace_access_allowed(user_id, patient_id)
+    return False
+
+
 def _row_to_principal(row: sqlite3.Row) -> SessionPrincipal:
     return SessionPrincipal(
         session_id=row["id"],
@@ -536,6 +558,25 @@ def _lookup_session(session_id: str) -> SessionPrincipal | None:
             """,
             (session_id,),
         ).fetchone()
+        if row is not None and not _session_patient_allowed(
+            row["mode"],
+            row["user_id"],
+            row["active_patient_id"],
+        ):
+            conn.execute(
+                "UPDATE sessions SET active_patient_id = NULL, active_patient_name = NULL WHERE id = ?",
+                (session_id,),
+            )
+            conn.commit()
+            row = conn.execute(
+                """
+                SELECT s.*, u.email, u.display_name, COALESCE(u.role, 'clinician') AS role
+                FROM sessions s
+                LEFT JOIN users u ON u.id = s.user_id
+                WHERE s.id = ?
+                """,
+                (session_id,),
+            ).fetchone()
     return _row_to_principal(row) if row is not None else None
 
 
@@ -709,8 +750,11 @@ def select_patient(principal: SessionPrincipal, patient_id: str | None) -> Sessi
                 raise HTTPException(status_code=403, detail="Demo sessions can only select approved demo patients.")
             active_patient_name = demo_patient_label(patient_id)
         else:
-            if not patient_exists(patient_id):
-                raise HTTPException(status_code=404, detail=f"Patient not found: {patient_id}")
+            if not _authenticated_workspace_access_allowed(principal.user_id, patient_id):
+                raise HTTPException(
+                    status_code=403,
+                    detail="This account does not have access to that workspace.",
+                )
             active_patient_name = _known_patient_name(patient_id) or patient_id
     with _connect() as conn:
         conn.execute(
@@ -748,6 +792,11 @@ def authorize_patient_access(
     actual_patient_id = requested_patient_id
     if principal.is_demo:
         actual_patient_id = resolve_demo_patient_alias(requested_patient_id)
+    elif not _authenticated_workspace_access_allowed(principal.user_id, requested_patient_id):
+        raise HTTPException(
+            status_code=403,
+            detail="This account does not have access to that workspace.",
+        )
     audit_event(
         event_type=event_type,
         session=principal,

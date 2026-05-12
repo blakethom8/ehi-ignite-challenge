@@ -510,13 +510,7 @@ def list_patients(request: Request) -> list[PatientListItem]:
     all_synthea_items = _cached_patient_list()
     if session.is_demo:
         return _demo_patient_items(all_synthea_items)
-    synthea_items = _curated_demo_patients(all_synthea_items)
-    all_synthea_ids = {patient.id for patient in all_synthea_items}
-    upload_items = [
-        item for item in list_upload_workspaces(user_id=session.user_id)
-        if item.id not in all_synthea_ids
-    ]
-    return upload_items + synthea_items
+    return list_upload_workspaces(user_id=session.user_id)
 
 
 def _demo_patient_items(items: list[PatientListItem]) -> list[PatientListItem]:

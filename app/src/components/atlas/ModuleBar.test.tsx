@@ -200,6 +200,14 @@ describe("ModuleBar", () => {
         "href",
         "/patient-record/sources",
       );
+      expect(screen.getByRole("link", { name: "FHIR Charts" })).toHaveAttribute(
+        "href",
+        "/patient-record/sources",
+      );
+      expect(screen.getByRole("link", { name: "Caspian" })).toHaveAttribute(
+        "href",
+        "/patient-record/sources",
+      );
     });
 
     fireEvent.click(screen.getByRole("button", { name: /sign out/i }));

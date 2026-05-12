@@ -98,6 +98,11 @@ class Trace:
     question: str = ""
     stance: str = "opinionated"
     engine: str | None = None
+    # Assistant mode that produced this trace — context | deterministic |
+    # agent_sdk | cursor. Populated by provider_assistant_service after
+    # the mode resolves; lets the per-user audit query group by mode and
+    # supports H3.1 mode comparison.
+    mode: str | None = None
     status: str = "ok"  # "ok" | "error" | "fallback"
     confidence: str | None = None
     answer_preview: str = ""  # First 500 chars of the answer
@@ -278,7 +283,8 @@ def _ensure_db() -> None:
                     created_at     TEXT NOT NULL,
                     user_id        TEXT NOT NULL DEFAULT '',
                     session_id     TEXT NOT NULL DEFAULT '',
-                    workspace_kind TEXT NOT NULL DEFAULT 'caspian'
+                    workspace_kind TEXT NOT NULL DEFAULT 'caspian',
+                    mode           TEXT
                 );
 
                 CREATE TABLE IF NOT EXISTS spans (
@@ -311,6 +317,7 @@ def _ensure_db() -> None:
                 ("user_id", "ALTER TABLE traces ADD COLUMN user_id TEXT NOT NULL DEFAULT ''"),
                 ("session_id", "ALTER TABLE traces ADD COLUMN session_id TEXT NOT NULL DEFAULT ''"),
                 ("workspace_kind", "ALTER TABLE traces ADD COLUMN workspace_kind TEXT NOT NULL DEFAULT 'caspian'"),
+                ("mode", "ALTER TABLE traces ADD COLUMN mode TEXT"),
             ]:
                 try:
                     conn.execute(ddl)
@@ -333,8 +340,8 @@ def _flush_trace(trace: Trace) -> None:
                    (trace_id, patient_id, question, stance, engine, status,
                     confidence, answer_preview, answer_length, citation_count,
                     follow_up_count, duration_ms, created_at,
-                    user_id, session_id, workspace_kind)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    user_id, session_id, workspace_kind, mode)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     trace.trace_id,
                     trace.patient_id,
@@ -352,6 +359,7 @@ def _flush_trace(trace: Trace) -> None:
                     trace.user_id,
                     trace.session_id,
                     trace.workspace_kind,
+                    trace.mode,
                 ),
             )
 

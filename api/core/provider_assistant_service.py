@@ -22,6 +22,10 @@ def _record_trace_metadata(result: AssistantResult) -> None:
     if trace is None:
         return
     trace.engine = result.engine
+    # H0.10: also tag the resolved mode (context | deterministic | agent_sdk |
+    # cursor) so the audit query and mode-comparison harness can group by it.
+    if hasattr(result, "mode_used"):
+        trace.mode = result.mode_used
     trace.confidence = result.confidence
     trace.answer_preview = result.answer[:500] if result.answer else ""
     trace.answer_length = len(result.answer) if result.answer else 0

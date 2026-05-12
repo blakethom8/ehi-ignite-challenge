@@ -52,11 +52,22 @@ class VendorRecord:
 # ============================================================
 
 
+def _is_production() -> bool:
+    return os.getenv("ENVIRONMENT", "development").strip().lower() in {"prod", "production"}
+
+
 def _load_or_create_atlas_key(path: Path) -> tuple[Ed25519PrivateKey, Ed25519PublicKey]:
     env = os.environ.get("ATLAS_SIGNING_KEY")
     if env:
         sk = private_key_from_b64(env)
         return sk, sk.public_key()
+    if _is_production():
+        raise RuntimeError(
+            "ATLAS_SIGNING_KEY env var is required when ENVIRONMENT=production. "
+            "Refusing to fall back to data/atlas-signing.key — the Atlas signing "
+            "key is the root of the plugin trust chain and must not live as a "
+            "plaintext file on disk in production."
+        )
     if path.exists():
         sk = private_key_from_b64(path.read_text().strip())
         return sk, sk.public_key()

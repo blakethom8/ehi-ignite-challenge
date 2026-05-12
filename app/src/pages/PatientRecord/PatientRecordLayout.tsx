@@ -7,6 +7,7 @@ import {
   ChevronRight,
   Database,
   FileSearch,
+  History,
   Layers3,
   MessageSquareText,
   ShieldCheck,
@@ -71,6 +72,13 @@ export function PatientRecordLayout({ children }: PatientRecordLayoutProps) {
         to: withPatient("/patient-record/publish", patientId),
         icon: ShieldCheck,
         match: (pathname) => pathname.startsWith("/patient-record/publish"),
+      },
+      {
+        label: "Snapshots",
+        description: "History and rollback",
+        to: withPatient("/patient-record/snapshots", patientId),
+        icon: History,
+        match: (pathname) => pathname.startsWith("/patient-record/snapshots"),
       },
       {
         label: "Patient Context",

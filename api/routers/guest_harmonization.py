@@ -2,13 +2,18 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from fastapi import APIRouter, File, HTTPException, Request, Response, UploadFile, status
+from fastapi.responses import FileResponse
 
 from api.core import guest_harmonization
 from api.models import (
+    GuestHarmonizationContextRequest,
     GuestHarmonizationDeleteResponse,
     GuestHarmonizationRunResponse,
 )
+from scripts.export_workspace_package import build_package_from_input
 
 
 router = APIRouter(prefix="/guest-harmonization", tags=["guest-harmonization"])
@@ -106,6 +111,29 @@ def process_guest_run(run_id: str, request: Request) -> GuestHarmonizationRunRes
         raise _map_run_error(exc) from exc
 
 
+@router.post("/runs/{run_id}/context", response_model=GuestHarmonizationRunResponse)
+def set_guest_context(
+    run_id: str,
+    request: Request,
+    payload: GuestHarmonizationContextRequest,
+) -> GuestHarmonizationRunResponse:
+    """Record patient_voice and/or audience for this run.
+
+    Fields are folded into the patient-summary packet (patient_voice) and
+    used to mark the primary packet (audience) at export time.
+    """
+    _require_guest_run(request, run_id)
+    try:
+        manifest = guest_harmonization.set_context(
+            run_id,
+            patient_voice=payload.patient_voice,
+            audience=payload.audience or None,
+        )
+    except Exception as exc:
+        raise _map_run_error(exc) from exc
+    return _response(manifest)
+
+
 @router.get("/runs/{run_id}/output")
 def get_guest_output(run_id: str, request: Request) -> dict:
     _require_guest_run(request, run_id)
@@ -113,6 +141,36 @@ def get_guest_output(run_id: str, request: Request) -> dict:
         return guest_harmonization.output_payload(run_id)
     except Exception as exc:
         raise _map_run_error(exc) from exc
+
+
+@router.get("/runs/{run_id}/export-workspace")
+def export_guest_workspace(run_id: str, request: Request) -> FileResponse:
+    """Download a portable EHI Atlas workspace ZIP for a guest run.
+
+    Mirrors the authenticated ``/api/harmonize/{collection}/export-workspace``
+    surface but is gated by the guest cookie instead of a logged-in session.
+    The ZIP layout is identical to the authenticated path; both build through
+    ``build_package_from_input()``.
+    """
+    _require_guest_run(request, run_id)
+    try:
+        workspace_input = guest_harmonization.build_workspace_input(run_id)
+    except Exception as exc:
+        raise _map_run_error(exc) from exc
+
+    out_dir = Path("data/guest-harmonization") / run_id / "outputs"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out = out_dir / f"{workspace_input.workspace_id}.zip"
+    try:
+        build_package_from_input(workspace_input, out, include_originals=True)
+    except SystemExit as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return FileResponse(
+        path=out,
+        media_type="application/zip",
+        filename=out.name,
+    )
 
 
 @router.delete("/runs/{run_id}", response_model=GuestHarmonizationDeleteResponse)

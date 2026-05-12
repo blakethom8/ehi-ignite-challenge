@@ -76,6 +76,7 @@ const PatientRecordMethodology = lazyNamed(() => import("./pages/PatientRecord/M
 const PatientRecordContext = lazyNamed(() => import("./pages/PatientRecord/Context"), "PatientContext");
 const PatientRecordPublish = lazyNamed(() => import("./pages/PatientRecord/aggregator/PublishReadinessPage"), "PublishReadinessPage");
 const PatientRecordSources = lazyNamed(() => import("./pages/PatientRecord/aggregator/SourceIntakePage"), "SourceIntakePage");
+const PatientRecordSnapshots = lazyNamed(() => import("./pages/PatientRecord/Snapshots"), "PatientRecordSnapshots");
 // FHIR Charts module — FHIR resource browser (former Explorer)
 const FhirChartsOverview = lazyNamed(() => import("./pages/FhirCharts/Overview"), "FhirChartsOverview");
 const FhirChartsTimeline = lazyNamed(() => import("./pages/FhirCharts/Timeline"), "FhirChartsTimeline");
@@ -265,6 +266,7 @@ function AppShellRoutes() {
     { path: "/patient-record/cleaning", element: <PatientRecordHarmonize /> },
     { path: "/patient-record/workspaces", element: <PatientRecordWorkspaceRedirect /> },
     { path: "/patient-record/publish", element: <PatientRecordPublish /> },
+    { path: "/patient-record/snapshots", element: <PatientRecordSnapshots /> },
     { path: "/patient-record/context", element: <PatientRecordContext /> },
 
     // FHIR Charts — FHIR resource browser (former Explorer + Journey)

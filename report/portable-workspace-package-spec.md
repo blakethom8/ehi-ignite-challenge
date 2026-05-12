@@ -77,36 +77,34 @@ ehi-atlas-workspace-<id>/
       <per-source extracted/prepared bundles>
 
   evidence/
-    canonical-facts.json
-    observations.json
-    medications.json
-    conditions.json
-    allergies.json
-    immunizations.json
-    encounters.json
-    provenance.json
-    source-contributions.json
-    conflicts.json
-    missing-information.json
+    canonical-facts.json          (shipped today)
+    provenance.json               (shipped today)
+    source-contributions.json     (shipped today)
+    conflicts.json                (shipped today)
+    missing-information.json      (shipped today)
+    drug-classes.json             (shipped today — fact_id -> {classes, severity_max})
+    medication-episodes.json      (shipped today — grouped (patient, drug) episodes)
+    observations-latest.json      (shipped today — most-recent obs per code)
 
   fhir/
-    harmonized-bundle.json
-    source-bundles/
-      <source-id>.bundle.json
+    harmonized-bundle.json        (shipped today)
+    narratives/
+      <episode-slug>.json         (shipped when data/narratives/<patient>/<slug>/current.json exists)
 
   packets/
-    patient-summary.context.json
-    clinician-handoff.context.json
-    second-opinion.context.json
-    preop-review.context.json
+    second-opinion.context.json   (shipped today)
+    patient-summary.context.json  (shipped today)
+    clinician-handoff.context.json (shipped today)
+    preop-review.context.json     (shipped today — drug-class flagged)
+
+  terminology/
+    loinc-used.json               (shipped when LOINC codes used)
+    rxnorm-used.json              (shipped when RxNorm codes used)
+    cvx-used.json                 (shipped when CVX codes used)
 
   exports/
-    labs.csv
-    medications.csv
-    conditions.csv
-    timeline.csv
-    clinician-handoff.md
-    patient-readable-summary.md
+    labs.csv                      (shipped today)
+    clinician-handoff.md          (shipped today)
 
   cli/
     atlas_workspace.py

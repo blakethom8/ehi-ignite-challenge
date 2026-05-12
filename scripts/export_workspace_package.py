@@ -21,11 +21,40 @@ import textwrap
 import zipfile
 import xml.etree.ElementTree as ET
 from collections import Counter, defaultdict
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+@dataclass
+class WorkspaceInput:
+    """Neutral input for build_package_from_input().
+
+    Captures everything the packager needs to produce a ZIP, regardless of
+    whether the caller is the authenticated harmonize-service path or the
+    Guest temporary-run path. ``sources`` follows the same shape that
+    ``discover_sources()`` returns (each entry has ``source_id``, ``label``,
+    ``kind``, ``path``, optional ``resources``, ``demo_source`` flag, etc.).
+    ``harmonization`` is the optional latest-run JSON; if absent,
+    ``build_evidence()`` falls back to building facts directly from
+    ``sources[*].resources`` or by parsing source bundles.
+
+    ``patient_voice`` and ``audience`` are optional user-supplied context
+    that flow into the packets. ``patient_voice`` is free text recorded in
+    the patient-summary packet; ``audience`` (one of ``patient-summary``,
+    ``clinician-handoff``, ``second-opinion``, ``preop-review``) marks a
+    primary packet so consumers know which one matches the user's intent.
+    """
+
+    workspace_id: str
+    sources: list[dict[str, Any]]
+    harmonization: dict[str, Any] | None = None
+    package_id_override: str | None = None
+    patient_voice: str | None = None
+    audience: str | None = None
 FHIR_TYPES = {
     "Observation",
     "Condition",
@@ -686,11 +715,479 @@ if __name__ == '__main__': main()
 '''
 
 
-def build_package(collection: str, out: Path, include_originals: bool) -> Path:
+def workspace_input_from_collection(collection: str) -> WorkspaceInput:
+    """Adapter: build a WorkspaceInput for an authenticated harmonize collection."""
     sources = discover_sources(collection)
     harmonization = load_harmonization(collection)
+    return WorkspaceInput(
+        workspace_id=collection,
+        sources=sources,
+        harmonization=harmonization,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Bundle enrichments — drug classes, derived tables, terminology, narratives
+# ---------------------------------------------------------------------------
+
+LOINC_REFERENCE_PATHS = [
+    REPO_ROOT / "ehi-atlas" / "corpus" / "reference" / "loinc" / "common-labs.json",
+    REPO_ROOT / "ehi-atlas" / "corpus" / "reference" / "loinc" / "showcase-loinc.json",
+]
+RXNORM_CACHE_DIR = REPO_ROOT / "ehi-atlas" / "corpus" / "reference" / "rxnorm" / ".cache"
+NARRATIVE_STORE_ROOT = REPO_ROOT / "data" / "narratives"
+_ACTIVE_MED_STATUSES = {"active", "on-hold"}
+
+
+def _try_drug_classifier():
+    """Lazy-load DrugClassifier; tolerate missing optional deps."""
+    try:
+        from lib.clinical.drug_classifier import DrugClassifier
+        return DrugClassifier()
+    except Exception:
+        return None
+
+
+def build_drug_class_index(facts: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    """Map fact_id → drug-class metadata for every MedicationRequest fact.
+
+    Output shape (per fact):
+        {"classes": [class_key, ...], "severity_max": "critical"|"warning"|"info"|""}
+
+    Missing classifier or no matches yields ``{"classes": [], "severity_max": ""}``.
+    """
+    classifier = _try_drug_classifier()
+    severity_order = {"critical": 0, "warning": 1, "info": 2}
+    index: dict[str, dict[str, Any]] = {}
+
+    for fact in facts:
+        if fact.get("resource_type") not in {"MedicationRequest", "MedicationStatement"}:
+            continue
+        fact_id = fact.get("fact_id")
+        if not isinstance(fact_id, str):
+            continue
+        entry: dict[str, Any] = {"classes": [], "severity_max": "", "display": fact.get("display")}
+        if classifier is not None:
+            display = str(fact.get("display") or "")
+            rxnorm_code = str(fact.get("code") or "")
+            classes: list[str] = []
+            best_severity = 9
+            best_label = ""
+            for key, info in classifier._classes.items():  # type: ignore[attr-defined]
+                matched = False
+                if rxnorm_code and rxnorm_code in info.rxnorm_codes:
+                    matched = True
+                else:
+                    display_lower = display.lower()
+                    for keyword in info.keywords:
+                        if keyword and keyword in display_lower:
+                            matched = True
+                            break
+                if matched:
+                    classes.append(key)
+                    sev_rank = severity_order.get(info.severity, 9)
+                    if sev_rank < best_severity:
+                        best_severity = sev_rank
+                        best_label = info.severity
+            entry["classes"] = classes
+            entry["severity_max"] = best_label
+        index[fact_id] = entry
+
+    return index
+
+
+def build_medication_episodes_from_facts(
+    facts: list[dict[str, Any]],
+    drug_class_index: dict[str, dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Collapse MedicationRequest facts into one row per (normalized display).
+
+    Mirrors the shape of ``lib/sql_on_fhir/derived.py::build_medication_episodes``
+    but works directly off canonical facts so the bundle does not require a
+    materialized warehouse. Output rows include ``drug_class`` carried forward
+    from ``drug_class_index`` when available.
+    """
+    groups: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for fact in facts:
+        if fact.get("resource_type") not in {"MedicationRequest", "MedicationStatement"}:
+            continue
+        key = (fact.get("display") or "").strip().lower()
+        if not key:
+            continue
+        groups[key].append(fact)
+
+    episodes: list[dict[str, Any]] = []
+    for key, items in groups.items():
+        dated = [f for f in items if f.get("date")]
+        dated.sort(key=lambda f: str(f.get("date") or ""))
+        ordered = dated if dated else items
+        first = ordered[0]
+        latest = ordered[-1]
+        latest_status = str(latest.get("status") or "")
+        is_active = latest_status in _ACTIVE_MED_STATUSES
+
+        drug_class = ""
+        for f in ordered:
+            entry = drug_class_index.get(str(f.get("fact_id") or ""))
+            if entry and entry.get("classes"):
+                drug_class = entry["classes"][0]
+                break
+
+        episodes.append(
+            {
+                "episode_id": f"med-episode::{key}",
+                "display": first.get("display"),
+                "rxnorm_code": first.get("code"),
+                "drug_class": drug_class,
+                "latest_status": latest_status,
+                "is_active": is_active,
+                "start_date": first.get("date") if dated else None,
+                "end_date": None if is_active else (latest.get("date") if dated else None),
+                "request_count": len(items),
+                "first_fact_id": first.get("fact_id"),
+                "latest_fact_id": latest.get("fact_id"),
+            }
+        )
+    episodes.sort(key=lambda e: (not e["is_active"], e.get("display") or ""))
+    return episodes
+
+
+def build_observations_latest_from_facts(facts: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """One row per (code|display) keeping the most recent Observation fact.
+
+    Mirrors ``lib/sql_on_fhir/derived.py::build_observation_latest`` shape.
+    """
+    by_key: dict[str, dict[str, Any]] = {}
+    for fact in facts:
+        if fact.get("resource_type") != "Observation":
+            continue
+        key = str(fact.get("code") or fact.get("display") or "").strip().lower()
+        if not key:
+            continue
+        existing = by_key.get(key)
+        if existing is None or str(fact.get("date") or "") > str(existing.get("date") or ""):
+            by_key[key] = fact
+
+    rows = []
+    for fact in by_key.values():
+        rows.append(
+            {
+                "fact_id": fact.get("fact_id"),
+                "loinc_code": fact.get("code"),
+                "display": fact.get("display"),
+                "value": fact.get("value"),
+                "effective_date": fact.get("date"),
+                "status": fact.get("status"),
+            }
+        )
+    rows.sort(key=lambda r: (str(r.get("loinc_code") or ""), str(r.get("display") or "")))
+    return rows
+
+
+def build_code_index(facts: list[dict[str, Any]]) -> dict[str, set[str]]:
+    """Collect codes per terminology system used by the facts in this bundle.
+
+    Today we infer system from resource type (Observation → LOINC,
+    MedicationRequest → RxNorm). Codes that exist but can't be assigned a
+    system are bucketed under ``"unknown"``.
+    """
+    index: dict[str, set[str]] = defaultdict(set)
+    for fact in facts:
+        code = fact.get("code")
+        if not code:
+            continue
+        rt = fact.get("resource_type")
+        if rt == "Observation":
+            index["http://loinc.org"].add(str(code))
+        elif rt in {"MedicationRequest", "MedicationStatement"}:
+            index["http://www.nlm.nih.gov/research/umls/rxnorm"].add(str(code))
+        elif rt == "Immunization":
+            index["http://hl7.org/fhir/sid/cvx"].add(str(code))
+        else:
+            index["unknown"].add(str(code))
+    return index
+
+
+def _load_loinc_reference() -> list[dict[str, Any]]:
+    """Load (and dedupe by code) the available LOINC reference snippets."""
+    seen: set[str] = set()
+    merged: list[dict[str, Any]] = []
+    for path in LOINC_REFERENCE_PATHS:
+        if not path.exists():
+            continue
+        try:
+            payload = read_json(path)
+        except Exception:
+            continue
+        # showcase-loinc.json is a top-level list; common-labs.json wraps under "codes".
+        entries = payload if isinstance(payload, list) else payload.get("codes", []) if isinstance(payload, dict) else []
+        for entry in entries:
+            if not isinstance(entry, dict):
+                continue
+            code = entry.get("code")
+            if not code or code in seen:
+                continue
+            seen.add(str(code))
+            merged.append(entry)
+    return merged
+
+
+def build_terminology_slices(code_index: dict[str, set[str]]) -> dict[str, dict[str, Any]]:
+    """Produce per-patient slices of reference terminology covering used codes."""
+    slices: dict[str, dict[str, Any]] = {}
+
+    loinc_used = code_index.get("http://loinc.org", set())
+    if loinc_used:
+        reference = _load_loinc_reference()
+        included = [entry for entry in reference if str(entry.get("code")) in loinc_used]
+        slices["loinc-used.json"] = {
+            "system": "http://loinc.org",
+            "version": "loinc-2.77",
+            "source_files": [rel_repo(p) for p in LOINC_REFERENCE_PATHS if p.exists()],
+            "count": len(included),
+            "codes": sorted(included, key=lambda e: str(e.get("code"))),
+            "codes_used_but_unreferenced": sorted(
+                code for code in loinc_used if not any(str(e.get("code")) == code for e in included)
+            ),
+        }
+
+    rxnorm_used = code_index.get("http://www.nlm.nih.gov/research/umls/rxnorm", set())
+    if rxnorm_used:
+        slices["rxnorm-used.json"] = {
+            "system": "http://www.nlm.nih.gov/research/umls/rxnorm",
+            "version": "rxnorm-cache-v0",
+            "source_files": [rel_repo(RXNORM_CACHE_DIR)] if RXNORM_CACHE_DIR.exists() else [],
+            "count": len(rxnorm_used),
+            "codes": [{"code": code} for code in sorted(rxnorm_used)],
+        }
+
+    cvx_used = code_index.get("http://hl7.org/fhir/sid/cvx", set())
+    if cvx_used:
+        slices["cvx-used.json"] = {
+            "system": "http://hl7.org/fhir/sid/cvx",
+            "version": "cvx-cdc-current",
+            "source_files": [],
+            "count": len(cvx_used),
+            "codes": [{"code": code} for code in sorted(cvx_used)],
+        }
+
+    return slices
+
+
+def load_patient_narratives(patient_id: str | None) -> list[dict[str, Any]]:
+    """Return Composition resources for each episode that has a current narrative.
+
+    Reads from ``data/narratives/<patient_id>/<slug>/current.json`` directly to
+    avoid forcing the export script to import ``lib.narratives.storage`` (which
+    pulls in optional generator deps). Yields ``[]`` when no narratives exist
+    for this patient (common for Guest runs).
+    """
+    if not patient_id:
+        return []
+    patient_dir = NARRATIVE_STORE_ROOT / patient_id
+    if not patient_dir.exists():
+        return []
+    out: list[dict[str, Any]] = []
+    for slug_dir in sorted(patient_dir.iterdir()):
+        if not slug_dir.is_dir():
+            continue
+        current = slug_dir / "current.json"
+        if not current.exists():
+            continue
+        try:
+            composition = read_json(current)
+        except Exception:
+            continue
+        if isinstance(composition, dict):
+            out.append({"episode_slug": slug_dir.name, "composition": composition})
+    return out
+
+
+def _filter_facts_by_type(facts: list[dict[str, Any]], rt: str) -> list[dict[str, Any]]:
+    return [f for f in facts if f.get("resource_type") == rt]
+
+
+def _is_active_med(fact: dict[str, Any]) -> bool:
+    return str(fact.get("status") or "").lower() in _ACTIVE_MED_STATUSES
+
+
+def build_packets(
+    collection: str,
+    evidence: dict[str, Any],
+    drug_class_index: dict[str, dict[str, Any]],
+    medication_episodes: list[dict[str, Any]],
+    *,
+    patient_voice: str | None = None,
+    audience: str | None = None,
+) -> dict[str, dict[str, Any]]:
+    """Build the four context packets that ship in every bundle.
+
+    Returns dict keyed on the packet filename (without the ``.context.json``
+    suffix). Each packet shares the ``atlas-context.v1`` envelope.
+    """
+    base_summary = evidence["summary"]
+    facts = evidence["facts"]
+    top_facts = sorted(
+        facts,
+        key=lambda f: (str(f.get("date") or ""), f["resource_type"], f["display"]),
+        reverse=True,
+    )[:12]
+
+    second_opinion = {
+        "packet_version": "atlas-context.v1",
+        "purpose": "second-opinion",
+        "audience": "clinician_or_agent",
+        "workspace_id": collection,
+        "instructions": [
+            "Use only facts in this packet unless explicitly asked to inspect source files.",
+            "Cite source_refs or provenance_refs for important claims.",
+            "Mention relevant missing_information and conflicts.",
+            "Do not provide unsupported medical advice.",
+        ],
+        "summary": base_summary,
+        "facts": facts[:200],
+        "provenance": evidence["provenance"][:200],
+        "missing_information": evidence["missing_information"],
+        "conflicts": evidence["conflicts"],
+    }
+
+    patient_summary = {
+        "packet_version": "atlas-context.v1",
+        "purpose": "patient-summary",
+        "audience": "patient",
+        "workspace_id": collection,
+        "instructions": [
+            "This is a plain-language overview of what was documented across the patient's sources.",
+            "Use the facts list to surface the most recent, representative entries.",
+            "Flag missing-information items so the patient knows what to follow up on.",
+            "Do not invent clinical findings that are not in the facts list.",
+            "This summary is not medical advice.",
+        ],
+        "summary": base_summary,
+        "facts": top_facts,
+        "missing_information": evidence["missing_information"],
+        "patient_voice": patient_voice or "",
+    }
+
+    clinician_handoff = {
+        "packet_version": "atlas-context.v1",
+        "purpose": "clinician-handoff",
+        "audience": "clinician",
+        "workspace_id": collection,
+        "instructions": [
+            "Use for transitions of care. Lead with the most recent representative facts.",
+            "Cite provenance_refs for every clinical claim that informs decisions.",
+            "Request raw sources from the package's `sources/` directory if you need details beyond this packet.",
+            "Surface conflicts and missing_information so the receiving clinician knows the chart's gaps.",
+        ],
+        "summary": base_summary,
+        "facts": top_facts,
+        "source_contributions": evidence["source_contributions"],
+        "missing_information": evidence["missing_information"],
+        "conflicts": evidence["conflicts"],
+    }
+
+    # Pre-op review: filter to perioperative-critical resource types and surface
+    # drug-class severity so anesthesia/surgery can scan for risk in one glance.
+    active_meds: list[dict[str, Any]] = []
+    for fact in _filter_facts_by_type(facts, "MedicationRequest") + _filter_facts_by_type(facts, "MedicationStatement"):
+        enriched = drug_class_index.get(str(fact.get("fact_id") or ""), {})
+        active_meds.append(
+            {
+                **fact,
+                "drug_classes": enriched.get("classes", []),
+                "severity_max": enriched.get("severity_max", ""),
+                "is_active": _is_active_med(fact),
+            }
+        )
+    active_meds.sort(key=lambda m: (
+        0 if m.get("severity_max") == "critical"
+        else 1 if m.get("severity_max") == "warning"
+        else 2,
+        0 if m["is_active"] else 1,
+        m.get("display") or "",
+    ))
+
+    allergies = _filter_facts_by_type(facts, "AllergyIntolerance")
+    # Recent vitals/labs: latest in observation_latest cluster
+    recent_vitals_codes = {
+        # LOINC heart rate, respiratory rate, systolic BP, diastolic BP, SpO2, weight, height, BMI
+        "8867-4", "9279-1", "8480-6", "8462-4", "59408-5", "29463-7", "8302-2", "39156-5",
+    }
+    recent_vitals = [
+        fact for fact in _filter_facts_by_type(facts, "Observation")
+        if str(fact.get("code") or "") in recent_vitals_codes
+    ][:24]
+
+    preop_review = {
+        "packet_version": "atlas-context.v1",
+        "purpose": "preop-review",
+        "audience": "anesthesia_and_surgery",
+        "workspace_id": collection,
+        "instructions": [
+            "Critical medication and allergy review for perioperative planning.",
+            "Verify all active medications and allergies before proceeding.",
+            "Pay attention to drug_classes flagged severity_max == 'critical' (anticoagulants, antiplatelets, immunosuppressants, etc.).",
+            "Request the full record if details are incomplete.",
+        ],
+        "summary": {
+            "medication_count": len(active_meds),
+            "active_medication_count": sum(1 for m in active_meds if m["is_active"]),
+            "allergy_count": len(allergies),
+            "recent_vitals_count": len(recent_vitals),
+            "medication_episodes": len(medication_episodes),
+            "active_medication_episodes": sum(1 for e in medication_episodes if e["is_active"]),
+        },
+        "medications": active_meds,
+        "medication_episodes": medication_episodes,
+        "allergies": allergies,
+        "recent_vitals": recent_vitals,
+        "missing_information": [
+            m for m in evidence["missing_information"]
+            if any(token in m.get("kind", "").lower() for token in ("medication", "allergy", "observation"))
+        ],
+    }
+
+    packets = {
+        "second-opinion": second_opinion,
+        "patient-summary": patient_summary,
+        "clinician-handoff": clinician_handoff,
+        "preop-review": preop_review,
+    }
+    if audience and audience in packets:
+        for purpose, payload in packets.items():
+            payload["primary"] = purpose == audience
+    return packets
+
+
+def build_package(collection: str, out: Path, include_originals: bool) -> Path:
+    """Backward-compatible CLI/authenticated entry point.
+
+    Builds a WorkspaceInput from the harmonize collection registry, then
+    delegates to ``build_package_from_input()``.
+    """
+    return build_package_from_input(
+        workspace_input_from_collection(collection),
+        out,
+        include_originals,
+    )
+
+
+def build_package_from_input(
+    workspace_input: WorkspaceInput,
+    out: Path,
+    include_originals: bool,
+) -> Path:
+    """Produce a portable workspace ZIP from any source (auth or guest)."""
+    collection = workspace_input.workspace_id
+    sources = workspace_input.sources
+    harmonization = workspace_input.harmonization
+    if not sources:
+        raise SystemExit(f"No packageable sources found for workspace '{collection}'")
     evidence = build_evidence(collection, sources, harmonization)
-    package_id = f"ehi-atlas-workspace-{collection}-{datetime.now().strftime('%Y%m%d')}"
+    package_id = workspace_input.package_id_override or (
+        f"ehi-atlas-workspace-{collection}-{datetime.now().strftime('%Y%m%d')}"
+    )
     out = out.resolve()
     out.parent.mkdir(parents=True, exist_ok=True)
 
@@ -718,6 +1215,27 @@ def build_package(collection: str, out: Path, include_originals: bool) -> Path:
                     record["original_packaged_path"] = f"sources/original/{orig.name}"
             source_records.append(record)
 
+        # --- Enrichments (drug classes, derived tables, terminology, narratives) ---
+        drug_class_index = build_drug_class_index(evidence["facts"])
+        medication_episodes = build_medication_episodes_from_facts(
+            evidence["facts"], drug_class_index
+        )
+        observations_latest = build_observations_latest_from_facts(evidence["facts"])
+        code_index = build_code_index(evidence["facts"])
+        terminology_slices = build_terminology_slices(code_index)
+        patient_id_for_narratives = (
+            (evidence.get("patient") or {}).get("id") if isinstance(evidence.get("patient"), dict) else None
+        )
+        narratives = load_patient_narratives(patient_id_for_narratives)
+        packets = build_packets(
+            collection,
+            evidence,
+            drug_class_index,
+            medication_episodes,
+            patient_voice=workspace_input.patient_voice,
+            audience=workspace_input.audience,
+        )
+
         manifest_files = [
             "README.md",
             "MANIFEST.json",
@@ -729,12 +1247,22 @@ def build_package(collection: str, out: Path, include_originals: bool) -> Path:
             "evidence/source-contributions.json",
             "evidence/conflicts.json",
             "evidence/missing-information.json",
+            "evidence/drug-classes.json",
+            "evidence/medication-episodes.json",
+            "evidence/observations-latest.json",
             "fhir/harmonized-bundle.json",
             "packets/second-opinion.context.json",
+            "packets/patient-summary.context.json",
+            "packets/clinician-handoff.context.json",
+            "packets/preop-review.context.json",
             "exports/clinician-handoff.md",
             "exports/labs.csv",
             "cli/atlas_workspace.py",
         ]
+        for slice_name in sorted(terminology_slices):
+            manifest_files.append(f"terminology/{slice_name}")
+        for narrative in narratives:
+            manifest_files.append(f"fhir/narratives/{narrative['episode_slug']}.json")
         manifest = {
             "package_version": "atlas-workspace.v1",
             "workspace_id": collection,
@@ -770,8 +1298,16 @@ def build_package(collection: str, out: Path, include_originals: bool) -> Path:
         python cli/atlas_workspace.py sources
         python cli/atlas_workspace.py facts --type Observation
         python cli/atlas_workspace.py missing
-        python cli/atlas_workspace.py packet second-opinion
+        python cli/atlas_workspace.py packet patient-summary
+        python cli/atlas_workspace.py packet preop-review
         ```
+
+        ## Using this package with a coding agent
+
+        Unzip this archive, `cd` into the directory, and open Claude Code (or any
+        agent that can read the local filesystem). The agent should read
+        `AGENT-INSTRUCTIONS.md` first; that file directs it to the structured
+        evidence and the context packet that matches its task.
 
         ## Privacy
 
@@ -784,12 +1320,19 @@ def build_package(collection: str, out: Path, include_originals: bool) -> Path:
 
         1. Read `MANIFEST.json` first.
         2. Prefer structured evidence in `evidence/` and `packets/` before inspecting raw/prepared source files.
-        3. Cite `source_refs` or `provenance_refs` for important clinical claims.
-        4. Use `evidence/missing-information.json` to disclose gaps.
-        5. Use `evidence/conflicts.json` to disclose unresolved or ambiguous facts.
-        6. Do not invent unsupported clinical facts.
-        7. If raw files are included, use them to verify or investigate; do not discard the structured evidence layer.
-        8. This is not medical advice. Recommend clinician review for medical decisions.
+        3. Pick the packet that matches your task before consuming raw facts:
+           - `packets/patient-summary.context.json` — plain-language patient-facing overview.
+           - `packets/clinician-handoff.context.json` — care transition / handoff use.
+           - `packets/second-opinion.context.json` — external review with full facts + provenance.
+           - `packets/preop-review.context.json` — anesthesia / surgical safety; surfaces drug-class severity.
+        4. Cite `source_refs` or `provenance_refs` for important clinical claims.
+        5. Use `evidence/missing-information.json` to disclose gaps and `evidence/conflicts.json` to disclose unresolved facts.
+        6. Consult `evidence/drug-classes.json`, `evidence/medication-episodes.json`, and `evidence/observations-latest.json` for clinically-derived summaries (active medications, drug classes, most-recent labs).
+        7. Use the per-system slices under `terminology/` to ground codes in their official displays.
+        8. If `fhir/narratives/*.json` is present, treat those Composition resources as authored narrative summaries.
+        9. Do not invent unsupported clinical facts.
+        10. If raw files are included under `sources/`, use them to verify or investigate; do not discard the structured evidence layer.
+        11. This is not medical advice. Recommend clinician review for medical decisions.
         """).lstrip())
 
         top_facts = sorted(evidence["facts"], key=lambda f: (str(f.get("date") or ""), f["resource_type"], f["display"]), reverse=True)[:12]
@@ -825,24 +1368,34 @@ def build_package(collection: str, out: Path, include_originals: bool) -> Path:
         write_json(root / "evidence" / "missing-information.json", {"missing_information": evidence["missing_information"]})
         write_json(root / "fhir" / "harmonized-bundle.json", evidence["fhir_bundle"])
 
-        packet = {
-            "packet_version": "atlas-context.v1",
-            "purpose": "second-opinion",
-            "audience": "clinician_or_agent",
-            "workspace_id": collection,
-            "instructions": [
-                "Use only facts in this packet unless explicitly asked to inspect source files.",
-                "Cite source_refs or provenance_refs for important claims.",
-                "Mention relevant missing_information and conflicts.",
-                "Do not provide unsupported medical advice.",
-            ],
-            "summary": evidence["summary"],
-            "facts": evidence["facts"][:200],
-            "provenance": evidence["provenance"][:200],
-            "missing_information": evidence["missing_information"],
-            "conflicts": evidence["conflicts"],
-        }
-        write_json(root / "packets" / "second-opinion.context.json", packet)
+        # Enrichment evidence files
+        write_json(
+            root / "evidence" / "drug-classes.json",
+            {"drug_classes": drug_class_index},
+        )
+        write_json(
+            root / "evidence" / "medication-episodes.json",
+            {"medication_episodes": medication_episodes},
+        )
+        write_json(
+            root / "evidence" / "observations-latest.json",
+            {"observations_latest": observations_latest},
+        )
+
+        # Terminology slices (per-patient subset of reference vocabularies)
+        for slice_name, slice_payload in terminology_slices.items():
+            write_json(root / "terminology" / slice_name, slice_payload)
+
+        # Per-episode FHIR Compositions (only present when authored upstream)
+        for narrative in narratives:
+            write_json(
+                root / "fhir" / "narratives" / f"{narrative['episode_slug']}.json",
+                narrative["composition"],
+            )
+
+        # Four context packets
+        for purpose, payload in packets.items():
+            write_json(root / "packets" / f"{purpose}.context.json", payload)
 
         handoff_rows = [["Type", "Date", "Fact", "Value", "Evidence"]] + [[f["resource_type"], str(f.get("date") or ""), str(f.get("display") or ""), str(f.get("value") or ""), ", ".join((f.get("provenance_refs") or f.get("source_refs") or [])[:3])] for f in top_facts]
         (root / "exports" / "clinician-handoff.md").parent.mkdir(parents=True, exist_ok=True)

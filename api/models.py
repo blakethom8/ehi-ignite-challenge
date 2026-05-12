@@ -1119,11 +1119,20 @@ class GuestHarmonizationRunResponse(BaseModel):
     outputs: list[GuestHarmonizationOutput] = Field(default_factory=list)
     status: Literal["ready", "processing", "completed", "expired", "failed"]
     disclosure: str
+    patient_voice: str | None = None
+    audience: str | None = None
 
 
 class GuestHarmonizationDeleteResponse(BaseModel):
     deleted: bool
     run_id: str
+
+
+class GuestHarmonizationContextRequest(BaseModel):
+    patient_voice: str | None = None
+    audience: Literal[
+        "patient-summary", "clinician-handoff", "second-opinion", "preop-review", ""
+    ] | None = None
 
 
 # ---------------------------------------------------------------------------

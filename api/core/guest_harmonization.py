@@ -36,10 +36,20 @@ GUEST_MAX_FILE_BYTES = max(
     int(os.getenv("GUEST_HARMONIZATION_MAX_FILE_BYTES", str(10 * 1024 * 1024))),
 )
 ALLOWED_EXTENSIONS = {".json", ".pdf", ".xml", ".txt"}
+GUEST_MAX_PDF_PAGES = max(
+    1, int(os.getenv("GUEST_HARMONIZATION_MAX_PDF_PAGES", "20"))
+)
 DISCLOSURE = (
     "Guest uploads are processed in a temporary workspace and automatically deleted. "
     "Download your output or create an account to save your workspace."
 )
+ALLOWED_AUDIENCES = {
+    "patient-summary",
+    "clinician-handoff",
+    "second-opinion",
+    "preop-review",
+}
+PATIENT_VOICE_MAX_CHARS = 4000
 
 
 class GuestRunNotFound(FileNotFoundError):
@@ -275,6 +285,39 @@ def delete_run(run_id: str) -> dict[str, Any]:
     return {"deleted": True, "run_id": run_id}
 
 
+def set_context(
+    run_id: str,
+    *,
+    patient_voice: str | None = None,
+    audience: str | None = None,
+) -> dict[str, Any]:
+    """Record patient-supplied context on the run manifest.
+
+    ``patient_voice`` is free text the user writes about their own
+    history/concerns — folded into the patient-summary packet at export
+    time. ``audience`` selects which packet purpose the user wants the
+    bundle emphasized for; downstream packagers use it to mark a
+    primary packet.
+    """
+    manifest = _read_manifest(run_id)
+    if patient_voice is not None:
+        cleaned = patient_voice.strip()
+        if len(cleaned) > PATIENT_VOICE_MAX_CHARS:
+            raise ValueError(
+                f"Patient voice is limited to {PATIENT_VOICE_MAX_CHARS} characters."
+            )
+        manifest["patient_voice"] = cleaned
+    if audience is not None:
+        audience_clean = audience.strip()
+        if audience_clean and audience_clean not in ALLOWED_AUDIENCES:
+            raise ValueError(
+                f"Audience must be one of {sorted(ALLOWED_AUDIENCES)} or empty."
+            )
+        manifest["audience"] = audience_clean
+    _write_manifest(run_id, manifest)
+    return manifest
+
+
 def process_run(run_id: str) -> dict[str, Any]:
     manifest = _read_manifest(run_id)
     manifest["status"] = "processing"
@@ -297,8 +340,28 @@ def process_run(run_id: str) -> dict[str, Any]:
         )
         rel = Path(str(uploaded["storage_path"]))
         path = _run_dir(run_id) / rel
-        if path.suffix.lower() == ".json":
+        suffix = path.suffix.lower()
+        if suffix == ".json":
             _extract_json_facts(
+                path=path,
+                uploaded=uploaded,
+                patient=patient,
+                facts=facts,
+                provenance=provenance,
+                quality_issues=quality_issues,
+            )
+        elif suffix == ".pdf":
+            _extract_pdf_facts(
+                path=path,
+                uploaded=uploaded,
+                patient=patient,
+                facts=facts,
+                provenance=provenance,
+                quality_issues=quality_issues,
+                manifest=manifest,
+            )
+        elif suffix == ".xml":
+            _extract_ccda_facts(
                 path=path,
                 uploaded=uploaded,
                 patient=patient,
@@ -313,7 +376,7 @@ def process_run(run_id: str) -> dict[str, Any]:
                     "code": "format_not_deeply_parsed",
                     "message": (
                         f"{uploaded['file_name']} is stored in the temporary workspace, "
-                        "but this MVP only extracts structured facts from FHIR JSON."
+                        "but plain-text files are not parsed for structured facts."
                     ),
                     "source_file_id": uploaded["file_id"],
                 }
@@ -351,6 +414,58 @@ def output_payload(run_id: str) -> dict[str, Any]:
     if not path.exists():
         raise GuestRunNotFound(f"Guest run output not found: {run_id}")
     return json.loads(path.read_text())
+
+
+def build_workspace_input(run_id: str):
+    """Adapter: convert a guest run into a WorkspaceInput for the packager.
+
+    Each uploaded file becomes a ``source`` record in the shape that
+    ``discover_sources()`` produces for authenticated collections. JSON files
+    have their FHIR resources pre-parsed and attached as ``resources`` so
+    ``build_evidence()`` can rebuild canonical facts using the same code path
+    as the authenticated workspace export.
+    """
+    from scripts.export_workspace_package import WorkspaceInput, source_kind_for_path
+
+    manifest = _read_manifest(run_id)
+    sources: list[dict[str, Any]] = []
+    for uploaded in manifest.get("uploaded_files", []):
+        rel = Path(str(uploaded.get("storage_path", "")))
+        path = _run_dir(run_id) / rel
+        if not path.exists():
+            continue
+
+        resources: list[dict[str, Any]] = []
+        if path.suffix.lower() == ".json":
+            try:
+                payload = json.loads(path.read_text())
+            except (OSError, json.JSONDecodeError):
+                payload = None
+            if payload is not None:
+                resources = _resources_from_payload(payload)
+
+        kind = source_kind_for_path(path)
+        sources.append(
+            {
+                "source_id": uploaded["file_id"],
+                "label": uploaded.get("file_name") or uploaded["file_id"],
+                "kind": kind,
+                "path": path,
+                "original_path": path if path.suffix.lower() != ".json" else None,
+                "resources": resources,
+                "demo_source": False,
+            }
+        )
+
+    workspace_id = f"guest-{run_id[len('guest_'):][:12]}" if run_id.startswith("guest_") else run_id
+    return WorkspaceInput(
+        workspace_id=workspace_id,
+        sources=sources,
+        harmonization=None,
+        package_id_override=f"ehi-atlas-workspace-{workspace_id}-{utc_now().strftime('%Y%m%d')}",
+        patient_voice=manifest.get("patient_voice") or None,
+        audience=manifest.get("audience") or None,
+    )
 
 
 def _extract_json_facts(
@@ -402,6 +517,234 @@ def _extract_json_facts(
                 "source_resource_type": resource.get("resourceType"),
                 "source_resource_id": resource.get("id"),
                 "method": "guest_fhir_json_mvp",
+            }
+        )
+
+
+def _resources_from_bundle(bundle: dict[str, Any]) -> list[dict[str, Any]]:
+    """Pull resource dicts out of a FHIR Bundle (or a single resource)."""
+    if not isinstance(bundle, dict):
+        return []
+    if bundle.get("resourceType") == "Bundle":
+        resources = []
+        for entry in bundle.get("entry") or []:
+            if isinstance(entry, dict) and isinstance(entry.get("resource"), dict):
+                resources.append(entry["resource"])
+        return resources
+    if isinstance(bundle.get("resourceType"), str):
+        return [bundle]
+    return []
+
+
+def _extract_facts_from_resources(
+    resources: list[dict[str, Any]],
+    *,
+    uploaded: dict[str, Any],
+    patient: dict[str, Any],
+    facts: list[dict[str, Any]],
+    provenance: list[dict[str, Any]],
+    method: str,
+) -> int:
+    """Walk a list of FHIR resources, appending fact + provenance entries.
+
+    Returns the number of fact rows added so callers can flag low-yield
+    extractions.
+    """
+    added = 0
+    for resource in resources:
+        if resource.get("resourceType") == "Patient" and not patient:
+            patient.update(_patient_summary(resource))
+            continue
+        fact = _fact_from_resource(resource, uploaded["file_id"])
+        if fact is None:
+            continue
+        facts.append(fact)
+        provenance.append(
+            {
+                "target_fact_id": fact["fact_id"],
+                "source_file_id": uploaded["file_id"],
+                "source_resource_type": resource.get("resourceType"),
+                "source_resource_id": resource.get("id"),
+                "method": method,
+            }
+        )
+        added += 1
+    return added
+
+
+def _extract_pdf_facts(
+    *,
+    path: Path,
+    uploaded: dict[str, Any],
+    patient: dict[str, Any],
+    facts: list[dict[str, Any]],
+    provenance: list[dict[str, Any]],
+    quality_issues: list[dict[str, Any]],
+    manifest: dict[str, Any],
+) -> None:
+    """Extract FHIR facts from a PDF using the deterministic text-first pipeline.
+
+    Anonymous Guest tier: ``PdfPlumberLabTextPipeline`` (no LLM, free, ~100ms).
+    Surfaces lab Observations only. Rate-limited by total PDF pages per run
+    (``GUEST_HARMONIZATION_MAX_PDF_PAGES``, default 20) to bound Guest cost.
+    """
+    pages_consumed_already = int(manifest.get("pdf_pages_processed", 0) or 0)
+    try:
+        from lib.extract.pipelines.text_first import (
+            PdfPlumberLabTextPipeline,
+            extract_pdf_text_pages,
+        )
+    except Exception as exc:  # pragma: no cover — defensive against missing extras
+        quality_issues.append(
+            {
+                "severity": "high",
+                "code": "pdf_pipeline_unavailable",
+                "message": f"PDF extraction not available in this environment: {exc}",
+                "source_file_id": uploaded["file_id"],
+            }
+        )
+        return
+
+    try:
+        pages = extract_pdf_text_pages(path)
+    except Exception as exc:
+        quality_issues.append(
+            {
+                "severity": "high",
+                "code": "pdf_unreadable",
+                "message": f"Could not read PDF text layer: {exc}",
+                "source_file_id": uploaded["file_id"],
+            }
+        )
+        return
+
+    if pages_consumed_already + len(pages) > GUEST_MAX_PDF_PAGES:
+        quality_issues.append(
+            {
+                "severity": "medium",
+                "code": "pdf_page_limit_exceeded",
+                "message": (
+                    f"PDF has {len(pages)} pages but only {GUEST_MAX_PDF_PAGES - pages_consumed_already} "
+                    f"pages remain in this Guest workspace's quota. Create an account for the full pipeline."
+                ),
+                "source_file_id": uploaded["file_id"],
+            }
+        )
+        return
+
+    pipeline = PdfPlumberLabTextPipeline(patient_id=f"guest_{uploaded['file_id'][:8]}")
+    try:
+        bundle = pipeline.extract(path)
+    except Exception as exc:
+        quality_issues.append(
+            {
+                "severity": "high",
+                "code": "pdf_extraction_failed",
+                "message": f"PDF extraction failed: {str(exc)[:280]}",
+                "source_file_id": uploaded["file_id"],
+            }
+        )
+        return
+
+    manifest["pdf_pages_processed"] = pages_consumed_already + len(pages)
+    resources = _resources_from_bundle(bundle)
+    added = _extract_facts_from_resources(
+        resources,
+        uploaded=uploaded,
+        patient=patient,
+        facts=facts,
+        provenance=provenance,
+        method="guest_pdf_text_first_v1",
+    )
+    if added == 0:
+        quality_issues.append(
+            {
+                "severity": "low",
+                "code": "pdf_low_yield",
+                "message": (
+                    f"{uploaded['file_name']} parsed but no structured lab rows were "
+                    "recognized. Scanned PDFs or non-tabular reports need the authenticated "
+                    "vision pipeline."
+                ),
+                "source_file_id": uploaded["file_id"],
+            }
+        )
+
+
+def _extract_ccda_facts(
+    *,
+    path: Path,
+    uploaded: dict[str, Any],
+    patient: dict[str, Any],
+    facts: list[dict[str, Any]],
+    provenance: list[dict[str, Any]],
+    quality_issues: list[dict[str, Any]],
+) -> None:
+    """Extract FHIR facts from a C-CDA XML using the deterministic fallback parser.
+
+    The Microsoft FHIR Converter path is not used for Guests; only the
+    no-dependency fallback in ``api.core.ccda``. Today this fallback covers
+    Patient + Conditions + Medications.
+    """
+    try:
+        from api.core.ccda import convert_ccda_to_fhir_bundle, is_ccda_xml
+    except Exception as exc:  # pragma: no cover
+        quality_issues.append(
+            {
+                "severity": "high",
+                "code": "ccda_pipeline_unavailable",
+                "message": f"C-CDA parser not available in this environment: {exc}",
+                "source_file_id": uploaded["file_id"],
+            }
+        )
+        return
+
+    if not is_ccda_xml(path):
+        quality_issues.append(
+            {
+                "severity": "medium",
+                "code": "xml_not_ccda",
+                "message": (
+                    f"{uploaded['file_name']} is XML but does not look like a C-CDA "
+                    "ClinicalDocument; no facts extracted."
+                ),
+                "source_file_id": uploaded["file_id"],
+            }
+        )
+        return
+
+    try:
+        bundle = convert_ccda_to_fhir_bundle(str(path), uploaded["file_id"], mode="fallback")
+    except Exception as exc:
+        quality_issues.append(
+            {
+                "severity": "high",
+                "code": "ccda_extraction_failed",
+                "message": f"C-CDA parse failed: {str(exc)[:280]}",
+                "source_file_id": uploaded["file_id"],
+            }
+        )
+        return
+
+    resources = _resources_from_bundle(bundle)
+    added = _extract_facts_from_resources(
+        resources,
+        uploaded=uploaded,
+        patient=patient,
+        facts=facts,
+        provenance=provenance,
+        method="guest_ccda_fallback_v1",
+    )
+    if added == 0:
+        quality_issues.append(
+            {
+                "severity": "low",
+                "code": "ccda_low_yield",
+                "message": (
+                    f"{uploaded['file_name']} parsed but no Conditions or Medications were "
+                    "recognized by the fallback parser."
+                ),
+                "source_file_id": uploaded["file_id"],
             }
         )
 

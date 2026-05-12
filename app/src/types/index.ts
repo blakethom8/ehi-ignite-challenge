@@ -1222,6 +1222,12 @@ export interface GuestHarmonizationOutput {
   storage_path: string;
 }
 
+export type GuestHarmonizationAudience =
+  | "patient-summary"
+  | "clinician-handoff"
+  | "second-opinion"
+  | "preop-review";
+
 export interface GuestHarmonizationRunResponse {
   run_id: string;
   mode: "guest";
@@ -1231,6 +1237,13 @@ export interface GuestHarmonizationRunResponse {
   outputs: GuestHarmonizationOutput[];
   status: "ready" | "processing" | "completed" | "expired" | "failed";
   disclosure: string;
+  patient_voice?: string | null;
+  audience?: GuestHarmonizationAudience | "" | null;
+}
+
+export interface GuestHarmonizationContextRequest {
+  patient_voice?: string | null;
+  audience?: GuestHarmonizationAudience | "" | null;
 }
 
 export interface GuestHarmonizationDeleteResponse {

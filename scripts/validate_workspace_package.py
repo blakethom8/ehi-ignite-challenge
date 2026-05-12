@@ -19,7 +19,13 @@ REQUIRED = [
     "evidence/source-contributions.json",
     "evidence/conflicts.json",
     "evidence/missing-information.json",
+    "evidence/drug-classes.json",
+    "evidence/medication-episodes.json",
+    "evidence/observations-latest.json",
     "packets/second-opinion.context.json",
+    "packets/patient-summary.context.json",
+    "packets/clinician-handoff.context.json",
+    "packets/preop-review.context.json",
     "exports/clinician-handoff.md",
     "cli/atlas_workspace.py",
 ]

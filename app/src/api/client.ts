@@ -68,6 +68,7 @@ import type {
   AdminUserDetail,
   AdminUserSummary,
   CanonicalPatientSummary,
+  GuestHarmonizationContextRequest,
   GuestHarmonizationDeleteResponse,
   GuestHarmonizationOutputPackage,
   GuestHarmonizationRunResponse,
@@ -387,6 +388,24 @@ export const api = {
 
   getGuestHarmonizationOutput: (runId: string): Promise<GuestHarmonizationOutputPackage> =>
     http.get<GuestHarmonizationOutputPackage>(`/guest-harmonization/runs/${encodeURIComponent(runId)}/output`).then((r) => r.data),
+
+  exportGuestHarmonizationBundle: (runId: string): Promise<Blob> =>
+    http
+      .get<Blob>(`/guest-harmonization/runs/${encodeURIComponent(runId)}/export-workspace`, {
+        responseType: "blob",
+      })
+      .then((r) => r.data),
+
+  setGuestHarmonizationContext: (
+    runId: string,
+    payload: GuestHarmonizationContextRequest,
+  ): Promise<GuestHarmonizationRunResponse> =>
+    http
+      .post<GuestHarmonizationRunResponse>(
+        `/guest-harmonization/runs/${encodeURIComponent(runId)}/context`,
+        payload,
+      )
+      .then((r) => r.data),
 
   deleteGuestHarmonizationRun: (runId: string): Promise<GuestHarmonizationDeleteResponse> =>
     http.delete<GuestHarmonizationDeleteResponse>(`/guest-harmonization/runs/${encodeURIComponent(runId)}`).then((r) => r.data),

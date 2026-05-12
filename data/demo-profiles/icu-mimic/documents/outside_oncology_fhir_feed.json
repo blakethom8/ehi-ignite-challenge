@@ -1,0 +1,1869 @@
+{
+  "resourceType": "Bundle",
+  "id": "8f7d2c3a-9b1e-4f6a-a2d8-5e3c9b8f1a7d",
+  "type": "collection",
+  "meta": {
+    "source": "https://dana-farber.example/fhir",
+    "lastUpdated": "2150-07-15T14:32:18-04:00"
+  },
+  "timestamp": "2150-07-15T14:32:18-04:00",
+  "entry": [
+    {
+      "fullUrl": "urn:uuid:a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "resource": {
+        "resourceType": "Patient",
+        "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        "identifier": [
+          {
+            "system": "https://dana-farber.example/mrn",
+            "value": "DF-2086-7742",
+            "type": {
+              "coding": [
+                {
+                  "system": "http://terminology.hl7.org/CodeSystem/v2-0203",
+                  "code": "MR",
+                  "display": "Medical Record Number"
+                }
+              ]
+            }
+          },
+          {
+            "system": "http://hl7.org/fhir/sid/us-ssn",
+            "value": "999-62-8642"
+          }
+        ],
+        "name": [
+          {
+            "family": "Patient",
+            "given": ["Anonymous"],
+            "use": "official"
+          }
+        ],
+        "gender": "male",
+        "birthDate": "2086-10-08",
+        "address": [
+          {
+            "line": ["123 Main Street"],
+            "city": "Boston",
+            "state": "MA",
+            "postalCode": "02115",
+            "country": "US"
+          }
+        ],
+        "telecom": [
+          {
+            "system": "phone",
+            "value": "617-555-0198",
+            "use": "home"
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:b2c3d4e5-f6a7-8901-bcde-f12345678901",
+      "resource": {
+        "resourceType": "Practitioner",
+        "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+        "identifier": [
+          {
+            "system": "http://hl7.org/fhir/sid/us-npi",
+            "value": "1982746538"
+          }
+        ],
+        "name": [
+          {
+            "family": "Chen",
+            "given": ["Jennifer", "L"],
+            "prefix": ["Dr."],
+            "suffix": ["MD"]
+          }
+        ],
+        "qualification": [
+          {
+            "code": {
+              "coding": [
+                {
+                  "system": "http://terminology.hl7.org/CodeSystem/v2-0360",
+                  "code": "MD",
+                  "display": "Doctor of Medicine"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:c3d4e5f6-a7b8-9012-cdef-123456789012",
+      "resource": {
+        "resourceType": "Practitioner",
+        "id": "c3d4e5f6-a7b8-9012-cdef-123456789012",
+        "identifier": [
+          {
+            "system": "http://hl7.org/fhir/sid/us-npi",
+            "value": "1437298564"
+          }
+        ],
+        "name": [
+          {
+            "family": "Rodriguez",
+            "given": ["Maria", "T"],
+            "prefix": ["Dr."],
+            "suffix": ["MD", "PhD"]
+          }
+        ],
+        "qualification": [
+          {
+            "code": {
+              "coding": [
+                {
+                  "system": "http://terminology.hl7.org/CodeSystem/v2-0360",
+                  "code": "MD",
+                  "display": "Doctor of Medicine"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:d4e5f6a7-b8c9-0123-def0-234567890123",
+      "resource": {
+        "resourceType": "Organization",
+        "id": "d4e5f6a7-b8c9-0123-def0-234567890123",
+        "identifier": [
+          {
+            "system": "http://hl7.org/fhir/sid/us-npi",
+            "value": "1538492746"
+          }
+        ],
+        "name": "Dana-Farber Cancer Institute",
+        "telecom": [
+          {
+            "system": "phone",
+            "value": "617-632-3000"
+          }
+        ],
+        "address": [
+          {
+            "line": ["450 Brookline Avenue"],
+            "city": "Boston",
+            "state": "MA",
+            "postalCode": "02215",
+            "country": "US"
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:e5f6a7b8-c9d0-1234-ef01-345678901234",
+      "resource": {
+        "resourceType": "Encounter",
+        "id": "e5f6a7b8-c9d0-1234-ef01-345678901234",
+        "status": "finished",
+        "class": {
+          "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+          "code": "AMB",
+          "display": "ambulatory"
+        },
+        "type": [
+          {
+            "coding": [
+              {
+                "system": "http://snomed.info/sct",
+                "code": "185347001",
+                "display": "Encounter for problem"
+              }
+            ]
+          }
+        ],
+        "subject": {
+          "reference": "urn:uuid:a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        },
+        "participant": [
+          {
+            "individual": {
+              "reference": "urn:uuid:b2c3d4e5-f6a7-8901-bcde-f12345678901"
+            }
+          }
+        ],
+        "period": {
+          "start": "2150-06-18T09:30:00-04:00",
+          "end": "2150-06-18T10:45:00-04:00"
+        },
+        "serviceProvider": {
+          "reference": "urn:uuid:d4e5f6a7-b8c9-0123-def0-234567890123"
+        },
+        "reasonCode": [
+          {
+            "coding": [
+              {
+                "system": "http://snomed.info/sct",
+                "code": "92814006",
+                "display": "Chronic lymphocytic leukemia"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:f6a7b8c9-d0e1-2345-f012-456789012345",
+      "resource": {
+        "resourceType": "Encounter",
+        "id": "f6a7b8c9-d0e1-2345-f012-456789012345",
+        "status": "finished",
+        "class": {
+          "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+          "code": "AMB",
+          "display": "ambulatory"
+        },
+        "type": [
+          {
+            "coding": [
+              {
+                "system": "http://snomed.info/sct",
+                "code": "185347001",
+                "display": "Encounter for problem"
+              }
+            ]
+          }
+        ],
+        "subject": {
+          "reference": "urn:uuid:a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        },
+        "participant": [
+          {
+            "individual": {
+              "reference": "urn:uuid:b2c3d4e5-f6a7-8901-bcde-f12345678901"
+            }
+          }
+        ],
+        "period": {
+          "start": "2150-03-14T14:00:00-04:00",
+          "end": "2150-03-14T15:15:00-04:00"
+        },
+        "serviceProvider": {
+          "reference": "urn:uuid:d4e5f6a7-b8c9-0123-def0-234567890123"
+        },
+        "reasonCode": [
+          {
+            "coding": [
+              {
+                "system": "http://snomed.info/sct",
+                "code": "92814006",
+                "display": "Chronic lymphocytic leukemia"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:a7b8c9d0-e1f2-3456-0123-567890123456",
+      "resource": {
+        "resourceType": "Encounter",
+        "id": "a7b8c9d0-e1f2-3456-0123-567890123456",
+        "status": "finished",
+        "class": {
+          "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+          "code": "AMB",
+          "display": "ambulatory"
+        },
+        "type": [
+          {
+            "coding": [
+              {
+                "system": "http://snomed.info/sct",
+                "code": "185347001",
+                "display": "Encounter for problem"
+              }
+            ]
+          }
+        ],
+        "subject": {
+          "reference": "urn:uuid:a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        },
+        "participant": [
+          {
+            "individual": {
+              "reference": "urn:uuid:c3d4e5f6-a7b8-9012-cdef-123456789012"
+            }
+          }
+        ],
+        "period": {
+          "start": "2149-12-08T10:00:00-05:00",
+          "end": "2149-12-08T11:30:00-05:00"
+        },
+        "serviceProvider": {
+          "reference": "urn:uuid:d4e5f6a7-b8c9-0123-def0-234567890123"
+        },
+        "reasonCode": [
+          {
+            "coding": [
+              {
+                "system": "http://snomed.info/sct",
+                "code": "92814006",
+                "display": "Chronic lymphocytic leukemia"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:b8c9d0e1-f2a3-4567-1234-678901234567",
+      "resource": {
+        "resourceType": "Encounter",
+        "id": "b8c9d0e1-f2a3-4567-1234-678901234567",
+        "status": "finished",
+        "class": {
+          "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+          "code": "AMB",
+          "display": "ambulatory"
+        },
+        "type": [
+          {
+            "coding": [
+              {
+                "system": "http://snomed.info/sct",
+                "code": "185349003",
+                "display": "Encounter for check up"
+              }
+            ]
+          }
+        ],
+        "subject": {
+          "reference": "urn:uuid:a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        },
+        "participant": [
+          {
+            "individual": {
+              "reference": "urn:uuid:b2c3d4e5-f6a7-8901-bcde-f12345678901"
+            }
+          }
+        ],
+        "period": {
+          "start": "2149-09-22T13:30:00-04:00",
+          "end": "2149-09-22T14:30:00-04:00"
+        },
+        "serviceProvider": {
+          "reference": "urn:uuid:d4e5f6a7-b8c9-0123-def0-234567890123"
+        },
+        "reasonCode": [
+          {
+            "coding": [
+              {
+                "system": "http://snomed.info/sct",
+                "code": "92814006",
+                "display": "Chronic lymphocytic leukemia"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:c9d0e1f2-a3b4-5678-2345-789012345678",
+      "resource": {
+        "resourceType": "Condition",
+        "id": "c9d0e1f2-a3b4-5678-2345-789012345678",
+        "clinicalStatus": {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/condition-clinical",
+              "code": "remission",
+              "display": "Remission"
+            }
+          ]
+        },
+        "verificationStatus": {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/condition-ver-status",
+              "code": "confirmed",
+              "display": "Confirmed"
+            }
+          ]
+        },
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/condition-category",
+                "code": "problem-list-item",
+                "display": "Problem List Item"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "http://snomed.info/sct",
+              "code": "92814006",
+              "display": "Chronic lymphocytic leukemia"
+            }
+          ],
+          "text": "Chronic lymphocytic leukemia, B-cell type"
+        },
+        "subject": {
+          "reference": "urn:uuid:a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        },
+        "onsetDateTime": "2147-11-15",
+        "recordedDate": "2147-11-22T10:15:00-05:00",
+        "recorder": {
+          "reference": "urn:uuid:c3d4e5f6-a7b8-9012-cdef-123456789012"
+        },
+        "asserter": {
+          "reference": "urn:uuid:c3d4e5f6-a7b8-9012-cdef-123456789012"
+        },
+        "stage": [
+          {
+            "summary": {
+              "coding": [
+                {
+                  "system": "http://snomed.info/sct",
+                  "code": "60333009",
+                  "display": "Rai stage I"
+                }
+              ]
+            },
+            "assessment": [
+              {
+                "reference": "urn:uuid:d0e1f2a3-b4c5-6789-3456-890123456789"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:d0e1f2a3-b4c5-6789-3456-890123456789",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "d0e1f2a3-b4c5-6789-3456-890123456789",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "laboratory",
+                "display": "Laboratory"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "6690-2",
+              "display": "Leukocytes [#/volume] in Blood by Automated count"
+            }
+          ],
+          "text": "White blood cell count"
+        },
+        "subject": {
+          "reference": "urn:uuid:a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        },
+        "effectiveDateTime": "2150-06-18T09:45:00-04:00",
+        "issued": "2150-06-18T11:20:00-04:00",
+        "performer": [
+          {
+            "reference": "urn:uuid:d4e5f6a7-b8c9-0123-def0-234567890123"
+          }
+        ],
+        "valueQuantity": {
+          "value": 8.2,
+          "unit": "10*3/uL",
+          "system": "http://unitsofmeasure.org",
+          "code": "10*3/uL"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 4.5,
+              "unit": "10*3/uL",
+              "system": "http://unitsofmeasure.org",
+              "code": "10*3/uL"
+            },
+            "high": {
+              "value": 11.0,
+              "unit": "10*3/uL",
+              "system": "http://unitsofmeasure.org",
+              "code": "10*3/uL"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:e1f2a3b4-c5d6-7890-4567-901234567890",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "e1f2a3b4-c5d6-7890-4567-901234567890",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "laboratory",
+                "display": "Laboratory"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "731-0",
+              "display": "Lymphocytes [#/volume] in Blood by Automated count"
+            }
+          ],
+          "text": "Absolute lymphocyte count"
+        },
+        "subject": {
+          "reference": "urn:uuid:a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        },
+        "effectiveDateTime": "2150-06-18T09:45:00-04:00",
+        "issued": "2150-06-18T11:20:00-04:00",
+        "performer": [
+          {
+            "reference": "urn:uuid:d4e5f6a7-b8c9-0123-def0-234567890123"
+          }
+        ],
+        "valueQuantity": {
+          "value": 3.8,
+          "unit": "10*3/uL",
+          "system": "http://unitsofmeasure.org",
+          "code": "10*3/uL"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 1.0,
+              "unit": "10*3/uL",
+              "system": "http://unitsofmeasure.org",
+              "code": "10*3/uL"
+            },
+            "high": {
+              "value": 4.0,
+              "unit": "10*3/uL",
+              "system": "http://unitsofmeasure.org",
+              "code": "10*3/uL"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:f2a3b4c5-d6e7-8901-5678-012345678901",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "f2a3b4c5-d6e7-8901-5678-012345678901",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "laboratory",
+                "display": "Laboratory"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7",
+              "display": "Hemoglobin [Mass/volume] in Blood"
+            }
+          ],
+          "text": "Hemoglobin"
+        },
+        "subject": {
+          "reference": "urn:uuid:a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        },
+        "effectiveDateTime": "2150-06-18T09:45:00-04:00",
+        "issued": "2150-06-18T11:20:00-04:00",
+        "performer": [
+          {
+            "reference": "urn:uuid:d4e5f6a7-b8c9-0123-def0-234567890123"
+          }
+        ],
+        "valueQuantity": {
+          "value": 13.2,
+          "unit": "g/dL",
+          "system": "http://unitsofmeasure.org",
+          "code": "g/dL"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 13.5,
+              "unit": "g/dL",
+              "system": "http://unitsofmeasure.org",
+              "code": "g/dL"
+            },
+            "high": {
+              "value": 17.5,
+              "unit": "g/dL",
+              "system": "http://unitsofmeasure.org",
+              "code": "g/dL"
+            }
+          }
+        ],
+        "interpretation": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/v3-ObservationInterpretation",
+                "code": "L",
+                "display": "Low"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:a3b4c5d6-e7f8-9012-6789-123456789012",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "a3b4c5d6-e7f8-9012-6789-123456789012",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "laboratory",
+                "display": "Laboratory"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "777-3",
+              "display": "Platelets [#/volume] in Blood by Automated count"
+            }
+          ],
+          "text": "Platelet count"
+        },
+        "subject": {
+          "reference": "urn:uuid:a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        },
+        "effectiveDateTime": "2150-06-18T09:45:00-04:00",
+        "issued": "2150-06-18T11:20:00-04:00",
+        "performer": [
+          {
+            "reference": "urn:uuid:d4e5f6a7-b8c9-0123-def0-234567890123"
+          }
+        ],
+        "valueQuantity": {
+          "value": 142,
+          "unit": "10*3/uL",
+          "system": "http://unitsofmeasure.org",
+          "code": "10*3/uL"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 150,
+              "unit": "10*3/uL",
+              "system": "http://unitsofmeasure.org",
+              "code": "10*3/uL"
+            },
+            "high": {
+              "value": 400,
+              "unit": "10*3/uL",
+              "system": "http://unitsofmeasure.org",
+              "code": "10*3/uL"
+            }
+          }
+        ],
+        "interpretation": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/v3-ObservationInterpretation",
+                "code": "L",
+                "display": "Low"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:b4c5d6e7-f8a9-0123-7890-234567890123",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "b4c5d6e7-f8a9-0123-7890-234567890123",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "laboratory",
+                "display": "Laboratory"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "6690-2",
+              "display": "Leukocytes [#/volume] in Blood by Automated count"
+            }
+          ],
+          "text": "White blood cell count"
+        },
+        "subject": {
+          "reference": "urn:uuid:a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        },
+        "effectiveDateTime": "2150-03-14T14:15:00-04:00",
+        "issued": "2150-03-14T16:45:00-04:00",
+        "performer": [
+          {
+            "reference": "urn:uuid:d4e5f6a7-b8c9-0123-def0-234567890123"
+          }
+        ],
+        "valueQuantity": {
+          "value": 12.8,
+          "unit": "10*3/uL",
+          "system": "http://unitsofmeasure.org",
+          "code": "10*3/uL"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 4.5,
+              "unit": "10*3/uL",
+              "system": "http://unitsofmeasure.org",
+              "code": "10*3/uL"
+            },
+            "high": {
+              "value": 11.0,
+              "unit": "10*3/uL",
+              "system": "http://unitsofmeasure.org",
+              "code": "10*3/uL"
+            }
+          }
+        ],
+        "interpretation": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/v3-ObservationInterpretation",
+                "code": "H",
+                "display": "High"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:c5d6e7f8-a9b0-1234-8901-345678901234",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "c5d6e7f8-a9b0-1234-8901-345678901234",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "laboratory",
+                "display": "Laboratory"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "731-0",
+              "display": "Lymphocytes [#/volume] in Blood by Automated count"
+            }
+          ],
+          "text": "Absolute lymphocyte count"
+        },
+        "subject": {
+          "reference": "urn:uuid:a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        },
+        "effectiveDateTime": "2150-03-14T14:15:00-04:00",
+        "issued": "2150-03-14T16:45:00-04:00",
+        "performer": [
+          {
+            "reference": "urn:uuid:d4e5f6a7-b8c9-0123-def0-234567890123"
+          }
+        ],
+        "valueQuantity": {
+          "value": 6.4,
+          "unit": "10*3/uL",
+          "system": "http://unitsofmeasure.org",
+          "code": "10*3/uL"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 1.0,
+              "unit": "10*3/uL",
+              "system": "http://unitsofmeasure.org",
+              "code": "10*3/uL"
+            },
+            "high": {
+              "value": 4.0,
+              "unit": "10*3/uL",
+              "system": "http://unitsofmeasure.org",
+              "code": "10*3/uL"
+            }
+          }
+        ],
+        "interpretation": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/v3-ObservationInterpretation",
+                "code": "H",
+                "display": "High"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:d6e7f8a9-b0c1-2345-9012-456789012345",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "d6e7f8a9-b0c1-2345-9012-456789012345",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "laboratory",
+                "display": "Laboratory"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7",
+              "display": "Hemoglobin [Mass/volume] in Blood"
+            }
+          ],
+          "text": "Hemoglobin"
+        },
+        "subject": {
+          "reference": "urn:uuid:a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        },
+        "effectiveDateTime": "2150-03-14T14:15:00-04:00",
+        "issued": "2150-03-14T16:45:00-04:00",
+        "performer": [
+          {
+            "reference": "urn:uuid:d4e5f6a7-b8c9-0123-def0-234567890123"
+          }
+        ],
+        "valueQuantity": {
+          "value": 12.9,
+          "unit": "g/dL",
+          "system": "http://unitsofmeasure.org",
+          "code": "g/dL"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 13.5,
+              "unit": "g/dL",
+              "system": "http://unitsofmeasure.org",
+              "code": "g/dL"
+            },
+            "high": {
+              "value": 17.5,
+              "unit": "g/dL",
+              "system": "http://unitsofmeasure.org",
+              "code": "g/dL"
+            }
+          }
+        ],
+        "interpretation": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/v3-ObservationInterpretation",
+                "code": "L",
+                "display": "Low"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:e7f8a9b0-c1d2-3456-0123-567890123456",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "e7f8a9b0-c1d2-3456-0123-567890123456",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "laboratory",
+                "display": "Laboratory"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "777-3",
+              "display": "Platelets [#/volume] in Blood by Automated count"
+            }
+          ],
+          "text": "Platelet count"
+        },
+        "subject": {
+          "reference": "urn:uuid:a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        },
+        "effectiveDateTime": "2150-03-14T14:15:00-04:00",
+        "issued": "2150-03-14T16:45:00-04:00",
+        "performer": [
+          {
+            "reference": "urn:uuid:d4e5f6a7-b8c9-0123-def0-234567890123"
+          }
+        ],
+        "valueQuantity": {
+          "value": 138,
+          "unit": "10*3/uL",
+          "system": "http://unitsofmeasure.org",
+          "code": "10*3/uL"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 150,
+              "unit": "10*3/uL",
+              "system": "http://unitsofmeasure.org",
+              "code": "10*3/uL"
+            },
+            "high": {
+              "value": 400,
+              "unit": "10*3/uL",
+              "system": "http://unitsofmeasure.org",
+              "code": "10*3/uL"
+            }
+          }
+        ],
+        "interpretation": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/v3-ObservationInterpretation",
+                "code": "L",
+                "display": "Low"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:f8a9b0c1-d2e3-4567-1234-678901234567",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "f8a9b0c1-d2e3-4567-1234-678901234567",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "laboratory",
+                "display": "Laboratory"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "2532-0",
+              "display": "Lactate dehydrogenase [Enzymatic activity/volume] in Serum or Plasma"
+            }
+          ],
+          "text": "Lactate dehydrogenase"
+        },
+        "subject": {
+          "reference": "urn:uuid:a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        },
+        "effectiveDateTime": "2150-03-14T14:15:00-04:00",
+        "issued": "2150-03-14T16:45:00-04:00",
+        "performer": [
+          {
+            "reference": "urn:uuid:d4e5f6a7-b8c9-0123-def0-234567890123"
+          }
+        ],
+        "valueQuantity": {
+          "value": 198,
+          "unit": "U/L",
+          "system": "http://unitsofmeasure.org",
+          "code": "U/L"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 120,
+              "unit": "U/L",
+              "system": "http://unitsofmeasure.org",
+              "code": "U/L"
+            },
+            "high": {
+              "value": 246,
+              "unit": "U/L",
+              "system": "http://unitsofmeasure.org",
+              "code": "U/L"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:a9b0c1d2-e3f4-5678-2345-789012345678",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "a9b0c1d2-e3f4-5678-2345-789012345678",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "laboratory",
+                "display": "Laboratory"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "6690-2",
+              "display": "Leukocytes [#/volume] in Blood by Automated count"
+            }
+          ],
+          "text": "White blood cell count"
+        },
+        "subject": {
+          "reference": "urn:uuid:a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        },
+        "effectiveDateTime": "2149-12-08T10:30:00-05:00",
+        "issued": "2149-12-08T12:15:00-05:00",
+        "performer": [
+          {
+            "reference": "urn:uuid:d4e5f6a7-b8c9-0123-def0-234567890123"
+          }
+        ],
+        "valueQuantity": {
+          "value": 18.6,
+          "unit": "10*3/uL",
+          "system": "http://unitsofmeasure.org",
+          "code": "10*3/uL"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 4.5,
+              "unit": "10*3/uL",
+              "system": "http://unitsofmeasure.org",
+              "code": "10*3/uL"
+            },
+            "high": {
+              "value": 11.0,
+              "unit": "10*3/uL",
+              "system": "http://unitsofmeasure.org",
+              "code": "10*3/uL"
+            }
+          }
+        ],
+        "interpretation": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/v3-ObservationInterpretation",
+                "code": "H",
+                "display": "High"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:b0c1d2e3-f4a5-6789-3456-890123456789",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "b0c1d2e3-f4a5-6789-3456-890123456789",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "laboratory",
+                "display": "Laboratory"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "731-0",
+              "display": "Lymphocytes [#/volume] in Blood by Automated count"
+            }
+          ],
+          "text": "Absolute lymphocyte count"
+        },
+        "subject": {
+          "reference": "urn:uuid:a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        },
+        "effectiveDateTime": "2149-12-08T10:30:00-05:00",
+        "issued": "2149-12-08T12:15:00-05:00",
+        "performer": [
+          {
+            "reference": "urn:uuid:d4e5f6a7-b8c9-0123-def0-234567890123"
+          }
+        ],
+        "valueQuantity": {
+          "value": 11.2,
+          "unit": "10*3/uL",
+          "system": "http://unitsofmeasure.org",
+          "code": "10*3/uL"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 1.0,
+              "unit": "10*3/uL",
+              "system": "http://unitsofmeasure.org",
+              "code": "10*3/uL"
+            },
+            "high": {
+              "value": 4.0,
+              "unit": "10*3/uL",
+              "system": "http://unitsofmeasure.org",
+              "code": "10*3/uL"
+            }
+          }
+        ],
+        "interpretation": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/v3-ObservationInterpretation",
+                "code": "H",
+                "display": "High"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:c1d2e3f4-a5b6-7890-4567-901234567890",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "c1d2e3f4-a5b6-7890-4567-901234567890",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "laboratory",
+                "display": "Laboratory"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "2532-0",
+              "display": "Lactate dehydrogenase [Enzymatic activity/volume] in Serum or Plasma"
+            }
+          ],
+          "text": "Lactate dehydrogenase"
+        },
+        "subject": {
+          "reference": "urn:uuid:a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        },
+        "effectiveDateTime": "2149-12-08T10:30:00-05:00",
+        "issued": "2149-12-08T12:15:00-05:00",
+        "performer": [
+          {
+            "reference": "urn:uuid:d4e5f6a7-b8c9-0123-def0-234567890123"
+          }
+        ],
+        "valueQuantity": {
+          "value": 278,
+          "unit": "U/L",
+          "system": "http://unitsofmeasure.org",
+          "code": "U/L"
+        },
+        "referenceRange": [
+          {
+            "low": {
+              "value": 120,
+              "unit": "U/L",
+              "system": "http://unitsofmeasure.org",
+              "code": "U/L"
+            },
+            "high": {
+              "value": 246,
+              "unit": "U/L",
+              "system": "http://unitsofmeasure.org",
+              "code": "U/L"
+            }
+          }
+        ],
+        "interpretation": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/v3-ObservationInterpretation",
+                "code": "H",
+                "display": "High"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:d2e3f4a5-b6c7-8901-5678-012345678901",
+      "resource": {
+        "resourceType": "MedicationStatement",
+        "id": "d2e3f4a5-b6c7-8901-5678-012345678901",
+        "status": "active",
+        "category": {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/medication-statement-category",
+              "code": "outpatient",
+              "display": "Outpatient"
+            }
+          ]
+        },
+        "medicationCodeableConcept": {
+          "coding": [
+            {
+              "system": "http://www.nlm.nih.gov/research/umls/rxnorm",
+              "code": "1442968",
+              "display": "ibrutinib 140 MG Oral Capsule"
+            }
+          ],
+          "text": "Ibrutinib 140mg capsule"
+        },
+        "subject": {
+          "reference": "urn:uuid:a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        },
+        "effectivePeriod": {
+          "start": "2150-02-15"
+        },
+        "dateAsserted": "2150-02-15T11:20:00-05:00",
+        "informationSource": {
+          "reference": "urn:uuid:b2c3d4e5-f6a7-8901-bcde-f12345678901"
+        },
+        "dosage": [
+          {
+            "text": "420 mg (three 140mg capsules) by mouth once daily",
+            "timing": {
+              "repeat": {
+                "frequency": 1,
+                "period": 1,
+                "periodUnit": "d"
+              }
+            },
+            "route": {
+              "coding": [
+                {
+                  "system": "http://snomed.info/sct",
+                  "code": "26643006",
+                  "display": "Oral route"
+                }
+              ]
+            },
+            "doseAndRate": [
+              {
+                "doseQuantity": {
+                  "value": 420,
+                  "unit": "mg",
+                  "system": "http://unitsofmeasure.org",
+                  "code": "mg"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:e3f4a5b6-c7d8-9012-6789-123456789012",
+      "resource": {
+        "resourceType": "MedicationStatement",
+        "id": "e3f4a5b6-c7d8-9012-6789-123456789012",
+        "status": "completed",
+        "category": {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/medication-statement-category",
+              "code": "outpatient",
+              "display": "Outpatient"
+            }
+          ]
+        },
+        "medicationCodeableConcept": {
+          "coding": [
+            {
+              "system": "http://www.nlm.nih.gov/research/umls/rxnorm",
+              "code": "1790099",
+              "display": "obinutuzumab 25 MG/ML Injectable Solution"
+            }
+          ],
+          "text": "Obinutuzumab 1000mg IV"
+        },
+        "subject": {
+          "reference": "urn:uuid:a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        },
+        "effectivePeriod": {
+          "start": "2148-11-20",
+          "end": "2149-05-15"
+        },
+        "dateAsserted": "2149-05-15T14:30:00-04:00",
+        "informationSource": {
+          "reference": "urn:uuid:c3d4e5f6-a7b8-9012-cdef-123456789012"
+        },
+        "note": [
+          {
+            "text": "Six-cycle course completed. Patient achieved partial response."
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:f4a5b6c7-d8e9-0123-7890-234567890123",
+      "resource": {
+        "resourceType": "MedicationStatement",
+        "id": "f4a5b6c7-d8e9-0123-7890-234567890123",
+        "status": "completed",
+        "category": {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/medication-statement-category",
+              "code": "outpatient",
+              "display": "Outpatient"
+            }
+          ]
+        },
+        "medicationCodeableConcept": {
+          "coding": [
+            {
+              "system": "http://www.nlm.nih.gov/research/umls/rxnorm",
+              "code": "72156",
+              "display": "chlorambucil 2 MG Oral Tablet"
+            }
+          ],
+          "text": "Chlorambucil 2mg tablet"
+        },
+        "subject": {
+          "reference": "urn:uuid:a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        },
+        "effectivePeriod": {
+          "start": "2147-12-01",
+          "end": "2148-10-30"
+        },
+        "dateAsserted": "2148-10-30T10:00:00-04:00",
+        "informationSource": {
+          "reference": "urn:uuid:c3d4e5f6-a7b8-9012-cdef-123456789012"
+        },
+        "note": [
+          {
+            "text": "Initial therapy. Discontinued due to disease progression."
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:a5b6c7d8-e9f0-1234-8901-345678901234",
+      "resource": {
+        "resourceType": "MedicationStatement",
+        "id": "a5b6c7d8-e9f0-1234-8901-345678901234",
+        "status": "active",
+        "category": {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/medication-statement-category",
+              "code": "outpatient",
+              "display": "Outpatient"
+            }
+          ]
+        },
+        "medicationCodeableConcept": {
+          "coding": [
+            {
+              "system": "http://www.nlm.nih.gov/research/umls/rxnorm",
+              "code": "1440564",
+              "display": "acyclovir 400 MG Oral Tablet"
+            }
+          ],
+          "text": "Acyclovir 400mg tablet (prophylaxis)"
+        },
+        "subject": {
+          "reference": "urn:uuid:a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        },
+        "effectivePeriod": {
+          "start": "2150-02-15"
+        },
+        "dateAsserted": "2150-02-15T11:20:00-05:00",
+        "informationSource": {
+          "reference": "urn:uuid:b2c3d4e5-f6a7-8901-bcde-f12345678901"
+        },
+        "dosage": [
+          {
+            "text": "400 mg by mouth twice daily",
+            "timing": {
+              "repeat": {
+                "frequency": 2,
+                "period": 1,
+                "periodUnit": "d"
+              }
+            },
+            "route": {
+              "coding": [
+                {
+                  "system": "http://snomed.info/sct",
+                  "code": "26643006",
+                  "display": "Oral route"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:b6c7d8e9-f0a1-2345-9012-456789012345",
+      "resource": {
+        "resourceType": "DiagnosticReport",
+        "id": "b6c7d8e9-f0a1-2345-9012-456789012345",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/v2-0074",
+                "code": "HM",
+                "display": "Hematology"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "24318-8",
+              "display": "Leukocyte immunophenotyping panel - Blood or Tissue by Flow cytometry (FC)"
+            }
+          ],
+          "text": "Flow Cytometry - CLL Panel"
+        },
+        "subject": {
+          "reference": "urn:uuid:a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        },
+        "effectiveDateTime": "2150-03-14T14:15:00-04:00",
+        "issued": "2150-03-16T09:30:00-04:00",
+        "performer": [
+          {
+            "reference": "urn:uuid:d4e5f6a7-b8c9-0123-def0-234567890123"
+          }
+        ],
+        "result": [
+          {
+            "reference": "urn:uuid:c7d8e9f0-a1b2-3456-0123-567890123456"
+          },
+          {
+            "reference": "urn:uuid:d8e9f0a1-b2c3-4567-1234-678901234567"
+          }
+        ],
+        "conclusion": "Peripheral blood immunophenotyping reveals a monoclonal B-cell population consistent with CLL. Cells are positive for CD5, CD19, CD20 (dim), CD23, and show kappa light chain restriction. Minimal residual disease detected at 2.3% of lymphocytes."
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:c7d8e9f0-a1b2-3456-0123-567890123456",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "c7d8e9f0-a1b2-3456-0123-567890123456",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "laboratory",
+                "display": "Laboratory"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "42254-3",
+              "display": "CD19 Ag [Presence] on Blood or Tissue by Flow cytometry"
+            }
+          ],
+          "text": "CD19 positive"
+        },
+        "subject": {
+          "reference": "urn:uuid:a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        },
+        "effectiveDateTime": "2150-03-14T14:15:00-04:00",
+        "issued": "2150-03-16T09:30:00-04:00",
+        "performer": [
+          {
+            "reference": "urn:uuid:d4e5f6a7-b8c9-0123-def0-234567890123"
+          }
+        ],
+        "valueCodeableConcept": {
+          "coding": [
+            {
+              "system": "http://snomed.info/sct",
+              "code": "10828004",
+              "display": "Positive"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:d8e9f0a1-b2c3-4567-1234-678901234567",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "d8e9f0a1-b2c3-4567-1234-678901234567",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "laboratory",
+                "display": "Laboratory"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "42250-1",
+              "display": "CD5 Ag [Presence] on Blood or Tissue by Flow cytometry"
+            }
+          ],
+          "text": "CD5 positive"
+        },
+        "subject": {
+          "reference": "urn:uuid:a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        },
+        "effectiveDateTime": "2150-03-14T14:15:00-04:00",
+        "issued": "2150-03-16T09:30:00-04:00",
+        "performer": [
+          {
+            "reference": "urn:uuid:d4e5f6a7-b8c9-0123-def0-234567890123"
+          }
+        ],
+        "valueCodeableConcept": {
+          "coding": [
+            {
+              "system": "http://snomed.info/sct",
+              "code": "10828004",
+              "display": "Positive"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:e9f0a1b2-c3d4-5678-2345-789012345678",
+      "resource": {
+        "resourceType": "DiagnosticReport",
+        "id": "e9f0a1b2-c3d4-5678-2345-789012345678",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/v2-0074",
+                "code": "RAD",
+                "display": "Radiology"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "30746-2",
+              "display": "CT Chest WO contrast"
+            }
+          ],
+          "text": "CT Chest without contrast"
+        },
+        "subject": {
+          "reference": "urn:uuid:a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        },
+        "effectiveDateTime": "2150-06-20T15:30:00-04:00",
+        "issued": "2150-06-21T08:15:00-04:00",
+        "performer": [
+          {
+            "reference": "urn:uuid:d4e5f6a7-b8c9-0123-def0-234567890123"
+          }
+        ],
+        "conclusion": "IMPRESSION: 1. Stable mediastinal lymphadenopathy, largest node measuring 1.8 x 1.2 cm in the prevascular space, unchanged from prior study dated 2149-12-10. 2. No new adenopathy or pleural effusion. 3. Mild emphysematous changes. 4. No evidence of pneumonia or pulmonary nodules."
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:f0a1b2c3-d4e5-6789-3456-890123456789",
+      "resource": {
+        "resourceType": "DiagnosticReport",
+        "id": "f0a1b2c3-d4e5-6789-3456-890123456789",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/v2-0074",
+                "code": "RAD",
+                "display": "Radiology"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "30621-7",
+              "display": "CT Abdomen and Pelvis WO contrast"
+            }
+          ],
+          "text": "CT Abdomen and Pelvis without contrast"
+        },
+        "subject": {
+          "reference": "urn:uuid:a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        },
+        "effectiveDateTime": "2149-12-10T10:00:00-05:00",
+        "issued": "2149-12-10T16:45:00-05:00",
+        "performer": [
+          {
+            "reference": "urn:uuid:d4e5f6a7-b8c9-0123-def0-234567890123"
+          }
+        ],
+        "conclusion": "IMPRESSION: 1. Multiple enlarged retroperitoneal and mesenteric lymph nodes, largest measuring 2.1 x 1.5 cm in the para-aortic region. Overall slightly decreased in size compared to prior study dated 2149-06-18. 2. Mild splenomegaly measuring 13.2 cm in greatest dimension, stable. 3. No ascites or liver lesions. 4. Status post gastric bypass, expected postoperative appearance."
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:a1b2c3d4-e5f6-7890-4567-901234567891",
+      "resource": {
+        "resourceType": "CarePlan",
+        "id": "a1b2c3d4-e5f6-7890-4567-901234567891",
+        "status": "active",
+        "intent": "plan",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://snomed.info/sct",
+                "code": "385884004",
+                "display": "Cancer care plan"
+              }
+            ]
+          }
+        ],
+        "title": "CLL Treatment Plan - Ibrutinib Therapy",
+        "description": "Ongoing targeted therapy with ibrutinib for chronic lymphocytic leukemia with regular monitoring",
+        "subject": {
+          "reference": "urn:uuid:a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        },
+        "period": {
+          "start": "2150-02-15"
+        },
+        "author": {
+          "reference": "urn:uuid:b2c3d4e5-f6a7-8901-bcde-f12345678901"
+        },
+        "careTeam": [
+          {
+            "reference": "urn:uuid:b2c3d4e5-f6a7-8901-bcde-f12345678902"
+          }
+        ],
+        "addresses": [
+          {
+            "reference": "urn:uuid:c9d0e1f2-a3b4-5678-2345-789012345678"
+          }
+        ],
+        "activity": [
+          {
+            "detail": {
+              "kind": "MedicationRequest",
+              "code": {
+                "coding": [
+                  {
+                    "system": "http://snomed.info/sct",
+                    "code": "182964004",
+                    "display": "Medication therapy"
+                  }
+                ]
+              },
+              "status": "in-progress",
+              "description": "Continue ibrutinib 420mg PO daily with viral prophylaxis"
+            }
+          },
+          {
+            "detail": {
+              "kind": "ServiceRequest",
+              "code": {
+                "coding": [
+                  {
+                    "system": "http://snomed.info/sct",
+                    "code": "168731009",
+                    "display": "Laboratory monitoring"
+                  }
+                ]
+              },
+              "status": "scheduled",
+              "scheduledTiming": {
+                "repeat": {
+                  "frequency": 1,
+                  "period": 3,
+                  "periodUnit": "mo"
+                }
+              },
+              "description": "CBC with differential, CMP every 3 months"
+            }
+          },
+          {
+            "detail": {
+              "kind": "Appointment",
+              "code": {
+                "coding": [
+                  {
+                    "system": "http://snomed.info/sct",
+                    "code": "185389009",
+                    "display": "Follow-up visit"
+                  }
+                ]
+              },
+              "status": "scheduled",
+              "scheduledTiming": {
+                "repeat": {
+                  "frequency": 1,
+                  "period": 3,
+                  "periodUnit": "mo"
+                }
+              },
+              "description": "Oncology clinic follow-up every 3 months"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:b2c3d4e5-f6a7-8901-bcde-f12345678902",
+      "resource": {
+        "resourceType": "CareTeam",
+        "id": "b2c3d4e5-f6a7-8901-bcde-f12345678902",
+        "status": "active",
+        "name": "Dana-Farber CLL Care Team",
+        "subject": {
+          "reference": "urn:uuid:a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        },
+        "period": {
+          "start": "2147-11-22"
+        },
+        "participant": [
+          {
+            "role": [
+              {
+                "coding": [
+                  {
+                    "system": "http://snomed.info/sct",
+                    "code": "446050000",
+                    "display": "Primary care physician"
+                  }
+                ]
+              }
+            ],
+            "member": {
+              "reference": "urn:uuid:b2c3d4e5-f6a7-8901-bcde-f12345678901"
+            }
+          },
+          {
+            "role": [
+              {
+                "coding": [
+                  {
+                    "system": "http://snomed.info/sct",
+                    "code": "310193003",
+                    "display": "Hematologist"
+                  }
+                ]
+              }
+            ],
+            "member": {
+              "reference": "urn:uuid:c3d4e5f6-a7b8-9012-cdef-123456789012"
+            }
+          }
+        ],
+        "managingOrganization": [
+          {
+            "reference": "urn:uuid:d4e5f6a7-b8c9-0123-def0-234567890123"
+          }
+        ]
+      }
+    }
+  ]
+}

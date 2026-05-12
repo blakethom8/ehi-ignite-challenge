@@ -1,0 +1,902 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ClinicalDocument xmlns="urn:hl7-org:v3" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:sdtc="urn:hl7-org:sdtc" xsi:schemaLocation="urn:hl7-org:v3 urn:hl7-org:sdtc-infrastructure/cda/CDA_SDTC.xsd">
+  <realmCode code="US"/>
+  <typeId root="2.16.840.1.113883.1.3" extension="POCD_HD000040"/>
+  <templateId root="2.16.840.1.113883.10.20.22.1.1" extension="2015-08-01"/>
+  <templateId root="2.16.840.1.113883.10.20.22.1.2" extension="2015-08-01"/>
+  <id root="2.16.840.1.113883.3.9876.1.1" extension="CCD-20190901-ECHEVARRIA"/>
+  <code code="34133-9" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Summarization of Episode Note"/>
+  <title>Continuity of Care Document</title>
+  <effectiveTime value="20190901120000-0500"/>
+  <confidentialityCode code="N" codeSystem="2.16.840.1.113883.5.25"/>
+  <languageCode code="en-US"/>
+  <recordTarget>
+    <patientRole>
+      <id root="2.16.840.1.113883.3.9876.2" extension="PT-635842"/>
+      <addr use="HP">
+        <streetAddressLine>742 Evergreen Terrace</streetAddressLine>
+        <city>Springfield</city>
+        <state>MA</state>
+        <postalCode>01103</postalCode>
+        <country>US</country>
+      </addr>
+      <telecom value="tel:+1(413)555-0842" use="HP"/>
+      <patient>
+        <name use="L">
+          <given>Ester</given>
+          <family>Echevarría</family>
+        </name>
+        <administrativeGenderCode code="F" codeSystem="2.16.840.1.113883.5.1" displayName="Female"/>
+        <birthTime value="19270620"/>
+        <maritalStatusCode code="W" codeSystem="2.16.840.1.113883.5.2" displayName="Widowed"/>
+        <raceCode code="2106-3" codeSystem="2.16.840.1.113883.6.238" displayName="White"/>
+        <ethnicGroupCode code="2186-5" codeSystem="2.16.840.1.113883.6.238" displayName="Not Hispanic or Latino"/>
+        <languageCommunication>
+          <languageCode code="en"/>
+          <preferenceInd value="true"/>
+        </languageCommunication>
+      </patient>
+    </patientRole>
+  </recordTarget>
+  <author>
+    <time value="20190901120000-0500"/>
+    <assignedAuthor>
+      <id root="2.16.840.1.113883.3.9876.3" extension="DR-HENDERSON"/>
+      <addr use="WP">
+        <streetAddressLine>124 Main Street, Suite 200</streetAddressLine>
+        <city>Springfield</city>
+        <state>MA</state>
+        <postalCode>01103</postalCode>
+      </addr>
+      <telecom value="tel:+1(413)555-1200" use="WP"/>
+      <assignedPerson>
+        <name>
+          <given>Margaret</given>
+          <family>Henderson</family>
+          <suffix>MD</suffix>
+        </name>
+      </assignedPerson>
+    </assignedAuthor>
+  </author>
+  <custodian>
+    <assignedCustodian>
+      <representedCustodianOrganization>
+        <id root="2.16.840.1.113883.3.9876" extension="ORG-SPRINGFIELD-PCP"/>
+        <name>Springfield Community Primary Care Associates</name>
+        <telecom value="tel:+1(413)555-1200" use="WP"/>
+        <addr use="WP">
+          <streetAddressLine>124 Main Street, Suite 200</streetAddressLine>
+          <city>Springfield</city>
+          <state>MA</state>
+          <postalCode>01103</postalCode>
+        </addr>
+      </representedCustodianOrganization>
+    </assignedCustodian>
+  </custodian>
+  <documentationOf>
+    <serviceEvent classCode="PCPR">
+      <effectiveTime>
+        <low value="20160902"/>
+        <high value="20190901"/>
+      </effectiveTime>
+      <performer typeCode="PRF">
+        <functionCode code="PCP" codeSystem="2.16.840.1.113883.5.88" displayName="Primary Care Physician"/>
+        <assignedEntity>
+          <id root="2.16.840.1.113883.3.9876.3" extension="DR-HENDERSON"/>
+          <addr use="WP">
+            <streetAddressLine>124 Main Street, Suite 200</streetAddressLine>
+            <city>Springfield</city>
+            <state>MA</state>
+            <postalCode>01103</postalCode>
+          </addr>
+          <telecom value="tel:+1(413)555-1200" use="WP"/>
+          <assignedPerson>
+            <name>
+              <given>Margaret</given>
+              <family>Henderson</family>
+              <suffix>MD</suffix>
+            </name>
+          </assignedPerson>
+        </assignedEntity>
+      </performer>
+    </serviceEvent>
+  </documentationOf>
+  <component>
+    <structuredBody>
+      <component>
+        <section>
+          <templateId root="2.16.840.1.113883.10.20.22.2.5.1" extension="2015-08-01"/>
+          <code code="11450-4" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Problem List"/>
+          <title>Problem List</title>
+          <text>
+            <table border="1" width="100%">
+              <thead>
+                <tr>
+                  <th>Condition</th>
+                  <th>Status</th>
+                  <th>Onset Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr ID="prob1">
+                  <td>Atrial fibrillation</td>
+                  <td>Active</td>
+                  <td>2016</td>
+                </tr>
+                <tr ID="prob2">
+                  <td>Type 2 diabetes mellitus</td>
+                  <td>Active</td>
+                  <td>2008</td>
+                </tr>
+                <tr ID="prob3">
+                  <td>Osteoarthritis of knee</td>
+                  <td>Active</td>
+                  <td>2012</td>
+                </tr>
+                <tr ID="prob4">
+                  <td>Hyperlipidemia</td>
+                  <td>Active</td>
+                  <td>2010</td>
+                </tr>
+                <tr ID="prob5">
+                  <td>Alzheimer's disease</td>
+                  <td>Active</td>
+                  <td>2017</td>
+                </tr>
+                <tr ID="prob6">
+                  <td>Chronic kidney disease stage 1</td>
+                  <td>Active</td>
+                  <td>2015</td>
+                </tr>
+              </tbody>
+            </table>
+          </text>
+          <entry typeCode="DRIV">
+            <act classCode="ACT" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.3" extension="2015-08-01"/>
+              <id root="2.16.840.1.113883.3.9876.4.1" extension="prob1"/>
+              <code code="CONC" codeSystem="2.16.840.1.113883.5.6"/>
+              <statusCode code="active"/>
+              <effectiveTime>
+                <low value="2016"/>
+              </effectiveTime>
+              <entryRelationship typeCode="SUBJ">
+                <observation classCode="OBS" moodCode="EVN">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.4" extension="2015-08-01"/>
+                  <id root="2.16.840.1.113883.3.9876.4.2" extension="obs1"/>
+                  <code code="55607006" codeSystem="2.16.840.1.113883.6.96" displayName="Problem">
+                    <translation code="75326-9" codeSystem="2.16.840.1.113883.6.1" displayName="Problem"/>
+                  </code>
+                  <statusCode code="completed"/>
+                  <effectiveTime>
+                    <low value="2016"/>
+                  </effectiveTime>
+                  <value xsi:type="CD" code="49436004" codeSystem="2.16.840.1.113883.6.96" displayName="Atrial fibrillation"/>
+                  <entryRelationship typeCode="REFR">
+                    <observation classCode="OBS" moodCode="EVN">
+                      <templateId root="2.16.840.1.113883.10.20.22.4.6"/>
+                      <code code="33999-4" codeSystem="2.16.840.1.113883.6.1" displayName="Status"/>
+                      <statusCode code="completed"/>
+                      <value xsi:type="CE" code="55561003" codeSystem="2.16.840.1.113883.6.96" displayName="Active"/>
+                    </observation>
+                  </entryRelationship>
+                </observation>
+              </entryRelationship>
+            </act>
+          </entry>
+          <entry typeCode="DRIV">
+            <act classCode="ACT" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.3" extension="2015-08-01"/>
+              <id root="2.16.840.1.113883.3.9876.4.1" extension="prob2"/>
+              <code code="CONC" codeSystem="2.16.840.1.113883.5.6"/>
+              <statusCode code="active"/>
+              <effectiveTime>
+                <low value="2008"/>
+              </effectiveTime>
+              <entryRelationship typeCode="SUBJ">
+                <observation classCode="OBS" moodCode="EVN">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.4" extension="2015-08-01"/>
+                  <id root="2.16.840.1.113883.3.9876.4.2" extension="obs2"/>
+                  <code code="55607006" codeSystem="2.16.840.1.113883.6.96" displayName="Problem">
+                    <translation code="75326-9" codeSystem="2.16.840.1.113883.6.1" displayName="Problem"/>
+                  </code>
+                  <statusCode code="completed"/>
+                  <effectiveTime>
+                    <low value="2008"/>
+                  </effectiveTime>
+                  <value xsi:type="CD" code="44054006" codeSystem="2.16.840.1.113883.6.96" displayName="Type 2 diabetes mellitus"/>
+                  <entryRelationship typeCode="REFR">
+                    <observation classCode="OBS" moodCode="EVN">
+                      <templateId root="2.16.840.1.113883.10.20.22.4.6"/>
+                      <code code="33999-4" codeSystem="2.16.840.1.113883.6.1" displayName="Status"/>
+                      <statusCode code="completed"/>
+                      <value xsi:type="CE" code="55561003" codeSystem="2.16.840.1.113883.6.96" displayName="Active"/>
+                    </observation>
+                  </entryRelationship>
+                </observation>
+              </entryRelationship>
+            </act>
+          </entry>
+          <entry typeCode="DRIV">
+            <act classCode="ACT" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.3" extension="2015-08-01"/>
+              <id root="2.16.840.1.113883.3.9876.4.1" extension="prob3"/>
+              <code code="CONC" codeSystem="2.16.840.1.113883.5.6"/>
+              <statusCode code="active"/>
+              <effectiveTime>
+                <low value="2012"/>
+              </effectiveTime>
+              <entryRelationship typeCode="SUBJ">
+                <observation classCode="OBS" moodCode="EVN">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.4" extension="2015-08-01"/>
+                  <id root="2.16.840.1.113883.3.9876.4.2" extension="obs3"/>
+                  <code code="55607006" codeSystem="2.16.840.1.113883.6.96" displayName="Problem">
+                    <translation code="75326-9" codeSystem="2.16.840.1.113883.6.1" displayName="Problem"/>
+                  </code>
+                  <statusCode code="completed"/>
+                  <effectiveTime>
+                    <low value="2012"/>
+                  </effectiveTime>
+                  <value xsi:type="CD" code="239873007" codeSystem="2.16.840.1.113883.6.96" displayName="Osteoarthritis of knee"/>
+                  <entryRelationship typeCode="REFR">
+                    <observation classCode="OBS" moodCode="EVN">
+                      <templateId root="2.16.840.1.113883.10.20.22.4.6"/>
+                      <code code="33999-4" codeSystem="2.16.840.1.113883.6.1" displayName="Status"/>
+                      <statusCode code="completed"/>
+                      <value xsi:type="CE" code="55561003" codeSystem="2.16.840.1.113883.6.96" displayName="Active"/>
+                    </observation>
+                  </entryRelationship>
+                </observation>
+              </entryRelationship>
+            </act>
+          </entry>
+          <entry typeCode="DRIV">
+            <act classCode="ACT" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.3" extension="2015-08-01"/>
+              <id root="2.16.840.1.113883.3.9876.4.1" extension="prob4"/>
+              <code code="CONC" codeSystem="2.16.840.1.113883.5.6"/>
+              <statusCode code="active"/>
+              <effectiveTime>
+                <low value="2010"/>
+              </effectiveTime>
+              <entryRelationship typeCode="SUBJ">
+                <observation classCode="OBS" moodCode="EVN">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.4" extension="2015-08-01"/>
+                  <id root="2.16.840.1.113883.3.9876.4.2" extension="obs4"/>
+                  <code code="55607006" codeSystem="2.16.840.1.113883.6.96" displayName="Problem">
+                    <translation code="75326-9" codeSystem="2.16.840.1.113883.6.1" displayName="Problem"/>
+                  </code>
+                  <statusCode code="completed"/>
+                  <effectiveTime>
+                    <low value="2010"/>
+                  </effectiveTime>
+                  <value xsi:type="CD" code="55822004" codeSystem="2.16.840.1.113883.6.96" displayName="Hyperlipidemia"/>
+                  <entryRelationship typeCode="REFR">
+                    <observation classCode="OBS" moodCode="EVN">
+                      <templateId root="2.16.840.1.113883.10.20.22.4.6"/>
+                      <code code="33999-4" codeSystem="2.16.840.1.113883.6.1" displayName="Status"/>
+                      <statusCode code="completed"/>
+                      <value xsi:type="CE" code="55561003" codeSystem="2.16.840.1.113883.6.96" displayName="Active"/>
+                    </observation>
+                  </entryRelationship>
+                </observation>
+              </entryRelationship>
+            </act>
+          </entry>
+          <entry typeCode="DRIV">
+            <act classCode="ACT" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.3" extension="2015-08-01"/>
+              <id root="2.16.840.1.113883.3.9876.4.1" extension="prob5"/>
+              <code code="CONC" codeSystem="2.16.840.1.113883.5.6"/>
+              <statusCode code="active"/>
+              <effectiveTime>
+                <low value="2017"/>
+              </effectiveTime>
+              <entryRelationship typeCode="SUBJ">
+                <observation classCode="OBS" moodCode="EVN">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.4" extension="2015-08-01"/>
+                  <id root="2.16.840.1.113883.3.9876.4.2" extension="obs5"/>
+                  <code code="55607006" codeSystem="2.16.840.1.113883.6.96" displayName="Problem">
+                    <translation code="75326-9" codeSystem="2.16.840.1.113883.6.1" displayName="Problem"/>
+                  </code>
+                  <statusCode code="completed"/>
+                  <effectiveTime>
+                    <low value="2017"/>
+                  </effectiveTime>
+                  <value xsi:type="CD" code="26929004" codeSystem="2.16.840.1.113883.6.96" displayName="Alzheimer's disease"/>
+                  <entryRelationship typeCode="REFR">
+                    <observation classCode="OBS" moodCode="EVN">
+                      <templateId root="2.16.840.1.113883.10.20.22.4.6"/>
+                      <code code="33999-4" codeSystem="2.16.840.1.113883.6.1" displayName="Status"/>
+                      <statusCode code="completed"/>
+                      <value xsi:type="CE" code="55561003" codeSystem="2.16.840.1.113883.6.96" displayName="Active"/>
+                    </observation>
+                  </entryRelationship>
+                </observation>
+              </entryRelationship>
+            </act>
+          </entry>
+          <entry typeCode="DRIV">
+            <act classCode="ACT" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.3" extension="2015-08-01"/>
+              <id root="2.16.840.1.113883.3.9876.4.1" extension="prob6"/>
+              <code code="CONC" codeSystem="2.16.840.1.113883.5.6"/>
+              <statusCode code="active"/>
+              <effectiveTime>
+                <low value="2015"/>
+              </effectiveTime>
+              <entryRelationship typeCode="SUBJ">
+                <observation classCode="OBS" moodCode="EVN">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.4" extension="2015-08-01"/>
+                  <id root="2.16.840.1.113883.3.9876.4.2" extension="obs6"/>
+                  <code code="55607006" codeSystem="2.16.840.1.113883.6.96" displayName="Problem">
+                    <translation code="75326-9" codeSystem="2.16.840.1.113883.6.1" displayName="Problem"/>
+                  </code>
+                  <statusCode code="completed"/>
+                  <effectiveTime>
+                    <low value="2015"/>
+                  </effectiveTime>
+                  <value xsi:type="CD" code="431855005" codeSystem="2.16.840.1.113883.6.96" displayName="Chronic kidney disease stage 1"/>
+                  <entryRelationship typeCode="REFR">
+                    <observation classCode="OBS" moodCode="EVN">
+                      <templateId root="2.16.840.1.113883.10.20.22.4.6"/>
+                      <code code="33999-4" codeSystem="2.16.840.1.113883.6.1" displayName="Status"/>
+                      <statusCode code="completed"/>
+                      <value xsi:type="CE" code="55561003" codeSystem="2.16.840.1.113883.6.96" displayName="Active"/>
+                    </observation>
+                  </entryRelationship>
+                </observation>
+              </entryRelationship>
+            </act>
+          </entry>
+        </section>
+      </component>
+      <component>
+        <section>
+          <templateId root="2.16.840.1.113883.10.20.22.2.1.1" extension="2014-06-09"/>
+          <code code="10160-0" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="History of Medication Use"/>
+          <title>Medications</title>
+          <text>
+            <table border="1" width="100%">
+              <thead>
+                <tr>
+                  <th>Medication</th>
+                  <th>Directions</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr ID="med1">
+                  <td>Aspirin 81 mg oral tablet</td>
+                  <td>Take 1 tablet by mouth daily</td>
+                  <td>Active</td>
+                </tr>
+                <tr ID="med2">
+                  <td>Simvastatin 10 mg oral tablet</td>
+                  <td>Take 1 tablet by mouth nightly</td>
+                  <td>Active</td>
+                </tr>
+                <tr ID="med3">
+                  <td>Insulin human isophane 70 UNT/ML / Regular insulin human 30 UNT/ML injectable suspension</td>
+                  <td>Inject 20 units subcutaneously twice daily</td>
+                  <td>Active</td>
+                </tr>
+                <tr ID="med4">
+                  <td>Galantamine 4 mg oral tablet</td>
+                  <td>Take 1 tablet by mouth twice daily</td>
+                  <td>Active</td>
+                </tr>
+                <tr ID="med5">
+                  <td>Naproxen sodium 220 mg oral tablet</td>
+                  <td>Take 1 tablet by mouth twice daily as needed for pain</td>
+                  <td>Active</td>
+                </tr>
+              </tbody>
+            </table>
+          </text>
+          <entry typeCode="DRIV">
+            <substanceAdministration classCode="SBADM" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.16" extension="2014-06-09"/>
+              <id root="2.16.840.1.113883.3.9876.5.1" extension="med1"/>
+              <statusCode code="active"/>
+              <effectiveTime xsi:type="IVL_TS">
+                <low value="20160301"/>
+              </effectiveTime>
+              <effectiveTime xsi:type="PIVL_TS" institutionSpecified="true" operator="A">
+                <period value="1" unit="d"/>
+              </effectiveTime>
+              <doseQuantity value="1"/>
+              <consumable>
+                <manufacturedProduct classCode="MANU">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.23" extension="2014-06-09"/>
+                  <manufacturedMaterial>
+                    <code code="243670" codeSystem="2.16.840.1.113883.6.88" displayName="Aspirin 81 mg oral tablet">
+                      <originalText>
+                        <reference value="#med1"/>
+                      </originalText>
+                    </code>
+                  </manufacturedMaterial>
+                </manufacturedProduct>
+              </consumable>
+            </substanceAdministration>
+          </entry>
+          <entry typeCode="DRIV">
+            <substanceAdministration classCode="SBADM" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.16" extension="2014-06-09"/>
+              <id root="2.16.840.1.113883.3.9876.5.1" extension="med2"/>
+              <statusCode code="active"/>
+              <effectiveTime xsi:type="IVL_TS">
+                <low value="20100215"/>
+              </effectiveTime>
+              <effectiveTime xsi:type="PIVL_TS" institutionSpecified="true" operator="A">
+                <period value="1" unit="d"/>
+              </effectiveTime>
+              <doseQuantity value="1"/>
+              <consumable>
+                <manufacturedProduct classCode="MANU">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.23" extension="2014-06-09"/>
+                  <manufacturedMaterial>
+                    <code code="196503" codeSystem="2.16.840.1.113883.6.88" displayName="Simvastatin 10 mg oral tablet">
+                      <originalText>
+                        <reference value="#med2"/>
+                      </originalText>
+                    </code>
+                  </manufacturedMaterial>
+                </manufacturedProduct>
+              </consumable>
+            </substanceAdministration>
+          </entry>
+          <entry typeCode="DRIV">
+            <substanceAdministration classCode="SBADM" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.16" extension="2014-06-09"/>
+              <id root="2.16.840.1.113883.3.9876.5.1" extension="med3"/>
+              <statusCode code="active"/>
+              <effectiveTime xsi:type="IVL_TS">
+                <low value="20080410"/>
+              </effectiveTime>
+              <effectiveTime xsi:type="PIVL_TS" institutionSpecified="true" operator="A">
+                <period value="12" unit="h"/>
+              </effectiveTime>
+              <doseQuantity value="20" unit="U"/>
+              <consumable>
+                <manufacturedProduct classCode="MANU">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.23" extension="2014-06-09"/>
+                  <manufacturedMaterial>
+                    <code code="106892" codeSystem="2.16.840.1.113883.6.88" displayName="insulin human, isophane 70 UNT/ML / Regular Insulin, Human 30 UNT/ML Injectable Suspension [Humulin]">
+                      <originalText>
+                        <reference value="#med3"/>
+                      </originalText>
+                    </code>
+                  </manufacturedMaterial>
+                </manufacturedProduct>
+              </consumable>
+            </substanceAdministration>
+          </entry>
+          <entry typeCode="DRIV">
+            <substanceAdministration classCode="SBADM" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.16" extension="2014-06-09"/>
+              <id root="2.16.840.1.113883.3.9876.5.1" extension="med4"/>
+              <statusCode code="active"/>
+              <effectiveTime xsi:type="IVL_TS">
+                <low value="20170620"/>
+              </effectiveTime>
+              <effectiveTime xsi:type="PIVL_TS" institutionSpecified="true" operator="A">
+                <period value="12" unit="h"/>
+              </effectiveTime>
+              <doseQuantity value="1"/>
+              <consumable>
+                <manufacturedProduct classCode="MANU">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.23" extension="2014-06-09"/>
+                  <manufacturedMaterial>
+                    <code code="996572" codeSystem="2.16.840.1.113883.6.88" displayName="Galantamine 4 mg oral tablet">
+                      <originalText>
+                        <reference value="#med4"/>
+                      </originalText>
+                    </code>
+                  </manufacturedMaterial>
+                </manufacturedProduct>
+              </consumable>
+            </substanceAdministration>
+          </entry>
+          <entry typeCode="DRIV">
+            <substanceAdministration classCode="SBADM" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.16" extension="2014-06-09"/>
+              <id root="2.16.840.1.113883.3.9876.5.1" extension="med5"/>
+              <statusCode code="active"/>
+              <effectiveTime xsi:type="IVL_TS">
+                <low value="20120718"/>
+              </effectiveTime>
+              <effectiveTime xsi:type="PIVL_TS" institutionSpecified="true" operator="A">
+                <period value="12" unit="h"/>
+              </effectiveTime>
+              <doseQuantity value="1"/>
+              <consumable>
+                <manufacturedProduct classCode="MANU">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.23" extension="2014-06-09"/>
+                  <manufacturedMaterial>
+                    <code code="849574" codeSystem="2.16.840.1.113883.6.88" displayName="Naproxen sodium 220 mg oral tablet">
+                      <originalText>
+                        <reference value="#med5"/>
+                      </originalText>
+                    </code>
+                  </manufacturedMaterial>
+                </manufacturedProduct>
+              </consumable>
+            </substanceAdministration>
+          </entry>
+        </section>
+      </component>
+      <component>
+        <section>
+          <templateId root="2.16.840.1.113883.10.20.22.2.6.1" extension="2015-08-01"/>
+          <code code="48765-2" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Allergies and Adverse Reactions"/>
+          <title>Allergies and Adverse Reactions</title>
+          <text>
+            <content ID="allergy1">No Known Drug Allergies</content>
+          </text>
+          <entry typeCode="DRIV">
+            <act classCode="ACT" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.30" extension="2015-08-01"/>
+              <id root="2.16.840.1.113883.3.9876.6.1" extension="allergy1"/>
+              <code code="CONC" codeSystem="2.16.840.1.113883.5.6"/>
+              <statusCode code="active"/>
+              <effectiveTime>
+                <low value="20160902"/>
+              </effectiveTime>
+              <entryRelationship typeCode="SUBJ">
+                <observation classCode="OBS" moodCode="EVN">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.7" extension="2014-06-09"/>
+                  <id root="2.16.840.1.113883.3.9876.6.2" extension="allergyobs1"/>
+                  <code code="ASSERTION" codeSystem="2.16.840.1.113883.5.4"/>
+                  <statusCode code="completed"/>
+                  <effectiveTime>
+                    <low value="20160902"/>
+                  </effectiveTime>
+                  <value xsi:type="CD" code="409137002" codeSystem="2.16.840.1.113883.6.96" displayName="No Known Drug Allergy"/>
+                  <participant typeCode="CSM">
+                    <participantRole classCode="MANU">
+                      <playingEntity classCode="MMAT">
+                        <code nullFlavor="NA"/>
+                      </playingEntity>
+                    </participantRole>
+                  </participant>
+                </observation>
+              </entryRelationship>
+            </act>
+          </entry>
+        </section>
+      </component>
+      <component>
+        <section>
+          <templateId root="2.16.840.1.113883.10.20.22.2.3.1" extension="2015-08-01"/>
+          <code code="30954-2" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Relevant Diagnostic Tests and/or Laboratory Data"/>
+          <title>Results</title>
+          <text>
+            <table border="1" width="100%">
+              <thead>
+                <tr>
+                  <th>Test</th>
+                  <th>Value</th>
+                  <th>Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr ID="result1">
+                  <td>Hemoglobin A1c</td>
+                  <td>7.2%</td>
+                  <td>08/15/2019</td>
+                </tr>
+                <tr ID="result2">
+                  <td>Glucose</td>
+                  <td>142 mg/dL</td>
+                  <td>08/15/2019</td>
+                </tr>
+                <tr ID="result3">
+                  <td>Creatinine</td>
+                  <td>1.1 mg/dL</td>
+                  <td>08/15/2019</td>
+                </tr>
+                <tr ID="result4">
+                  <td>Total Cholesterol</td>
+                  <td>198 mg/dL</td>
+                  <td>06/10/2019</td>
+                </tr>
+                <tr ID="result5">
+                  <td>LDL Cholesterol</td>
+                  <td>115 mg/dL</td>
+                  <td>06/10/2019</td>
+                </tr>
+                <tr ID="result6">
+                  <td>HDL Cholesterol</td>
+                  <td>52 mg/dL</td>
+                  <td>06/10/2019</td>
+                </tr>
+              </tbody>
+            </table>
+          </text>
+          <entry typeCode="DRIV">
+            <organizer classCode="BATTERY" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.1" extension="2015-08-01"/>
+              <id root="2.16.840.1.113883.3.9876.7.1" extension="panel1"/>
+              <code code="4548-4" codeSystem="2.16.840.1.113883.6.1" displayName="Hemoglobin A1c"/>
+              <statusCode code="completed"/>
+              <effectiveTime value="20190815"/>
+              <component>
+                <observation classCode="OBS" moodCode="EVN">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.2" extension="2015-08-01"/>
+                  <id root="2.16.840.1.113883.3.9876.7.2" extension="result1"/>
+                  <code code="4548-4" codeSystem="2.16.840.1.113883.6.1" displayName="Hemoglobin A1c"/>
+                  <statusCode code="completed"/>
+                  <effectiveTime value="20190815"/>
+                  <value xsi:type="PQ" value="7.2" unit="%"/>
+                  <referenceRange>
+                    <observationRange>
+                      <text>4.0-6.0%</text>
+                    </observationRange>
+                  </referenceRange>
+                </observation>
+              </component>
+            </organizer>
+          </entry>
+          <entry typeCode="DRIV">
+            <organizer classCode="BATTERY" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.1" extension="2015-08-01"/>
+              <id root="2.16.840.1.113883.3.9876.7.1" extension="panel2"/>
+              <code code="24331-1" codeSystem="2.16.840.1.113883.6.1" displayName="Basic Metabolic Panel"/>
+              <statusCode code="completed"/>
+              <effectiveTime value="20190815"/>
+              <component>
+                <observation classCode="OBS" moodCode="EVN">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.2" extension="2015-08-01"/>
+                  <id root="2.16.840.1.113883.3.9876.7.2" extension="result2"/>
+                  <code code="2345-7" codeSystem="2.16.840.1.113883.6.1" displayName="Glucose"/>
+                  <statusCode code="completed"/>
+                  <effectiveTime value="20190815"/>
+                  <value xsi:type="PQ" value="142" unit="mg/dL"/>
+                  <referenceRange>
+                    <observationRange>
+                      <text>70-100 mg/dL</text>
+                    </observationRange>
+                  </referenceRange>
+                </observation>
+              </component>
+              <component>
+                <observation classCode="OBS" moodCode="EVN">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.2" extension="2015-08-01"/>
+                  <id root="2.16.840.1.113883.3.9876.7.2" extension="result3"/>
+                  <code code="2160-0" codeSystem="2.16.840.1.113883.6.1" displayName="Creatinine"/>
+                  <statusCode code="completed"/>
+                  <effectiveTime value="20190815"/>
+                  <value xsi:type="PQ" value="1.1" unit="mg/dL"/>
+                  <referenceRange>
+                    <observationRange>
+                      <text>0.6-1.2 mg/dL</text>
+                    </observationRange>
+                  </referenceRange>
+                </observation>
+              </component>
+            </organizer>
+          </entry>
+          <entry typeCode="DRIV">
+            <organizer classCode="BATTERY" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.1" extension="2015-08-01"/>
+              <id root="2.16.840.1.113883.3.9876.7.1" extension="panel3"/>
+              <code code="57698-3" codeSystem="2.16.840.1.113883.6.1" displayName="Lipid Panel"/>
+              <statusCode code="completed"/>
+              <effectiveTime value="20190610"/>
+              <component>
+                <observation classCode="OBS" moodCode="EVN">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.2" extension="2015-08-01"/>
+                  <id root="2.16.840.1.113883.3.9876.7.2" extension="result4"/>
+                  <code code="2093-3" codeSystem="2.16.840.1.113883.6.1" displayName="Total Cholesterol"/>
+                  <statusCode code="completed"/>
+                  <effectiveTime value="20190610"/>
+                  <value xsi:type="PQ" value="198" unit="mg/dL"/>
+                  <referenceRange>
+                    <observationRange>
+                      <text>&lt;200 mg/dL</text>
+                    </observationRange>
+                  </referenceRange>
+                </observation>
+              </component>
+              <component>
+                <observation classCode="OBS" moodCode="EVN">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.2" extension="2015-08-01"/>
+                  <id root="2.16.840.1.113883.3.9876.7.2" extension="result5"/>
+                  <code code="18262-6" codeSystem="2.16.840.1.113883.6.1" displayName="LDL Cholesterol"/>
+                  <statusCode code="completed"/>
+                  <effectiveTime value="20190610"/>
+                  <value xsi:type="PQ" value="115" unit="mg/dL"/>
+                  <referenceRange>
+                    <observationRange>
+                      <text>&lt;100 mg/dL</text>
+                    </observationRange>
+                  </referenceRange>
+                </observation>
+              </component>
+              <component>
+                <observation classCode="OBS" moodCode="EVN">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.2" extension="2015-08-01"/>
+                  <id root="2.16.840.1.113883.3.9876.7.2" extension="result6"/>
+                  <code code="2085-9" codeSystem="2.16.840.1.113883.6.1" displayName="HDL Cholesterol"/>
+                  <statusCode code="completed"/>
+                  <effectiveTime value="20190610"/>
+                  <value xsi:type="PQ" value="52" unit="mg/dL"/>
+                  <referenceRange>
+                    <observationRange>
+                      <text>&gt;40 mg/dL</text>
+                    </observationRange>
+                  </referenceRange>
+                </observation>
+              </component>
+            </organizer>
+          </entry>
+        </section>
+      </component>
+      <component>
+        <section>
+          <templateId root="2.16.840.1.113883.10.20.22.2.22.1" extension="2015-08-01"/>
+          <code code="46240-8" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="History of Encounters"/>
+          <title>Encounters</title>
+          <text>
+            <table border="1" width="100%">
+              <thead>
+                <tr>
+                  <th>Encounter Type</th>
+                  <th>Date</th>
+                  <th>Provider</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr ID="enc1">
+                  <td>Annual wellness visit</td>
+                  <td>09/02/2019</td>
+                  <td>Dr. Margaret Henderson</td>
+                </tr>
+                <tr ID="enc2">
+                  <td>Annual wellness visit</td>
+                  <td>09/04/2018</td>
+                  <td>Dr. Margaret Henderson</td>
+                </tr>
+                <tr ID="enc3">
+                  <td>Annual wellness visit</td>
+                  <td>09/05/2017</td>
+                  <td>Dr. Margaret Henderson</td>
+                </tr>
+                <tr ID="enc4">
+                  <td>Annual wellness visit</td>
+                  <td>09/02/2016</td>
+                  <td>Dr. Margaret Henderson</td>
+                </tr>
+              </tbody>
+            </table>
+          </text>
+          <entry typeCode="DRIV">
+            <encounter classCode="ENC" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.49" extension="2015-08-01"/>
+              <id root="2.16.840.1.113883.3.9876.8.1" extension="enc1"/>
+              <code code="444971000124105" codeSystem="2.16.840.1.113883.6.96" displayName="Annual wellness visit">
+                <originalText>
+                  <reference value="#enc1"/>
+                </originalText>
+              </code>
+              <effectiveTime value="20190902"/>
+              <performer>
+                <assignedEntity>
+                  <id root="2.16.840.1.113883.3.9876.3" extension="DR-HENDERSON"/>
+                  <addr use="WP">
+                    <streetAddressLine>124 Main Street, Suite 200</streetAddressLine>
+                    <city>Springfield</city>
+                    <state>MA</state>
+                    <postalCode>01103</postalCode>
+                  </addr>
+                  <telecom value="tel:+1(413)555-1200" use="WP"/>
+                  <assignedPerson>
+                    <name>
+                      <given>Margaret</given>
+                      <family>Henderson</family>
+                      <suffix>MD</suffix>
+                    </name>
+                  </assignedPerson>
+                </assignedEntity>
+              </performer>
+            </encounter>
+          </entry>
+          <entry typeCode="DRIV">
+            <encounter classCode="ENC" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.49" extension="2015-08-01"/>
+              <id root="2.16.840.1.113883.3.9876.8.1" extension="enc2"/>
+              <code code="444971000124105" codeSystem="2.16.840.1.113883.6.96" displayName="Annual wellness visit">
+                <originalText>
+                  <reference value="#enc2"/>
+                </originalText>
+              </code>
+              <effectiveTime value="20180904"/>
+              <performer>
+                <assignedEntity>
+                  <id root="2.16.840.1.113883.3.9876.3" extension="DR-HENDERSON"/>
+                  <addr use="WP">
+                    <streetAddressLine>124 Main Street, Suite 200</streetAddressLine>
+                    <city>Springfield</city>
+                    <state>MA</state>
+                    <postalCode>01103</postalCode>
+                  </addr>
+                  <telecom value="tel:+1(413)555-1200" use="WP"/>
+                  <assignedPerson>
+                    <name>
+                      <given>Margaret</given>
+                      <family>Henderson</family>
+                      <suffix>MD</suffix>
+                    </name>
+                  </assignedPerson>
+                </assignedEntity>
+              </performer>
+            </encounter>
+          </entry>
+          <entry typeCode="DRIV">
+            <encounter classCode="ENC" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.49" extension="2015-08-01"/>
+              <id root="2.16.840.1.113883.3.9876.8.1" extension="enc3"/>
+              <code code="444971000124105" codeSystem="2.16.840.1.113883.6.96" displayName="Annual wellness visit">
+                <originalText>
+                  <reference value="#enc3"/>
+                </originalText>
+              </code>
+              <effectiveTime value="20170905"/>
+              <performer>
+                <assignedEntity>
+                  <id root="2.16.840.1.113883.3.9876.3" extension="DR-HENDERSON"/>
+                  <addr use="WP">
+                    <streetAddressLine>124 Main Street, Suite 200</streetAddressLine>
+                    <city>Springfield</city>
+                    <state>MA</state>
+                    <postalCode>01103</postalCode>
+                  </addr>
+                  <telecom value="tel:+1(413)555-1200" use="WP"/>
+                  <assignedPerson>
+                    <name>
+                      <given>Margaret</given>
+                      <family>Henderson</family>
+                      <suffix>MD</suffix>
+                    </name>
+                  </assignedPerson>
+                </assignedEntity>
+              </performer>
+            </encounter>
+          </entry>
+          <entry typeCode="DRIV">
+            <encounter classCode="ENC" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.49" extension="2015-08-01"/>
+              <id root="2.16.840.1.113883.3.9876.8.1" extension="enc4"/>
+              <code code="444971000124105" codeSystem="2.16.840.1.113883.6.96" displayName="Annual wellness visit">
+                <originalText>
+                  <reference value="#enc4"/>
+                </originalText>
+              </code>
+              <effectiveTime value="20160902"/>
+              <performer>
+                <assignedEntity>
+                  <id root="2.16.840.1.113883.3.9876.3" extension="DR-HENDERSON"/>
+                  <addr use="WP">
+                    <streetAddressLine>124 Main Street, Suite 200</streetAddressLine>
+                    <city>Springfield</city>
+                    <state>MA</state>
+                    <postalCode>01103</postalCode>
+                  </addr>
+                  <telecom value="tel:+1(413)555-1200" use="WP"/>
+                  <assignedPerson>
+                    <name>
+                      <given>Margaret</given>
+                      <family>Henderson</family>
+                      <suffix>MD</suffix>
+                    </name>
+                  </assignedPerson>
+                </assignedEntity>
+              </performer>
+            </encounter>
+          </entry>
+        </section>
+      </component>
+    </structuredBody>
+  </component>
+</ClinicalDocument>

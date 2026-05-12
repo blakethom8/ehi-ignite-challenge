@@ -1,0 +1,884 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ClinicalDocument xmlns="urn:hl7-org:v3" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:sdtc="urn:hl7-org:sdtc" xsi:schemaLocation="urn:hl7-org:v3 urn:hl7-org:v3">
+  <realmCode code="US"/>
+  <typeId root="2.16.840.1.113883.1.3" extension="POCD_HD000040"/>
+  <templateId root="2.16.840.1.113883.10.20.22.1.1" extension="2015-08-01"/>
+  <templateId root="2.16.840.1.113883.10.20.22.1.2" extension="2015-08-01"/>
+  <id root="2.16.840.1.113883.19.5.99999.1" extension="CCD-20231215-JENNYM"/>
+  <code code="34133-9" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Summarization of Episode Note"/>
+  <title>Continuity of Care Document - Jenny M</title>
+  <effectiveTime value="20231215103000-0500"/>
+  <confidentialityCode code="N" codeSystem="2.16.840.1.113883.5.25" displayName="Normal"/>
+  <languageCode code="en-US"/>
+  <setId root="2.16.840.1.113883.19.5.99999.19" extension="EB234567"/>
+  <versionNumber value="1"/>
+  <recordTarget>
+    <patientRole>
+      <id extension="JM-55-1965" root="2.16.840.1.113883.19.5.99999.2"/>
+      <addr use="HP">
+        <streetAddressLine>423 Maple Drive</streetAddressLine>
+        <city>Springfield</city>
+        <state>IL</state>
+        <postalCode>62701</postalCode>
+        <country>US</country>
+      </addr>
+      <telecom value="tel:+1(217)555-0142" use="HP"/>
+      <telecom value="mailto:jenny.m@email.com" use="HP"/>
+      <patient>
+        <name use="L">
+          <given>Jenny</given>
+          <given qualifier="IN">M</given>
+          <family>M</family>
+        </name>
+        <administrativeGenderCode code="F" codeSystem="2.16.840.1.113883.5.1" displayName="Female"/>
+        <birthTime value="19650101"/>
+        <maritalStatusCode code="M" codeSystem="2.16.840.1.113883.5.2" displayName="Married"/>
+        <raceCode code="2106-3" codeSystem="2.16.840.1.113883.6.238" displayName="White"/>
+        <ethnicGroupCode code="2186-5" codeSystem="2.16.840.1.113883.6.238" displayName="Not Hispanic or Latino"/>
+        <languageCommunication>
+          <languageCode code="en"/>
+          <preferenceInd value="true"/>
+        </languageCommunication>
+      </patient>
+      <providerOrganization>
+        <id root="2.16.840.1.113883.19.5.99999.1"/>
+        <name>Springfield Women's Health Associates</name>
+        <telecom value="tel:+1(217)555-8800" use="WP"/>
+        <addr use="WP">
+          <streetAddressLine>1550 Medical Park Drive, Suite 200</streetAddressLine>
+          <city>Springfield</city>
+          <state>IL</state>
+          <postalCode>62704</postalCode>
+          <country>US</country>
+        </addr>
+      </providerOrganization>
+    </patientRole>
+  </recordTarget>
+  <author>
+    <time value="20231215103000-0500"/>
+    <assignedAuthor>
+      <id extension="52847" root="2.16.840.1.113883.4.6"/>
+      <code code="207VG0400X" codeSystem="2.16.840.1.113883.6.101" codeSystemName="NUCC" displayName="Obstetrics &amp; Gynecology, Gynecology"/>
+      <addr use="WP">
+        <streetAddressLine>1550 Medical Park Drive, Suite 200</streetAddressLine>
+        <city>Springfield</city>
+        <state>IL</state>
+        <postalCode>62704</postalCode>
+        <country>US</country>
+      </addr>
+      <telecom value="tel:+1(217)555-8800" use="WP"/>
+      <assignedPerson>
+        <name>
+          <given>Patricia</given>
+          <family>Henderson</family>
+          <suffix>MD</suffix>
+        </name>
+      </assignedPerson>
+      <representedOrganization>
+        <id root="2.16.840.1.113883.19.5.99999.1"/>
+        <name>Springfield Women's Health Associates</name>
+        <telecom value="tel:+1(217)555-8800" use="WP"/>
+        <addr use="WP">
+          <streetAddressLine>1550 Medical Park Drive, Suite 200</streetAddressLine>
+          <city>Springfield</city>
+          <state>IL</state>
+          <postalCode>62704</postalCode>
+          <country>US</country>
+        </addr>
+      </representedOrganization>
+    </assignedAuthor>
+  </author>
+  <custodian>
+    <assignedCustodian>
+      <representedCustodianOrganization>
+        <id root="2.16.840.1.113883.19.5.99999.1"/>
+        <name>Springfield Women's Health Associates</name>
+        <telecom value="tel:+1(217)555-8800" use="WP"/>
+        <addr use="WP">
+          <streetAddressLine>1550 Medical Park Drive, Suite 200</streetAddressLine>
+          <city>Springfield</city>
+          <state>IL</state>
+          <postalCode>62704</postalCode>
+          <country>US</country>
+        </addr>
+      </representedCustodianOrganization>
+    </assignedCustodian>
+  </custodian>
+  <documentationOf>
+    <serviceEvent classCode="PCPR">
+      <effectiveTime>
+        <low value="20180315"/>
+        <high value="20231215"/>
+      </effectiveTime>
+      <performer typeCode="PRF">
+        <functionCode code="PCP" codeSystem="2.16.840.1.113883.5.88" displayName="Primary Care Provider"/>
+        <assignedEntity>
+          <id extension="52847" root="2.16.840.1.113883.4.6"/>
+          <code code="207VG0400X" codeSystem="2.16.840.1.113883.6.101" codeSystemName="NUCC" displayName="Obstetrics &amp; Gynecology, Gynecology"/>
+          <addr use="WP">
+            <streetAddressLine>1550 Medical Park Drive, Suite 200</streetAddressLine>
+            <city>Springfield</city>
+            <state>IL</state>
+            <postalCode>62704</postalCode>
+            <country>US</country>
+          </addr>
+          <telecom value="tel:+1(217)555-8800" use="WP"/>
+          <assignedPerson>
+            <name>
+              <given>Patricia</given>
+              <family>Henderson</family>
+              <suffix>MD</suffix>
+            </name>
+          </assignedPerson>
+          <representedOrganization>
+            <id root="2.16.840.1.113883.19.5.99999.1"/>
+            <name>Springfield Women's Health Associates</name>
+            <telecom value="tel:+1(217)555-8800" use="WP"/>
+            <addr use="WP">
+              <streetAddressLine>1550 Medical Park Drive, Suite 200</streetAddressLine>
+              <city>Springfield</city>
+              <state>IL</state>
+              <postalCode>62704</postalCode>
+              <country>US</country>
+            </addr>
+          </representedOrganization>
+        </assignedEntity>
+      </performer>
+    </serviceEvent>
+  </documentationOf>
+  <component>
+    <structuredBody>
+      <component>
+        <section>
+          <templateId root="2.16.840.1.113883.10.20.22.2.5.1" extension="2015-08-01"/>
+          <code code="11450-4" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Problem List"/>
+          <title>Problem List</title>
+          <text>
+            <table border="1" width="100%">
+              <thead>
+                <tr>
+                  <th>Problem</th>
+                  <th>Status</th>
+                  <th>Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td ID="problem1">Fibrocystic breast disease</td>
+                  <td>Active</td>
+                  <td>2015</td>
+                </tr>
+                <tr>
+                  <td ID="problem2">History of BI-RADS 3 breast mass (resolved)</td>
+                  <td>Resolved</td>
+                  <td>2019 - 2020</td>
+                </tr>
+                <tr>
+                  <td ID="problem3">History of human papillomavirus infection</td>
+                  <td>Resolved</td>
+                  <td>2008</td>
+                </tr>
+              </tbody>
+            </table>
+          </text>
+          <entry typeCode="DRIV">
+            <act classCode="ACT" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.3" extension="2015-08-01"/>
+              <id root="2.16.840.1.113883.19.5.99999.3" extension="problem1"/>
+              <code code="CONC" codeSystem="2.16.840.1.113883.5.6"/>
+              <statusCode code="active"/>
+              <effectiveTime>
+                <low value="2015"/>
+              </effectiveTime>
+              <entryRelationship typeCode="SUBJ">
+                <observation classCode="OBS" moodCode="EVN">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.4" extension="2015-08-01"/>
+                  <id root="2.16.840.1.113883.19.5.99999.3" extension="obs1"/>
+                  <code code="29308-4" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Diagnosis"/>
+                  <text>
+                    <reference value="#problem1"/>
+                  </text>
+                  <statusCode code="completed"/>
+                  <effectiveTime>
+                    <low value="2015"/>
+                  </effectiveTime>
+                  <value xsi:type="CD" code="28486009" codeSystem="2.16.840.1.113883.6.96" codeSystemName="SNOMED CT" displayName="Fibrocystic disease of breast">
+                    <originalText>
+                      <reference value="#problem1"/>
+                    </originalText>
+                  </value>
+                  <entryRelationship typeCode="REFR">
+                    <observation classCode="OBS" moodCode="EVN">
+                      <templateId root="2.16.840.1.113883.10.20.22.4.6"/>
+                      <code code="33999-4" codeSystem="2.16.840.1.113883.6.1" displayName="Status"/>
+                      <statusCode code="completed"/>
+                      <value xsi:type="CE" code="55561003" codeSystem="2.16.840.1.113883.6.96" displayName="Active"/>
+                    </observation>
+                  </entryRelationship>
+                </observation>
+              </entryRelationship>
+            </act>
+          </entry>
+          <entry typeCode="DRIV">
+            <act classCode="ACT" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.3" extension="2015-08-01"/>
+              <id root="2.16.840.1.113883.19.5.99999.3" extension="problem2"/>
+              <code code="CONC" codeSystem="2.16.840.1.113883.5.6"/>
+              <statusCode code="completed"/>
+              <effectiveTime>
+                <low value="2019"/>
+                <high value="2020"/>
+              </effectiveTime>
+              <entryRelationship typeCode="SUBJ">
+                <observation classCode="OBS" moodCode="EVN">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.4" extension="2015-08-01"/>
+                  <id root="2.16.840.1.113883.19.5.99999.3" extension="obs2"/>
+                  <code code="29308-4" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Diagnosis"/>
+                  <text>
+                    <reference value="#problem2"/>
+                  </text>
+                  <statusCode code="completed"/>
+                  <effectiveTime>
+                    <low value="2019"/>
+                    <high value="2020"/>
+                  </effectiveTime>
+                  <value xsi:type="CD" code="416471007" codeSystem="2.16.840.1.113883.6.96" codeSystemName="SNOMED CT" displayName="Benign neoplasm of breast">
+                    <originalText>
+                      <reference value="#problem2"/>
+                    </originalText>
+                  </value>
+                  <entryRelationship typeCode="REFR">
+                    <observation classCode="OBS" moodCode="EVN">
+                      <templateId root="2.16.840.1.113883.10.20.22.4.6"/>
+                      <code code="33999-4" codeSystem="2.16.840.1.113883.6.1" displayName="Status"/>
+                      <statusCode code="completed"/>
+                      <value xsi:type="CE" code="413322009" codeSystem="2.16.840.1.113883.6.96" displayName="Resolved"/>
+                    </observation>
+                  </entryRelationship>
+                </observation>
+              </entryRelationship>
+            </act>
+          </entry>
+          <entry typeCode="DRIV">
+            <act classCode="ACT" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.3" extension="2015-08-01"/>
+              <id root="2.16.840.1.113883.19.5.99999.3" extension="problem3"/>
+              <code code="CONC" codeSystem="2.16.840.1.113883.5.6"/>
+              <statusCode code="completed"/>
+              <effectiveTime>
+                <low value="2008"/>
+              </effectiveTime>
+              <entryRelationship typeCode="SUBJ">
+                <observation classCode="OBS" moodCode="EVN">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.4" extension="2015-08-01"/>
+                  <id root="2.16.840.1.113883.19.5.99999.3" extension="obs3"/>
+                  <code code="29308-4" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Diagnosis"/>
+                  <text>
+                    <reference value="#problem3"/>
+                  </text>
+                  <statusCode code="completed"/>
+                  <effectiveTime>
+                    <low value="2008"/>
+                  </effectiveTime>
+                  <value xsi:type="CD" code="240532009" codeSystem="2.16.840.1.113883.6.96" codeSystemName="SNOMED CT" displayName="Human papillomavirus infection">
+                    <originalText>
+                      <reference value="#problem3"/>
+                    </originalText>
+                  </value>
+                  <entryRelationship typeCode="REFR">
+                    <observation classCode="OBS" moodCode="EVN">
+                      <templateId root="2.16.840.1.113883.10.20.22.4.6"/>
+                      <code code="33999-4" codeSystem="2.16.840.1.113883.6.1" displayName="Status"/>
+                      <statusCode code="completed"/>
+                      <value xsi:type="CE" code="413322009" codeSystem="2.16.840.1.113883.6.96" displayName="Resolved"/>
+                    </observation>
+                  </entryRelationship>
+                </observation>
+              </entryRelationship>
+            </act>
+          </entry>
+        </section>
+      </component>
+      <component>
+        <section>
+          <templateId root="2.16.840.1.113883.10.20.22.2.1.1" extension="2014-06-09"/>
+          <code code="10160-0" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="History of Medication Use"/>
+          <title>Medications</title>
+          <text>
+            <table border="1" width="100%">
+              <thead>
+                <tr>
+                  <th>Medication</th>
+                  <th>Dose</th>
+                  <th>Dates</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td ID="med1">Ethinyl estradiol / norethindrone (oral contraceptive)</td>
+                  <td>1 tablet daily</td>
+                  <td>1990 - 2010</td>
+                  <td>Discontinued</td>
+                </tr>
+                <tr>
+                  <td ID="med2">No current medications prescribed by this provider</td>
+                  <td>N/A</td>
+                  <td>N/A</td>
+                  <td>N/A</td>
+                </tr>
+              </tbody>
+            </table>
+          </text>
+          <entry typeCode="DRIV">
+            <substanceAdministration classCode="SBADM" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.16" extension="2014-06-09"/>
+              <id root="2.16.840.1.113883.19.5.99999.4" extension="med1"/>
+              <text>
+                <reference value="#med1"/>
+              </text>
+              <statusCode code="completed"/>
+              <effectiveTime xsi:type="IVL_TS">
+                <low value="1990"/>
+                <high value="2010"/>
+              </effectiveTime>
+              <effectiveTime xsi:type="PIVL_TS" institutionSpecified="true" operator="A">
+                <period value="1" unit="d"/>
+              </effectiveTime>
+              <doseQuantity value="1"/>
+              <consumable>
+                <manufacturedProduct classCode="MANU">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.23" extension="2014-06-09"/>
+                  <id root="2.16.840.1.113883.19.5.99999.5" extension="prod1"/>
+                  <manufacturedMaterial>
+                    <code code="748796" codeSystem="2.16.840.1.113883.6.88" codeSystemName="RxNorm" displayName="ethinyl estradiol 0.035 MG / norethindrone 1 MG Oral Tablet">
+                      <originalText>
+                        <reference value="#med1"/>
+                      </originalText>
+                    </code>
+                  </manufacturedMaterial>
+                </manufacturedProduct>
+              </consumable>
+            </substanceAdministration>
+          </entry>
+        </section>
+      </component>
+      <component>
+        <section>
+          <templateId root="2.16.840.1.113883.10.20.22.2.6.1" extension="2015-08-01"/>
+          <code code="48765-2" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Allergies and Adverse Reactions"/>
+          <title>Allergies and Intolerances</title>
+          <text>
+            <table border="1" width="100%">
+              <thead>
+                <tr>
+                  <th>Allergen</th>
+                  <th>Reaction</th>
+                  <th>Severity</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td ID="allergy1">Sulfonamide antibiotics</td>
+                  <td>Rash</td>
+                  <td>Moderate</td>
+                </tr>
+              </tbody>
+            </table>
+          </text>
+          <entry typeCode="DRIV">
+            <act classCode="ACT" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.30" extension="2015-08-01"/>
+              <id root="2.16.840.1.113883.19.5.99999.6" extension="allergy1"/>
+              <code code="CONC" codeSystem="2.16.840.1.113883.5.6"/>
+              <statusCode code="active"/>
+              <effectiveTime>
+                <low value="2005"/>
+              </effectiveTime>
+              <entryRelationship typeCode="SUBJ">
+                <observation classCode="OBS" moodCode="EVN">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.7" extension="2014-06-09"/>
+                  <id root="2.16.840.1.113883.19.5.99999.6" extension="obs-allergy1"/>
+                  <code code="ASSERTION" codeSystem="2.16.840.1.113883.5.4"/>
+                  <text>
+                    <reference value="#allergy1"/>
+                  </text>
+                  <statusCode code="completed"/>
+                  <effectiveTime>
+                    <low value="2005"/>
+                  </effectiveTime>
+                  <value xsi:type="CD" code="419511003" codeSystem="2.16.840.1.113883.6.96" codeSystemName="SNOMED CT" displayName="Propensity to adverse reactions to drug"/>
+                  <participant typeCode="CSM">
+                    <participantRole classCode="MANU">
+                      <playingEntity classCode="MMAT">
+                        <code code="387406002" codeSystem="2.16.840.1.113883.6.96" codeSystemName="SNOMED CT" displayName="Sulfonamide">
+                          <originalText>
+                            <reference value="#allergy1"/>
+                          </originalText>
+                        </code>
+                      </playingEntity>
+                    </participantRole>
+                  </participant>
+                  <entryRelationship typeCode="MFST" inversionInd="true">
+                    <observation classCode="OBS" moodCode="EVN">
+                      <templateId root="2.16.840.1.113883.10.20.22.4.9" extension="2014-06-09"/>
+                      <id root="2.16.840.1.113883.19.5.99999.6" extension="reaction1"/>
+                      <code code="ASSERTION" codeSystem="2.16.840.1.113883.5.4"/>
+                      <text>
+                        <reference value="#allergy1"/>
+                      </text>
+                      <statusCode code="completed"/>
+                      <value xsi:type="CD" code="271807003" codeSystem="2.16.840.1.113883.6.96" codeSystemName="SNOMED CT" displayName="Rash"/>
+                      <entryRelationship typeCode="SUBJ" inversionInd="true">
+                        <observation classCode="OBS" moodCode="EVN">
+                          <templateId root="2.16.840.1.113883.10.20.22.4.8" extension="2014-06-09"/>
+                          <code code="SEV" codeSystem="2.16.840.1.113883.5.4" codeSystemName="ActCode" displayName="Severity"/>
+                          <text>
+                            <reference value="#allergy1"/>
+                          </text>
+                          <statusCode code="completed"/>
+                          <value xsi:type="CD" code="6736007" codeSystem="2.16.840.1.113883.6.96" codeSystemName="SNOMED CT" displayName="Moderate"/>
+                        </observation>
+                      </entryRelationship>
+                    </observation>
+                  </entryRelationship>
+                </observation>
+              </entryRelationship>
+            </act>
+          </entry>
+        </section>
+      </component>
+      <component>
+        <section>
+          <templateId root="2.16.840.1.113883.10.20.22.2.3.1" extension="2015-08-01"/>
+          <code code="30954-2" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Relevant diagnostic tests and/or laboratory data"/>
+          <title>Results</title>
+          <text>
+            <table border="1" width="100%">
+              <thead>
+                <tr>
+                  <th>Test</th>
+                  <th>Date</th>
+                  <th>Result</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td ID="result1">Cervical cytology (Pap test)</td>
+                  <td>2023-03-15</td>
+                  <td>Negative for intraepithelial lesion or malignancy</td>
+                </tr>
+                <tr>
+                  <td ID="result2">Cervical cytology (Pap test)</td>
+                  <td>2022-02-18</td>
+                  <td>Negative for intraepithelial lesion or malignancy</td>
+                </tr>
+                <tr>
+                  <td ID="result3">Cervical cytology (Pap test)</td>
+                  <td>2021-03-10</td>
+                  <td>Negative for intraepithelial lesion or malignancy</td>
+                </tr>
+                <tr>
+                  <td ID="result4">Mammography screening bilateral</td>
+                  <td>2022-11-08</td>
+                  <td>BI-RADS 1 - Negative</td>
+                </tr>
+                <tr>
+                  <td ID="result5">Mammography screening bilateral</td>
+                  <td>2021-10-22</td>
+                  <td>BI-RADS 2 - Benign finding (fibrocystic changes)</td>
+                </tr>
+                <tr>
+                  <td ID="result6">Mammography screening bilateral</td>
+                  <td>2020-09-15</td>
+                  <td>BI-RADS 2 - Benign finding (stable mass, resolved from BI-RADS 3)</td>
+                </tr>
+                <tr>
+                  <td ID="result7">Mammography diagnostic with ultrasound</td>
+                  <td>2019-11-20</td>
+                  <td>BI-RADS 3 - Probably benign finding, short interval follow-up suggested</td>
+                </tr>
+              </tbody>
+            </table>
+          </text>
+          <entry typeCode="DRIV">
+            <organizer classCode="BATTERY" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.1" extension="2015-08-01"/>
+              <id root="2.16.840.1.113883.19.5.99999.7" extension="result-panel1"/>
+              <code code="47528-5" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Cytology report of Cervical or vaginal smear or scraping Cyto stain"/>
+              <statusCode code="completed"/>
+              <effectiveTime value="20230315"/>
+              <component>
+                <observation classCode="OBS" moodCode="EVN">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.2" extension="2015-08-01"/>
+                  <id root="2.16.840.1.113883.19.5.99999.7" extension="result1"/>
+                  <code code="10524-7" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Microscopic observation [Identifier] in Cervix by Cyto stain"/>
+                  <text>
+                    <reference value="#result1"/>
+                  </text>
+                  <statusCode code="completed"/>
+                  <effectiveTime value="20230315"/>
+                  <value xsi:type="CD" code="373887005" codeSystem="2.16.840.1.113883.6.96" codeSystemName="SNOMED CT" displayName="Negative for intraepithelial lesion or malignancy"/>
+                  <interpretationCode code="N" codeSystem="2.16.840.1.113883.5.83" displayName="Normal"/>
+                </observation>
+              </component>
+            </organizer>
+          </entry>
+          <entry typeCode="DRIV">
+            <organizer classCode="BATTERY" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.1" extension="2015-08-01"/>
+              <id root="2.16.840.1.113883.19.5.99999.7" extension="result-panel2"/>
+              <code code="47528-5" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Cytology report of Cervical or vaginal smear or scraping Cyto stain"/>
+              <statusCode code="completed"/>
+              <effectiveTime value="20220218"/>
+              <component>
+                <observation classCode="OBS" moodCode="EVN">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.2" extension="2015-08-01"/>
+                  <id root="2.16.840.1.113883.19.5.99999.7" extension="result2"/>
+                  <code code="10524-7" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Microscopic observation [Identifier] in Cervix by Cyto stain"/>
+                  <text>
+                    <reference value="#result2"/>
+                  </text>
+                  <statusCode code="completed"/>
+                  <effectiveTime value="20220218"/>
+                  <value xsi:type="CD" code="373887005" codeSystem="2.16.840.1.113883.6.96" codeSystemName="SNOMED CT" displayName="Negative for intraepithelial lesion or malignancy"/>
+                  <interpretationCode code="N" codeSystem="2.16.840.1.113883.5.83" displayName="Normal"/>
+                </observation>
+              </component>
+            </organizer>
+          </entry>
+          <entry typeCode="DRIV">
+            <organizer classCode="BATTERY" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.1" extension="2015-08-01"/>
+              <id root="2.16.840.1.113883.19.5.99999.7" extension="result-panel3"/>
+              <code code="47528-5" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Cytology report of Cervical or vaginal smear or scraping Cyto stain"/>
+              <statusCode code="completed"/>
+              <effectiveTime value="20210310"/>
+              <component>
+                <observation classCode="OBS" moodCode="EVN">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.2" extension="2015-08-01"/>
+                  <id root="2.16.840.1.113883.19.5.99999.7" extension="result3"/>
+                  <code code="10524-7" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Microscopic observation [Identifier] in Cervix by Cyto stain"/>
+                  <text>
+                    <reference value="#result3"/>
+                  </text>
+                  <statusCode code="completed"/>
+                  <effectiveTime value="20210310"/>
+                  <value xsi:type="CD" code="373887005" codeSystem="2.16.840.1.113883.6.96" codeSystemName="SNOMED CT" displayName="Negative for intraepithelial lesion or malignancy"/>
+                  <interpretationCode code="N" codeSystem="2.16.840.1.113883.5.83" displayName="Normal"/>
+                </observation>
+              </component>
+            </organizer>
+          </entry>
+          <entry typeCode="DRIV">
+            <observation classCode="OBS" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.2" extension="2015-08-01"/>
+              <id root="2.16.840.1.113883.19.5.99999.7" extension="result4"/>
+              <code code="24606-6" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Mammography Breast - bilateral"/>
+              <text>
+                <reference value="#result4"/>
+              </text>
+              <statusCode code="completed"/>
+              <effectiveTime value="20221108"/>
+              <value xsi:type="CD" code="399000009" codeSystem="2.16.840.1.113883.6.96" codeSystemName="SNOMED CT" displayName="Breast imaging assessment - BI-RADS 1 - Negative"/>
+              <interpretationCode code="N" codeSystem="2.16.840.1.113883.5.83" displayName="Normal"/>
+            </observation>
+          </entry>
+          <entry typeCode="DRIV">
+            <observation classCode="OBS" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.2" extension="2015-08-01"/>
+              <id root="2.16.840.1.113883.19.5.99999.7" extension="result5"/>
+              <code code="24606-6" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Mammography Breast - bilateral"/>
+              <text>
+                <reference value="#result5"/>
+              </text>
+              <statusCode code="completed"/>
+              <effectiveTime value="20211022"/>
+              <value xsi:type="CD" code="399131007" codeSystem="2.16.840.1.113883.6.96" codeSystemName="SNOMED CT" displayName="Breast imaging assessment - BI-RADS 2 - Benign finding"/>
+              <interpretationCode code="N" codeSystem="2.16.840.1.113883.5.83" displayName="Normal"/>
+            </observation>
+          </entry>
+          <entry typeCode="DRIV">
+            <observation classCode="OBS" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.2" extension="2015-08-01"/>
+              <id root="2.16.840.1.113883.19.5.99999.7" extension="result6"/>
+              <code code="24606-6" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Mammography Breast - bilateral"/>
+              <text>
+                <reference value="#result6"/>
+              </text>
+              <statusCode code="completed"/>
+              <effectiveTime value="20200915"/>
+              <value xsi:type="CD" code="399131007" codeSystem="2.16.840.1.113883.6.96" codeSystemName="SNOMED CT" displayName="Breast imaging assessment - BI-RADS 2 - Benign finding"/>
+              <interpretationCode code="N" codeSystem="2.16.840.1.113883.5.83" displayName="Normal"/>
+            </observation>
+          </entry>
+          <entry typeCode="DRIV">
+            <observation classCode="OBS" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.2" extension="2015-08-01"/>
+              <id root="2.16.840.1.113883.19.5.99999.7" extension="result7"/>
+              <code code="24604-1" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Diagnostic Mammogram Bilateral"/>
+              <text>
+                <reference value="#result7"/>
+              </text>
+              <statusCode code="completed"/>
+              <effectiveTime value="20191120"/>
+              <value xsi:type="CD" code="399303006" codeSystem="2.16.840.1.113883.6.96" codeSystemName="SNOMED CT" displayName="Breast imaging assessment - BI-RADS 3 - Probably benign finding"/>
+              <interpretationCode code="A" codeSystem="2.16.840.1.113883.5.83" displayName="Abnormal"/>
+            </observation>
+          </entry>
+        </section>
+      </component>
+      <component>
+        <section>
+          <templateId root="2.16.840.1.113883.10.20.22.2.22.1" extension="2015-08-01"/>
+          <code code="46240-8" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="History of Encounters"/>
+          <title>Encounters</title>
+          <text>
+            <table border="1" width="100%">
+              <thead>
+                <tr>
+                  <th>Encounter</th>
+                  <th>Date</th>
+                  <th>Provider</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td ID="enc1">Annual gynecologic examination</td>
+                  <td>2023-03-15</td>
+                  <td>Dr. Patricia Henderson</td>
+                </tr>
+                <tr>
+                  <td ID="enc2">Annual gynecologic examination</td>
+                  <td>2022-02-18</td>
+                  <td>Dr. Patricia Henderson</td>
+                </tr>
+                <tr>
+                  <td ID="enc3">Annual gynecologic examination</td>
+                  <td>2021-03-10</td>
+                  <td>Dr. Patricia Henderson</td>
+                </tr>
+                <tr>
+                  <td ID="enc4">Annual gynecologic examination</td>
+                  <td>2020-01-22</td>
+                  <td>Dr. Patricia Henderson</td>
+                </tr>
+                <tr>
+                  <td ID="enc5">Follow-up visit for breast mass</td>
+                  <td>2019-12-05</td>
+                  <td>Dr. Patricia Henderson</td>
+                </tr>
+                <tr>
+                  <td ID="enc6">Annual gynecologic examination</td>
+                  <td>2019-02-14</td>
+                  <td>Dr. Patricia Henderson</td>
+                </tr>
+                <tr>
+                  <td ID="enc7">Annual gynecologic examination</td>
+                  <td>2018-03-15</td>
+                  <td>Dr. Patricia Henderson</td>
+                </tr>
+              </tbody>
+            </table>
+          </text>
+          <entry typeCode="DRIV">
+            <encounter classCode="ENC" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.49" extension="2015-08-01"/>
+              <id root="2.16.840.1.113883.19.5.99999.8" extension="enc1"/>
+              <code code="185468002" codeSystem="2.16.840.1.113883.6.96" codeSystemName="SNOMED CT" displayName="Annual gynecologic examination">
+                <originalText>
+                  <reference value="#enc1"/>
+                </originalText>
+              </code>
+              <text>
+                <reference value="#enc1"/>
+              </text>
+              <effectiveTime value="20230315"/>
+              <performer>
+                <assignedEntity>
+                  <id extension="52847" root="2.16.840.1.113883.4.6"/>
+                  <code code="207VG0400X" codeSystem="2.16.840.1.113883.6.101" codeSystemName="NUCC" displayName="Obstetrics &amp; Gynecology, Gynecology"/>
+                  <assignedPerson>
+                    <name>
+                      <given>Patricia</given>
+                      <family>Henderson</family>
+                      <suffix>MD</suffix>
+                    </name>
+                  </assignedPerson>
+                </assignedEntity>
+              </performer>
+            </encounter>
+          </entry>
+          <entry typeCode="DRIV">
+            <encounter classCode="ENC" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.49" extension="2015-08-01"/>
+              <id root="2.16.840.1.113883.19.5.99999.8" extension="enc2"/>
+              <code code="185468002" codeSystem="2.16.840.1.113883.6.96" codeSystemName="SNOMED CT" displayName="Annual gynecologic examination">
+                <originalText>
+                  <reference value="#enc2"/>
+                </originalText>
+              </code>
+              <text>
+                <reference value="#enc2"/>
+              </text>
+              <effectiveTime value="20220218"/>
+              <performer>
+                <assignedEntity>
+                  <id extension="52847" root="2.16.840.1.113883.4.6"/>
+                  <code code="207VG0400X" codeSystem="2.16.840.1.113883.6.101" codeSystemName="NUCC" displayName="Obstetrics &amp; Gynecology, Gynecology"/>
+                  <assignedPerson>
+                    <name>
+                      <given>Patricia</given>
+                      <family>Henderson</family>
+                      <suffix>MD</suffix>
+                    </name>
+                  </assignedPerson>
+                </assignedEntity>
+              </performer>
+            </encounter>
+          </entry>
+          <entry typeCode="DRIV">
+            <encounter classCode="ENC" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.49" extension="2015-08-01"/>
+              <id root="2.16.840.1.113883.19.5.99999.8" extension="enc3"/>
+              <code code="185468002" codeSystem="2.16.840.1.113883.6.96" codeSystemName="SNOMED CT" displayName="Annual gynecologic examination">
+                <originalText>
+                  <reference value="#enc3"/>
+                </originalText>
+              </code>
+              <text>
+                <reference value="#enc3"/>
+              </text>
+              <effectiveTime value="20210310"/>
+              <performer>
+                <assignedEntity>
+                  <id extension="52847" root="2.16.840.1.113883.4.6"/>
+                  <code code="207VG0400X" codeSystem="2.16.840.1.113883.6.101" codeSystemName="NUCC" displayName="Obstetrics &amp; Gynecology, Gynecology"/>
+                  <assignedPerson>
+                    <name>
+                      <given>Patricia</given>
+                      <family>Henderson</family>
+                      <suffix>MD</suffix>
+                    </name>
+                  </assignedPerson>
+                </assignedEntity>
+              </performer>
+            </encounter>
+          </entry>
+          <entry typeCode="DRIV">
+            <encounter classCode="ENC" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.49" extension="2015-08-01"/>
+              <id root="2.16.840.1.113883.19.5.99999.8" extension="enc4"/>
+              <code code="185468002" codeSystem="2.16.840.1.113883.6.96" codeSystemName="SNOMED CT" displayName="Annual gynecologic examination">
+                <originalText>
+                  <reference value="#enc4"/>
+                </originalText>
+              </code>
+              <text>
+                <reference value="#enc4"/>
+              </text>
+              <effectiveTime value="20200122"/>
+              <performer>
+                <assignedEntity>
+                  <id extension="52847" root="2.16.840.1.113883.4.6"/>
+                  <code code="207VG0400X" codeSystem="2.16.840.1.113883.6.101" codeSystemName="NUCC" displayName="Obstetrics &amp; Gynecology, Gynecology"/>
+                  <assignedPerson>
+                    <name>
+                      <given>Patricia</given>
+                      <family>Henderson</family>
+                      <suffix>MD</suffix>
+                    </name>
+                  </assignedPerson>
+                </assignedEntity>
+              </performer>
+            </encounter>
+          </entry>
+          <entry typeCode="DRIV">
+            <encounter classCode="ENC" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.49" extension="2015-08-01"/>
+              <id root="2.16.840.1.113883.19.5.99999.8" extension="enc5"/>
+              <code code="308335008" codeSystem="2.16.840.1.113883.6.96" codeSystemName="SNOMED CT" displayName="Follow-up encounter">
+                <originalText>
+                  <reference value="#enc5"/>
+                </originalText>
+              </code>
+              <text>
+                <reference value="#enc5"/>
+              </text>
+              <effectiveTime value="20191205"/>
+              <performer>
+                <assignedEntity>
+                  <id extension="52847" root="2.16.840.1.113883.4.6"/>
+                  <code code="207VG0400X" codeSystem="2.16.840.1.113883.6.101" codeSystemName="NUCC" displayName="Obstetrics &amp; Gynecology, Gynecology"/>
+                  <assignedPerson>
+                    <name>
+                      <given>Patricia</given>
+                      <family>Henderson</family>
+                      <suffix>MD</suffix>
+                    </name>
+                  </assignedPerson>
+                </assignedEntity>
+              </performer>
+            </encounter>
+          </entry>
+          <entry typeCode="DRIV">
+            <encounter classCode="ENC" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.49" extension="2015-08-01"/>
+              <id root="2.16.840.1.113883.19.5.99999.8" extension="enc6"/>
+              <code code="185468002" codeSystem="2.16.840.1.113883.6.96" codeSystemName="SNOMED CT" displayName="Annual gynecologic examination">
+                <originalText>
+                  <reference value="#enc6"/>
+                </originalText>
+              </code>
+              <text>
+                <reference value="#enc6"/>
+              </text>
+              <effectiveTime value="20190214"/>
+              <performer>
+                <assignedEntity>
+                  <id extension="52847" root="2.16.840.1.113883.4.6"/>
+                  <code code="207VG0400X" codeSystem="2.16.840.1.113883.6.101" codeSystemName="NUCC" displayName="Obstetrics &amp; Gynecology, Gynecology"/>
+                  <assignedPerson>
+                    <name>
+                      <given>Patricia</given>
+                      <family>Henderson</family>
+                      <suffix>MD</suffix>
+                    </name>
+                  </assignedPerson>
+                </assignedEntity>
+              </performer>
+            </encounter>
+          </entry>
+          <entry typeCode="DRIV">
+            <encounter classCode="ENC" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.49" extension="2015-08-01"/>
+              <id root="2.16.840.1.113883.19.5.99999.8" extension="enc7"/>
+              <code code="185468002" codeSystem="2.16.840.1.113883.6.96" codeSystemName="SNOMED CT" displayName="Annual gynecologic examination">
+                <originalText>
+                  <reference value="#enc7"/>
+                </originalText>
+              </code>
+              <text>
+                <reference value="#enc7"/>
+              </text>
+              <effectiveTime value="20180315"/>
+              <performer>
+                <assignedEntity>
+                  <id extension="52847" root="2.16.840.1.113883.4.6"/>
+                  <code code="207VG0400X" codeSystem="2.16.840.1.113883.6.101" codeSystemName="NUCC" displayName="Obstetrics &amp; Gynecology, Gynecology"/>
+                  <assignedPerson>
+                    <name>
+                      <given>Patricia</given>
+                      <family>Henderson</family>
+                      <suffix>MD</suffix>
+                    </name>
+                  </assignedPerson>
+                </assignedEntity>
+              </performer>
+            </encounter>
+          </entry>
+        </section>
+      </component>
+    </structuredBody>
+  </component>
+</ClinicalDocument>

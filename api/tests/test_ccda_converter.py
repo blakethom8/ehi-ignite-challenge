@@ -32,6 +32,112 @@ def _write_ccda(path: Path) -> None:
     )
 
 
+def _write_problems_and_medications_ccda(path: Path) -> None:
+    """Minimal C-CDA fixture with a Problem List and Medications section.
+
+    Mirrors the structure of the Cerner ``problems-and-medications.xml`` sample
+    that lives in ``ehi-atlas/corpus/_sources/josh-ccdas/raw/`` after the
+    corpus repo is cloned. That corpus is gitignored, so the test inlines
+    a small equivalent here: 5 problem entries (each with a nested ``Status``
+    observation whose displayName the fallback parser must NOT promote to a
+    Condition) plus 6 ``substanceAdministration`` entries.
+    """
+
+    def _problem_entry(code: str, display: str) -> str:
+        return f"""
+      <entry>
+        <act classCode="ACT" moodCode="EVN">
+          <code code="CONC" displayName="Concern"/>
+          <statusCode code="active"/>
+          <entryRelationship typeCode="SUBJ">
+            <observation classCode="OBS" moodCode="EVN">
+              <code code="55607006" displayName="Problem" codeSystem="2.16.840.1.113883.6.96"/>
+              <statusCode code="completed"/>
+              <value xsi:type="CD" code="{code}" displayName="{display}" codeSystem="2.16.840.1.113883.6.96"/>
+              <entryRelationship typeCode="REFR">
+                <observation classCode="OBS" moodCode="EVN">
+                  <code code="33999-4" displayName="Status" codeSystem="2.16.840.1.113883.6.1"/>
+                  <statusCode code="completed"/>
+                  <value xsi:type="CD" code="55561003" displayName="Active" codeSystem="2.16.840.1.113883.6.96"/>
+                </observation>
+              </entryRelationship>
+            </observation>
+          </entryRelationship>
+        </act>
+      </entry>"""
+
+    def _medication_entry(code: str, display: str) -> str:
+        return f"""
+      <entry>
+        <substanceAdministration classCode="SBADM" moodCode="EVN">
+          <statusCode code="active"/>
+          <consumable>
+            <manufacturedProduct>
+              <manufacturedMaterial>
+                <code code="{code}" displayName="{display}" codeSystem="2.16.840.1.113883.6.88"/>
+              </manufacturedMaterial>
+            </manufacturedProduct>
+          </consumable>
+        </substanceAdministration>
+      </entry>"""
+
+    problems = "".join(
+        _problem_entry(code, display)
+        for code, display in (
+            ("59621000", "Essential hypertension"),
+            ("44054006", "Diabetes mellitus type 2"),
+            ("13644009", "Hypercholesterolemia"),
+            ("194828000", "Angina"),
+            ("195967001", "Asthma"),
+        )
+    )
+    medications = "".join(
+        _medication_entry(code, display)
+        for code, display in (
+            ("617314", "Lipitor 20 mg oral tablet"),
+            ("310965", "Aspirin 81 mg oral tablet"),
+            ("197361", "Metformin 500 mg oral tablet"),
+            ("314076", "Lisinopril 10 mg oral tablet"),
+            ("198211", "Albuterol 90 mcg/actuation inhaler"),
+            ("204384", "Atorvastatin 40 mg oral tablet"),
+        )
+    )
+
+    path.write_text(
+        f"""<?xml version="1.0" encoding="UTF-8"?>
+<ClinicalDocument xmlns="urn:hl7-org:v3" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <recordTarget>
+    <patientRole>
+      <patient>
+        <name><given>Cerner</given><family>Sample</family></name>
+        <administrativeGenderCode code="F"/>
+        <birthTime value="19500101"/>
+      </patient>
+    </patientRole>
+  </recordTarget>
+  <title>Problems and Medications</title>
+  <component>
+    <structuredBody>
+      <component>
+        <section>
+          <code code="11450-4" displayName="Problem List" codeSystem="2.16.840.1.113883.6.1"/>
+          <title>Problems</title>{problems}
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="10160-0" displayName="History of Medication Use" codeSystem="2.16.840.1.113883.6.1"/>
+          <title>Medications</title>{medications}
+        </section>
+      </component>
+    </structuredBody>
+  </component>
+</ClinicalDocument>
+""",
+        encoding="utf-8",
+    )
+
+
 def _bundle() -> dict:
     return {
         "resourceType": "Bundle",
@@ -109,10 +215,12 @@ class CcdaConverterTests(unittest.TestCase):
                 ccda.convert_ccda_to_fhir_bundle(str(path), "ccda-summary")
 
     def test_fallback_does_not_turn_problem_statuses_into_conditions(self) -> None:
-        path = REPO_ROOT / "ehi-atlas/corpus/_sources/josh-ccdas/raw/Cerner Samples/problems-and-medications.xml"
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "problems-and-medications.xml"
+            _write_problems_and_medications_ccda(path)
 
-        with patch.dict("os.environ", {}, clear=True):
-            bundle = ccda.convert_ccda_to_fhir_bundle(str(path), "ccda-cerner", mode="fallback")
+            with patch.dict("os.environ", {}, clear=True):
+                bundle = ccda.convert_ccda_to_fhir_bundle(str(path), "ccda-cerner", mode="fallback")
 
         resources = [entry["resource"] for entry in bundle["entry"]]
         conditions = [resource for resource in resources if resource["resourceType"] == "Condition"]

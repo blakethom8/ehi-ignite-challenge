@@ -7,14 +7,12 @@ import {
   Braces,
   CalendarDays,
   CheckCircle2,
-  CircleHelp,
   Download,
   FolderOpen,
   FileSearch,
   FileText,
   FileUp,
   Loader2,
-  Layers3,
   Pencil,
   Play,
   Plus,
@@ -70,29 +68,6 @@ const pageCopy: Record<AggregatorPage, { badge: string; title: string; body: str
       "Pin a reviewed harmonization run as the active chart snapshot for FHIR Charts, Caspian, and future clinical workflows.",
   },
 };
-
-function HelpButton({ title, body }: { title: string; body: string }) {
-  const [open, setOpen] = useState(false);
-
-  return (
-    <div className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((value) => !value)}
-        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[#dfe4ea] bg-white text-[#667085] hover:border-[#5b76fe] hover:text-[#5b76fe]"
-        aria-label={`Help: ${title}`}
-      >
-        <CircleHelp size={16} />
-      </button>
-      {open && (
-        <div className="absolute right-0 z-20 mt-2 w-72 rounded-xl border border-[#dfe4ea] bg-white p-4 text-left shadow-lg">
-          <p className="text-sm font-semibold text-[#1c1c1e]">{title}</p>
-          <p className="mt-1 text-sm leading-6 text-[#667085]">{body}</p>
-        </div>
-      )}
-    </div>
-  );
-}
 
 function MetricCard({ label, value, detail }: { label: string; value: string | number; detail: string }) {
   return (
@@ -1529,7 +1504,6 @@ function SourceInventoryPage({
 
 function ReadinessPage({
   sources,
-  patientId,
   collectionId,
   latestRun,
   publishedState,
@@ -1542,11 +1516,8 @@ function ReadinessPage({
   onPublish,
   onActivateSnapshot,
   onUnpublish,
-  onDeleteWorkspace,
-  isDeleting,
 }: {
   sources: AggregationEnvironmentResponse;
-  patientId: string;
   collectionId: string;
   latestRun: HarmonizeRunResponse | null;
   publishedState: PublishedChartStateResponse | null;
@@ -1559,14 +1530,7 @@ function ReadinessPage({
   onPublish: () => void;
   onActivateSnapshot: (snapshotId: string) => void;
   onUnpublish: () => void;
-  onDeleteWorkspace: () => void;
-  isDeleting: boolean;
 }) {
-  const uploadedCount = sources.uploaded_files.length;
-  const preparedCount = sources.uploaded_files.filter((file) => file.parse_status === "structured" || file.parse_status === "extracted").length;
-  const needsPreparationCount = sources.uploaded_files.filter((file) => file.parse_status === "ready_to_extract").length;
-  const needsContextCount = sources.uploaded_files.filter((file) => !file.description || !file.contains.length).length;
-  const canDeleteWorkspace = patientId.startsWith("workspace-");
   const activeSnapshot = publishedState?.active_snapshot ?? null;
   const snapshots = publishedState?.snapshots ?? [];
   const latestRunIsActive = activeSnapshot?.run_id === latestRun?.run_id;
@@ -1590,7 +1554,7 @@ function ReadinessPage({
   return (
     <div className="space-y-5">
       <section className="rounded-lg border border-[#dfe4ea] bg-white p-4">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="max-w-3xl">
           <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-wider text-[#5b76fe]">Workspace</p>
             <h2 className="mt-1 text-xl font-semibold text-[#1c1c1e]">{sources.patient_label}</h2>
@@ -1600,87 +1564,7 @@ function ReadinessPage({
               of raw uploads or transient previews.
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Link to={`/patient-record/sources?patient=${patientId}`} className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#dfe4ea] bg-white px-3 py-2 text-sm font-semibold text-[#555a6a] hover:border-[#5b76fe] hover:text-[#5b76fe]">
-              <FileUp size={15} />
-              Add sources
-            </Link>
-            <Link to={`/patient-record/harmonize?patient=${patientId}`} className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#dfe4ea] bg-white px-3 py-2 text-sm font-semibold text-[#555a6a] hover:border-[#5b76fe] hover:text-[#5b76fe]">
-              <Play size={15} />
-              Harmonized Record
-            </Link>
-            <Link to={`/fhir-charts?patient=${patientId}`} className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#5b76fe] px-3 py-2 text-sm font-semibold text-white">
-              <Layers3 size={15} />
-              Open FHIR Charts
-            </Link>
-            {canDeleteWorkspace && (
-              <button
-                type="button"
-                onClick={onDeleteWorkspace}
-                disabled={isDeleting}
-                className="inline-flex items-center justify-center gap-2 rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <Trash2 size={15} />
-                {isDeleting ? "Deleting..." : "Delete workspace"}
-              </button>
-            )}
-          </div>
         </div>
-      </section>
-
-      {activeSnapshot && (
-        <section className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-1 text-xs font-semibold text-emerald-800">
-                  <CheckCircle2 size={13} />
-                  Active chart snapshot
-                </span>
-                {latestRunIsActive && (
-                  <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-800">
-                    Latest run is live
-                  </span>
-                )}
-              </div>
-              <p className="mt-2 text-sm leading-6 text-emerald-950">
-                FHIR Charts and Caspian should now read from snapshot{" "}
-                <span className="font-mono">{activeSnapshot.snapshot_id.slice(0, 8)}</span>{" "}
-                from run <span className="font-mono">{activeSnapshot.run_id.slice(0, 8)}</span>.
-              </p>
-              <p className="mt-1 text-xs leading-5 text-emerald-900">
-                Active since {dateLabel(activeSnapshot.activated_at ?? activeSnapshot.published_at)}
-                {activeSnapshot.activated_from_snapshot_id
-                  ? ` · rolled from ${activeSnapshot.activated_from_snapshot_id.slice(0, 8)}`
-                  : ""}{" "}
-                · {activeSnapshot.change_summary.headline}
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Link
-                to={`/fhir-charts?patient=${patientId}`}
-                className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#5b76fe] px-3 py-2 text-sm font-semibold text-white"
-              >
-                <Layers3 size={15} />
-                Open FHIR Charts
-              </Link>
-              <Link
-                to={`/caspian?patient=${patientId}`}
-                className="inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-100"
-              >
-                Caspian
-                <ArrowRight size={14} />
-              </Link>
-            </div>
-          </div>
-        </section>
-      )}
-
-      <section className="grid gap-3 md:grid-cols-4">
-        <MetricCard label="Active snapshot" value={activeSnapshot ? "Published" : "None"} detail={activeSnapshot ? `Run ${activeSnapshot.run_id.slice(0, 8)}` : "No chart is active."} />
-        <MetricCard label="Latest run" value={latestRun ? "Complete" : "Not run"} detail={latestRun ? `${latestRun.summary.total_candidate_facts} candidate facts.` : "Run harmonization first."} />
-        <MetricCard label="Review items" value={latestRun?.summary.review_item_count ?? "—"} detail="Must be resolved before publish." />
-        <MetricCard label="Sources" value={uploadedCount} detail="Uploaded files in this workspace." />
       </section>
 
       <section className="grid gap-4 lg:grid-cols-[1.05fr_0.8fr]">
@@ -1701,11 +1585,32 @@ function ReadinessPage({
                 completed run as the chart state downstream screens should use.
               </p>
             </div>
-            <HelpButton
-              title="What publish means now"
-              body="Publish pins a harmonization run as the active chart snapshot. Prior snapshots remain available for rollback and audit."
-            />
           </div>
+
+          {activeSnapshot && (
+            <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-1 text-xs font-semibold text-emerald-800">
+                  <CheckCircle2 size={13} />
+                  Active snapshot
+                </span>
+                {latestRunIsActive && (
+                  <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-800">
+                    Latest run is live
+                  </span>
+                )}
+              </div>
+              <p className="mt-2 text-sm leading-6 text-emerald-950">
+                Snapshot <span className="font-mono">{activeSnapshot.snapshot_id.slice(0, 8)}</span> is currently feeding downstream chart surfaces.
+              </p>
+              <p className="mt-1 text-xs leading-5 text-emerald-900">
+                Active since {dateLabel(activeSnapshot.activated_at ?? activeSnapshot.published_at)}
+                {activeSnapshot.activated_from_snapshot_id
+                  ? ` · rolled from ${activeSnapshot.activated_from_snapshot_id.slice(0, 8)}`
+                  : ""}
+              </p>
+            </div>
+          )}
 
           <div className="mt-4 rounded-lg border border-[#eef0f4] bg-[#fafbff] p-3">
             <p className="text-xs font-semibold uppercase tracking-wider text-[#667085]">Latest harmonization run</p>
@@ -1772,66 +1677,6 @@ function ReadinessPage({
               {isUnpublishing ? "Removing access..." : "Unpublish active snapshot"}
             </button>
           )}
-
-          <div className="mt-4 space-y-2">
-            {[
-              ["1", "Source Intake", `${preparedCount}/${uploadedCount} uploaded files prepared; ${needsPreparationCount} need parsing.`],
-              ["2", "Harmonized Record", latestRun ? `${latestRun.summary.total_candidate_facts} candidate facts in latest run.` : "Run harmonization before publish."],
-              ["3", "Review", latestRun ? `${latestRun.summary.review_item_count} open review items.` : "No run to review yet."],
-              ["4", "Publish Chart", activeSnapshot ? "An active snapshot is available to downstream modules." : "No active chart snapshot yet."],
-            ].map(([step, title, body]) => (
-              <div key={step} className="flex gap-3 rounded-lg border border-[#eef0f4] bg-[#fafbff] p-3">
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#eef1ff] text-xs font-semibold text-[#5b76fe]">{step}</span>
-                <div>
-                  <p className="text-sm font-semibold text-[#1c1c1e]">{title}</p>
-                  <p className="mt-0.5 text-sm leading-5 text-[#667085]">{body}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-          <Link to={`/patient-record/context?patient=${patientId}`} className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-[#0f766e]">
-            Review Patient Context
-            <ArrowRight size={14} />
-          </Link>
-        </div>
-      </section>
-
-      <section className="grid gap-4 lg:grid-cols-[1fr_0.8fr]">
-        <div className="overflow-hidden rounded-lg border border-[#dfe4ea] bg-white">
-          <div className="border-b border-[#eef0f5] px-4 py-3">
-            <h2 className="text-base font-semibold text-[#1c1c1e]">Source history</h2>
-            <p className="mt-1 text-sm text-[#667085]">Files saved to this workspace.</p>
-          </div>
-          {sources.uploaded_files.length ? (
-            <div className="divide-y divide-[#eef0f4]">
-              {sources.uploaded_files.map((file) => (
-                <div key={file.file_id} className="grid gap-3 px-4 py-3 md:grid-cols-[minmax(0,1fr)_180px_150px] md:items-center">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-[#1c1c1e]">{file.file_name}</p>
-                    <p className="mt-1 text-xs text-[#8d92a3]">
-                      {bytesLabel(file.size_bytes)} · {file.source_name || "No source named"} · {dateLabel(file.uploaded_at)}
-                    </p>
-                  </div>
-                  <p className="text-sm text-[#555a6a]">{file.data_type}</p>
-                  <span className={`w-fit rounded-full px-2.5 py-1 text-xs font-semibold ${parseStatusClass(file.parse_status)}`}>
-                    {parseStatusLabel(file.parse_status)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="p-5 text-sm text-[#667085]">No files have been added yet. Start in Source Intake.</div>
-          )}
-        </div>
-        <div className="rounded-lg border border-[#dfe4ea] bg-white p-4">
-          <p className="text-xs font-semibold uppercase tracking-wider text-[#667085]">Workspace controls</p>
-          <h2 className="mt-1 text-base font-semibold text-[#1c1c1e]">Access and cleanup</h2>
-          <p className="mt-2 text-sm leading-6 text-[#667085]">
-            Publishing controls downstream chart access. Deleting the workspace
-            removes the source files and published snapshot state for this demo
-            workspace.
-          </p>
-          <MetricCard label="Context gaps" value={needsContextCount} detail="Sources missing description or tags." />
         </div>
       </section>
     </div>
@@ -2262,7 +2107,7 @@ function AggregatorPageShell({
                 Portal exports, PDFs, lab reports, medication lists, insurance files, images, CSVs, and device data.
               </p>
             </div>
-          ) : (
+          ) : page === "publish" ? null : (
             <div className="min-w-[260px] rounded-lg border border-[#dfe4ea] bg-[#f7f8ff] p-3">
               <div className="flex items-center gap-2">
                 <CheckCircle2 size={18} className="text-[#5b76fe]" />
@@ -2343,7 +2188,6 @@ export function SourceIntakePage() {
 }
 
 export function PublishReadinessPage() {
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { patientId, patientFromUrl, patientsQuery } = useSelectedAggregationPatient();
   const collectionId = patientId ? workspaceCollectionId(patientId) : "";
@@ -2363,13 +2207,6 @@ export function PublishReadinessPage() {
     enabled: Boolean(collectionId),
   });
 
-  const deleteProfileMutation = useMutation({
-    mutationFn: () => api.deleteAggregationProfile(patientId),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["patients"] });
-      navigate("/patient-record/sources", { replace: true });
-    },
-  });
   const publishMutation = useMutation({
     mutationFn: () => {
       const runId = latestRunQuery.data?.latest_run?.run_id;
@@ -2393,16 +2230,9 @@ export function PublishReadinessPage() {
     },
   });
 
-  const guidance = [
-    "Publish only after harmonization has run and review items are resolved.",
-    "The active snapshot controls what downstream modules should trust.",
-    "Prior snapshots remain available for rollback and audit.",
-  ];
-
   return (
     <AggregatorPageShell
       page="publish"
-      guidance={guidance}
       isLoading={
         ((!patientFromUrl && patientsQuery.isLoading) ||
           !patientId ||
@@ -2420,7 +2250,6 @@ export function PublishReadinessPage() {
       {sourcesQuery.data && (
         <ReadinessPage
           sources={sourcesQuery.data}
-          patientId={patientId}
           collectionId={collectionId}
           latestRun={latestRunQuery.data?.latest_run ?? null}
           publishedState={publishedQuery.data ?? null}
@@ -2440,11 +2269,6 @@ export function PublishReadinessPage() {
           onUnpublish={() => {
             if (!window.confirm("Remove the active published chart snapshot? Snapshot history will remain available.")) return;
             unpublishMutation.mutate();
-          }}
-          isDeleting={deleteProfileMutation.isPending}
-          onDeleteWorkspace={() => {
-            if (!window.confirm(`Delete ${sourcesQuery.data?.patient_label ?? "this workspace"} and all staged uploads? This cannot be undone.`)) return;
-            deleteProfileMutation.mutate();
           }}
         />
       )}

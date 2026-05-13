@@ -3227,17 +3227,17 @@ export function HarmonizeView() {
               </div>
             </section>
 
-            <section className="self-start rounded-[10px] border border-line-1 bg-surface-0 p-4 shadow-[var(--shadow-1)]">
+            <section className="self-start rounded-[10px] border border-line-1 bg-surface-0 p-3.5 shadow-[var(--shadow-1)]">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-action">Next action</p>
-              <h2 className="mt-1 text-lg font-semibold text-ink-1">{nextAction.title}</h2>
-              <p className="mt-1.5 text-sm leading-6 text-ink-3">{nextAction.body}</p>
+              <h2 className="mt-0.5 text-lg font-semibold leading-8 text-ink-1">{nextAction.title}</h2>
+              <p className="mt-1 text-sm leading-6 text-ink-3">{nextAction.body}</p>
 
               <button
                 type="button"
                 disabled={runMutation.isPending || !activeId}
                 onClick={() => runMutation.mutate()}
                 className={cls(
-                  "mt-3.5 inline-flex w-full items-center justify-center gap-2 rounded-[6px] px-4 py-2.5 text-sm font-semibold transition-colors",
+                  "mt-3 inline-flex w-full items-center justify-center gap-2 rounded-[6px] px-4 py-2.5 text-sm font-semibold transition-colors",
                   runMutation.isPending
                     ? "bg-surface-3 text-ink-3"
                     : "bg-action text-white hover:bg-action-hover",
@@ -3256,7 +3256,7 @@ export function HarmonizeView() {
                 )}
               </button>
 
-              <div className="mt-2.5 flex flex-wrap gap-2">
+              <div className="mt-2 flex flex-wrap gap-2">
                 <button
                   type="button"
                   onClick={() => setWorkspaceTab(openRunReviewItems.length > 0 ? "review" : "record")}
@@ -3275,7 +3275,7 @@ export function HarmonizeView() {
               </div>
 
               {latestRun && openRunReviewItems.length > 0 && (
-                <div className="mt-3 rounded-[10px] border border-caution-line bg-caution-tint px-4 py-3 text-sm text-caution">
+                <div className="mt-2.5 rounded-[10px] border border-caution-line bg-caution-tint px-4 py-2.5 text-sm text-caution">
                   <span className="font-semibold">{openRunReviewItems[0].title}</span>
                   <span className="ml-1">{openRunReviewItems[0].body}</span>
                   {openRunReviewItems.length > 1 && (
@@ -3286,7 +3286,7 @@ export function HarmonizeView() {
                 </div>
               )}
               {runMutation.error && (
-                <p className="mt-3 rounded-[10px] border border-critical-line bg-critical-tint px-4 py-3 text-sm text-critical">
+                <p className="mt-2.5 rounded-[10px] border border-critical-line bg-critical-tint px-4 py-2.5 text-sm text-critical">
                   Couldn&apos;t run harmonization: {(runMutation.error as Error).message}
                 </p>
               )}

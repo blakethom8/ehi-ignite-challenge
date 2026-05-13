@@ -4,20 +4,15 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import {
   Bot,
-  CheckCircle2,
   ClipboardList,
-  Download,
   FileText,
-  LockKeyhole,
   MessageSquareText,
   Send,
-  UserRound,
 } from "lucide-react";
 import { api } from "../../api/client";
 import type {
   PatientContextGapCard,
   PatientContextSessionResponse,
-  PatientContextSourceMode,
 } from "../../types";
 
 const categoryLabels: Record<PatientContextGapCard["category"], string> = {
@@ -26,21 +21,6 @@ const categoryLabels: Record<PatientContextGapCard["category"], string> = {
   timeline_gap: "Timeline gaps",
   uncertain_fact: "Uncertain facts",
   qualitative_context: "Patient context",
-};
-
-const sourceModeCopy: Record<PatientContextSourceMode, { label: string; detail: string }> = {
-  selected_patient: {
-    label: "Selected patient",
-    detail: "Use the active patient workspace and its current evidence posture.",
-  },
-  synthetic: {
-    label: "Synthetic showcase",
-    detail: "Use the demo interview flow for product walkthroughs and UI review.",
-  },
-  private_blake_cedars: {
-    label: "Private Cedars proof-of-life",
-    detail: "Use the local Cedars record when it is available on this machine.",
-  },
 };
 
 function cls(...parts: (string | false | null | undefined)[]): string {
@@ -107,17 +87,10 @@ export function PatientContext() {
   const [selectedGapId, setSelectedGapId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [exportPreview, setExportPreview] = useState("");
-  const [sourceMode, setSourceMode] = useState<PatientContextSourceMode>("selected_patient");
 
   const patientsQuery = useQuery({
     queryKey: ["patients"],
     queryFn: api.listPatients,
-  });
-
-  const statusQuery = useQuery({
-    queryKey: ["patient-context-status"],
-    queryFn: api.getPatientContextStatus,
-    retry: false,
   });
 
   const patientId = patientFromUrl || patientsQuery.data?.[0]?.id || "";
@@ -131,7 +104,7 @@ export function PatientContext() {
   }, [selectedGapId, session]);
 
   const createMutation = useMutation({
-    mutationFn: () => api.createPatientContextSession(patientId, sourceMode),
+    mutationFn: () => api.createPatientContextSession(patientId),
     onSuccess: (data) => {
       setSession(data);
       setExportPreview("");
@@ -176,7 +149,6 @@ export function PatientContext() {
   const openCount = session?.gap_cards.filter((gap) => gap.status === "open").length ?? 0;
   const latestTurn = session?.turns.at(-1) ?? null;
   const progressPercent = totalCount > 0 ? Math.round((answeredCount / totalCount) * 100) : 0;
-  const privateAvailable = statusQuery.data?.private_blake_cedars_available ?? false;
   const files = session?.export_status.files.length
     ? session.export_status.files
     : ["PATIENT_CONTEXT.md", "QUESTIONS.md", "SOURCES.md", "AGENT.md"];
@@ -204,23 +176,6 @@ export function PatientContext() {
               without changing verified chart data. The workflow is simple: start a session, answer the active prompt,
               review captured context, then export a portable bundle.
             </p>
-            <div className="mt-5 grid gap-3 sm:grid-cols-3">
-              <MetricTile
-                label="Progress"
-                value={session ? `${answeredCount}/${totalCount}` : "Not started"}
-                detail={session ? `${progressPercent}% of the intake completed` : "Start a session to generate gap cards"}
-              />
-              <MetricTile
-                label="Captured facts"
-                value={session?.facts.length ?? 0}
-                detail={session ? "Patient-reported statements saved as local context" : "No patient-reported facts yet"}
-              />
-              <MetricTile
-                label="Export status"
-                value={session?.export_status.generated ? "Generated" : "Pending"}
-                detail={session?.export_status.generated_at ? formatDateTime(session.export_status.generated_at) : "Create the Markdown bundle after intake"}
-              />
-            </div>
             <div className="mt-5 rounded-[10px] border border-line-1 bg-surface-1 px-4 py-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
@@ -231,7 +186,7 @@ export function PatientContext() {
                   <p className="mt-1 text-sm leading-6 text-ink-3">
                     {session
                       ? `${openCount} open prompt${openCount === 1 ? "" : "s"} remain. ${selectedGap ? `Current focus: ${selectedGap.title}.` : ""}`
-                      : "Choose the evidence posture on the right, then start the guided intake."}
+                      : "Start the guided intake to generate the first patient-context prompt."}
                   </p>
                 </div>
                 {session && (
@@ -252,38 +207,18 @@ export function PatientContext() {
           </div>
 
           <aside className="rounded-[10px] border border-line-1 bg-surface-1 p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-action">Session setup</p>
-                <h2 className="mt-1 text-lg font-semibold text-ink-1">Choose evidence posture</h2>
-              </div>
-              <UserRound size={18} className="mt-1 text-action" />
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-action">Session setup</p>
+              <h2 className="mt-1 text-lg font-semibold text-ink-1">Start guided intake</h2>
             </div>
             <p className="mt-2 text-sm leading-6 text-ink-3">
-              Start the intake against the selected patient, the synthetic walkthrough, or the private local record.
+              Start a structured intake against the current chart so Atlas can capture missing story, treatment reality, and timeline gaps.
             </p>
 
-            <label className="mt-4 block text-sm font-semibold text-ink-1">
-              Source mode
-              <select
-                value={sourceMode}
-                onChange={(event) => setSourceMode(event.target.value as PatientContextSourceMode)}
-                className="mt-2 w-full rounded-[6px] border border-line-1 bg-surface-0 px-3 py-2.5 text-sm text-ink-1 outline-none focus:border-action"
-              >
-                <option value="selected_patient">Selected patient</option>
-                <option value="synthetic">Synthetic showcase</option>
-                <option value="private_blake_cedars" disabled={!privateAvailable}>
-                  Private Cedars proof-of-life{privateAvailable ? "" : " (not found locally)"}
-                </option>
-              </select>
-            </label>
-
             <div className="mt-3 rounded-[10px] border border-line-1 bg-surface-0 px-3 py-3 text-sm leading-6 text-ink-3">
-              <p><span className="font-semibold text-ink-1">Patient:</span> {patientId || "Loading patient list..."}</p>
-              <p><span className="font-semibold text-ink-1">Selected mode:</span> {sourceModeCopy[sourceMode].label}</p>
-              <p><span className="font-semibold text-ink-1">Private source:</span> {privateAvailable ? "Available locally" : "Not detected"}</p>
+              <p><span className="font-semibold text-ink-1">Chart:</span> {patientId || "Loading patient..."}</p>
+              <p><span className="font-semibold text-ink-1">Mode:</span> Current patient context</p>
             </div>
-            <p className="mt-3 text-xs leading-5 text-ink-3">{sourceModeCopy[sourceMode].detail}</p>
 
             <button
               onClick={() => createMutation.mutate()}
@@ -302,77 +237,7 @@ export function PatientContext() {
         </div>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)_320px]">
-        <aside className="space-y-4">
-          <section className="rounded-[10px] border border-line-1 bg-surface-0 shadow-[var(--shadow-1)]">
-            <div className="flex items-center justify-between gap-3 border-b border-line-1 px-4 py-3">
-              <div>
-                <h2 className="text-sm font-semibold text-ink-1">Session map</h2>
-                <p className="mt-1 text-xs leading-5 text-ink-3">Review gaps in order and move to the next open question.</p>
-              </div>
-              <CheckCircle2 size={16} className="text-action" />
-            </div>
-            <div className="space-y-2 p-3">
-              {(session?.gap_cards ?? []).map((gap, index) => {
-                const isActive = activeGapId === gap.id;
-                return (
-                  <button
-                    key={gap.id}
-                    onClick={() => setSelectedGapId(gap.id)}
-                    className={cls(
-                      "w-full rounded-[10px] border px-3 py-3 text-left transition-colors",
-                      isActive
-                        ? "border-action-line bg-action-tint"
-                        : "border-line-1 bg-surface-0 hover:bg-surface-1",
-                    )}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-action">
-                          Step {index + 1} · {categoryLabels[gap.category]}
-                        </p>
-                        <p className="mt-1 text-sm font-semibold text-ink-1">{gap.title}</p>
-                      </div>
-                      <span className={cls("rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em]", statusStyle(gap.status))}>
-                        {gap.status}
-                      </span>
-                    </div>
-                    <p className="mt-2 text-sm leading-5 text-ink-3">{gap.why_it_matters}</p>
-                    {gap.evidence.length > 0 && (
-                      <p className="mt-2 text-xs text-ink-3">{gap.evidence.length} evidence cue{gap.evidence.length === 1 ? "" : "s"}</p>
-                    )}
-                  </button>
-                );
-              })}
-              {!session && (
-                <EmptyCard>Start an intake session to generate patient-specific context gaps.</EmptyCard>
-              )}
-            </div>
-          </section>
-
-          <section className="rounded-[10px] border border-line-1 bg-surface-0 shadow-[var(--shadow-1)]">
-            <div className="border-b border-line-1 px-4 py-3">
-              <h2 className="text-sm font-semibold text-ink-1">Captured context</h2>
-              <p className="mt-1 text-xs leading-5 text-ink-3">Most recent patient-reported facts that will land in the export bundle.</p>
-            </div>
-            <div className="space-y-2 p-3">
-              {session?.facts.length ? (
-                session.facts.slice(-5).reverse().map((fact) => (
-                  <div key={fact.id} className="rounded-[10px] border border-line-1 bg-surface-1 px-3 py-3">
-                    <p className="text-sm font-medium text-ink-1">{fact.summary}</p>
-                    <p className="mt-1 text-xs text-ink-3">
-                      {fact.confidence} confidence
-                      {fact.linked_gap_id ? " · linked to session gap" : ""}
-                    </p>
-                  </div>
-                ))
-              ) : (
-                <EmptyCard>Patient-reported context will appear here as the intake captures answers.</EmptyCard>
-              )}
-            </div>
-          </section>
-        </aside>
-
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
         <section className="rounded-[10px] border border-line-1 bg-surface-0 shadow-[var(--shadow-1)]">
           <div className="border-b border-line-1 px-5 py-4">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -487,18 +352,91 @@ export function PatientContext() {
 
         <aside className="space-y-4">
           <section className="rounded-[10px] border border-line-1 bg-surface-0 shadow-[var(--shadow-1)]">
-            <div className="flex items-start justify-between gap-3 border-b border-line-1 px-4 py-3">
+            <div className="border-b border-line-1 px-4 py-3">
               <div>
-                <h2 className="text-sm font-semibold text-ink-1">Export bundle</h2>
-                <p className="mt-1 text-xs leading-5 text-ink-3">Portable Markdown files for clinicians and downstream agents.</p>
+                <h2 className="text-sm font-semibold text-ink-1">Progress and export</h2>
+                <p className="mt-1 text-xs leading-5 text-ink-3">Track intake progress, review captured facts, and generate the portable bundle.</p>
               </div>
-              <Download size={16} className="mt-1 text-action" />
             </div>
             <div className="p-4">
+              <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
+                <MetricTile
+                  label="Progress"
+                  value={session ? `${answeredCount}/${totalCount}` : "Not started"}
+                  detail={session ? `${progressPercent}% completed` : "Start a session"}
+                />
+                <MetricTile
+                  label="Captured facts"
+                  value={session?.facts.length ?? 0}
+                  detail="Patient-reported context saved locally"
+                />
+                <MetricTile
+                  label="Export"
+                  value={session?.export_status.generated ? "Ready" : "Pending"}
+                  detail={session?.export_status.generated_at ? formatDateTime(session.export_status.generated_at) : "Generate after intake"}
+                />
+              </div>
+
+              <div className="mt-4 rounded-[10px] border border-line-1 bg-surface-1 px-3 py-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-ink-3">Session outline</p>
+                <div className="mt-2 space-y-2">
+                  {(session?.gap_cards ?? []).map((gap, index) => {
+                    const isActive = activeGapId === gap.id;
+                    return (
+                      <button
+                        key={gap.id}
+                        onClick={() => setSelectedGapId(gap.id)}
+                        className={cls(
+                          "w-full rounded-[10px] border px-3 py-2.5 text-left transition-colors",
+                          isActive
+                            ? "border-action-line bg-action-tint"
+                            : "border-line-1 bg-surface-0 hover:bg-surface-1",
+                        )}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-action">
+                              Step {index + 1} · {categoryLabels[gap.category]}
+                            </p>
+                            <p className="mt-1 text-sm font-semibold text-ink-1">{gap.title}</p>
+                          </div>
+                          <span className={cls("rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em]", statusStyle(gap.status))}>
+                            {gap.status}
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                  {!session && (
+                    <EmptyCard>Start an intake session to generate patient-specific context gaps.</EmptyCard>
+                  )}
+                </div>
+              </div>
+
+              <div className="mt-4 rounded-[10px] border border-line-1 bg-surface-1 px-3 py-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-ink-3">Captured context</p>
+                <div className="mt-2 space-y-2">
+                  {session?.facts.length ? (
+                    session.facts.slice(-4).reverse().map((fact) => (
+                      <div key={fact.id} className="rounded-[10px] border border-line-1 bg-surface-0 px-3 py-3">
+                        <p className="text-sm font-medium text-ink-1">{fact.summary}</p>
+                        <p className="mt-1 text-xs text-ink-3">
+                          {fact.confidence} confidence
+                          {fact.linked_gap_id ? " · linked to session gap" : ""}
+                        </p>
+                      </div>
+                    ))
+                  ) : (
+                    <EmptyCard>Patient-reported context will appear here as answers are captured.</EmptyCard>
+                  )}
+                </div>
+              </div>
+
               <button
+                type="button"
                 onClick={() => exportMutation.mutate()}
                 disabled={!session || exportMutation.isPending}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-[6px] bg-ink-1 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-ink-2 disabled:cursor-not-allowed disabled:bg-surface-3 disabled:text-ink-3"
+                className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-[6px] bg-ink-1 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-ink-2 disabled:cursor-not-allowed disabled:bg-surface-3 disabled:text-ink-3"
               >
                 <FileText size={16} />
                 {exportMutation.isPending ? "Generating bundle..." : "Generate Markdown bundle"}
@@ -523,17 +461,6 @@ export function PatientContext() {
                   {exportPreview || "# Patient Context\n\nGenerate the bundle to preview the portable Markdown output."}
                 </pre>
               </div>
-            </div>
-          </section>
-
-          <section className="rounded-[10px] border border-line-1 bg-surface-0 shadow-[var(--shadow-1)]">
-            <div className="flex items-center gap-2 border-b border-line-1 px-4 py-3">
-              <LockKeyhole size={16} className="text-action" />
-              <h2 className="text-sm font-semibold text-ink-1">Privacy and separation</h2>
-            </div>
-            <div className="space-y-3 p-4 text-sm leading-6 text-ink-3">
-              <p>Patient answers are stored as local context artifacts. They do not overwrite the verified chart or the published Atlas record.</p>
-              <p>Use this space for the facts that matter clinically but are missing, ambiguous, or out of date in the source record.</p>
             </div>
           </section>
         </aside>

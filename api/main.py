@@ -19,6 +19,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from api.core.auth import init_auth_store
+from api.core.demo_aggregate_seed import seed_demo_aggregate_uploads
 from api.core.loader import warm_patient_indexes
 from api.core.sof_materialize import materialize_from_env
 from api.middleware.tracing import TracingMiddleware
@@ -80,6 +81,15 @@ def _materialize_sof_db() -> None:
     # rebuild cost on the first page load after deploy.
     warm_patient_indexes()
     patients._cached_patient_list()
+    # Stage the multi-source demo personas' synthetic documents into the
+    # aggregation-uploads store so they appear as pre-uploaded sources on the
+    # source intake page. Idempotent — only adds files that aren't already
+    # present, never clobbers user edits.
+    try:
+        seed_demo_aggregate_uploads()
+    except Exception:
+        # Never let a seeder failure prevent the API from booting.
+        pass
     # Cache verified plugin manifests in memory so /api/plugins/installed
     # serves without re-verifying signatures on every request.
     try:

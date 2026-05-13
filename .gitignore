@@ -7,14 +7,10 @@ data/synthea-samples/sample-bulk-fhir-datasets-10-patients/log.ndjson
 # Keep the folder structure
 !data/synthea-samples/.gitkeep
 
-# Demo-profile heavy patient source data — synced manually to the Mac mini, not git.
-# (synthesize_documents.py + the synthetic documents themselves ARE tracked.)
+# Demo-profile tooling artefacts — re-fetchable from PhysioNet, not needed at runtime.
+# (The baseline FHIR bundles + DICOM ARE tracked — they're what the app loads.)
 data/demo-profiles/icu-mimic/raw/
 data/demo-profiles/icu-mimic/*.zip
-data/demo-profiles/icu-mimic/fhir/*.json
-data/demo-profiles/cardiac-coherent/fhir/*.json
-data/demo-profiles/cardiac-coherent/imaging/*.dcm
-data/demo-profiles/polypharmacy-synthea/fhir/*.json
 
 # Node (Cursor sidecar)
 cursor-sidecar/node_modules/

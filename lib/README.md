@@ -14,6 +14,7 @@ Production library code imported by `api/`, `ehi-atlas/`, `scripts/`, and protot
 | `lib.extract` | PDF → FHIR extraction framework — `pipelines/` (Protocol + registry), `bake_off.py`, `eval.py`, `pdf.py` (Anthropic + Google AI Studio backends). Production path: `multipass-fhir`. | `api/core/harmonize_service.py`, `ehi-atlas/app/pages/03_PDF_Lab.py` etc. |
 | `lib.narratives` | Per-episode FHIR `Composition` generator. Given a harmonized chart + patient-voice bundle + curated `EpisodeOfCare` list, produces one Composition per episode citing the merged resources it draws from. | `api/core/narrative_service.py` |
 | `lib.patient_voice` | Patient-voice adapter: turns guided Patient Context intake (Markdown + JSON) into FHIR-shaped resources that `lib.harmonize` can ingest. | `api/core/patient_context.py` |
+| `lib.observability` | LLM tracing primitives (`SpanKind`, `start_span`, `start_trace`) + SQLite traces.db schema + optional Langfuse export. Standalone — reads config from env vars, no `api.*` imports. `api/core/tracing.py` re-exports the same symbols for api-side callers. | `api/core/tracing.py`, `lib.narratives`, `lib.harmonize`, `lib.patient_voice` |
 
 ## Conventions
 

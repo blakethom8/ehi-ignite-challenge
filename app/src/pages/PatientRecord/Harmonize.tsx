@@ -239,10 +239,10 @@ function MetricCard({
   detail?: string;
 }) {
   return (
-    <div className="rounded-lg border border-[#dfe4ea] bg-[#f7f9fc] px-3 py-2.5">
-      <p className="text-xs font-semibold uppercase tracking-wider text-[#667085]">{label}</p>
-      <p className="mt-1 text-xl font-semibold text-[#1c1c1e]">{value}</p>
-      {detail && <p className="mt-0.5 text-xs leading-5 text-[#667085]">{detail}</p>}
+    <div className="rounded-[10px] border border-line-1 bg-surface-1 px-3 py-3">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-3">{label}</p>
+      <p className="mt-1 text-xl font-semibold text-ink-1">{value}</p>
+      {detail && <p className="mt-1 text-xs leading-5 text-ink-3">{detail}</p>}
     </div>
   );
 }
@@ -250,24 +250,63 @@ function MetricCard({
 const workspaceTabs: {
   id: WorkspaceTab;
   label: string;
+  description: string;
   icon: LucideIcon;
 }[] = [
-  { id: "record", label: "Record", icon: Layers3 },
-  { id: "review", label: "Review Queue", icon: AlertTriangle },
-  { id: "sources", label: "Source Contributions", icon: FileText },
-  { id: "provenance", label: "Provenance", icon: Link2 },
+  {
+    id: "record",
+    label: "Merged record",
+    description: "Inspect canonical facts by resource type.",
+    icon: Layers3,
+  },
+  {
+    id: "review",
+    label: "Review blockers",
+    description: "Resolve source issues and fact conflicts.",
+    icon: AlertTriangle,
+  },
+  {
+    id: "sources",
+    label: "Source evidence",
+    description: "See what each source contributed to the record.",
+    icon: FileText,
+  },
+  {
+    id: "provenance",
+    label: "Provenance",
+    description: "Trace each merged fact back to its source edges.",
+    icon: Link2,
+  },
 ];
+
+function reviewSeverityClass(severity: HarmonizeRunReviewItem["severity"]): string {
+  if (severity === "high") return "border-critical-line bg-critical-tint text-critical";
+  if (severity === "medium") return "border-caution-line bg-caution-tint text-caution";
+  return "border-line-1 bg-surface-1 text-ink-3";
+}
+
+function reviewCategoryLabel(item: HarmonizeRunReviewItem): string {
+  return item.category === "fact" ? "Fact conflict" : "Source issue";
+}
+
+function workflowStepTone(status: "ready" | "attention" | "pending"): string {
+  if (status === "ready") return "border-clear-line bg-clear-tint";
+  if (status === "attention") return "border-caution-line bg-caution-tint";
+  return "border-line-1 bg-surface-1";
+}
 
 function WorkspaceTabs({
   active,
   onChange,
+  meta,
 }: {
   active: WorkspaceTab;
   onChange: (tab: WorkspaceTab) => void;
+  meta?: Partial<Record<WorkspaceTab, string>>;
 }) {
   return (
-    <div className="overflow-hidden rounded-lg border border-[#dfe4ea] bg-white">
-      <div className="flex flex-wrap items-center gap-1 border-b border-[#eef0f4] px-3 py-2">
+    <div className="rounded-[10px] border border-line-1 bg-surface-0 p-2 shadow-[var(--shadow-1)]">
+      <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
         {workspaceTabs.map((item) => {
           const Icon = item.icon;
           const selected = active === item.id;
@@ -277,14 +316,34 @@ function WorkspaceTabs({
               type="button"
               onClick={() => onChange(item.id)}
               className={cls(
-                "inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-colors",
+                "rounded-[10px] border px-3 py-3 text-left transition-colors",
                 selected
-                  ? "bg-[#eef2ff] text-[#5b76fe]"
-                  : "text-[#667085] hover:bg-[#f7f9fc] hover:text-[#1c1c1e]",
+                  ? "border-action-line bg-action-tint text-action"
+                  : "border-line-1 bg-surface-0 text-ink-3 hover:bg-surface-1 hover:text-ink-1",
               )}
             >
-              <Icon size={14} />
-              {item.label}
+              <div className="flex items-start gap-3">
+                <div className={cls(
+                  "mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[6px]",
+                  selected ? "bg-surface-0 text-action" : "bg-surface-1 text-ink-3",
+                )}>
+                  <Icon size={14} />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-sm font-semibold">{item.label}</p>
+                    {meta?.[item.id] && (
+                      <span className={cls(
+                        "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em]",
+                        selected ? "bg-surface-0 text-action" : "bg-surface-1 text-ink-3",
+                      )}>
+                        {meta[item.id]}
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-1 text-xs leading-5 text-ink-3">{item.description}</p>
+                </div>
+              </div>
             </button>
           );
         })}
@@ -548,8 +607,14 @@ function ReviewQueuePanel({
       source.status !== "structured" &&
       source.status !== "extracted",
   );
-  const openRunItems = latestRun?.review_items.filter((item) => !item.resolved) ?? [];
-  const resolvedRunItems = latestRun?.review_items.filter((item) => item.resolved) ?? [];
+  const openRunItems = useMemo(
+    () => latestRun?.review_items.filter((item) => !item.resolved) ?? [],
+    [latestRun?.review_items],
+  );
+  const resolvedRunItems = useMemo(
+    () => latestRun?.review_items.filter((item) => item.resolved) ?? [],
+    [latestRun?.review_items],
+  );
   const labConflicts = openRunItems.filter(
     (item) => item.category === "fact" && item.resource_type === "Observation",
   ).length;
@@ -558,6 +623,7 @@ function ReviewQueuePanel({
     observationsQuery.data?.merged.filter((item) => item.has_conflict).length ?? 0
   );
   const isLoading = sourcesQuery.isLoading || observationsQuery.isLoading || latestRunQuery.isLoading;
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
 
   const matchingObservation = (item: HarmonizeRunReviewItem) =>
     item.merged_ref
@@ -577,29 +643,46 @@ function ReviewQueuePanel({
     resolveMutation.mutate({ runId: latestRun.run_id, item, decision, notes, selectedSourceRef });
   };
 
+  useEffect(() => {
+    if (openRunItems.length === 0) {
+      if (selectedItemId !== null) setSelectedItemId(null);
+      return;
+    }
+    if (!selectedItemId || !openRunItems.some((item) => item.id === selectedItemId)) {
+      setSelectedItemId(openRunItems[0].id);
+    }
+  }, [openRunItems, selectedItemId]);
+
+  const activeItem = openRunItems.find((item) => item.id === selectedItemId) ?? openRunItems[0] ?? null;
+  const activeObservation = activeItem ? matchingObservation(activeItem) : null;
+  const activeSourceLabel = activeItem ? sourceLabel(activeItem) : null;
+  const activeRecommended = activeObservation?.latest ?? null;
+  const activeSpread = activeObservation
+    ? conflictSpreadLabel(activeObservation.sources, activeObservation.canonical_unit)
+    : null;
+
   return (
-    <section className="rounded-lg border border-[#dfe4ea] bg-white p-4">
+    <section className="rounded-[10px] border border-line-1 bg-surface-0 p-4 shadow-[var(--shadow-1)]">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <div className="flex items-center gap-2">
             {reviewItems > 0 ? (
-              <AlertTriangle size={16} className="text-amber-600" />
+              <AlertTriangle size={16} className="text-caution" />
             ) : (
-              <CheckCircle2 size={16} className="text-emerald-600" />
+              <CheckCircle2 size={16} className="text-clear" />
             )}
-            <h2 className="text-sm font-semibold text-[#1c1c1e]">Review queue</h2>
+            <h2 className="text-sm font-semibold text-ink-1">Review blockers</h2>
           </div>
-          <p className="mt-1 max-w-3xl text-sm leading-6 text-[#667085]">
-            Review is part of the harmonized record. It only fills up when a
-            source cannot be prepared, a PDF needs extraction, or a merged fact
-            has a conflict that needs human judgment.
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-ink-3">
+            Review is the final human gate before publish. Fix source-preparation issues, resolve conflicting fact
+            candidates, and leave the run with an explicit audit trail.
           </p>
         </div>
         <div className="grid min-w-full gap-2 sm:grid-cols-3 lg:min-w-[520px]">
           <MetricCard
-            label="Open review"
+            label="Open blockers"
             value={isLoading ? "…" : reviewItems}
-            detail="Blocking source or fact issues"
+            detail="Issues that must be reviewed before publish"
           />
           <MetricCard
             label="Lab conflicts"
@@ -614,13 +697,13 @@ function ReviewQueuePanel({
         </div>
       </div>
       {!isLoading && !latestRun && (
-        <div className="mt-4 rounded-lg border border-[#dfe4ea] bg-[#f7f9fc] px-3 py-3 text-sm text-[#667085]">
-          Run harmonization first. The review queue is populated from the
-          persisted run artifact so each decision can be carried into Publish Chart.
+        <div className="mt-4 rounded-[10px] border border-line-1 bg-surface-1 px-4 py-4 text-sm leading-6 text-ink-3">
+          Run harmonization first. The review workspace is populated from the persisted run artifact so each decision
+          can be carried into Publish Chart with the exact candidate set that was reviewed.
         </div>
       )}
       {!isLoading && latestRun && openRunItems.length === 0 && (
-        <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm text-emerald-900">
+        <div className="mt-4 rounded-[10px] border border-clear-line bg-clear-tint px-4 py-4 text-sm text-clear">
           <span className="font-semibold">No open review items.</span>{" "}
           This run can move to Publish Chart when you are ready to activate it downstream.
           {resolvedRunItems.length > 0 && (
@@ -631,268 +714,301 @@ function ReviewQueuePanel({
           )}
         </div>
       )}
-      {!isLoading && latestRun && openRunItems.length > 0 && (
-        <div className="mt-4 space-y-3">
-          {openRunItems.map((item) => {
-            const observation = matchingObservation(item);
-            const label = sourceLabel(item);
-            const recommended = observation?.latest ?? null;
-            const spread = observation ? conflictSpreadLabel(observation.sources, observation.canonical_unit) : null;
-            return (
-              <article
-                key={item.id}
-                className="rounded-lg border border-amber-200 bg-amber-50/70 p-3"
-              >
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-amber-800">
-                        {item.category === "fact" ? "Fact conflict" : "Source issue"}
-                      </span>
-                      <span className="text-xs font-semibold uppercase tracking-wide text-amber-800">
-                        {item.severity} severity
+      {!isLoading && latestRun && activeItem && (
+        <div className="mt-4 grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
+          <aside className="rounded-[10px] border border-line-1 bg-surface-1 p-2">
+            <div className="border-b border-line-1 px-2 py-2">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-ink-3">Queue</p>
+              <p className="mt-1 text-sm text-ink-3">{openRunItems.length} item{openRunItems.length === 1 ? "" : "s"} need a decision.</p>
+            </div>
+            <div className="space-y-2 p-2">
+              {openRunItems.map((item, index) => {
+                const observation = matchingObservation(item);
+                const label = sourceLabel(item);
+                const selected = item.id === activeItem.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setSelectedItemId(item.id)}
+                    className={cls(
+                      "w-full rounded-[10px] border px-3 py-3 text-left transition-colors",
+                      selected ? "border-action-line bg-action-tint" : "border-line-1 bg-surface-0 hover:bg-surface-1",
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-action">
+                          Item {index + 1} · {reviewCategoryLabel(item)}
+                        </p>
+                        <p className="mt-1 text-sm font-semibold text-ink-1">
+                          {observation?.canonical_name ?? item.title}
+                        </p>
+                      </div>
+                      <span className={cls(
+                        "rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em]",
+                        reviewSeverityClass(item.severity),
+                      )}>
+                        {item.severity}
                       </span>
                     </div>
-                    <h3 className="mt-2 text-sm font-semibold text-[#1c1c1e]">
-                      {observation?.canonical_name ?? item.title}
-                    </h3>
-                    <p className="mt-1 text-sm leading-6 text-[#667085]">
-                      {item.body}
+                    <p className="mt-2 line-clamp-3 text-sm leading-5 text-ink-3">{item.body}</p>
+                    <p className="mt-2 text-xs text-ink-3">
+                      {label ? `Source: ${label}` : observation?.loinc_code ? `LOINC ${observation.loinc_code}` : item.resource_type ?? "Clinical fact"}
                     </p>
-                    {observation && (
-                      <div className="mt-3 grid gap-2 rounded-lg border border-amber-200 bg-white p-3 md:grid-cols-3">
-                        <div>
-                          <p className="text-xs font-semibold uppercase tracking-wider text-[#667085]">Fact under review</p>
-                          <p className="mt-1 text-sm font-semibold text-[#1c1c1e]">{observation.canonical_name}</p>
-                          <p className="mt-0.5 text-xs text-[#667085]">
-                            {observation.loinc_code ? `LOINC ${observation.loinc_code}` : item.resource_type ?? "Clinical fact"}
-                            {observation.canonical_unit ? ` · canonical unit ${observation.canonical_unit}` : ""}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs font-semibold uppercase tracking-wider text-[#667085]">Current candidate</p>
-                          <p className="mt-1 text-sm font-semibold text-[#1c1c1e]">
-                            {recommended ? reviewValueLabel(recommended.value, observation.canonical_unit ?? recommended.unit) : "Needs judgment"}
-                          </p>
-                          <p className="mt-0.5 text-xs text-[#667085]">
-                            {recommended ? `${reviewDateLabel(recommended.effective_date)} · ${recommended.source_label}` : "No recommended value was found."}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs font-semibold uppercase tracking-wider text-[#667085]">Why review</p>
-                          <p className="mt-1 text-sm leading-5 text-[#667085]">
-                            {spread
-                              ? `Same-day values span ${spread}; confirm which value should represent this fact.`
-                              : "Multiple source values share the same day or fact identity and need a reviewer decision."}
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                    {observation && (
-                      <div className="mt-3 rounded-lg border border-amber-200 bg-white px-3 py-2">
-                        <p className="text-xs font-semibold uppercase tracking-wider text-amber-800">Recommendation</p>
-                        <p className="mt-1 text-sm leading-6 text-[#555a6a]">
-                          Accept the current candidate only if the value, date, and source below match the canonical fact you want downstream charts and agents to use. This records reviewer sign-off for the current harmonization run; alternate rows remain retained as provenance, not deleted.
-                        </p>
-                      </div>
-                    )}
-                    {label && (
-                      <p className="mt-1 text-xs text-[#667085]">
-                        Source: <span className="font-semibold text-[#1c1c1e]">{label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </aside>
+
+          <div className="space-y-4">
+            <article className="rounded-[10px] border border-caution-line bg-caution-tint p-4">
+              <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,1fr)_300px]">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-full bg-surface-0 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-caution">
+                      {reviewCategoryLabel(activeItem)}
+                    </span>
+                    <span className={cls(
+                      "rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em]",
+                      reviewSeverityClass(activeItem.severity),
+                    )}>
+                      {activeItem.severity} severity
+                    </span>
+                  </div>
+                  <h3 className="mt-3 text-lg font-semibold text-ink-1">
+                    {activeObservation?.canonical_name ?? activeItem.title}
+                  </h3>
+                  <p className="mt-2 text-sm leading-6 text-ink-3">{activeItem.body}</p>
+
+                  {activeObservation && (
+                    <div className="mt-4 grid gap-3 md:grid-cols-3">
+                      <MetricCard
+                        label="Fact under review"
+                        value={activeObservation.canonical_name}
+                        detail={activeObservation.loinc_code
+                          ? `LOINC ${activeObservation.loinc_code}${activeObservation.canonical_unit ? ` · canonical unit ${activeObservation.canonical_unit}` : ""}`
+                          : activeItem.resource_type ?? "Clinical fact"}
+                      />
+                      <MetricCard
+                        label="Current candidate"
+                        value={activeRecommended
+                          ? reviewValueLabel(activeRecommended.value, activeObservation.canonical_unit ?? activeRecommended.unit)
+                          : "Needs judgment"}
+                        detail={activeRecommended
+                          ? `${reviewDateLabel(activeRecommended.effective_date)} · ${activeRecommended.source_label}`
+                          : "No recommended value was found"}
+                      />
+                      <MetricCard
+                        label="Why review"
+                        value={activeSpread ? "Value spread detected" : "Conflicting evidence"}
+                        detail={activeSpread
+                          ? `Same-day values span ${activeSpread}; confirm which value should represent this fact.`
+                          : "Multiple source values share the same day or fact identity and need a reviewer decision."}
+                      />
+                    </div>
+                  )}
+
+                  {activeObservation && (
+                    <div className="mt-4 rounded-[10px] border border-caution-line bg-surface-0 px-4 py-3">
+                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-caution">Reviewer guidance</p>
+                      <p className="mt-2 text-sm leading-6 text-ink-3">
+                        Accept the current candidate only if the value, date, and source below match the canonical
+                        fact you want downstream charts and agents to use. Alternate rows remain preserved as provenance.
                       </p>
-                    )}
-                  </div>
-                  <div className="flex shrink-0 flex-col gap-2 lg:w-[300px]">
-                    {item.category === "source" && (
-                      <div className="rounded-lg border border-amber-200 bg-white p-3">
-                        <p className="text-xs font-semibold uppercase tracking-wider text-amber-800">Source fix workflow</p>
-                        <p className="mt-1 text-xs leading-5 text-[#667085]">
-                          Open Source Intake on this file, repair or extract it, then re-run harmonization before publishing.
+                    </div>
+                  )}
+
+                  {activeSourceLabel && (
+                    <p className="mt-3 text-xs text-ink-3">
+                      Source: <span className="font-semibold text-ink-1">{activeSourceLabel}</span>
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-3">
+                  {activeItem.category === "source" && (
+                    <div className="rounded-[10px] border border-line-1 bg-surface-0 p-3">
+                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-ink-3">Source fix workflow</p>
+                      <p className="mt-2 text-sm leading-6 text-ink-3">
+                        Open Source Intake on this file, repair or extract it, then re-run harmonization before
+                        publishing.
+                      </p>
+                      <Link
+                        to={`/patient-record/sources${patientId ? `?patient=${encodeURIComponent(patientId)}${activeItem.source_id ? `&source=${encodeURIComponent(activeItem.source_id)}` : ""}` : activeItem.source_id ? `?source=${encodeURIComponent(activeItem.source_id)}` : ""}`}
+                        className="mt-3 inline-flex w-full items-center justify-center rounded-[6px] border border-line-1 bg-surface-0 px-3 py-2 text-sm font-semibold text-ink-2 hover:border-action hover:text-action"
+                      >
+                        Fix in Source Intake
+                      </Link>
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    disabled={resolveMutation.isPending}
+                    onClick={() =>
+                      resolveItem(
+                        activeItem,
+                        activeItem.category === "fact" ? "accepted" : "dismissed",
+                        activeItem.category === "fact"
+                          ? "Accepted current candidate canonical fact after review."
+                          : "Dismissed source blocker after review.",
+                      )
+                    }
+                    className="inline-flex items-center justify-center gap-2 rounded-[6px] bg-action px-3 py-2.5 text-sm font-semibold text-white hover:bg-action-hover disabled:bg-surface-3 disabled:text-ink-3"
+                  >
+                    {resolveMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                    {activeItem.category === "fact" ? "Use candidate in canonical record" : "Mark reviewed"}
+                  </button>
+
+                  {activeItem.category === "fact" && (
+                    <>
+                      <button
+                        type="button"
+                        disabled={resolveMutation.isPending}
+                        onClick={() =>
+                          resolveItem(
+                            activeItem,
+                            "kept_separate",
+                            "Reviewer kept conflicting values separate and preserved each value as source-backed evidence.",
+                          )
+                        }
+                        className="inline-flex w-full items-center justify-center rounded-[6px] border border-line-1 bg-surface-0 px-3 py-2 text-sm font-semibold text-ink-2 hover:border-action hover:text-action disabled:bg-surface-1 disabled:text-ink-4"
+                      >
+                        Keep values separate
+                      </button>
+                      <button
+                        type="button"
+                        disabled={resolveMutation.isPending}
+                        onClick={() =>
+                          resolveItem(
+                            activeItem,
+                            "deferred",
+                            "Reviewer deferred this conflict. It remains blocking until a final decision is recorded.",
+                          )
+                        }
+                        className="inline-flex w-full items-center justify-center rounded-[6px] border border-caution-line bg-surface-0 px-3 py-2 text-sm font-semibold text-caution hover:bg-caution-tint disabled:bg-surface-1 disabled:text-ink-4"
+                      >
+                        Defer review
+                      </button>
+                      <div className="rounded-[10px] border border-line-1 bg-surface-0 px-3 py-3 text-xs leading-5 text-ink-3">
+                        <p className="font-semibold uppercase tracking-[0.16em] text-ink-3">Decision model</p>
+                        <p className="mt-2">
+                          Accept uses the current candidate. Keep separate resolves the blocker while retaining all
+                          source-backed values. Alternate preference updates this run&apos;s candidate pick before publish.
+                          Defer keeps this run blocked.
                         </p>
-                        <Link
-                          to={`/patient-record/sources${patientId ? `?patient=${encodeURIComponent(patientId)}${item.source_id ? `&source=${encodeURIComponent(item.source_id)}` : ""}` : item.source_id ? `?source=${encodeURIComponent(item.source_id)}` : ""}`}
-                          className="mt-2 inline-flex w-full items-center justify-center rounded-lg border border-[#dfe4ea] bg-white px-3 py-2 text-sm font-semibold text-[#555a6a] hover:border-[#5b76fe] hover:text-[#5b76fe]"
-                        >
-                          Fix in Source Intake
-                        </Link>
                       </div>
-                    )}
-                    <button
-                      type="button"
-                      disabled={resolveMutation.isPending}
-                      onClick={() =>
-                        resolveItem(
-                          item,
-                          item.category === "fact" ? "accepted" : "dismissed",
-                          item.category === "fact"
-                            ? "Accepted current candidate canonical fact after review."
-                            : "Dismissed source blocker after review.",
-                        )
-                      }
-                      className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#5b76fe] px-3 py-2 text-sm font-semibold text-white hover:bg-[#4760e8] disabled:bg-[#dfe4ea] disabled:text-[#667085]"
-                    >
-                      {resolveMutation.isPending ? (
-                        <Loader2 size={14} className="animate-spin" />
-                      ) : (
-                        <CheckCircle2 size={14} />
-                      )}
-                      {item.category === "fact" ? "Use candidate in canonical record" : "Mark reviewed"}
-                    </button>
-                    {item.category === "fact" && (
-                      <div className="space-y-2">
-                        <button
-                          type="button"
-                          disabled={resolveMutation.isPending}
-                          onClick={() =>
-                            resolveItem(
-                              item,
-                              "kept_separate",
-                              "Reviewer kept conflicting values separate and preserved each value as source-backed evidence.",
-                            )
-                          }
-                          className="inline-flex w-full items-center justify-center rounded-lg border border-[#dfe4ea] bg-white px-3 py-2 text-sm font-semibold text-[#555a6a] hover:border-[#5b76fe] hover:text-[#5b76fe] disabled:bg-[#f4f6f8] disabled:text-[#98a2b3]"
-                        >
-                          Keep values separate
-                        </button>
-                        <button
-                          type="button"
-                          disabled={resolveMutation.isPending}
-                          onClick={() =>
-                            resolveItem(
-                              item,
-                              "deferred",
-                              "Reviewer deferred this conflict. It remains blocking until a final decision is recorded.",
-                            )
-                          }
-                          className="inline-flex w-full items-center justify-center rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-50 disabled:bg-[#f4f6f8] disabled:text-[#98a2b3]"
-                        >
-                          Defer review
-                        </button>
-                        <div className="rounded-lg border border-amber-200 bg-white px-3 py-2 text-xs leading-5 text-[#667085]">
-                          <p className="font-semibold uppercase tracking-wider text-amber-800">
-                            Decision model
+                    </>
+                  )}
+                </div>
+              </div>
+            </article>
+
+            {activeObservation && (
+              <section className="overflow-hidden rounded-[10px] border border-line-1 bg-surface-0">
+                <div className="border-b border-line-1 px-4 py-3">
+                  <p className="text-sm font-semibold text-ink-1">Source values under review</p>
+                  <p className="mt-1 text-xs leading-5 text-ink-3">Compare every candidate value before choosing the canonical row for this run.</p>
+                </div>
+                <div className="divide-y divide-line-1">
+                  {activeObservation.sources.map((source) => {
+                    const isCandidate = sourceMatchesLatest(source, activeRecommended);
+                    return (
+                      <div
+                        key={`${activeItem.id}-${source.source_observation_ref}`}
+                        className={cls(
+                          "grid gap-3 px-4 py-3 text-sm md:grid-cols-[minmax(0,1.1fr)_140px_150px_170px]",
+                          isCandidate && "bg-clear-tint",
+                        )}
+                      >
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="font-semibold text-ink-1">{source.source_label}</p>
+                            <span className={cls(
+                              "rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.14em]",
+                              isCandidate ? "bg-clear-tint text-clear" : "bg-surface-1 text-ink-3",
+                            )}>
+                              {isCandidate ? "Current pick" : "Alternate"}
+                            </span>
+                          </div>
+                          <p className="mt-1 text-xs text-ink-3">
+                            {activeObservation.loinc_code ? `LOINC ${activeObservation.loinc_code}` : "Observation"}
                           </p>
-                          <p className="mt-1">
-                            Accept uses the current candidate. Keep separate resolves the blocker while retaining all source-backed values. Alternate preference updates this run's candidate pick before publish. Defer keeps this run blocked.
+                          <details className="mt-2 text-xs text-ink-3">
+                            <summary className="cursor-pointer list-none hover:text-action">
+                              Technical reference: {shortReference(source.source_observation_ref)}
+                            </summary>
+                            <p className="mt-1 break-all font-mono text-[11px]">{source.source_observation_ref}</p>
+                          </details>
+                        </div>
+                        <div>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-3">Value</p>
+                          <p className="mt-1 font-semibold text-ink-1">
+                            {reviewValueLabel(source.value, source.unit, source.raw_value, source.raw_unit)}
                           </p>
                         </div>
+                        <div>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-3">Observed date</p>
+                          <p className="mt-1 text-ink-2">{reviewDateLabel(source.effective_date)}</p>
+                        </div>
+                        <div className="flex items-center md:justify-end">
+                          {isCandidate ? (
+                            <span className="rounded-full bg-clear-tint px-2.5 py-1 text-xs font-semibold text-clear">
+                              Current pick
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              disabled={resolveMutation.isPending}
+                              onClick={() =>
+                                resolveItem(
+                                  activeItem,
+                                  "overridden",
+                                  "Reviewer selected this alternate source value as the candidate for this run.",
+                                  source.source_observation_ref,
+                                )
+                              }
+                              className="inline-flex items-center justify-center rounded-[6px] border border-line-1 bg-surface-0 px-2.5 py-1.5 text-xs font-semibold text-ink-2 hover:border-action hover:text-action disabled:bg-surface-1 disabled:text-ink-4"
+                            >
+                              Use this value
+                            </button>
+                          )}
+                        </div>
                       </div>
-                    )}
-                  </div>
+                    );
+                  })}
                 </div>
-                {observation && (
-                  <div className="mt-3 overflow-hidden rounded-lg border border-amber-200 bg-white">
-                    <div className="border-b border-amber-100 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-[#667085]">
-                      Source values under review
-                    </div>
-                    <div className="divide-y divide-[#eef1f5]">
-                      {observation.sources.map((source) => {
-                        const isCandidate = sourceMatchesLatest(source, recommended);
-                        return (
-                          <div
-                            key={`${item.id}-${source.source_observation_ref}`}
-                            className={cls(
-                              "grid gap-2 px-3 py-2 text-sm md:grid-cols-[1fr_150px_160px_170px]",
-                              isCandidate && "bg-emerald-50/60",
-                            )}
-                          >
-                            <div>
-                              <div className="flex flex-wrap items-center gap-2">
-                                <p className="font-semibold text-[#1c1c1e]">
-                                  {observation.canonical_name}
-                                </p>
-                                <span
-                                  className={cls(
-                                    "rounded-full px-2 py-0.5 text-[11px] font-semibold",
-                                    isCandidate
-                                      ? "bg-emerald-100 text-emerald-800"
-                                      : "bg-slate-100 text-slate-700",
-                                  )}
-                                >
-                                  {isCandidate ? "Candidate" : "Alternate"}
-                                </span>
-                              </div>
-                              <p className="mt-0.5 text-xs text-[#667085]">
-                                {source.source_label}
-                                {observation.loinc_code ? ` · LOINC ${observation.loinc_code}` : ""}
-                              </p>
-                              <details className="mt-0.5 text-xs text-[#667085]">
-                                <summary className="cursor-pointer list-none text-[#667085] hover:text-[#5b76fe]">
-                                  Technical reference: {shortReference(source.source_observation_ref)}
-                                </summary>
-                                <p className="mt-1 break-all font-mono text-[11px]">{source.source_observation_ref}</p>
-                              </details>
-                            </div>
-                            <div>
-                              <p className="text-xs font-semibold uppercase tracking-wider text-[#667085]">Value</p>
-                              <p className="mt-1 font-semibold text-[#1c1c1e]">
-                                {reviewValueLabel(source.value, source.unit, source.raw_value, source.raw_unit)}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-xs font-semibold uppercase tracking-wider text-[#667085]">Observed date</p>
-                              <p className="mt-1 text-[#555a6a]">
-                                {reviewDateLabel(source.effective_date)}
-                              </p>
-                            </div>
-                            <div className="flex items-center md:justify-end">
-                              {isCandidate ? (
-                                <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-800">
-                                  Current pick
-                                </span>
-                              ) : (
-                                <button
-                                  type="button"
-                                  disabled={resolveMutation.isPending}
-                                  onClick={() =>
-                                    resolveItem(
-                                      item,
-                                      "overridden",
-                                      "Reviewer selected this alternate source value as the candidate for this run.",
-                                      source.source_observation_ref,
-                                    )
-                                  }
-                                  className="inline-flex items-center justify-center rounded-lg border border-[#dfe4ea] bg-white px-2.5 py-1.5 text-xs font-semibold text-[#555a6a] hover:border-[#5b76fe] hover:text-[#5b76fe] disabled:bg-[#f4f6f8] disabled:text-[#98a2b3]"
-                                >
-                                  Use this value
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </article>
-            );
-          })}
+              </section>
+            )}
+          </div>
         </div>
       )}
       {!isLoading && latestRun && resolvedRunItems.length > 0 && (
-        <details className="mt-4 rounded-lg border border-[#dfe4ea] bg-[#f7f9fc]">
-          <summary className="cursor-pointer list-none px-3 py-2 text-sm font-semibold text-[#1c1c1e] hover:text-[#5b76fe]">
+        <details className="mt-4 rounded-[10px] border border-line-1 bg-surface-1">
+          <summary className="cursor-pointer list-none px-4 py-3 text-sm font-semibold text-ink-1 hover:text-action">
             Resolved decisions ({resolvedRunItems.length})
           </summary>
-          <div className="grid gap-2 border-t border-[#dfe4ea] bg-white px-3 py-3 text-sm md:grid-cols-3">
+          <div className="grid gap-2 border-t border-line-1 bg-surface-0 px-4 py-4 text-sm md:grid-cols-3">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-[#667085]">Audit events</p>
-              <p className="mt-1 font-semibold text-[#1c1c1e]">{latestRun.review_decision_summary.event_count}</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-ink-3">Audit events</p>
+              <p className="mt-1 font-semibold text-ink-1">{latestRun.review_decision_summary.event_count}</p>
             </div>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-[#667085]">Decision mix</p>
-              <p className="mt-1 text-[#555a6a]">{reviewDecisionSummaryLabel(latestRun.review_decision_summary.decisions)}</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-ink-3">Decision mix</p>
+              <p className="mt-1 text-ink-2">{reviewDecisionSummaryLabel(latestRun.review_decision_summary.decisions)}</p>
             </div>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-[#667085]">Latest event</p>
-              <p className="mt-1 text-[#555a6a]">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-ink-3">Latest event</p>
+              <p className="mt-1 text-ink-2">
                 {latestRun.review_decision_summary.latest_event_at
                   ? reviewDateLabel(latestRun.review_decision_summary.latest_event_at)
                   : "No timestamp"}
               </p>
             </div>
           </div>
-          <div className="divide-y divide-[#eef1f5] border-t border-[#dfe4ea]">
+          <div className="divide-y divide-line-1 border-t border-line-1">
             {resolvedRunItems.slice(0, 6).map((item) => {
               const observation = matchingObservation(item);
               const selectedSource = observation?.sources.find(
@@ -909,29 +1025,29 @@ function ReviewQueuePanel({
                   ? reviewValueLabel(observation.latest.value, observation.canonical_unit ?? observation.latest.unit)
                   : null;
               return (
-                <div key={item.id} className="grid gap-2 px-3 py-2 text-sm md:grid-cols-[220px_1fr_220px]">
+                <div key={item.id} className="grid gap-2 px-4 py-3 text-sm md:grid-cols-[220px_1fr_220px]">
                   <div>
-                    <p className="font-semibold text-[#1c1c1e]">{reviewDecisionLabel(item.decision)}</p>
-                    <p className="text-xs text-[#667085]">{item.resolved_at ? reviewDateLabel(item.resolved_at) : "No timestamp"}</p>
+                    <p className="font-semibold text-ink-1">{reviewDecisionLabel(item.decision)}</p>
+                    <p className="text-xs text-ink-3">{item.resolved_at ? reviewDateLabel(item.resolved_at) : "No timestamp"}</p>
                   </div>
                   <div className="min-w-0">
-                    <p className="truncate font-semibold text-[#1c1c1e]">
+                    <p className="truncate font-semibold text-ink-1">
                       {observation?.canonical_name ?? item.title}
                     </p>
-                    <p className="line-clamp-2 text-xs leading-5 text-[#667085]">
+                    <p className="line-clamp-2 text-xs leading-5 text-ink-3">
                       {item.decision_notes || item.body}
                     </p>
                     {observation?.loinc_code && (
-                      <p className="mt-0.5 text-xs text-[#98a2b3]">
+                      <p className="mt-0.5 text-xs text-ink-4">
                         LOINC {observation.loinc_code}
                         {observation.canonical_unit ? ` · canonical unit ${observation.canonical_unit}` : ""}
                       </p>
                     )}
                   </div>
-                  <div className="text-xs text-[#667085] md:text-right">
+                  <div className="text-xs text-ink-3 md:text-right">
                     {selectedValue ? (
                       <div>
-                        <p className="font-semibold text-[#1c1c1e]">{selectedValue}</p>
+                        <p className="font-semibold text-ink-1">{selectedValue}</p>
                         <p className="mt-0.5">
                           {selectedSource?.source_label ?? observation?.latest?.source_label ?? "Current candidate"}
                         </p>
@@ -949,24 +1065,24 @@ function ReviewQueuePanel({
               );
             })}
             {resolvedRunItems.length > 6 && (
-              <div className="px-3 py-2 text-xs text-[#667085]">
+              <div className="px-4 py-3 text-xs text-ink-3">
                 Showing 6 of {resolvedRunItems.length} saved decisions.
               </div>
             )}
           </div>
           {latestRun.review_events.length > 0 && (
-            <div className="border-t border-[#dfe4ea] bg-white px-3 py-3">
-              <p className="text-xs font-semibold uppercase tracking-wider text-[#667085]">
+            <div className="border-t border-line-1 bg-surface-0 px-4 py-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-ink-3">
                 Event ledger
               </p>
-              <div className="mt-2 divide-y divide-[#eef1f5] rounded-lg border border-[#eef1f5]">
+              <div className="mt-2 divide-y divide-line-1 rounded-[10px] border border-line-1">
                 {latestRun.review_events.slice(-4).reverse().map((event) => (
                   <div key={event.event_id} className="grid gap-2 px-3 py-2 text-xs md:grid-cols-[150px_1fr_160px]">
-                    <p className="font-semibold text-[#1c1c1e]">{reviewDecisionLabel(event.decision)}</p>
-                    <p className="min-w-0 truncate text-[#667085]">
+                    <p className="font-semibold text-ink-1">{reviewDecisionLabel(event.decision)}</p>
+                    <p className="min-w-0 truncate text-ink-3">
                       {event.notes || event.item_id}
                     </p>
-                    <p className="text-[#8d92a3] md:text-right">
+                    <p className="text-ink-4 md:text-right">
                       {reviewDateLabel(event.created_at)}
                     </p>
                   </div>
@@ -1008,44 +1124,46 @@ function ContributionsPanel({
 
   // Pick which dataset to display: either the full contribution payload
   // or the unique-to-this-source subset from the source-diff endpoint.
-  const view = showUniqueOnly && uniqueDiff
-    ? {
-        observations: uniqueDiff.unique_facts.observations,
-        conditions: uniqueDiff.unique_facts.conditions,
-        medications: uniqueDiff.unique_facts.medications,
-        allergies: uniqueDiff.unique_facts.allergies,
-        immunizations: uniqueDiff.unique_facts.immunizations,
-        encounters: [],
-        procedures: [],
-        diagnostic_reports: [],
-        clinical_notes: [],
-        totals: {
-          observations: uniqueDiff.totals.unique.observations,
-          conditions: uniqueDiff.totals.unique.conditions,
-          medications: uniqueDiff.totals.unique.medications,
-          allergies: uniqueDiff.totals.unique.allergies,
-          immunizations: uniqueDiff.totals.unique.immunizations,
-          encounters: uniqueDiff.totals.unique.encounters ?? 0,
-          procedures: uniqueDiff.totals.unique.procedures ?? 0,
-          diagnostic_reports: uniqueDiff.totals.unique.diagnostic_reports ?? 0,
-          clinical_notes: uniqueDiff.totals.unique.clinical_notes ?? 0,
-          all: uniqueDiff.totals.unique.all,
-        },
-      }
-    : data
+  const view = useMemo(() => (
+    showUniqueOnly && uniqueDiff
       ? {
-          observations: data.observations,
-          conditions: data.conditions,
-          medications: data.medications,
-          allergies: data.allergies,
-          immunizations: data.immunizations,
-          encounters: data.encounters,
-          procedures: data.procedures,
-          diagnostic_reports: data.diagnostic_reports,
-          clinical_notes: data.clinical_notes,
-          totals: data.totals,
+          observations: uniqueDiff.unique_facts.observations,
+          conditions: uniqueDiff.unique_facts.conditions,
+          medications: uniqueDiff.unique_facts.medications,
+          allergies: uniqueDiff.unique_facts.allergies,
+          immunizations: uniqueDiff.unique_facts.immunizations,
+          encounters: [],
+          procedures: [],
+          diagnostic_reports: [],
+          clinical_notes: [],
+          totals: {
+            observations: uniqueDiff.totals.unique.observations,
+            conditions: uniqueDiff.totals.unique.conditions,
+            medications: uniqueDiff.totals.unique.medications,
+            allergies: uniqueDiff.totals.unique.allergies,
+            immunizations: uniqueDiff.totals.unique.immunizations,
+            encounters: uniqueDiff.totals.unique.encounters ?? 0,
+            procedures: uniqueDiff.totals.unique.procedures ?? 0,
+            diagnostic_reports: uniqueDiff.totals.unique.diagnostic_reports ?? 0,
+            clinical_notes: uniqueDiff.totals.unique.clinical_notes ?? 0,
+            all: uniqueDiff.totals.unique.all,
+          },
         }
-      : null;
+      : data
+        ? {
+            observations: data.observations,
+            conditions: data.conditions,
+            medications: data.medications,
+            allergies: data.allergies,
+            immunizations: data.immunizations,
+            encounters: data.encounters,
+            procedures: data.procedures,
+            diagnostic_reports: data.diagnostic_reports,
+            clinical_notes: data.clinical_notes,
+            totals: data.totals,
+          }
+        : null
+  ), [data, showUniqueOnly, uniqueDiff]);
 
   const timelineEvents = useMemo<ContributionTimelineEvent[]>(() => {
     if (!view) return [];
@@ -2876,23 +2994,112 @@ export function HarmonizeView() {
       minute: "2-digit",
     });
   };
+  const preparedSourceCount = latestRun?.summary.prepared_source_count ?? 0;
+  const totalSourceCount = latestRun?.summary.source_count ?? activeCollection?.source_count ?? 0;
+  const sourcesLink = `/patient-record/sources${patientId ? `?patient=${encodeURIComponent(patientId)}` : ""}`;
+  const publishLink = `/patient-record/publish${patientId ? `?patient=${encodeURIComponent(patientId)}` : ""}`;
+  const workspaceMeta: Partial<Record<WorkspaceTab, string>> = {
+    record: latestRun ? `${latestRun.summary.total_candidate_facts} facts` : "Live preview",
+    review: latestRun ? (openRunReviewItems.length > 0 ? `${openRunReviewItems.length} open` : "Clear") : "Run first",
+    sources: activeCollection ? `${activeCollection.source_count} sources` : "No sources",
+    provenance: latestRun ? "Lineage ready" : "After run",
+  };
+  const workflowSteps: Array<{
+    id: WorkspaceTab | "publish";
+    title: string;
+    detail: string;
+    status: "ready" | "attention" | "pending";
+  }> = [
+    {
+      id: "sources",
+      title: "Collect sources",
+      detail: activeCollection?.source_count
+        ? `${activeCollection.source_count} source${activeCollection.source_count === 1 ? "" : "s"} attached to this workspace`
+        : "Add structured exports or PDFs to build the record",
+      status: activeCollectionHasNoSources ? "attention" : "ready",
+    },
+    {
+      id: "sources",
+      title: "Prepare evidence",
+      detail: extractInProgress
+        ? "PDF extraction is running now"
+        : totalSourceCount > 0
+          ? `${preparedSourceCount}/${totalSourceCount} sources prepared in the latest run`
+          : "Prepare uploaded PDFs before rerunning harmonization",
+      status: extractInProgress ? "pending" : preparedSourceCount === totalSourceCount && totalSourceCount > 0 ? "ready" : "attention",
+    },
+    {
+      id: "review",
+      title: "Review blockers",
+      detail: latestRun
+        ? openRunReviewItems.length > 0
+          ? `${openRunReviewItems.length} blocking review item${openRunReviewItems.length === 1 ? "" : "s"} remain`
+          : "No blocking review items remain on this run"
+        : "Run harmonization to generate the review artifact",
+      status: !latestRun ? "pending" : openRunReviewItems.length > 0 ? "attention" : "ready",
+    },
+    {
+      id: "publish",
+      title: "Publish chart",
+      detail: latestRun?.summary.publishable
+        ? "The run is publishable and ready for downstream activation"
+        : latestRun
+          ? "Publish stays blocked until review is cleared"
+          : "Publish becomes available after the first run",
+      status: latestRun?.summary.publishable ? "ready" : latestRun ? "attention" : "pending",
+    },
+  ];
+  const nextAction = activeCollectionHasNoSources
+    ? {
+        title: "Add source material before harmonization",
+        body: "This workspace exists, but it does not yet contain prepared records to merge into a candidate chart.",
+      }
+    : !latestRun
+      ? {
+          title: "Run harmonization to create the candidate record",
+          body: "The record tables below are a live preview. A persisted run is the durable handoff into review and publish.",
+        }
+      : openRunReviewItems.length > 0
+        ? {
+            title: "Resolve review blockers before publish",
+            body: "Focus on the review workspace to clear source issues and fact conflicts on the latest harmonization run.",
+          }
+        : latestRun.summary.publishable
+          ? {
+              title: "Candidate record is ready for Publish Chart",
+              body: "The run has a saved audit trail and no open blockers, so downstream activation is available.",
+            }
+          : {
+              title: "Re-run harmonization after source updates",
+              body: "Source preparation or matcher output changed. Generate a fresh run before publishing.",
+            };
 
   return (
     <div className="space-y-4">
-      <header className="rounded-lg border border-[#dfe4ea] bg-white px-5 py-4">
-        <div className="max-w-4xl">
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#5b76fe]">
+      <header className="rounded-[10px] border border-line-1 bg-surface-0 shadow-[var(--shadow-1)]">
+        <div className="grid gap-4 px-5 py-5 xl:grid-cols-[minmax(0,1.25fr)_320px] xl:px-6">
+          <div className="max-w-4xl">
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-action">
               <Layers3 size={14} />
               <span>Harmonized record</span>
             </div>
-            <h1 className="mt-2 text-2xl font-semibold text-[#1c1c1e]">
+            <h1 className="mt-2 text-2xl font-semibold text-ink-1">
               Merge, review, and trace the canonical record
             </h1>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-[#667085]">
-              Native FHIR pulls and vision-extracted PDFs become one
-              longitudinal record. Source contributions, review exceptions, and
-              provenance stay inside this workspace.
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-3">
+              Native FHIR pulls and vision-extracted PDFs become one longitudinal record. The goal here is to move
+              from source collection to a reviewable candidate chart, then publish only after blockers are cleared.
             </p>
+          </div>
+          <div className="rounded-[10px] border border-line-1 bg-surface-1 px-4 py-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-ink-3">What happens on this page</p>
+            <ul className="mt-3 space-y-2 text-sm leading-6 text-ink-3">
+              <li>1. Confirm the right source workspace is active.</li>
+              <li>2. Run harmonization to create a persisted candidate record.</li>
+              <li>3. Review blockers, source evidence, and provenance.</li>
+              <li>4. Move to Publish Chart once the run is clear.</li>
+            </ul>
+          </div>
         </div>
       </header>
 
@@ -2901,38 +3108,38 @@ export function HarmonizeView() {
       {patientId && <PatientContextPanels patientId={patientId} />}
 
       {isLoadingCollections && (
-        <div className="rounded-lg border border-[#dfe4ea] bg-white p-5">
-          <p className="flex items-center gap-2 text-sm text-[#667085]">
+        <div className="rounded-[10px] border border-line-1 bg-surface-0 p-5 shadow-[var(--shadow-1)]">
+          <p className="flex items-center gap-2 text-sm text-ink-3">
             <Loader2 size={14} className="animate-spin" />
-            Loading collections…
+            Loading collections...
           </p>
         </div>
       )}
 
       {hasNoCollections && (
-        <div className="rounded-lg border border-[#dfe4ea] bg-white p-8 text-center">
-          <div className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-full bg-[#eef2ff] text-[#5b76fe]">
+        <div className="rounded-[10px] border border-line-1 bg-surface-0 p-8 text-center shadow-[var(--shadow-1)]">
+          <div className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-full bg-action-tint text-action">
             <Inbox size={20} />
           </div>
-          <h2 className="mt-4 text-lg font-semibold text-[#1c1c1e]">
+          <h2 className="mt-4 text-lg font-semibold text-ink-1">
             No collections yet
           </h2>
-          <p className="mt-2 mx-auto max-w-xl text-sm leading-6 text-[#667085]">
+          <p className="mt-2 mx-auto max-w-xl text-sm leading-6 text-ink-3">
             The harmonize layer needs at least one document collection to merge.
             On a fresh checkout, the Synthea demo collection auto-registers from
-            the public sample data — if you're seeing this state, that bundle
+            the public sample data. If you're seeing this state, that bundle
             wasn't found at <code className="text-xs">data/synthea-samples/</code>.
           </p>
-          <p className="mt-3 mx-auto max-w-xl text-sm leading-6 text-[#667085]">
+          <p className="mt-3 mx-auto max-w-xl text-sm leading-6 text-ink-3">
             Either pull the Synthea sample data into{" "}
             <code className="text-xs">data/synthea-samples/synthea-r4-individual/fhir/</code>,
-            or upload at least one document on the Patient Record page — uploads
+            or upload at least one document on the Patient Record page. Uploads
             automatically register as a harmonize collection.
           </p>
           <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
             <Link
               to="/patient-record/sources"
-              className="inline-flex items-center gap-2 rounded-lg bg-[#5b76fe] px-4 py-2 text-sm font-semibold text-white hover:bg-[#4760e8]"
+              className="inline-flex items-center gap-2 rounded-[6px] bg-action px-4 py-2 text-sm font-semibold text-white hover:bg-action-hover"
             >
               <FileUp size={14} />
               Upload documents
@@ -2941,7 +3148,7 @@ export function HarmonizeView() {
               href="https://github.com/synthetichealth/synthea#quick-start"
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-2 rounded-lg border border-[#dfe4ea] bg-white px-4 py-2 text-sm font-semibold text-[#555a6a]"
+              className="inline-flex items-center gap-2 rounded-[6px] border border-line-1 bg-surface-0 px-4 py-2 text-sm font-semibold text-ink-2"
             >
               Synthea quick-start →
             </a>
@@ -2949,257 +3156,278 @@ export function HarmonizeView() {
         </div>
       )}
 
-      {!isLoadingCollections && !hasNoCollections && (<>
-      <div className="rounded-lg border border-[#dfe4ea] bg-white px-4 py-3">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-          <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-wider text-[#5b76fe]">Workspace sources</p>
-            <h2 className="mt-1 text-base font-semibold text-[#1c1c1e]">
-              {selectedPatient?.name ?? activeCollection?.name ?? "Selected patient workspace"}
-            </h2>
-            <p className="mt-1 max-w-4xl text-sm leading-6 text-[#667085]">
-              {activeCollection?.description ?? "The selected patient's baseline and uploaded source files are feeding this harmonized record."}
-            </p>
-          </div>
-          <div className="flex shrink-0 flex-wrap items-center gap-2">
-            {activeCollection && (
-              <span className="rounded-full bg-[#f7f9fc] px-2.5 py-1 text-xs font-semibold text-[#667085]">
-                {activeCollection.source_count} sources
-              </span>
-            )}
-            {activeId && !activeCollectionHasNoSources && (
-              <div className="inline-flex items-stretch gap-px overflow-hidden rounded-lg border border-[#dfe4ea] bg-white">
-                <select
-                  value={exportAudience}
-                  onChange={(event) => setExportAudience(event.target.value as BundleAudience)}
-                  className="cursor-pointer bg-white px-2 py-2 text-xs font-semibold text-[#555a6a] focus:outline-none"
-                  aria-label="Bundle primary packet"
-                >
-                  {BUNDLE_AUDIENCE_OPTIONS.map((option) => (
-                    <option key={option.value || "none"} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-                <a
-                  href={`/api/harmonize/${encodeURIComponent(activeId)}/export-workspace${
-                    exportAudience ? `?audience=${exportAudience}` : ""
-                  }`}
-                  className="inline-flex items-center gap-2 border-l border-[#dfe4ea] px-3 py-2 text-sm font-semibold text-[#555a6a] hover:bg-[#f6f8fc] hover:text-[#5b76fe]"
-                >
-                  <FileText size={14} />
-                  Download workspace
-                </a>
+      {!isLoadingCollections && !hasNoCollections && (
+        <>
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_380px]">
+            <section className="rounded-[10px] border border-line-1 bg-surface-0 px-5 py-5 shadow-[var(--shadow-1)]">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-action">Active workspace</p>
+                  <h2 className="mt-1 text-lg font-semibold text-ink-1">
+                    {selectedPatient?.name ?? activeCollection?.name ?? "Selected patient workspace"}
+                  </h2>
+                  <p className="mt-2 max-w-4xl text-sm leading-6 text-ink-3">
+                    {activeCollection?.description ?? "The selected patient's baseline and uploaded source files are feeding this harmonized record."}
+                  </p>
+                </div>
+                <div className="flex shrink-0 flex-wrap items-center gap-2">
+                  {activeCollection && (
+                    <span className="rounded-full bg-surface-1 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-3">
+                      {activeCollection.source_count} sources
+                    </span>
+                  )}
+                  {activeId && !activeCollectionHasNoSources && (
+                    <div className="inline-flex items-stretch gap-px overflow-hidden rounded-[6px] border border-line-1 bg-surface-0">
+                      <select
+                        value={exportAudience}
+                        onChange={(event) => setExportAudience(event.target.value as BundleAudience)}
+                        className="cursor-pointer bg-surface-0 px-2 py-2 text-xs font-semibold text-ink-2 focus:outline-none"
+                        aria-label="Bundle primary packet"
+                      >
+                        {BUNDLE_AUDIENCE_OPTIONS.map((option) => (
+                          <option key={option.value || "none"} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                      <a
+                        href={`/api/harmonize/${encodeURIComponent(activeId)}/export-workspace${
+                          exportAudience ? `?audience=${exportAudience}` : ""
+                        }`}
+                        className="inline-flex items-center gap-2 border-l border-line-1 px-3 py-2 text-sm font-semibold text-ink-2 hover:bg-surface-1 hover:text-action"
+                      >
+                        <FileText size={14} />
+                        Download workspace
+                      </a>
+                    </div>
+                  )}
+                  <Link
+                    to={sourcesLink}
+                    className="inline-flex items-center gap-2 rounded-[6px] border border-line-1 bg-surface-0 px-3 py-2 text-sm font-semibold text-ink-2 hover:border-action hover:text-action"
+                  >
+                    <FileUp size={14} />
+                    Manage sources
+                  </Link>
+                </div>
               </div>
-            )}
-            <Link
-              to={`/patient-record/sources${patientId ? `?patient=${encodeURIComponent(patientId)}` : ""}`}
-              className="inline-flex items-center gap-2 rounded-lg border border-[#dfe4ea] bg-white px-3 py-2 text-sm font-semibold text-[#555a6a] hover:border-[#5b76fe] hover:text-[#5b76fe]"
-            >
-              <FileUp size={14} />
-              Manage sources
-            </Link>
-          </div>
-        </div>
-        {extractJob?.status === "complete" && (
-          <div className="mt-3 rounded-lg border border-[#dfe4ea] bg-[#f7f9fc] p-3 text-sm">
-            <p className="font-semibold text-[#1c1c1e]">
-              Extracted {extractJob.results.length} PDF
-              {extractJob.results.length === 1 ? "" : "s"}
-            </p>
-            {extractJob.results.length > 0 ? (
-              <ul className="mt-2 space-y-1 text-xs text-[#667085]">
-                {extractJob.results.map((e) => (
-                  <li key={e.source_id}>
-                    <span className="font-medium text-[#1c1c1e]">{e.label}</span>
-                    {": "}
-                    {e.entry_count} resources
-                    {e.cache_hit ? " (cached)" : ` (${e.elapsed_seconds.toFixed(1)}s)`}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="mt-1 text-xs text-[#667085]">
-                No pending PDFs — every uploaded PDF already had a cached
-                extraction.
-              </p>
-            )}
-          </div>
-        )}
-        {extractJob?.status === "failed" && (
-          <p className="mt-3 text-sm text-red-700">
-            Extraction failed: {extractJob.error ?? "unknown error"}
-          </p>
-        )}
-        {extractMutation.error && !extractJob && (
-          <p className="mt-3 text-sm text-red-700">
-            Couldn't start extract job:{" "}
-            {(extractMutation.error as Error).message ?? "unknown error"}
-          </p>
-        )}
-      </div>
 
-      {activeCollectionHasNoSources && (
-        <section className="rounded-lg border border-[#dfe4ea] bg-white p-6">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="max-w-3xl">
-              <div className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-[#eef2ff] text-[#5b76fe]">
-                <Inbox size={18} />
+              {extractJob?.status === "complete" && (
+                <div className="mt-4 rounded-[10px] border border-line-1 bg-surface-1 p-4 text-sm">
+                  <p className="font-semibold text-ink-1">
+                    Extracted {extractJob.results.length} PDF{extractJob.results.length === 1 ? "" : "s"}
+                  </p>
+                  {extractJob.results.length > 0 ? (
+                    <ul className="mt-2 space-y-1 text-xs text-ink-3">
+                      {extractJob.results.map((result) => (
+                        <li key={result.source_id}>
+                          <span className="font-medium text-ink-1">{result.label}</span>: {result.entry_count} resources
+                          {result.cache_hit ? " (cached)" : ` (${result.elapsed_seconds.toFixed(1)}s)`}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="mt-1 text-xs text-ink-3">
+                      No pending PDFs. Every uploaded PDF already had a cached extraction.
+                    </p>
+                  )}
+                </div>
+              )}
+              {extractJob?.status === "failed" && (
+                <p className="mt-4 rounded-[10px] border border-critical-line bg-critical-tint px-4 py-3 text-sm text-critical">
+                  Extraction failed: {extractJob.error ?? "unknown error"}
+                </p>
+              )}
+              {extractMutation.error && !extractJob && (
+                <p className="mt-4 rounded-[10px] border border-critical-line bg-critical-tint px-4 py-3 text-sm text-critical">
+                  Couldn&apos;t start extract job: {(extractMutation.error as Error).message ?? "unknown error"}
+                </p>
+              )}
+            </section>
+
+            <section className="rounded-[10px] border border-line-1 bg-surface-0 p-5 shadow-[var(--shadow-1)]">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-action">Next action</p>
+              <h2 className="mt-1 text-lg font-semibold text-ink-1">{nextAction.title}</h2>
+              <p className="mt-2 text-sm leading-6 text-ink-3">{nextAction.body}</p>
+
+              <button
+                type="button"
+                disabled={runMutation.isPending || !activeId}
+                onClick={() => runMutation.mutate()}
+                className={cls(
+                  "mt-4 inline-flex w-full items-center justify-center gap-2 rounded-[6px] px-4 py-2.5 text-sm font-semibold transition-colors",
+                  runMutation.isPending
+                    ? "bg-surface-3 text-ink-3"
+                    : "bg-action text-white hover:bg-action-hover",
+                )}
+              >
+                {runMutation.isPending ? (
+                  <>
+                    <Loader2 size={15} className="animate-spin" />
+                    Running...
+                  </>
+                ) : (
+                  <>
+                    <PlayCircle size={15} />
+                    {latestRun ? "Re-run harmonization" : "Run harmonization"}
+                  </>
+                )}
+              </button>
+
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setWorkspaceTab(openRunReviewItems.length > 0 ? "review" : "record")}
+                  className="inline-flex items-center gap-2 rounded-[6px] border border-line-1 bg-surface-0 px-3 py-2 text-sm font-semibold text-ink-2 hover:border-action hover:text-action"
+                >
+                  {openRunReviewItems.length > 0 ? "Open review blockers" : "Open merged record"}
+                </button>
+                {latestRun?.summary.publishable && (
+                  <Link
+                    to={publishLink}
+                    className="inline-flex items-center gap-2 rounded-[6px] border border-line-1 bg-surface-0 px-3 py-2 text-sm font-semibold text-ink-2 hover:border-action hover:text-action"
+                  >
+                    Publish chart
+                  </Link>
+                )}
               </div>
-              <h2 className="mt-3 text-lg font-semibold text-[#1c1c1e]">
-                No sources ready for harmonization
-              </h2>
-              <p className="mt-2 text-sm leading-6 text-[#667085]">
-                This workspace exists, but Source Intake does not have any
-                prepared source files yet. Upload a portal export or PDF first;
-                the harmonized record will stay empty until there is source
-                data to merge.
-              </p>
-            </div>
-            <div className="flex shrink-0 flex-wrap gap-2">
-              <Link
-                to={`/patient-record/sources${patientId ? `?patient=${encodeURIComponent(patientId)}` : ""}`}
-                className="inline-flex items-center gap-2 rounded-lg bg-[#5b76fe] px-4 py-2 text-sm font-semibold text-white hover:bg-[#4760e8]"
-              >
-                <FileUp size={14} />
-                Add sources
-              </Link>
-              <Link
-                to={`/patient-record${patientId ? `?patient=${encodeURIComponent(patientId)}` : ""}`}
-                className="inline-flex items-center gap-2 rounded-lg border border-[#dfe4ea] bg-white px-4 py-2 text-sm font-semibold text-[#555a6a] hover:border-[#5b76fe] hover:text-[#5b76fe]"
-              >
-                Workspace overview
-              </Link>
-            </div>
-          </div>
-        </section>
-      )}
 
-      {activeId && !activeCollectionHasNoSources && (
-        <section className="rounded-lg border border-[#dfe4ea] bg-white p-4">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-wider text-[#5b76fe]">
-                Harmonization run
-              </p>
-              <h2 className="mt-1 text-base font-semibold text-[#1c1c1e]">
-                {latestRun
-                  ? latestRun.summary.publishable
-                    ? "Candidate record is ready for publish review"
-                    : "Candidate record needs review"
-                  : "Run harmonization to create the candidate record"}
-              </h2>
-              <p className="mt-1 max-w-4xl text-sm leading-6 text-[#667085]">
-                This creates a persisted run artifact with source fingerprints,
-                matcher version, candidate canonical facts, review items, and
-                provenance links. The tables below remain a live preview, but a
-                run is the durable handoff into review and publish.
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <MetricCard
+                  label="Last run"
+                  value={latestRunQuery.isLoading ? "…" : formatRunDate(latestRun?.completed_at)}
+                  detail={latestRun?.rule_version ?? "No persisted run yet"}
+                />
+                <MetricCard
+                  label="Publish state"
+                  value={latestRun ? (latestRun.summary.publishable ? "Ready" : "Blocked") : "Not run"}
+                  detail={latestRun ? `${preparedSourceCount}/${totalSourceCount} sources prepared` : "Run first"}
+                />
+                <MetricCard
+                  label="Candidate facts"
+                  value={latestRun?.summary.total_candidate_facts ?? "—"}
+                  detail="Persisted in latest run"
+                />
+                <MetricCard
+                  label="Review items"
+                  value={latestRun?.summary.review_item_count ?? "—"}
+                  detail="Source gaps or fact conflicts"
+                />
+              </div>
+
+              {latestRun && openRunReviewItems.length > 0 && (
+                <div className="mt-4 rounded-[10px] border border-caution-line bg-caution-tint px-4 py-3 text-sm text-caution">
+                  <span className="font-semibold">{openRunReviewItems[0].title}</span>
+                  <span className="ml-1">{openRunReviewItems[0].body}</span>
+                  {openRunReviewItems.length > 1 && (
+                    <span className="ml-1">
+                      +{openRunReviewItems.length - 1} more item{openRunReviewItems.length === 2 ? "" : "s"} in the run.
+                    </span>
+                  )}
+                </div>
+              )}
+              {runMutation.error && (
+                <p className="mt-4 rounded-[10px] border border-critical-line bg-critical-tint px-4 py-3 text-sm text-critical">
+                  Couldn&apos;t run harmonization: {(runMutation.error as Error).message}
+                </p>
+              )}
+            </section>
+          </div>
+
+          <section className="rounded-[10px] border border-line-1 bg-surface-0 p-4 shadow-[var(--shadow-1)]">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-action">Workflow</p>
+                <h2 className="mt-1 text-base font-semibold text-ink-1">From source collection to publish-ready chart</h2>
+              </div>
+              <p className="max-w-xl text-sm leading-6 text-ink-3">
+                Each step below shows where the current workspace stands. Use the workspace navigation after this strip
+                to inspect facts, resolve blockers, or audit provenance.
               </p>
             </div>
-            <button
-              type="button"
-              disabled={runMutation.isPending || !activeId}
-              onClick={() => runMutation.mutate()}
-              className={cls(
-                "inline-flex shrink-0 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors",
-                runMutation.isPending
-                  ? "bg-[#dfe4ea] text-[#667085]"
-                  : "bg-[#5b76fe] text-white hover:bg-[#4760e8]",
-              )}
-            >
-              {runMutation.isPending ? (
-                <>
-                  <Loader2 size={15} className="animate-spin" />
-                  Running…
-                </>
-              ) : (
-                <>
-                  <PlayCircle size={15} />
-                  {latestRun ? "Re-run harmonization" : "Run harmonization"}
-                </>
-              )}
-            </button>
-          </div>
-          <div className="mt-4 grid gap-3 md:grid-cols-4">
-            <MetricCard
-              label="Last run"
-              value={latestRunQuery.isLoading ? "…" : formatRunDate(latestRun?.completed_at)}
-              detail={latestRun?.rule_version ?? "No persisted run yet"}
-            />
-            <MetricCard
-              label="Candidate facts"
-              value={latestRun?.summary.total_candidate_facts ?? "—"}
-              detail="Persisted in latest run"
-            />
-            <MetricCard
-              label="Review items"
-              value={latestRun?.summary.review_item_count ?? "—"}
-              detail="Source gaps or fact conflicts"
-            />
-            <MetricCard
-              label="Publish state"
-              value={latestRun ? (latestRun.summary.publishable ? "Ready" : "Blocked") : "Not run"}
-              detail={latestRun ? `${latestRun.summary.prepared_source_count}/${latestRun.summary.source_count} sources ready` : "Run first"}
-            />
-          </div>
-          {latestRun && openRunReviewItems.length > 0 && (
-            <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-              <span className="font-semibold">{openRunReviewItems[0].title}</span>
-              <span className="ml-1">{openRunReviewItems[0].body}</span>
-              {openRunReviewItems.length > 1 && (
-                <span className="ml-1">
-                  +{openRunReviewItems.length - 1} more item
-                  {openRunReviewItems.length === 2 ? "" : "s"} in the run.
-                </span>
-              )}
+            <div className="mt-4 grid gap-3 xl:grid-cols-4">
+              {workflowSteps.map((step, index) => (
+                <div
+                  key={step.title}
+                  className={cls("rounded-[10px] border px-4 py-4", workflowStepTone(step.status))}
+                >
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-3">Step {index + 1}</p>
+                  <p className="mt-1 text-sm font-semibold text-ink-1">{step.title}</p>
+                  <p className="mt-2 text-sm leading-6 text-ink-3">{step.detail}</p>
+                </div>
+              ))}
             </div>
+          </section>
+
+          {activeCollectionHasNoSources && (
+            <section className="rounded-[10px] border border-line-1 bg-surface-0 p-6 shadow-[var(--shadow-1)]">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className="max-w-3xl">
+                  <div className="inline-flex h-10 w-10 items-center justify-center rounded-[10px] bg-action-tint text-action">
+                    <Inbox size={18} />
+                  </div>
+                  <h2 className="mt-3 text-lg font-semibold text-ink-1">No sources ready for harmonization</h2>
+                  <p className="mt-2 text-sm leading-6 text-ink-3">
+                    This workspace exists, but Source Intake does not have any prepared source files yet. Upload a
+                    portal export or PDF first. The harmonized record will stay empty until there is source data to merge.
+                  </p>
+                </div>
+                <div className="flex shrink-0 flex-wrap gap-2">
+                  <Link
+                    to={sourcesLink}
+                    className="inline-flex items-center gap-2 rounded-[6px] bg-action px-4 py-2 text-sm font-semibold text-white hover:bg-action-hover"
+                  >
+                    <FileUp size={14} />
+                    Add sources
+                  </Link>
+                  <Link
+                    to={`/patient-record${patientId ? `?patient=${encodeURIComponent(patientId)}` : ""}`}
+                    className="inline-flex items-center gap-2 rounded-[6px] border border-line-1 bg-surface-0 px-4 py-2 text-sm font-semibold text-ink-2 hover:border-action hover:text-action"
+                  >
+                    Workspace overview
+                  </Link>
+                </div>
+              </div>
+            </section>
           )}
-          {runMutation.error && (
-            <p className="mt-3 text-sm text-red-700">
-              Couldn't run harmonization: {(runMutation.error as Error).message}
-            </p>
+
+          {!activeCollectionHasNoSources && (
+            <>
+              <WorkspaceTabs active={workspaceTab} onChange={setWorkspaceTab} meta={workspaceMeta} />
+
+              {activeId && workspaceTab === "record" && (
+                <RecordWorkspace
+                  collectionId={activeId}
+                  tab={tab}
+                  onTabChange={setTab}
+                />
+              )}
+
+              {activeId && workspaceTab === "review" && (
+                <ReviewQueuePanel collectionId={activeId} patientId={patientId} />
+              )}
+
+              {activeId && workspaceTab === "sources" && (
+                <SourcesPanel
+                  collectionId={activeId}
+                  canExtract={isUploadCollection || isPatientWorkspace}
+                  extractInProgress={extractInProgress}
+                  onExtract={() => extractMutation.mutate()}
+                />
+              )}
+
+              {activeId && workspaceTab === "provenance" && (
+                <ProvenanceWorkspace collectionId={activeId} />
+              )}
+            </>
           )}
-        </section>
+        </>
       )}
-
-      {!activeCollectionHasNoSources && (
-        <WorkspaceTabs active={workspaceTab} onChange={setWorkspaceTab} />
-      )}
-
-      {activeId && !activeCollectionHasNoSources && workspaceTab === "record" && (
-        <RecordWorkspace
-          collectionId={activeId}
-          tab={tab}
-          onTabChange={setTab}
-        />
-      )}
-
-      {activeId && !activeCollectionHasNoSources && workspaceTab === "review" && (
-        <ReviewQueuePanel collectionId={activeId} patientId={patientId} />
-      )}
-
-      {activeId && !activeCollectionHasNoSources && workspaceTab === "sources" && (
-        <SourcesPanel
-          collectionId={activeId}
-          canExtract={isUploadCollection || isPatientWorkspace}
-          extractInProgress={extractInProgress}
-          onExtract={() => extractMutation.mutate()}
-        />
-      )}
-
-      {activeId && !activeCollectionHasNoSources && workspaceTab === "provenance" && (
-        <ProvenanceWorkspace collectionId={activeId} />
-      )}
-
-      </>)}
 
       {!isLoadingCollections && !hasNoCollections && (
-        <p className="text-xs leading-5 text-[#667085]">
-          The Provenance graph is the Atlas wedge: every merged fact retains
-          pointers back to its sources via FHIR Provenance entities. Atlas
-          Extension URLs (<code>source-label</code>, <code>harmonize-activity</code>)
-          carry the lineage that downstream consumers (clinician UI, agent
-          assistant) read to render explainability.
+        <p className="text-xs leading-5 text-ink-3">
+          The Provenance graph is the Atlas wedge: every merged fact retains pointers back to its sources via FHIR
+          Provenance entities. Atlas extension URLs (<code>source-label</code>, <code>harmonize-activity</code>)
+          carry the lineage that downstream consumers read to render explainability.
         </p>
       )}
     </div>

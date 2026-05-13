@@ -1007,6 +1007,25 @@ def _cached_load(path_str: str) -> tuple[PatientRecord, PatientStats]:
     return record, stats
 
 
+@lru_cache(maxsize=30)
+def _cached_load_raw_bundle(path_str: str) -> dict[str, Any]:
+    """Load the raw FHIR bundle JSON dict for a patient file. Cached by the
+    bundle's absolute path so repeated reads (e.g. encounter-raw lookups,
+    Patient resource UUID resolution) don't re-open and re-parse the file."""
+    with open(path_str) as f:
+        return json.load(f)
+
+
+def load_raw_bundle(patient_id: str) -> dict[str, Any] | None:
+    """Return the raw FHIR bundle JSON dict for ``patient_id``. ``None`` if
+    the patient is not found. Backed by the LRU cache so repeated requests
+    against the same physical bundle are served from memory."""
+    path = path_from_patient_id(patient_id)
+    if path is None:
+        return None
+    return _cached_load_raw_bundle(str(path))
+
+
 def load_patient(patient_id: str) -> tuple[PatientRecord, PatientStats] | None:
     """Load and parse a patient bundle by ID. Returns None if not found. Cached.
 

@@ -26,6 +26,7 @@ from api.core.loader import (
     patient_id_from_path,
     path_from_patient_id,
     load_patient,
+    load_raw_bundle,
     load_active_published_run,
     data_dir,
 )
@@ -1892,12 +1893,9 @@ def patient_procedures(patient_id: str, request: Request) -> ProceduresResponse:
 def encounter_raw(patient_id: str, encounter_id: str, request: Request) -> dict:
     """Return the raw FHIR Encounter resource JSON from the bundle file."""
     patient_id = _authorized_patient_id(request, patient_id)
-    path = path_from_patient_id(patient_id)
-    if path is None:
+    bundle = load_raw_bundle(patient_id)
+    if bundle is None:
         raise HTTPException(status_code=404, detail=f"Patient not found: {patient_id}")
-
-    with open(path) as f:
-        bundle = json.load(f)
 
     for entry in bundle.get("entry", []):
         resource = entry.get("resource", {})
@@ -1920,11 +1918,9 @@ def _patient_fhir_uuid(patient_id: str) -> str | None:
     The filename stem UUID is the *bundle* ID, not the patient resource ID.
     We must open the bundle and find the Patient entry's fullUrl.
     """
-    path = path_from_patient_id(patient_id)
-    if path is None:
+    bundle = load_raw_bundle(patient_id)
+    if bundle is None:
         return None
-    with open(path) as f:
-        bundle = json.load(f)
     for entry in bundle.get("entry", []):
         resource = entry.get("resource", {})
         if resource.get("resourceType") == "Patient":

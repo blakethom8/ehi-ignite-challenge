@@ -55,6 +55,17 @@ class Settings(BaseSettings):
     so unrelated env vars never break boot.
     """
 
+    @model_validator(mode="before")
+    @classmethod
+    def _empty_string_is_unset(cls, data: Any) -> Any:
+        # Docker compose / shell exports pass declared-but-unset vars as `FOO=`
+        # (empty string). Pydantic v2 won't coerce "" into typed numeric or
+        # boolean fields, so treat empty strings as missing and let the field
+        # default kick in.
+        if isinstance(data, dict):
+            return {k: (None if v == "" else v) for k, v in data.items()}
+        return data
+
     # ── Core ────────────────────────────────────────────────────────────────
     environment: str = "development"
 

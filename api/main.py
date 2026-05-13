@@ -4,6 +4,7 @@ EHI Ignite Challenge — FastAPI backend.
 Run: uv run uvicorn api.main:app --reload --port 8000
 """
 
+import logging
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -46,6 +47,8 @@ from api.plugins.routers import plugins as plugins_router
 from api.plugins import runtime as plugin_runtime
 from api.settings import get_settings
 
+logger = logging.getLogger(__name__)
+
 _settings = get_settings()
 _IS_PRODUCTION = _settings.is_production
 
@@ -82,21 +85,21 @@ def _materialize_sof_db() -> None:
         seed_demo_aggregate_uploads()
     except Exception:
         # Never let a seeder failure prevent the API from booting.
-        pass
+        logger.exception("startup: seed_demo_aggregate_uploads failed")
     # Cache verified plugin manifests in memory so /api/plugins/installed
     # serves without re-verifying signatures on every request.
     try:
         plugin_runtime.reload_manifests()
     except Exception:
         # Don't crash the API if a manifest is malformed — just log.
-        pass
+        logger.exception("startup: plugin_runtime.reload_manifests failed")
     # Rehydrate revoked-run set from runs.db so consent revocations survive
     # the restart we just performed. Without this, a revoked plugin would
     # silently regain tool access on the next deploy.
     try:
         plugin_runtime.reload_revoked_runs()
     except Exception:
-        pass
+        logger.exception("startup: plugin_runtime.reload_revoked_runs failed")
     # Purge audit events older than EVENTS_RETENTION_DAYS so events.db
     # stays bounded under production traffic. Default 90 days; set to 0
     # to disable. Best-effort — never crash the API on a purge failure.
@@ -105,7 +108,7 @@ def _materialize_sof_db() -> None:
 
         purge_events_older_than()
     except Exception:
-        pass
+        logger.exception("startup: purge_events_older_than failed")
 
 app.add_middleware(
     TrustedHostMiddleware,

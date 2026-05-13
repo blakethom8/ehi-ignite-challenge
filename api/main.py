@@ -5,6 +5,7 @@ Run: uv run uvicorn api.main:app --reload --port 8000
 """
 
 import logging
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -52,24 +53,35 @@ logger = logging.getLogger(__name__)
 _settings = get_settings()
 _IS_PRODUCTION = _settings.is_production
 
-app = FastAPI(
-    title="EHI Ignite API",
-    description="Clinical intelligence layer over FHIR patient data",
-    version="0.1.0",
-    docs_url=None if _IS_PRODUCTION else "/docs",
-    redoc_url=None if _IS_PRODUCTION else "/redoc",
-    openapi_url=None if _IS_PRODUCTION else "/openapi.json",
-)
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application startup/shutdown lifecycle.
 
-@app.on_event("startup")
-def _materialize_sof_db() -> None:
-    """Rebuild data/sof.db on boot if any ViewDefinition or bundle is newer.
+    Replaces the deprecated ``@app.on_event("startup")`` pattern (FastAPI
+    0.93+). All bootstrap work runs before ``yield``; shutdown hooks (none
+    today) would run after.
 
-    Idempotent — a fresh DB triggers no work. Controlled by the
-    ``SOF_AUTO_MATERIALIZE``/``SOF_PATIENT_LIMIT``/``SOF_DB_PATH`` env vars;
-    never raises (see ``sof_materialize.materialize_from_env``).
+    Two startup steps are security invariants and **fail closed in
+    production**: ``plugin_runtime.reload_manifests`` (signature-verifies
+    every installed plugin manifest) and
+    ``plugin_runtime.reload_revoked_runs`` (rehydrates the revoked-run set
+    so consent revocations survive restarts). If either of these raises in
+    production, the API refuses to boot rather than serving traffic with a
+    broken trust chain. In development they log-and-continue so local
+    workflows are unblocked. The other startup steps remain best-effort.
     """
+    # Re-read settings inside the lifespan so tests that
+    # ``monkeypatch.setenv("ENVIRONMENT", ...)`` before entering the
+    # TestClient context see the override take effect. Module-level
+    # ``_IS_PRODUCTION`` is captured at import time and only governs the
+    # OpenAPI/docs visibility above.
+    settings = get_settings()
+
+    # Rebuild data/sof.db on boot if any ViewDefinition or bundle is newer.
+    # Idempotent — a fresh DB triggers no work. Controlled by the
+    # ``SOF_AUTO_MATERIALIZE``/``SOF_PATIENT_LIMIT``/``SOF_DB_PATH`` env vars;
+    # never raises (see ``sof_materialize.materialize_from_env``).
     materialize_from_env()
     init_auth_store()
     # The first app interaction needs /api/patients. Build that lightweight
@@ -93,6 +105,11 @@ def _materialize_sof_db() -> None:
     except Exception:
         # Don't crash the API if a manifest is malformed — just log.
         logger.exception("startup: plugin_runtime.reload_manifests failed")
+        if settings.is_production:
+            # Refuse to boot in prod with a broken trust chain. Unsigned or
+            # tampered manifests must not reach the "no plugins loaded"
+            # silent-degrade state — surface the failure to the operator.
+            raise
     # Rehydrate revoked-run set from runs.db so consent revocations survive
     # the restart we just performed. Without this, a revoked plugin would
     # silently regain tool access on the next deploy.
@@ -100,6 +117,10 @@ def _materialize_sof_db() -> None:
         plugin_runtime.reload_revoked_runs()
     except Exception:
         logger.exception("startup: plugin_runtime.reload_revoked_runs failed")
+        if settings.is_production:
+            # Refuse to boot in prod if revocations can't be rehydrated —
+            # a revoked plugin would otherwise regain tool access.
+            raise
     # Purge audit events older than EVENTS_RETENTION_DAYS so events.db
     # stays bounded under production traffic. Default 90 days; set to 0
     # to disable. Best-effort — never crash the API on a purge failure.
@@ -109,6 +130,20 @@ def _materialize_sof_db() -> None:
         purge_events_older_than()
     except Exception:
         logger.exception("startup: purge_events_older_than failed")
+
+    yield
+    # No shutdown work today.
+
+
+app = FastAPI(
+    title="EHI Ignite API",
+    description="Clinical intelligence layer over FHIR patient data",
+    version="0.1.0",
+    docs_url=None if _IS_PRODUCTION else "/docs",
+    redoc_url=None if _IS_PRODUCTION else "/redoc",
+    openapi_url=None if _IS_PRODUCTION else "/openapi.json",
+    lifespan=lifespan,
+)
 
 app.add_middleware(
     TrustedHostMiddleware,

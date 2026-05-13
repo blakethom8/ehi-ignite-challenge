@@ -9,7 +9,7 @@
 | **Commits covered** | `dad8041..5e9246a` (Moves S–V; harmonize feature ships end-to-end) |
 | **Tests at writeup** | 153 green (129 lib unit + 24 API) |
 
-> Use this snapshot as the get-up-to-speed read after a multi-iteration autonomous build run. The entries below trace what shipped, where it lives in the tree, and how data flows through it. The companion experiment journal at [`docs/architecture/PIPELINE-LOG.md`](../architecture/PIPELINE-LOG.md) has per-move detail; this report is the higher-altitude picture.
+> Use this snapshot as the get-up-to-speed read after a multi-iteration autonomous build run. The entries below trace what shipped, where it lives in the tree, and how data flows through it. The companion experiment journal at [`docs/architecture/extraction/PIPELINE-LOG.md`](../architecture/PIPELINE-LOG.md) has per-move detail; this report is the higher-altitude picture.
 
 ---
 

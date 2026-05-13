@@ -163,7 +163,7 @@ Key discipline: build agents were always given explicit lists of which files to 
 ### Documentation (new)
 - `docs/FEATURE-REFERENCE.md`
 - `docs/ROADMAP.md`
-- `docs/SPRINT-NOTES-2026-04-05.md`
+- `archive/docs/SPRINT-NOTES-2026-04-05.md`
 - `.claude/feature-queue.md`
 - `.claude/build-log.md`
 

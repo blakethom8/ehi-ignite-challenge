@@ -9,7 +9,7 @@ and terminology snapshots (`reference/`).
 > **Current development focus:** the PDF → FHIR ingestion path. The cross-source
 > harmonization implementation (silver / gold / Provenance graph) is the
 > platform's defensible wedge and remains the long-horizon target — see
-> [`../../docs/architecture/ATLAS-DATA-MODEL.md`](../../docs/architecture/ATLAS-DATA-MODEL.md).
+> [`../../docs/architecture/data/ATLAS-DATA-MODEL.md`](../../docs/architecture/data/ATLAS-DATA-MODEL.md).
 > The early 5-layer scaffold lives at
 > [`../../archive/ehi-atlas-5layer/`](../../archive/ehi-atlas-5layer/) and will
 > be rebuilt against the production parser once PDF ingestion stabilizes.

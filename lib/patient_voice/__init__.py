@@ -15,7 +15,7 @@ returns a FHIR R4 ``Bundle`` (``type='collection'``) of:
 - ``Goal`` for care-goal statements
 - ``Observation`` (``code.system=atlas:patient-voice``) as the fallback
 
-See ``docs/architecture/LLM-CONTEXT-AUGMENTATION-PLAN.md`` §3.1 for the
+See ``docs/architecture/context/LLM-CONTEXT-AUGMENTATION-PLAN.md`` §3.1 for the
 worked JSON examples and §T1 for acceptance criteria.
 """
 

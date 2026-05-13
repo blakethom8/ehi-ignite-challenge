@@ -16,11 +16,15 @@ Clinicians don't need more records. They need the right 5 facts in 30 seconds.
 
 ## What This Does
 
-- **Patient Explorer** — Browse, search, and profile 1,180 synthetic patient records (Synthea FHIR R4)
-- **Clinical Safety Panel** — Drug class risk classification, interaction checking, allergy criticality
-- **Care Journey Timeline** — Medication episodes, condition arcs, and encounter history on an interactive Gantt chart
-- **SQL-on-FHIR Warehouse** — ViewDefinition-driven ETL from raw FHIR bundles into a queryable SQLite layer
-- **Provider Assistant** — Claude-powered chart Q&A with evidence-backed citations grounded in the patient's actual record
+The app ships as **Atlas Agentic Workspaces** — five top-level modules sitting on one shared FHIR data layer:
+
+- **Patient Record** — Source-of-truth chart layer (clinical overview, longitudinal history, Data Aggregator)
+- **FHIR Charts** — Raw-resource browser for the underlying bundle (formerly "FHIR Explorer")
+- **Caspian** — First-party agentic clinical workspace with full chart access (chat, workbench, tools)
+- **Plugins** — Installable, sandboxed workspaces that read a signed anchor package, never the raw chart (Trial Finder, Medication Access, Site Coordination)
+- **Learn** — Internal section: runbooks, evals, methodology, skills
+
+Underneath, a **SQL-on-FHIR warehouse** materializes the 1,180 Synthea bundles into a queryable SQLite layer (patient, condition, medication, observation, encounter views plus drug-class enrichment and a derived medication-episode table). Caspian and the deterministic clinical-intelligence modules (drug classifier, episode detector, interaction checker, cross-source harmonizer) read from that layer.
 
 ## Tech Stack
 
@@ -88,18 +92,27 @@ cp .env.example .env
 ```
 ehi-ignite-challenge/
 ├── api/                    ← FastAPI backend
-│   ├── core/               ← Clinical intelligence modules
-│   ├── routers/            ← REST endpoints
-│   └── agents/             ← Claude Agent SDK profiles
+│   ├── core/               ← Clinical intelligence modules (context_builder, harmonize_service, caspian_*, sof_*)
+│   └── routers/            ← REST endpoints
 ├── app/                    ← React + Vite frontend
 │   └── src/
-│       ├── pages/          ← Explorer, PatientJourney views
-│       └── components/     ← Shared UI components
-├── fhir_explorer/          ← FHIR parser library (shared)
-├── patient-journey/        ← SQL-on-FHIR engine + data models
+│       ├── pages/          ← PatientRecord, FhirCharts, Caspian, Plugins, InternalTools, UsingAtlas
+│       └── components/atlas/  ← Shared Atlas chrome + workspace shell
+├── lib/                    ← Shared production library code
+│   ├── fhir_parser/        ← FHIR R4 bundle parser + dataclass models
+│   ├── patient_catalog/    ← Single-patient stats + corpus loader
+│   ├── sql_on_fhir/        ← SQL-on-FHIR v2 engine: ViewDefinition → SQLite
+│   ├── clinical/           ← Drug classifier, episode detector, interaction checker
+│   ├── harmonize/          ← Cross-source Observation merge + FHIR Provenance
+│   ├── extract/            ← PDF → FHIR extraction framework
+│   ├── narratives/         ← Per-episode FHIR Composition generator
+│   └── patient_voice/      ← Patient-intake → FHIR adapter
 ├── deploy/                 ← Docker + nginx production configs
 ├── data/                   ← FHIR bundles + SQLite databases
-└── research/               ← Competition research + pitch snapshot
+├── docs/architecture/      ← Architecture docs (AGENTIC-HARNESS, ATLAS-DATA-MODEL, …)
+├── research/               ← Competition research + pitch snapshot
+├── ehi-atlas/              ← Development zone: corpus bench, prototypes, notes
+└── archive/                ← Frozen legacy Streamlit shells + pre-Atlas design
 ```
 
 ## License

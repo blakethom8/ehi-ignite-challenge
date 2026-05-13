@@ -4,7 +4,7 @@ This directory holds the PDF → FHIR Bundle pipelines that the Atlas bake-off h
 
 **If you're an external agent or a teammate implementing a new pipeline, this is the only doc you need to read.** You don't need to understand the rest of the Atlas codebase — the contract is intentionally small.
 
-For the *why* behind this design (instead of the how), see [`docs/architecture/PDF-PROCESSOR.md`](../../../../docs/architecture/PDF-PROCESSOR.md). The TL;DR: we don't pick a single pipeline architecture. We measure, compare, and ship the architecture that wins on F1, cost, and latency for our actual data.
+For the *why* behind this design (instead of the how), see [`docs/architecture/extraction/PDF-PROCESSOR.md`](../../../../docs/architecture/extraction/PDF-PROCESSOR.md). The TL;DR: we don't pick a single pipeline architecture. We measure, compare, and ship the architecture that wins on F1, cost, and latency for our actual data.
 
 ---
 
@@ -211,7 +211,7 @@ If you're contributing from outside this repo (Cursor session, Codex run, Aider 
 2. Add an import line in `pipelines/__init__.py` so the registry picks it up.
 3. Run `uv run --quiet pytest tests/extract/ -q` to confirm nothing breaks.
 4. Run the bake-off against at least one PDF + ground-truth pair to confirm your `extract()` returns a valid Bundle.
-5. Open a PR or hand back the diff. The Atlas team runs the full bake-off; results land in [`docs/architecture/PDF-PROCESSOR.md`](../../../../docs/architecture/PDF-PROCESSOR.md) as a decision-log entry.
+5. Open a PR or hand back the diff. The Atlas team runs the full bake-off; results land in [`docs/architecture/extraction/PDF-PROCESSOR.md`](../../../../docs/architecture/extraction/PDF-PROCESSOR.md) as a decision-log entry.
 
 If your pipeline beats the current default on F1, cost, or latency for our PDFs — it ships.
 

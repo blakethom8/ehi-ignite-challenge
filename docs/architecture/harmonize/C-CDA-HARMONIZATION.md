@@ -103,7 +103,7 @@ Workspace export consumes the harmonize collection registry and loaded resources
 
 ## References
 
-- Deployment posture: `docs/architecture/FHIR-CONVERTER-DEPLOYMENT.md`
+- Deployment posture: `docs/architecture/deployment/FHIR-CONVERTER-DEPLOYMENT.md`
 - Microsoft FHIR-Converter: https://github.com/microsoft/FHIR-Converter
 - Microsoft converter API docs: https://raw.githubusercontent.com/microsoft/FHIR-Converter/main/docs/how-to-guides/use-convert-web-apis.md
 - HL7 C-CDA on FHIR IG: https://hl7.org/fhir/us/ccda/

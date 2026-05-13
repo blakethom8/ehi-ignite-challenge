@@ -9,7 +9,7 @@ or an ``ExtractedClinicalNote``, then converts to FHIR via the existing
 Why this is the baseline (not the recommendation)
 -------------------------------------------------
 This pipeline embodies the design we explicitly moved away from in
-Decision 1 of ``docs/architecture/PDF-PROCESSOR.md``: a bespoke
+Decision 1 of ``docs/architecture/extraction/PDF-PROCESSOR.md``: a bespoke
 intermediate format (``ExtractionResult``) rather than direct FHIR.
 We keep it as the baseline because:
 

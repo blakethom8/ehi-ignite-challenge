@@ -5,7 +5,7 @@
 | Date | 2026-05-04 |
 | Topic | Should PDF-to-FHIR ingestion and cross-source harmonization become an agentic workflow? |
 | Scope | EHI Atlas PDF extraction, upload-derived collections, harmonization, provenance, future app workflow |
-| Primary references | `docs/snapshot/2026-05-04-harmonize-catchup.md`, `docs/architecture/PIPELINE-LOG.md`, `docs/architecture/CONTEXT-PIPELINE.md` |
+| Primary references | `docs/snapshot/2026-05-04-harmonize-catchup.md`, `docs/architecture/extraction/PIPELINE-LOG.md`, `docs/architecture/context/CONTEXT-PIPELINE.md` |
 
 ## Executive take
 

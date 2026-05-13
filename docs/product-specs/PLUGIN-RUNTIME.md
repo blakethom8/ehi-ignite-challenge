@@ -12,7 +12,7 @@
 ### Prerequisites — read these first, in order
 
 1. [`.claude/handoff/atlas/README.md`](../../.claude/handoff/atlas/README.md) — Atlas product spec (the IA, the two workspace families, the boundary-pill table in §"Caspian vs. Marketplace boundaries")
-2. [`docs/architecture/AGENTIC-HARNESS.md`](../architecture/AGENTIC-HARNESS.md) — Runtime contract for Caspian vs. Plugins. **This spec extends that doc; do not duplicate its content.**
+2. [`docs/architecture/harness/AGENTIC-HARNESS.md`](../architecture/AGENTIC-HARNESS.md) — Runtime contract for Caspian vs. Plugins. **This spec extends that doc; do not duplicate its content.**
 3. [`app/src/components/atlas/trust.ts`](../../app/src/components/atlas/trust.ts) — Frontend type stub for the manifest, anchor, and provenance contracts. Read this end-to-end before reading §4 below.
 4. [`app/src/components/atlas/README.md`](../../app/src/components/atlas/README.md) — Current shared-component inventory.
 5. [`app/src/components/atlas/data.ts`](../../app/src/components/atlas/data.ts) — Current fixture. The thing this build replaces with a manifest-driven loader.
@@ -51,7 +51,7 @@ Tracked in §11. Read §11 *before* you start — it's the rubric.
 
 ## 1. Core concepts (one-page recap)
 
-Read `docs/architecture/AGENTIC-HARNESS.md` for the deep version. This is the executive summary you can carry in your head:
+Read `docs/architecture/harness/AGENTIC-HARNESS.md` for the deep version. This is the executive summary you can carry in your head:
 
 A **plugin** is a versioned, vendor-published unit of installable functionality that runs inside the Atlas workspace shell against a *scoped, signed slice of a patient's data*. It cannot read the raw chart. It cannot widen its scope at runtime. Every outbound action it takes is gated by a clinician's per-run consent and a per-action approval, and every successful outbound write is recorded as a provenance row.
 
@@ -1198,7 +1198,7 @@ Each example plugin must:
 ### 11.4 Documentation
 
 - [ ] `app/src/components/atlas/README.md` updated to reference the renderer registry + manifest loader
-- [ ] `docs/architecture/AGENTIC-HARNESS.md` §10 status table flipped: "Plugin manifest loader: ✅ shipped"
+- [ ] `docs/architecture/harness/AGENTIC-HARNESS.md` §10 status table flipped: "Plugin manifest loader: ✅ shipped"
 - [ ] A `docs/daily/2026-MM-DD.md` snapshot capturing the build, with the rubric reproduced and every box checked
 
 ---
@@ -1290,7 +1290,7 @@ In this order:
 
 1. This spec (you just read it — re-skim §11 the rubric)
 2. `app/src/components/atlas/trust.ts` (extend, don't replace)
-3. `docs/architecture/AGENTIC-HARNESS.md` (the why)
+3. `docs/architecture/harness/AGENTIC-HARNESS.md` (the why)
 4. `app/src/components/atlas/data.ts` (the thing you're replacing)
 5. `app/src/components/atlas/PluginHome.tsx` (the component you'll make manifest-driven)
 6. `app/src/components/atlas/WorkbenchPane.tsx` (the component that gets the renderer registry)

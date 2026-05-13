@@ -2,7 +2,7 @@
 
 Runs every (pipeline × PDF) cell, scoring outputs against ground truth
 where available. The result is a comparison matrix that drives
-architecture decisions per ``docs/architecture/PDF-PROCESSOR.md``
+architecture decisions per ``docs/architecture/extraction/PDF-PROCESSOR.md``
 Decision 6.
 
 How a bake-off run works

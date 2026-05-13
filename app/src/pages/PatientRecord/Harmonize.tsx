@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import {
   Activity,
   AlertTriangle,
+  BookOpen,
   CheckCircle2,
   FileText,
   FileUp,
@@ -287,12 +288,6 @@ function reviewSeverityClass(severity: HarmonizeRunReviewItem["severity"]): stri
 
 function reviewCategoryLabel(item: HarmonizeRunReviewItem): string {
   return item.category === "fact" ? "Fact conflict" : "Source issue";
-}
-
-function workflowStepTone(status: "ready" | "attention" | "pending"): string {
-  if (status === "ready") return "border-clear-line bg-clear-tint";
-  if (status === "attention") return "border-caution-line bg-caution-tint";
-  return "border-line-1 bg-surface-1";
 }
 
 function WorkspaceTabs({
@@ -1716,6 +1711,50 @@ function ClinicalNoteModal({
   );
 }
 
+function HarmonizeGuideModal({ onClose }: { onClose: () => void }) {
+  const steps = [
+    "Confirm the right source workspace is active.",
+    "Run harmonization to create a persisted candidate record.",
+    "Review blockers, source evidence, and provenance.",
+    "Move to Publish Chart once the run is clear.",
+  ];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#101828]/45 px-4 py-6">
+      <div className="flex max-h-[86vh] w-full max-w-xl flex-col overflow-hidden rounded-xl border border-[#dfe4ea] bg-white shadow-xl">
+        <div className="flex items-start justify-between gap-4 border-b border-[#eef0f4] px-5 py-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-[#5b76fe]">
+              Harmonized record
+            </p>
+            <h3 className="mt-1 text-lg font-semibold text-[#1c1c1e]">
+              How this page works
+            </h3>
+            <p className="mt-1 text-sm text-[#667085]">
+              Keep this nearby if you want the intended review flow without leaving the harmonized record surface.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-[#dfe4ea] bg-white px-3 py-2 text-sm font-semibold text-[#667085] hover:bg-[#f7f9fc]"
+          >
+            Close
+          </button>
+        </div>
+        <div className="space-y-3 overflow-y-auto px-5 py-4">
+          {steps.map((step, index) => (
+            <div key={step} className="rounded-lg border border-[#dfe4ea] bg-[#f7f9fc] p-4">
+              <p className="text-xs font-semibold uppercase tracking-wider text-[#667085]">Step {index + 1}</p>
+              <p className="mt-1 text-sm font-medium leading-6 text-[#1c1c1e]">{step}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function CanonicalSelectionCard({
   selection,
 }: {
@@ -2850,20 +2889,10 @@ function ImmunizationsTab({ collectionId }: { collectionId: string }) {
   );
 }
 
-type BundleAudience = "" | "patient-summary" | "clinician-handoff" | "second-opinion" | "preop-review";
-
-const BUNDLE_AUDIENCE_OPTIONS: Array<{ value: BundleAudience; label: string }> = [
-  { value: "", label: "No primary packet" },
-  { value: "patient-summary", label: "Patient summary" },
-  { value: "clinician-handoff", label: "Clinician handoff" },
-  { value: "second-opinion", label: "Second opinion" },
-  { value: "preop-review", label: "Pre-op review" },
-];
-
 export function HarmonizeView() {
   const [tab, setTab] = useState<ResourceTab>("labs");
   const [workspaceTab, setWorkspaceTab] = useState<WorkspaceTab>("record");
-  const [exportAudience, setExportAudience] = useState<BundleAudience>("");
+  const [showGuide, setShowGuide] = useState(false);
   const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
   const patientId = searchParams.get("patient");
@@ -3004,51 +3033,6 @@ export function HarmonizeView() {
     sources: activeCollection ? `${activeCollection.source_count} sources` : "No sources",
     provenance: latestRun ? "Lineage ready" : "After run",
   };
-  const workflowSteps: Array<{
-    id: WorkspaceTab | "publish";
-    title: string;
-    detail: string;
-    status: "ready" | "attention" | "pending";
-  }> = [
-    {
-      id: "sources",
-      title: "Collect sources",
-      detail: activeCollection?.source_count
-        ? `${activeCollection.source_count} source${activeCollection.source_count === 1 ? "" : "s"} attached to this workspace`
-        : "Add structured exports or PDFs to build the record",
-      status: activeCollectionHasNoSources ? "attention" : "ready",
-    },
-    {
-      id: "sources",
-      title: "Prepare evidence",
-      detail: extractInProgress
-        ? "PDF extraction is running now"
-        : totalSourceCount > 0
-          ? `${preparedSourceCount}/${totalSourceCount} sources prepared in the latest run`
-          : "Prepare uploaded PDFs before rerunning harmonization",
-      status: extractInProgress ? "pending" : preparedSourceCount === totalSourceCount && totalSourceCount > 0 ? "ready" : "attention",
-    },
-    {
-      id: "review",
-      title: "Review blockers",
-      detail: latestRun
-        ? openRunReviewItems.length > 0
-          ? `${openRunReviewItems.length} blocking review item${openRunReviewItems.length === 1 ? "" : "s"} remain`
-          : "No blocking review items remain on this run"
-        : "Run harmonization to generate the review artifact",
-      status: !latestRun ? "pending" : openRunReviewItems.length > 0 ? "attention" : "ready",
-    },
-    {
-      id: "publish",
-      title: "Publish chart",
-      detail: latestRun?.summary.publishable
-        ? "The run is publishable and ready for downstream activation"
-        : latestRun
-          ? "Publish stays blocked until review is cleared"
-          : "Publish becomes available after the first run",
-      status: latestRun?.summary.publishable ? "ready" : latestRun ? "attention" : "pending",
-    },
-  ];
   const nextAction = activeCollectionHasNoSources
     ? {
         title: "Add source material before harmonization",
@@ -3076,9 +3060,9 @@ export function HarmonizeView() {
 
   return (
     <div className="space-y-4">
-      <header className="rounded-[10px] border border-line-1 bg-surface-0 shadow-[var(--shadow-1)]">
-        <div className="grid gap-4 px-5 py-5 xl:grid-cols-[minmax(0,1.25fr)_320px] xl:px-6">
-          <div className="max-w-4xl">
+      <header className="rounded-[10px] border border-line-1 bg-surface-0 px-5 py-4 shadow-[var(--shadow-1)] xl:px-6">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="max-w-3xl">
             <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-action">
               <Layers3 size={14} />
               <span>Harmonized record</span>
@@ -3086,20 +3070,19 @@ export function HarmonizeView() {
             <h1 className="mt-2 text-2xl font-semibold text-ink-1">
               Merge, review, and trace the canonical record
             </h1>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-3">
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-3">
               Native FHIR pulls and vision-extracted PDFs become one longitudinal record. The goal here is to move
               from source collection to a reviewable candidate chart, then publish only after blockers are cleared.
             </p>
           </div>
-          <div className="rounded-[10px] border border-line-1 bg-surface-1 px-4 py-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-ink-3">What happens on this page</p>
-            <ul className="mt-3 space-y-2 text-sm leading-6 text-ink-3">
-              <li>1. Confirm the right source workspace is active.</li>
-              <li>2. Run harmonization to create a persisted candidate record.</li>
-              <li>3. Review blockers, source evidence, and provenance.</li>
-              <li>4. Move to Publish Chart once the run is clear.</li>
-            </ul>
-          </div>
+          <button
+            type="button"
+            onClick={() => setShowGuide(true)}
+            className="inline-flex shrink-0 items-center gap-2 rounded-[8px] border border-line-1 bg-surface-1 px-3 py-2 text-sm font-semibold text-ink-2 hover:border-action hover:text-action"
+          >
+            <BookOpen size={15} />
+            How this works
+          </button>
         </div>
       </header>
 
@@ -3158,49 +3141,26 @@ export function HarmonizeView() {
 
       {!isLoadingCollections && !hasNoCollections && (
         <>
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_380px]">
-            <section className="rounded-[10px] border border-line-1 bg-surface-0 px-5 py-5 shadow-[var(--shadow-1)]">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="grid gap-3 xl:grid-cols-[minmax(0,1.08fr)_352px] xl:items-start">
+            <section className="self-start rounded-[10px] border border-line-1 bg-surface-0 px-5 py-3.5 shadow-[var(--shadow-1)]">
+              <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_max-content] xl:items-start">
                 <div className="min-w-0">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-action">Active workspace</p>
-                  <h2 className="mt-1 text-lg font-semibold text-ink-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-action">Active workspace</p>
+                    {activeCollection && (
+                      <span className="rounded-full bg-surface-1 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-3">
+                        {activeCollection.source_count} sources
+                      </span>
+                    )}
+                  </div>
+                  <h2 className="mt-1 max-w-2xl text-lg font-semibold leading-8 text-ink-1">
                     {selectedPatient?.name ?? activeCollection?.name ?? "Selected patient workspace"}
                   </h2>
-                  <p className="mt-2 max-w-4xl text-sm leading-6 text-ink-3">
+                  <p className="mt-1.5 max-w-2xl text-sm leading-6 text-ink-3">
                     {activeCollection?.description ?? "The selected patient's baseline and uploaded source files are feeding this harmonized record."}
                   </p>
                 </div>
-                <div className="flex shrink-0 flex-wrap items-center gap-2">
-                  {activeCollection && (
-                    <span className="rounded-full bg-surface-1 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-3">
-                      {activeCollection.source_count} sources
-                    </span>
-                  )}
-                  {activeId && !activeCollectionHasNoSources && (
-                    <div className="inline-flex items-stretch gap-px overflow-hidden rounded-[6px] border border-line-1 bg-surface-0">
-                      <select
-                        value={exportAudience}
-                        onChange={(event) => setExportAudience(event.target.value as BundleAudience)}
-                        className="cursor-pointer bg-surface-0 px-2 py-2 text-xs font-semibold text-ink-2 focus:outline-none"
-                        aria-label="Bundle primary packet"
-                      >
-                        {BUNDLE_AUDIENCE_OPTIONS.map((option) => (
-                          <option key={option.value || "none"} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                      <a
-                        href={`/api/harmonize/${encodeURIComponent(activeId)}/export-workspace${
-                          exportAudience ? `?audience=${exportAudience}` : ""
-                        }`}
-                        className="inline-flex items-center gap-2 border-l border-line-1 px-3 py-2 text-sm font-semibold text-ink-2 hover:bg-surface-1 hover:text-action"
-                      >
-                        <FileText size={14} />
-                        Download workspace
-                      </a>
-                    </div>
-                  )}
+                <div className="flex shrink-0 flex-wrap items-center gap-2 xl:max-w-[340px] xl:justify-end">
                   <Link
                     to={sourcesLink}
                     className="inline-flex items-center gap-2 rounded-[6px] border border-line-1 bg-surface-0 px-3 py-2 text-sm font-semibold text-ink-2 hover:border-action hover:text-action"
@@ -3242,56 +3202,8 @@ export function HarmonizeView() {
                   Couldn&apos;t start extract job: {(extractMutation.error as Error).message ?? "unknown error"}
                 </p>
               )}
-            </section>
 
-            <section className="rounded-[10px] border border-line-1 bg-surface-0 p-5 shadow-[var(--shadow-1)]">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-action">Next action</p>
-              <h2 className="mt-1 text-lg font-semibold text-ink-1">{nextAction.title}</h2>
-              <p className="mt-2 text-sm leading-6 text-ink-3">{nextAction.body}</p>
-
-              <button
-                type="button"
-                disabled={runMutation.isPending || !activeId}
-                onClick={() => runMutation.mutate()}
-                className={cls(
-                  "mt-4 inline-flex w-full items-center justify-center gap-2 rounded-[6px] px-4 py-2.5 text-sm font-semibold transition-colors",
-                  runMutation.isPending
-                    ? "bg-surface-3 text-ink-3"
-                    : "bg-action text-white hover:bg-action-hover",
-                )}
-              >
-                {runMutation.isPending ? (
-                  <>
-                    <Loader2 size={15} className="animate-spin" />
-                    Running...
-                  </>
-                ) : (
-                  <>
-                    <PlayCircle size={15} />
-                    {latestRun ? "Re-run harmonization" : "Run harmonization"}
-                  </>
-                )}
-              </button>
-
-              <div className="mt-3 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => setWorkspaceTab(openRunReviewItems.length > 0 ? "review" : "record")}
-                  className="inline-flex items-center gap-2 rounded-[6px] border border-line-1 bg-surface-0 px-3 py-2 text-sm font-semibold text-ink-2 hover:border-action hover:text-action"
-                >
-                  {openRunReviewItems.length > 0 ? "Open review blockers" : "Open merged record"}
-                </button>
-                {latestRun?.summary.publishable && (
-                  <Link
-                    to={publishLink}
-                    className="inline-flex items-center gap-2 rounded-[6px] border border-line-1 bg-surface-0 px-3 py-2 text-sm font-semibold text-ink-2 hover:border-action hover:text-action"
-                  >
-                    Publish chart
-                  </Link>
-                )}
-              </div>
-
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <div className="mt-3 grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
                 <MetricCard
                   label="Last run"
                   value={latestRunQuery.isLoading ? "…" : formatRunDate(latestRun?.completed_at)}
@@ -3313,9 +3225,57 @@ export function HarmonizeView() {
                   detail="Source gaps or fact conflicts"
                 />
               </div>
+            </section>
+
+            <section className="self-start rounded-[10px] border border-line-1 bg-surface-0 p-4 shadow-[var(--shadow-1)]">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-action">Next action</p>
+              <h2 className="mt-1 text-lg font-semibold text-ink-1">{nextAction.title}</h2>
+              <p className="mt-1.5 text-sm leading-6 text-ink-3">{nextAction.body}</p>
+
+              <button
+                type="button"
+                disabled={runMutation.isPending || !activeId}
+                onClick={() => runMutation.mutate()}
+                className={cls(
+                  "mt-3.5 inline-flex w-full items-center justify-center gap-2 rounded-[6px] px-4 py-2.5 text-sm font-semibold transition-colors",
+                  runMutation.isPending
+                    ? "bg-surface-3 text-ink-3"
+                    : "bg-action text-white hover:bg-action-hover",
+                )}
+              >
+                {runMutation.isPending ? (
+                  <>
+                    <Loader2 size={15} className="animate-spin" />
+                    Running...
+                  </>
+                ) : (
+                  <>
+                    <PlayCircle size={15} />
+                    {latestRun ? "Re-run harmonization" : "Run harmonization"}
+                  </>
+                )}
+              </button>
+
+              <div className="mt-2.5 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setWorkspaceTab(openRunReviewItems.length > 0 ? "review" : "record")}
+                  className="inline-flex items-center gap-2 rounded-[6px] border border-line-1 bg-surface-0 px-3 py-2 text-sm font-semibold text-ink-2 hover:border-action hover:text-action"
+                >
+                  {openRunReviewItems.length > 0 ? "Open review blockers" : "Open merged record"}
+                </button>
+                {latestRun?.summary.publishable && (
+                  <Link
+                    to={publishLink}
+                    className="inline-flex items-center gap-2 rounded-[6px] border border-line-1 bg-surface-0 px-3 py-2 text-sm font-semibold text-ink-2 hover:border-action hover:text-action"
+                  >
+                    Publish chart
+                  </Link>
+                )}
+              </div>
 
               {latestRun && openRunReviewItems.length > 0 && (
-                <div className="mt-4 rounded-[10px] border border-caution-line bg-caution-tint px-4 py-3 text-sm text-caution">
+                <div className="mt-3 rounded-[10px] border border-caution-line bg-caution-tint px-4 py-3 text-sm text-caution">
                   <span className="font-semibold">{openRunReviewItems[0].title}</span>
                   <span className="ml-1">{openRunReviewItems[0].body}</span>
                   {openRunReviewItems.length > 1 && (
@@ -3326,37 +3286,12 @@ export function HarmonizeView() {
                 </div>
               )}
               {runMutation.error && (
-                <p className="mt-4 rounded-[10px] border border-critical-line bg-critical-tint px-4 py-3 text-sm text-critical">
+                <p className="mt-3 rounded-[10px] border border-critical-line bg-critical-tint px-4 py-3 text-sm text-critical">
                   Couldn&apos;t run harmonization: {(runMutation.error as Error).message}
                 </p>
               )}
             </section>
           </div>
-
-          <section className="rounded-[10px] border border-line-1 bg-surface-0 p-4 shadow-[var(--shadow-1)]">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-action">Workflow</p>
-                <h2 className="mt-1 text-base font-semibold text-ink-1">From source collection to publish-ready chart</h2>
-              </div>
-              <p className="max-w-xl text-sm leading-6 text-ink-3">
-                Each step below shows where the current workspace stands. Use the workspace navigation after this strip
-                to inspect facts, resolve blockers, or audit provenance.
-              </p>
-            </div>
-            <div className="mt-4 grid gap-3 xl:grid-cols-4">
-              {workflowSteps.map((step, index) => (
-                <div
-                  key={step.title}
-                  className={cls("rounded-[10px] border px-4 py-4", workflowStepTone(step.status))}
-                >
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-3">Step {index + 1}</p>
-                  <p className="mt-1 text-sm font-semibold text-ink-1">{step.title}</p>
-                  <p className="mt-2 text-sm leading-6 text-ink-3">{step.detail}</p>
-                </div>
-              ))}
-            </div>
-          </section>
 
           {activeCollectionHasNoSources && (
             <section className="rounded-[10px] border border-line-1 bg-surface-0 p-6 shadow-[var(--shadow-1)]">
@@ -3430,6 +3365,8 @@ export function HarmonizeView() {
           carry the lineage that downstream consumers read to render explainability.
         </p>
       )}
+
+      {showGuide && <HarmonizeGuideModal onClose={() => setShowGuide(false)} />}
     </div>
   );
 }

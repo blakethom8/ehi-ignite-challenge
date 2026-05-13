@@ -2210,7 +2210,7 @@ function useSelectedAggregationPatient() {
     setParams(next, { replace: true });
   }, [params, patientFromUrl, patientsQuery.data, setParams]);
 
-  return { patientId, patientsQuery };
+  return { patientId, patientFromUrl, patientsQuery };
 }
 
 function AggregatorPageShell({
@@ -2311,7 +2311,7 @@ export function WorkspaceLibraryPage() {
 }
 
 export function SourceIntakePage() {
-  const { patientId, patientsQuery } = useSelectedAggregationPatient();
+  const { patientId, patientFromUrl, patientsQuery } = useSelectedAggregationPatient();
   const [searchParams] = useSearchParams();
   const highlightedSourceId = searchParams.get("source");
   const sourcesQuery = useQuery({
@@ -2327,8 +2327,8 @@ export function SourceIntakePage() {
   return (
     <AggregatorPageShell
       page="sources"
-      isLoading={patientsQuery.isLoading || !patientId || sourcesQuery.isLoading}
-      hasError={patientsQuery.isError || sourcesQuery.isError}
+      isLoading={(!patientFromUrl && patientsQuery.isLoading) || !patientId || sourcesQuery.isLoading}
+      hasError={(!patientFromUrl && patientsQuery.isError) || sourcesQuery.isError}
     >
       {sourcesQuery.data && (
         <SourceInventoryPage
@@ -2345,7 +2345,7 @@ export function SourceIntakePage() {
 export function PublishReadinessPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { patientId, patientsQuery } = useSelectedAggregationPatient();
+  const { patientId, patientFromUrl, patientsQuery } = useSelectedAggregationPatient();
   const collectionId = patientId ? workspaceCollectionId(patientId) : "";
   const sourcesQuery = useQuery({
     queryKey: ["aggregation-sources", patientId],
@@ -2403,8 +2403,19 @@ export function PublishReadinessPage() {
     <AggregatorPageShell
       page="publish"
       guidance={guidance}
-      isLoading={patientsQuery.isLoading || !patientId || sourcesQuery.isLoading || latestRunQuery.isLoading || publishedQuery.isLoading}
-      hasError={patientsQuery.isError || sourcesQuery.isError || latestRunQuery.isError || publishedQuery.isError}
+      isLoading={
+        ((!patientFromUrl && patientsQuery.isLoading) ||
+          !patientId ||
+          sourcesQuery.isLoading ||
+          latestRunQuery.isLoading ||
+          publishedQuery.isLoading)
+      }
+      hasError={
+        ((!patientFromUrl && patientsQuery.isError) ||
+          sourcesQuery.isError ||
+          latestRunQuery.isError ||
+          publishedQuery.isError)
+      }
     >
       {sourcesQuery.data && (
         <ReadinessPage

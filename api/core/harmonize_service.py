@@ -42,6 +42,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
+from api.core.auth import is_demo_alias, resolve_demo_patient_alias
 from api.core.loader import path_from_patient_id, patient_display_name
 from api.core.ccda import (
     compare_patient_identity,
@@ -511,12 +512,13 @@ def patient_workspace_collection(patient_id: str) -> CollectionDefinition | None
     Any uploaded files under the same patient workspace are additional sources
     that can be extracted and merged on top.
     """
-    safe_id = _safe_upload_segment(patient_id)
+    resolved_patient_id = resolve_demo_patient_alias(patient_id) if is_demo_alias(patient_id) else patient_id
+    safe_id = _safe_upload_segment(resolved_patient_id)
     sources: list[SourceDefinition] = []
     profile_label = _profile_display_name(patient_id)
     upload_root = UPLOADS_ROOT / safe_id
 
-    patient_path = path_from_patient_id(patient_id)
+    patient_path = path_from_patient_id(resolved_patient_id)
     if patient_path is not None:
         sources.append(
             SourceDefinition(
@@ -524,7 +526,7 @@ def patient_workspace_collection(patient_id: str) -> CollectionDefinition | None
                 label="Synthea FHIR patient bundle",
                 kind="fhir-pull",
                 path=patient_path,
-                document_reference=f"DocumentReference/synthea-baseline-{safe_id}",
+                document_reference=f"DocumentReference/synthea-baseline-{_safe_upload_segment(patient_id)}",
             )
         )
 

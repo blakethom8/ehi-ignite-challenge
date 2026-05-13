@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 type TimelineEntry = {
   kind: "event" | "trace" | "provenance";
@@ -51,16 +51,13 @@ export function InternalToolsAudit() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const since = useMemo(() => {
-    const d = new Date(Date.now() - hours * 3600 * 1000);
-    return d.toISOString();
-  }, [hours]);
-
   async function fetchTimeline() {
     setLoading(true);
     setError(null);
     setData(null);
     try {
+      const now = new Date();
+      const since = new Date(now.getTime() - hours * 3600 * 1000).toISOString();
       const params = new URLSearchParams({ since });
       if (workspaceKind) params.set("workspace_kind", workspaceKind);
       const res = await fetch(

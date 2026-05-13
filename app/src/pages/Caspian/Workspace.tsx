@@ -71,27 +71,31 @@ export function CaspianWorkspace() {
     onFilesChanged: () => files.refetchTree(),
     agentSettings: agentSettings.settings,
   });
+  const latestWorkflowTabId = assistant.workflow.latestTabId;
+  const workflowTabs = assistant.workflow.tabs;
+  const acknowledgeLatestWorkflow = assistant.acknowledgeLatestWorkflow;
+  const refetchTree = files.refetchTree;
 
   // When a workflow run completes, route the newly produced artifact tab into
   // the workbench: open the tab (and the workbench pane if it is collapsed).
   // Also refresh the files tree so workflow-runs/<…>.md shows up.
   useEffect(() => {
-    const tabId = assistant.workflow.latestTabId;
+    const tabId = latestWorkflowTabId;
     if (!tabId || !paneControls) return;
-    const tab = assistant.workflow.tabs.find((t) => t.id === tabId);
+    const tab = workflowTabs.find((t) => t.id === tabId);
     if (!tab) return;
     paneControls.openTab(tab);
     if (!paneControls.panes.workbench) {
       paneControls.togglePane("workbench");
     }
-    files.refetchTree();
-    assistant.acknowledgeLatestWorkflow();
+    refetchTree();
+    acknowledgeLatestWorkflow();
   }, [
-    assistant.workflow.latestTabId,
-    assistant.workflow.tabs,
+    acknowledgeLatestWorkflow,
+    latestWorkflowTabId,
     paneControls,
-    files,
-    assistant.acknowledgeLatestWorkflow,
+    refetchTree,
+    workflowTabs,
   ]);
 
   // Build a merged canvas: workflow artifacts (keyed by their tab id) +
@@ -199,6 +203,7 @@ export function CaspianWorkspace() {
               agentSettings={agentSettings.settings}
               onUpdateAgentSettings={agentSettings.setSettings}
               liveToolCalls={assistant.liveToolCalls}
+              pendingStatus={assistant.pendingStatus}
               onCitationClick={(id) => {
                 paneControls?.focusCitation(id);
                 paneControls?.setInspectorTab("evidence");

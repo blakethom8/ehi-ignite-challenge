@@ -104,16 +104,21 @@ function legacyStorageKey(patientId: string | null, sessionId: string | null): s
   return `${LEGACY_STORAGE_PREFIX}:${patientId}:${sessionId}`;
 }
 
-function readMessages(key: string | null): CaspianAssistantMessage[] {
-  if (!key) return [];
-  try {
-    const raw = window.localStorage.getItem(key);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as CaspianAssistantMessage[]) : [];
-  } catch {
-    return [];
+function readMessages(key: string | null, fallbackKey?: string | null): CaspianAssistantMessage[] {
+  const candidateKeys = [key, fallbackKey].filter((value): value is string => Boolean(value));
+  if (candidateKeys.length === 0) return [];
+  for (const candidateKey of candidateKeys) {
+    try {
+      const raw = window.localStorage.getItem(candidateKey);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? (parsed as CaspianAssistantMessage[]) : [];
+    } catch {
+      continue;
+    }
   }
+  if (!key) return [];
+  return [];
 }
 
 function countCitations(messages: CaspianAssistantMessage[]): number {
@@ -297,17 +302,17 @@ export function useCaspianAssistantSession(
     () => modeNamespacedStorageKey(mode, identity, patientId, sessionId),
     [mode, identity, patientId, sessionId],
   );
+  const legacyKey = useMemo(
+    () => legacyStorageKey(patientId, sessionId),
+    [patientId, sessionId],
+  );
   // One-shot migration of the legacy unscoped storage key into the current
   // mode-namespaced key. Idempotent: subsequent renders no-op because the
   // legacy key has been removed.
   const migratedKeyRef = useRef<string | null>(null);
-  if (key && migratedKeyRef.current !== key) {
-    const legacy = legacyStorageKey(patientId, sessionId);
-    if (legacy) migrateLegacyKey(legacy, key);
-    migratedKeyRef.current = key;
-  }
-  const [messages, setMessages] = useState<CaspianAssistantMessage[]>(() => readMessages(key));
+  const [messages, setMessages] = useState<CaspianAssistantMessage[]>(() => readMessages(key, legacyKey));
   const [liveToolCalls, setLiveToolCalls] = useState<LiveToolCall[]>([]);
+  const [pendingStatus, setPendingStatus] = useState<string | null>(null);
   const streamAbortRef = useRef<AbortController | null>(null);
   const [workflow, setWorkflow] = useState<CaspianWorkflowState>(() => ({
     tabs: [],
@@ -319,8 +324,9 @@ export function useCaspianAssistantSession(
   }));
 
   useEffect(() => {
-    setMessages(readMessages(key));
+    setMessages(readMessages(key, legacyKey));
     setLiveToolCalls([]);
+    setPendingStatus(null);
     if (streamAbortRef.current) {
       streamAbortRef.current.abort();
       streamAbortRef.current = null;
@@ -333,7 +339,13 @@ export function useCaspianAssistantSession(
       pendingWorkflowId: null,
       error: null,
     });
-  }, [key]);
+  }, [key, legacyKey]);
+
+  useEffect(() => {
+    if (!key || migratedKeyRef.current === key) return;
+    if (legacyKey) migrateLegacyKey(legacyKey, key);
+    migratedKeyRef.current = key;
+  }, [key, legacyKey]);
 
   useEffect(() => {
     if (!key) return;
@@ -353,6 +365,7 @@ export function useCaspianAssistantSession(
       const controller = new AbortController();
       streamAbortRef.current = controller;
       setLiveToolCalls([]);
+      setPendingStatus("Starting Caspian harness…");
 
       // Wrap in object refs so flow analysis doesn't narrow the closure-mutated
       // values to `null` at the outer scope.
@@ -372,7 +385,11 @@ export function useCaspianAssistantSession(
         {
           onEvent: (event) => {
             switch (event.type) {
+              case "status":
+                setPendingStatus(event.message);
+                break;
               case "tool_start":
+                setPendingStatus(null);
                 setLiveToolCalls((prev) => [
                   ...prev,
                   {
@@ -399,9 +416,11 @@ export function useCaspianAssistantSession(
                 );
                 break;
               case "done":
+                setPendingStatus(null);
                 finalRef.value = event.response;
                 break;
               case "error":
+                setPendingStatus(null);
                 errorRef.value = { message: event.message, status: event.status };
                 break;
               case "stream_closed":
@@ -423,6 +442,7 @@ export function useCaspianAssistantSession(
     onSuccess: (data) => {
       streamAbortRef.current = null;
       setLiveToolCalls([]);
+      setPendingStatus(null);
       setMessages((current) => [...current, buildAssistantMessage(data, current)]);
       if (data.files_created && data.files_created.length > 0) {
         options.onFilesChanged?.();
@@ -430,6 +450,7 @@ export function useCaspianAssistantSession(
     },
     onError: () => {
       streamAbortRef.current = null;
+      setPendingStatus(null);
       // Leave liveToolCalls in place — the inspector can show what ran before the failure.
     },
   });
@@ -463,6 +484,7 @@ export function useCaspianAssistantSession(
     }
     setMessages([]);
     setLiveToolCalls([]);
+    setPendingStatus(null);
     setWorkflow({
       tabs: [],
       canvas: {},
@@ -565,6 +587,7 @@ export function useCaspianAssistantSession(
     runWorkflow,
     acknowledgeLatestWorkflow,
     liveToolCalls,
+    pendingStatus,
   };
 }
 

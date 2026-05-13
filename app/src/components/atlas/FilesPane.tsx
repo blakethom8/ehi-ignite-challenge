@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Braces, ChevronDown, ChevronRight, FileSpreadsheet, FileText, Folder, Hash, MoreHorizontal, Plus, Search } from "lucide-react";
 import { FILE_TREES, type FileNode, type FileTreeNode, type FolderTreeNode } from "./data";
 import type { WorkspaceId } from "./types";
@@ -30,7 +30,7 @@ function collectInitiallyExpanded(nodes: FileTreeNode[], prefix = ""): Record<st
 }
 
 export function FilesPane({ workspaceId, onOpen, activeFileId, tree: treeOverride }: FilesPaneProps) {
-  const tree = treeOverride ?? FILE_TREES[workspaceId] ?? [];
+  const tree = useMemo(() => treeOverride ?? FILE_TREES[workspaceId] ?? [], [treeOverride, workspaceId]);
   const [filter, setFilter] = useState("");
   const [expanded, setExpanded] = useState<Record<string, boolean>>(() => collectInitiallyExpanded(tree));
   const capabilities = useCapabilities();

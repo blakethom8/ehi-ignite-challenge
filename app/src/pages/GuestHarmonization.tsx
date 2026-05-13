@@ -352,12 +352,13 @@ export function GuestHarmonization() {
   // page checkpoints, worker events) ticks in real time. Mirrors the
   // authenticated extract-job polling at aggregator/shared.tsx.
   const isProcessing = run?.status === "processing";
+  const activeRunId = run?.run_id ?? null;
   useEffect(() => {
-    if (!isProcessing || !run) return;
+    if (!isProcessing || !activeRunId) return;
     let cancelled = false;
     const tick = async () => {
       try {
-        const next = await api.getGuestHarmonizationRun(run.run_id);
+        const next = await api.getGuestHarmonizationRun(activeRunId);
         if (!cancelled) setRun(next);
       } catch {
         // Transient polling errors are non-fatal — we'll catch up on the
@@ -369,7 +370,7 @@ export function GuestHarmonization() {
       cancelled = true;
       clearInterval(interval);
     };
-  }, [isProcessing, run?.run_id]);
+  }, [activeRunId, isProcessing]);
 
   // Surface the daemon's failure event as a user-visible error.
   useEffect(() => {

@@ -125,8 +125,8 @@ export function usePluginRun(runId: string | null): PluginRunStateBundle {
     onSuccess: invalidate,
   });
 
-  const events = eventsQuery.data ?? [];
-  const approvals = approvalsQuery.data ?? [];
+  const events = useMemo(() => eventsQuery.data ?? [], [eventsQuery.data]);
+  const approvals = useMemo(() => approvalsQuery.data ?? [], [approvalsQuery.data]);
   const canvas = useMemo(
     () => buildCanvas(runQuery.data?.canvas, events),
     [events, runQuery.data?.canvas],

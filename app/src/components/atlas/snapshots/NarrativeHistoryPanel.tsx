@@ -244,7 +244,6 @@ function CompositionSections({ composition }: { composition: FhirComposition }) 
             // (lib/narratives/generator.py:_html_escape).
             <div
               className="mt-1 whitespace-pre-wrap break-words leading-relaxed"
-              // eslint-disable-next-line react/no-danger
               dangerouslySetInnerHTML={{ __html: section.text.div }}
             />
           ) : (

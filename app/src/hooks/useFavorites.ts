@@ -4,16 +4,20 @@ import { migrateLegacyKey, storageNamespace } from "../storage";
 
 const LEGACY_STORAGE_KEY = "ehi-favorites";
 
-function loadFavorites(key: string): Set<string> {
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return new Set();
-    const parsed = JSON.parse(raw) as unknown;
-    if (Array.isArray(parsed)) return new Set(parsed as string[]);
-    return new Set();
-  } catch {
-    return new Set();
+function loadFavorites(key: string, fallbackKey?: string): Set<string> {
+  for (const candidateKey of [key, fallbackKey]) {
+    if (!candidateKey) continue;
+    try {
+      const raw = localStorage.getItem(candidateKey);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw) as unknown;
+      if (Array.isArray(parsed)) return new Set(parsed as string[]);
+      return new Set();
+    } catch {
+      continue;
+    }
   }
+  return new Set();
 }
 
 function saveFavorites(key: string, favorites: Set<string>): void {
@@ -39,15 +43,17 @@ export function useFavorites() {
 
   // One-shot legacy migration into the current namespace.
   const migratedKeyRef = useRef<string | null>(null);
-  if (migratedKeyRef.current !== storageKey) {
-    migrateLegacyKey(LEGACY_STORAGE_KEY, storageKey);
-    migratedKeyRef.current = storageKey;
-  }
-
-  const [favorites, setFavorites] = useState<Set<string>>(() => loadFavorites(storageKey));
+  const [favorites, setFavorites] = useState<Set<string>>(() => loadFavorites(storageKey, LEGACY_STORAGE_KEY));
 
   // Re-hydrate when the namespace changes (mode/identity transition).
   useEffect(() => {
+    setFavorites(loadFavorites(storageKey, LEGACY_STORAGE_KEY));
+  }, [storageKey]);
+
+  useEffect(() => {
+    if (migratedKeyRef.current === storageKey) return;
+    migrateLegacyKey(LEGACY_STORAGE_KEY, storageKey);
+    migratedKeyRef.current = storageKey;
     setFavorites(loadFavorites(storageKey));
   }, [storageKey]);
 

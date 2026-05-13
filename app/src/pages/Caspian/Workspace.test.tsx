@@ -69,20 +69,21 @@ vi.mock("../../components/atlas/WorkspaceFrame", () => ({
     activeSessionId: string;
   }) => {
     workspaceFrameSpy(props);
+    const { onControlsChange, surface } = props;
 
     useEffect(() => {
-      props.onControlsChange?.({
+      onControlsChange?.({
         panes: { inspector: true },
         togglePane: togglePaneSpy,
         focusCitation: focusCitationSpy,
         activeCitationId: null,
         setInspectorTab: setInspectorTabSpy,
       });
-    }, [props.onControlsChange]);
+    }, [onControlsChange]);
 
     return (
       <div data-testid="workspace-frame">
-        {props.surface?.chatPane}
+        {surface?.chatPane}
       </div>
     );
   },

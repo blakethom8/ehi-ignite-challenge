@@ -364,7 +364,7 @@ export function CcdaPipelineLab() {
   });
 
   const inputKind = detectInputKind(file);
-  const processors = processorsQuery.data?.options || [];
+  const processors = useMemo(() => processorsQuery.data?.options ?? [], [processorsQuery.data?.options]);
   const filteredProcessors = useMemo(() => {
     if (!inputKind) return processors;
     return processors.filter((option) => option.input_kinds.includes(inputKind));

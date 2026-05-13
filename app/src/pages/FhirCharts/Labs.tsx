@@ -274,7 +274,7 @@ function LabsContent({
         return true;
       })
       .sort((a, b) => a.display.localeCompare(b.display));
-  }, [allLabs, keyLabs, keyLabs.panels, query, selectedPanel, statusFilter]);
+  }, [allLabs, keyLabs, query, selectedPanel, statusFilter]);
 
   const selectedLab = useMemo(() => {
     return filteredLabs.find((lab) => labKey(lab) === selectedLabKey) ?? filteredLabs[0] ?? null;

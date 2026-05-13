@@ -41,6 +41,36 @@ const DEFAULT_SETTINGS: AgentSettings = {
   maxTokens: 1500,
 };
 
+function readAgentSettings(key: string, fallbackKey?: string): AgentSettings {
+  for (const candidateKey of [key, fallbackKey]) {
+    if (!candidateKey) continue;
+    try {
+      const saved = localStorage.getItem(candidateKey);
+      if (!saved) continue;
+      const parsed = { ...DEFAULT_SETTINGS, ...JSON.parse(saved) };
+      return { ...parsed, maxTokens: clampMaxTokens(parsed.maxTokens) };
+    } catch {
+      continue;
+    }
+  }
+  return DEFAULT_SETTINGS;
+}
+
+function readContextPackages(key: string, fallbackKey?: string): ProviderAssistantContextPackage[] {
+  for (const candidateKey of [key, fallbackKey]) {
+    if (!candidateKey) continue;
+    try {
+      const saved = localStorage.getItem(candidateKey);
+      if (!saved) continue;
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {
+      continue;
+    }
+  }
+  return [];
+}
+
 function clampMaxTokens(value: unknown): number {
   const parsed = typeof value === "number" ? value : Number(value);
   if (!Number.isFinite(parsed)) return DEFAULT_SETTINGS.maxTokens;
@@ -110,37 +140,29 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   // pre-Phase-2 unscoped keys into whichever mode the user is currently in
   // so existing users don't lose state.
   const migratedAgentKeyRef = useRef<string | null>(null);
-  if (migratedAgentKeyRef.current !== agentSettingsKey) {
-    migrateLegacyKey(LEGACY_AGENT_SETTINGS_KEY, agentSettingsKey);
-    migratedAgentKeyRef.current = agentSettingsKey;
-  }
   const migratedContextKeyRef = useRef<string | null>(null);
-  if (migratedContextKeyRef.current !== contextPackagesKey) {
-    migrateLegacyKey(LEGACY_CONTEXT_PACKAGES_KEY, contextPackagesKey);
-    migratedContextKeyRef.current = contextPackagesKey;
-  }
 
   const [stance, setStance] = useState<"opinionated" | "balanced">("opinionated");
-  const [agentSettings, setAgentSettings] = useState<AgentSettings>(() => {
-    try {
-      const saved = localStorage.getItem(agentSettingsKey);
-      if (saved) {
-        const parsed = { ...DEFAULT_SETTINGS, ...JSON.parse(saved) };
-        return { ...parsed, maxTokens: clampMaxTokens(parsed.maxTokens) };
-      }
-    } catch { /* noop */ }
-    return DEFAULT_SETTINGS;
-  });
-  const [contextPackages, setContextPackagesState] = useState<ProviderAssistantContextPackage[]>(() => {
-    try {
-      const saved = localStorage.getItem(contextPackagesKey);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
-      }
-    } catch { /* noop */ }
-    return [];
-  });
+  const [agentSettings, setAgentSettings] = useState<AgentSettings>(() =>
+    readAgentSettings(agentSettingsKey, LEGACY_AGENT_SETTINGS_KEY),
+  );
+  const [contextPackages, setContextPackagesState] = useState<ProviderAssistantContextPackage[]>(() =>
+    readContextPackages(contextPackagesKey, LEGACY_CONTEXT_PACKAGES_KEY),
+  );
+
+  useEffect(() => {
+    if (migratedAgentKeyRef.current === agentSettingsKey) return;
+    migrateLegacyKey(LEGACY_AGENT_SETTINGS_KEY, agentSettingsKey);
+    migratedAgentKeyRef.current = agentSettingsKey;
+    setAgentSettings(readAgentSettings(agentSettingsKey));
+  }, [agentSettingsKey]);
+
+  useEffect(() => {
+    if (migratedContextKeyRef.current === contextPackagesKey) return;
+    migrateLegacyKey(LEGACY_CONTEXT_PACKAGES_KEY, contextPackagesKey);
+    migratedContextKeyRef.current = contextPackagesKey;
+    setContextPackagesState(readContextPackages(contextPackagesKey));
+  }, [contextPackagesKey]);
   const [messagesByPatient, setMessagesByPatient] = useState<Record<string, ChatMessage[]>>({});
 
   // When the storage key changes (mode/identity flip), rehydrate from the
@@ -311,7 +333,6 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
 // ── Hook: per-patient handle ─────────────────────────────────────────────────
 
-// eslint-disable-next-line react-refresh/only-export-components
 export function useChatForPatient(patientId: string | null): PatientChatHandle {
   const ctx = useContext(ChatContext);
   if (!ctx) throw new Error("useChatForPatient must be used within a ChatProvider");

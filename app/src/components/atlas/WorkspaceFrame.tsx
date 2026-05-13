@@ -217,7 +217,7 @@ export function WorkspaceFrame({
   useEffect(() => {
     if (activeSessionId === undefined) return;
     state.setActiveSessionId(activeSessionId === "__home__" ? null : activeSessionId);
-  }, [activeSessionId, state.setActiveSessionId]);
+  }, [activeSessionId, state]);
   const handleSelectSession =
     onSelectSession ??
     ((id: string | "__home__") =>

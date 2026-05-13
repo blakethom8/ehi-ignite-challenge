@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   FIXTURE_CANVAS,
   FILE_TREES,
@@ -181,8 +181,14 @@ export function useWorkspaceState(
   const activeFileStorageKey = `${ACTIVE_FILE_STORAGE_PREFIX}${workspaceId}`;
   const citationStorageKey = `${CITATION_STORAGE_PREFIX}${workspaceId}`;
   const inspectorTabStorageKey = `${INSPECTOR_TAB_STORAGE_PREFIX}${workspaceId}`;
-  const seededTabs = options.seedTabs ?? INITIAL_TABS[workspaceId] ?? [];
-  const fileTree = options.filesTree ?? FILE_TREES[workspaceId] ?? [];
+  const seededTabs = useMemo(
+    () => options.seedTabs ?? INITIAL_TABS[workspaceId] ?? [],
+    [options.seedTabs, workspaceId],
+  );
+  const fileTree = useMemo(
+    () => options.filesTree ?? FILE_TREES[workspaceId] ?? [],
+    [options.filesTree, workspaceId],
+  );
   const [panes, setPanes] = useState<PaneVisibility>(() =>
     loadPaneState(workspaceId, panesStorageKey),
   );

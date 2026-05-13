@@ -32,11 +32,15 @@ export function storageNamespace(
 
 export function purgeNamespacesByPrefix(prefix: string): void {
   if (typeof window === "undefined") return;
-  const keys = Object.keys(window.localStorage);
-  for (const k of keys) {
-    if (k.startsWith(prefix)) {
-      window.localStorage.removeItem(k);
+  const keys: string[] = [];
+  for (let i = 0; i < window.localStorage.length; i += 1) {
+    const key = window.localStorage.key(i);
+    if (key?.startsWith(prefix)) {
+      keys.push(key);
     }
+  }
+  for (const key of keys) {
+    window.localStorage.removeItem(key);
   }
 }
 

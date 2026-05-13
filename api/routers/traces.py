@@ -7,7 +7,6 @@ the Provider Assistant's Anthropic SDK calls.
 
 from __future__ import annotations
 
-import os
 import secrets
 
 from fastapi import APIRouter, HTTPException, Query, Request, status
@@ -18,31 +17,26 @@ from api.core.tracing import (
     get_traces_summary,
     query_traces,
 )
+from api.settings import get_settings
 
 router = APIRouter(prefix="/traces", tags=["traces"])
-_TRACES_API_ENABLED = os.getenv("TRACES_API_ENABLED", "false").strip().lower() in {
-    "1",
-    "true",
-    "yes",
-    "on",
-}
-_TRACES_API_TOKEN = os.getenv("TRACES_API_TOKEN", "").strip()
-_ENVIRONMENT = os.getenv("ENVIRONMENT", "development").strip().lower()
 
 
 def _assert_traces_api_enabled(request: Request) -> None:
-    if not _TRACES_API_ENABLED:
+    settings = get_settings()
+    token = (settings.traces_api_token or "").strip()
+    if not settings.traces_api_enabled:
         raise HTTPException(
             status_code=503,
             detail="Traces API is disabled. Set TRACES_API_ENABLED=true to enable.",
         )
-    if _ENVIRONMENT in {"prod", "production"} and not _TRACES_API_TOKEN:
+    if settings.is_production and not token:
         raise HTTPException(
             status_code=503,
             detail="Traces API requires TRACES_API_TOKEN in production.",
         )
-    if _TRACES_API_TOKEN:
-        expected = f"Bearer {_TRACES_API_TOKEN}"
+    if token:
+        expected = f"Bearer {token}"
         provided = request.headers.get("Authorization", "")
         if not secrets.compare_digest(provided, expected):
             raise HTTPException(

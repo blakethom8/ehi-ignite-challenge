@@ -121,6 +121,17 @@ class AuthApiTests(unittest.TestCase):
         self.assertEqual(overview.status_code, 200)
         self.assertEqual(overview.json()["id"], "demo-high-risk")
 
+    def test_demo_session_capabilities_include_harmonize(self) -> None:
+        client = TestClient(app)
+        start = client.post("/api/auth/demo", json={"patient_id": "demo-aggregate-icu"})
+        self.assertEqual(start.status_code, 200)
+
+        capabilities = client.get("/api/auth/capabilities")
+        self.assertEqual(capabilities.status_code, 200)
+        body = capabilities.json()
+        self.assertEqual(body["mode"], "demo")
+        self.assertTrue(body["can_use_harmonize"])
+
     def test_authenticated_session_does_not_list_seeded_synthea_workspaces(self) -> None:
         client = TestClient(app)
         email = f"workspace-list-{uuid.uuid4().hex}@example.com"

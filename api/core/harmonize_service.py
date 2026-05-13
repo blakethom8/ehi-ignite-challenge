@@ -34,7 +34,6 @@ from __future__ import annotations
 import base64
 import binascii
 import json
-import os
 import re
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -42,6 +41,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
+from api.core.auth import is_demo_alias, resolve_demo_patient_alias
 from api.core.loader import path_from_patient_id, patient_display_name
 from api.core.ccda import (
     compare_patient_identity,
@@ -49,6 +49,7 @@ from api.core.ccda import (
     is_ccda_xml,
     is_converter_required,
 )
+from api.settings import get_settings
 from lib.harmonize import (
     SourceBundle,
     merge_allergies,
@@ -68,13 +69,10 @@ from lib.harmonize.models import (
 from lib.patient_voice import patient_voice_source_bundles
 
 
+_settings = get_settings()
 REPO_ROOT = Path(__file__).resolve().parents[2]
-UPLOADS_ROOT = Path(
-    os.getenv("AGGREGATION_UPLOAD_STORE_PATH", REPO_ROOT / "data" / "aggregation-uploads")
-)
-PROFILE_ROOT = Path(
-    os.getenv("AGGREGATION_PROFILE_STORE_PATH", REPO_ROOT / "data" / "aggregation-profiles")
-)
+UPLOADS_ROOT = _settings.aggregation_upload_store_path
+PROFILE_ROOT = _settings.aggregation_profile_store_path
 PROFILE_REGISTRY_PATH = PROFILE_ROOT / "profiles.json"
 
 # ---------------------------------------------------------------------------
@@ -511,12 +509,13 @@ def patient_workspace_collection(patient_id: str) -> CollectionDefinition | None
     Any uploaded files under the same patient workspace are additional sources
     that can be extracted and merged on top.
     """
-    safe_id = _safe_upload_segment(patient_id)
+    resolved_patient_id = resolve_demo_patient_alias(patient_id) if is_demo_alias(patient_id) else patient_id
+    safe_id = _safe_upload_segment(resolved_patient_id)
     sources: list[SourceDefinition] = []
     profile_label = _profile_display_name(patient_id)
     upload_root = UPLOADS_ROOT / safe_id
 
-    patient_path = path_from_patient_id(patient_id)
+    patient_path = path_from_patient_id(resolved_patient_id)
     if patient_path is not None:
         sources.append(
             SourceDefinition(
@@ -524,7 +523,7 @@ def patient_workspace_collection(patient_id: str) -> CollectionDefinition | None
                 label="Synthea FHIR patient bundle",
                 kind="fhir-pull",
                 path=patient_path,
-                document_reference=f"DocumentReference/synthea-baseline-{safe_id}",
+                document_reference=f"DocumentReference/synthea-baseline-{_safe_upload_segment(patient_id)}",
             )
         )
 

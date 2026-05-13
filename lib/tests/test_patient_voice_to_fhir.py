@@ -1,7 +1,7 @@
 """Tests for ``lib.patient_voice.to_fhir`` (T1 of the Phase 1 plan).
 
 Acceptance criteria from
-``docs/architecture/LLM-CONTEXT-AUGMENTATION-PLAN.md`` §T1:
+``docs/architecture/context/LLM-CONTEXT-AUGMENTATION-PLAN.md`` §T1:
 
 1. A "stopped lisinopril 3 weeks ago" turn produces a MedicationStatement
    with status=stopped and effectivePeriod.end ≤ 25 days before today.

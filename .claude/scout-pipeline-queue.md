@@ -307,14 +307,14 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 
 - **Status:** ✅ Completed `c014e69` · 2026-05-07 · doc-only
 - **Depends on:** SCOUT-T01, SCOUT-T02
-- **Goal:** Append a Move Y entry in `docs/architecture/PIPELINE-LOG.md` documenting the scout-then-specialist architecture, the hypothesis, the implementation, and the open question (cost/F1 measurement requires PDF-LAB-STUDIO).
+- **Goal:** Append a Move Y entry in `docs/architecture/extraction/PIPELINE-LOG.md` documenting the scout-then-specialist architecture, the hypothesis, the implementation, and the open question (cost/F1 measurement requires PDF-LAB-STUDIO).
 
 ### What to build
 
-Add a new entry at the top of `docs/architecture/PIPELINE-LOG.md` (newest first per convention). Pattern matches Move X (the LOINC post-pass entry just shipped).
+Add a new entry at the top of `docs/architecture/extraction/PIPELINE-LOG.md` (newest first per convention). Pattern matches Move X (the LOINC post-pass entry just shipped).
 
 ### Files you may touch
-- `docs/architecture/PIPELINE-LOG.md`
+- `docs/architecture/extraction/PIPELINE-LOG.md`
 
 ### Acceptance
 - Move Y entry appended

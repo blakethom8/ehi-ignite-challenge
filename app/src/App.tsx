@@ -144,7 +144,11 @@ function AppShellRoute({
     return fullBleed ? <FullscreenPageFallback /> : <PageFallback />;
   }
 
-  if (isSyncingPatient) {
+  // When the URL already carries an explicit patient/workspace id, let the
+  // destination screen render from that scoped context while the shell syncs
+  // session state in the background. Blocking the whole route here creates a
+  // blank spinner even when the page has enough information to load.
+  if (isSyncingPatient && !requestedPatientId) {
     return fullBleed ? <FullscreenPageFallback /> : <PageFallback />;
   }
 

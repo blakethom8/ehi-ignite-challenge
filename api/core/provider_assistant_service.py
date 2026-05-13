@@ -7,10 +7,10 @@ Chooses deterministic, Anthropic Agent SDK, Cursor sidecar, or context runtime b
 from __future__ import annotations
 
 import logging
-import os
 
 from api.core.provider_assistant import AssistantResult, answer_provider_question as answer_deterministic
 from api.core.tracing import get_current_trace
+from api.settings import get_settings
 
 
 LOGGER = logging.getLogger(__name__)
@@ -35,29 +35,20 @@ def _record_trace_metadata(result: AssistantResult) -> None:
         trace.status = "fallback"
 
 
-def _env_bool(name: str, default: bool) -> bool:
-    raw = os.getenv(name)
-    if raw is None:
-        return default
-    return raw.strip().lower() in {"1", "true", "yes", "on"}
-
-
 def _client_overrides_enabled() -> bool:
-    default = os.getenv("ENVIRONMENT", "development").strip().lower() not in {"prod", "production"}
-    return _env_bool("PROVIDER_ASSISTANT_ALLOW_CLIENT_OVERRIDES", default)
+    settings = get_settings()
+    override = settings.provider_assistant_allow_client_overrides
+    if override is not None:
+        return override
+    return not settings.is_production
 
 
 def _max_response_tokens() -> int:
-    raw = os.getenv("PROVIDER_ASSISTANT_MAX_RESPONSE_TOKENS", "2000")
-    try:
-        value = int(raw)
-    except ValueError:
-        return 2000
-    return min(max(value, 128), 4000)
+    return min(max(get_settings().provider_assistant_max_response_tokens, 128), 4000)
 
 
 def _assistant_mode() -> str:
-    return os.getenv("PROVIDER_ASSISTANT_MODE", "deterministic").strip().lower()
+    return get_settings().provider_assistant_mode.strip().lower()
 
 
 def answer_provider_question(
@@ -92,7 +83,7 @@ def answer_provider_question(
         max_tokens_override = min(max_tokens_override, _max_response_tokens())
 
     mode = (mode_override or "").strip().lower() or _assistant_mode()
-    fallback_enabled = _env_bool("PROVIDER_ASSISTANT_FALLBACK_TO_DETERMINISTIC", True)
+    fallback_enabled = get_settings().provider_assistant_fallback_to_deterministic
 
     # Context mode: single-turn Claude call with pre-built clinical context
     if mode in {"context", "context_single_turn", "single_turn"}:

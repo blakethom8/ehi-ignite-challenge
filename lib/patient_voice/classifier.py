@@ -274,7 +274,7 @@ class HaikuTurnClassifier:
         if not self.enable_tracing:
             return
         try:
-            from api.core.tracing import SpanKind, start_span  # type: ignore[import-not-found]
+            from lib.observability.tracing import SpanKind, start_span
         except Exception:
             return
         attrs = {

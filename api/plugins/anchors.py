@@ -7,7 +7,6 @@ scope-limited, redacted, signed slice the plugin will see.
 from __future__ import annotations
 
 import json
-import os
 import uuid
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -15,6 +14,7 @@ from typing import Any
 
 from api.core.auth import DEMO_PATIENT_BY_ALIAS
 from api.core.loader import path_from_patient_id
+from api.settings import get_settings
 from api.trust.keys import REPO_ROOT, atlas_keypair
 from api.trust.models import AnchorPackage, PluginManifest
 from api.trust.redactions import apply_preset
@@ -296,11 +296,7 @@ def _use_fixtures_only() -> bool:
     Default false in all environments — fixtures are kept around as a pinned
     demo path for screenshots and marketing, not as the everyday data path.
     """
-    return os.getenv("PLUGIN_ANCHOR_USE_FIXTURES", "false").strip().lower() in {
-        "true",
-        "1",
-        "yes",
-    }
+    return get_settings().plugin_anchor_use_fixtures
 
 
 def load_raw_patient(patient_id: str) -> dict:

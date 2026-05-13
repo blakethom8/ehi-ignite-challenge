@@ -2432,7 +2432,7 @@ export interface CcdaLabConversionResponse {
 }
 
 // T8c — Patient Context augmentation read shapes.
-// See docs/architecture/LLM-CONTEXT-AUGMENTATION-PLAN.md §3 + §T8.
+// See docs/architecture/context/LLM-CONTEXT-AUGMENTATION-PLAN.md §3 + §T8.
 export interface PatientVoiceSummaryDTO {
   summary: string;
   citations: string[];

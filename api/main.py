@@ -4,12 +4,13 @@ EHI Ignite Challenge — FastAPI backend.
 Run: uv run uvicorn api.main:app --reload --port 8000
 """
 
-import os
+import logging
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from dotenv import load_dotenv
 
-# Load local .env from project root before anything else reads os.getenv().
+# Load local .env from project root before anything else reads env vars.
 # Keep override=False so real environment variables (e.g., production secrets)
 # always win over values from .env.
 load_dotenv(Path(__file__).resolve().parent.parent / ".env", override=False)
@@ -45,35 +46,42 @@ from api.routers import ccda_lab
 from api.routers import skills as skills_router
 from api.plugins.routers import plugins as plugins_router
 from api.plugins import runtime as plugin_runtime
+from api.settings import get_settings
 
-_ENVIRONMENT = os.getenv("ENVIRONMENT", "development").strip().lower()
-_IS_PRODUCTION = _ENVIRONMENT in {"prod", "production"}
+logger = logging.getLogger(__name__)
 
-app = FastAPI(
-    title="EHI Ignite API",
-    description="Clinical intelligence layer over FHIR patient data",
-    version="0.1.0",
-    docs_url=None if _IS_PRODUCTION else "/docs",
-    redoc_url=None if _IS_PRODUCTION else "/redoc",
-    openapi_url=None if _IS_PRODUCTION else "/openapi.json",
-)
+_settings = get_settings()
+_IS_PRODUCTION = _settings.is_production
 
 
-def _csv_env(name: str, default: list[str]) -> list[str]:
-    raw = os.getenv(name)
-    if not raw:
-        return default
-    return [item.strip() for item in raw.split(",") if item.strip()]
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application startup/shutdown lifecycle.
 
+    Replaces the deprecated ``@app.on_event("startup")`` pattern (FastAPI
+    0.93+). All bootstrap work runs before ``yield``; shutdown hooks (none
+    today) would run after.
 
-@app.on_event("startup")
-def _materialize_sof_db() -> None:
-    """Rebuild data/sof.db on boot if any ViewDefinition or bundle is newer.
-
-    Idempotent — a fresh DB triggers no work. Controlled by the
-    ``SOF_AUTO_MATERIALIZE``/``SOF_PATIENT_LIMIT``/``SOF_DB_PATH`` env vars;
-    never raises (see ``sof_materialize.materialize_from_env``).
+    Two startup steps are security invariants and **fail closed in
+    production**: ``plugin_runtime.reload_manifests`` (signature-verifies
+    every installed plugin manifest) and
+    ``plugin_runtime.reload_revoked_runs`` (rehydrates the revoked-run set
+    so consent revocations survive restarts). If either of these raises in
+    production, the API refuses to boot rather than serving traffic with a
+    broken trust chain. In development they log-and-continue so local
+    workflows are unblocked. The other startup steps remain best-effort.
     """
+    # Re-read settings inside the lifespan so tests that
+    # ``monkeypatch.setenv("ENVIRONMENT", ...)`` before entering the
+    # TestClient context see the override take effect. Module-level
+    # ``_IS_PRODUCTION`` is captured at import time and only governs the
+    # OpenAPI/docs visibility above.
+    settings = get_settings()
+
+    # Rebuild data/sof.db on boot if any ViewDefinition or bundle is newer.
+    # Idempotent — a fresh DB triggers no work. Controlled by the
+    # ``SOF_AUTO_MATERIALIZE``/``SOF_PATIENT_LIMIT``/``SOF_DB_PATH`` env vars;
+    # never raises (see ``sof_materialize.materialize_from_env``).
     materialize_from_env()
     init_auth_store()
     # The first app interaction needs /api/patients. Build that lightweight
@@ -89,21 +97,30 @@ def _materialize_sof_db() -> None:
         seed_demo_aggregate_uploads()
     except Exception:
         # Never let a seeder failure prevent the API from booting.
-        pass
+        logger.exception("startup: seed_demo_aggregate_uploads failed")
     # Cache verified plugin manifests in memory so /api/plugins/installed
     # serves without re-verifying signatures on every request.
     try:
         plugin_runtime.reload_manifests()
     except Exception:
         # Don't crash the API if a manifest is malformed — just log.
-        pass
+        logger.exception("startup: plugin_runtime.reload_manifests failed")
+        if settings.is_production:
+            # Refuse to boot in prod with a broken trust chain. Unsigned or
+            # tampered manifests must not reach the "no plugins loaded"
+            # silent-degrade state — surface the failure to the operator.
+            raise
     # Rehydrate revoked-run set from runs.db so consent revocations survive
     # the restart we just performed. Without this, a revoked plugin would
     # silently regain tool access on the next deploy.
     try:
         plugin_runtime.reload_revoked_runs()
     except Exception:
-        pass
+        logger.exception("startup: plugin_runtime.reload_revoked_runs failed")
+        if settings.is_production:
+            # Refuse to boot in prod if revocations can't be rehydrated —
+            # a revoked plugin would otherwise regain tool access.
+            raise
     # Purge audit events older than EVENTS_RETENTION_DAYS so events.db
     # stays bounded under production traffic. Default 90 days; set to 0
     # to disable. Best-effort — never crash the API on a purge failure.
@@ -112,31 +129,30 @@ def _materialize_sof_db() -> None:
 
         purge_events_older_than()
     except Exception:
-        pass
+        logger.exception("startup: purge_events_older_than failed")
+
+    yield
+    # No shutdown work today.
+
+
+app = FastAPI(
+    title="EHI Ignite API",
+    description="Clinical intelligence layer over FHIR patient data",
+    version="0.1.0",
+    docs_url=None if _IS_PRODUCTION else "/docs",
+    redoc_url=None if _IS_PRODUCTION else "/redoc",
+    openapi_url=None if _IS_PRODUCTION else "/openapi.json",
+    lifespan=lifespan,
+)
 
 app.add_middleware(
     TrustedHostMiddleware,
-    allowed_hosts=_csv_env(
-        "ALLOWED_HOSTS",
-        [
-            "ehi.healthcaredataai.com",
-            "localhost",
-            "127.0.0.1",
-            "testserver",
-        ],
-    ),
+    allowed_hosts=_settings.allowed_hosts,
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_csv_env(
-        "CORS_ALLOWED_ORIGINS",
-        [
-            "http://localhost:5173",
-            "http://localhost:3000",
-            "https://ehi.healthcaredataai.com",
-        ],
-    ),
+    allow_origins=_settings.cors_allowed_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Accept", "Authorization", "Content-Type"],

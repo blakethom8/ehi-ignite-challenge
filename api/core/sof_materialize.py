@@ -22,11 +22,12 @@ Design notes:
 from __future__ import annotations
 
 import logging
-import os
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+
+from api.settings import get_settings
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 _VIEWS_DIR = _REPO_ROOT / "lib" / "sql_on_fhir" / "views"
@@ -161,13 +162,6 @@ def materialize_if_stale(
     )
 
 
-def _env_flag(name: str, default: bool) -> bool:
-    raw = os.getenv(name)
-    if raw is None:
-        return default
-    return raw.strip().lower() not in {"0", "false", "no", "off", ""}
-
-
 def materialize_from_env() -> MaterializeReport | None:
     """Entry point for the FastAPI startup hook.
 
@@ -180,20 +174,14 @@ def materialize_from_env() -> MaterializeReport | None:
     Never raises. On any failure we log a warning and return ``None`` so
     the API comes up even with a broken warehouse.
     """
-    if not _env_flag("SOF_AUTO_MATERIALIZE", True):
+    settings = get_settings()
+    if not settings.sof_auto_materialize:
         _log.info("SOF_AUTO_MATERIALIZE disabled; skipping warehouse build")
         return None
 
-    patient_limit_raw = os.getenv("SOF_PATIENT_LIMIT")
-    try:
-        patient_limit = (
-            int(patient_limit_raw) if patient_limit_raw else _DEFAULT_LIMIT
-        )
-    except ValueError:
-        patient_limit = _DEFAULT_LIMIT
-
-    db_path = Path(os.getenv("SOF_DB_PATH") or _DEFAULT_DB_PATH)
-    fhir_dir = Path(os.getenv("SOF_FHIR_DIR") or _DEFAULT_FHIR_DIR)
+    patient_limit = settings.sof_patient_limit or _DEFAULT_LIMIT
+    db_path = settings.sof_db_path or _DEFAULT_DB_PATH
+    fhir_dir = settings.sof_fhir_dir or _DEFAULT_FHIR_DIR
 
     try:
         report = materialize_if_stale(

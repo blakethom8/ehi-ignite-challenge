@@ -6,7 +6,7 @@ primitives for the EHI Ignite redesign.
 > Spec: [`.claude/handoff/atlas/README.md`](../../../../.claude/handoff/atlas/README.md)
 > Tokens: [`.claude/handoff/atlas/tokens/design-tokens.css`](../../../../.claude/handoff/atlas/tokens/design-tokens.css) (mirrored into `app/src/index.css`)
 > Design: [`design/agentic-shell-spec/`](../../../../design/agentic-shell-spec/)
-> Build guide: [`docs/architecture/HARNESS-SURFACES.md`](../../../../docs/architecture/HARNESS-SURFACES.md)
+> Build guide: [`docs/architecture/harness/HARNESS-SURFACES.md`](../../../../docs/architecture/harness/HARNESS-SURFACES.md)
 
 ## When to use
 
@@ -90,7 +90,7 @@ renderers/
   second-opinion/                     // packet.referral, picker.specialty
 ```
 
-Per `docs/architecture/HARNESS-SURFACES.md` §6.3 + §8: plugin-specific
+Per `docs/architecture/harness/HARNESS-SURFACES.md` §6.3 + §8: plugin-specific
 renderers live in plugin-cohesive folders and are **pure projections**
 of the run's canvas state. They never fetch, mutate, or derive — domain
 logic lives in `api/plugins/tools.py`. Adding a new renderer = drop a

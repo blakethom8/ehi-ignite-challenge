@@ -15,7 +15,7 @@ Auth model mirrors /api/traces: bearer token, required in production.
 
 from __future__ import annotations
 
-import os
+import logging
 import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -25,26 +25,24 @@ from fastapi import APIRouter, HTTPException, Query, Request, status
 from api.core.auth import current_session
 from api.core.tracing import query_traces
 from api.plugins import provenance as prov_log
+from api.settings import get_settings
 from api.workspace.events import query_events
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/audit", tags=["audit"])
 
-_AUDIT_API_TOKEN = os.getenv("AUDIT_API_TOKEN", "").strip()
-_ENVIRONMENT = os.getenv("ENVIRONMENT", "development").strip().lower()
-
-
-def _is_production() -> bool:
-    return _ENVIRONMENT in {"prod", "production"}
-
 
 def _assert_authorized(request: Request) -> None:
-    if _is_production() and not _AUDIT_API_TOKEN:
+    settings = get_settings()
+    token = (settings.audit_api_token or "").strip()
+    if settings.is_production and not token:
         raise HTTPException(
             status_code=503,
             detail="Audit API requires AUDIT_API_TOKEN in production.",
         )
-    if _AUDIT_API_TOKEN:
-        expected = f"Bearer {_AUDIT_API_TOKEN}"
+    if token:
+        expected = f"Bearer {token}"
         provided = request.headers.get("Authorization", "")
         if not secrets.compare_digest(provided, expected):
             raise HTTPException(
@@ -149,6 +147,9 @@ def _provenance_for_user(
             approver_id=user_id, since=since_str, until=until_str
         )
     except Exception:
+        logger.exception(
+            "audit: prov_log.list_records failed for user_id=%s", user_id
+        )
         return out
     for r in records:
         out.append(_provenance_to_timeline_entry(r))
@@ -188,6 +189,7 @@ def get_user_timeline(
         try:
             traces = query_traces(limit=limit)
         except Exception:
+            logger.exception("audit: query_traces failed")
             traces = []
         for t in traces:
             if t.get("user_id") != user_id:

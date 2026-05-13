@@ -6,7 +6,7 @@ episode. Each Composition cites the merged resources it draws from,
 with every claim grounded in a specific resource ID that appears in
 the harmonized record.
 
-See ``docs/architecture/LLM-CONTEXT-AUGMENTATION-PLAN.md`` §T5 for the
+See ``docs/architecture/context/LLM-CONTEXT-AUGMENTATION-PLAN.md`` §T5 for the
 contract and §3.3 for the worked Composition example.
 """
 

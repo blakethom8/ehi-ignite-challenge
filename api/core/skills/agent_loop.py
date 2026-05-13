@@ -27,7 +27,6 @@ scripted responses without making real API calls.
 from __future__ import annotations
 
 import json
-import os
 from time import perf_counter
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Awaitable, Callable
@@ -42,6 +41,7 @@ from api.core.sof_tools import (
     run_sql as _sof_run_sql,
     tool_result_payload as _sof_tool_result_payload,
 )
+from api.settings import get_settings
 
 if TYPE_CHECKING:
     from api.core.skills.runner import SkillRunner
@@ -72,26 +72,13 @@ class AgentConfig:
 
 
 def load_config() -> AgentConfig:
+    settings = get_settings()
     return AgentConfig(
-        model=os.getenv("SKILLS_AGENT_MODEL", "claude-sonnet-4-6").strip()
-        or "claude-sonnet-4-6",
-        max_turns=_int_env("SKILLS_AGENT_MAX_TURNS", 30, minimum=1, maximum=100),
-        max_tokens_per_turn=_int_env(
-            "SKILLS_AGENT_MAX_TOKENS", 4096, minimum=256, maximum=64000
-        ),
-        api_key=(os.getenv("ANTHROPIC_API_KEY") or "").strip() or None,
+        model=settings.skills_agent_model.strip() or "claude-sonnet-4-6",
+        max_turns=max(1, min(settings.skills_agent_max_turns, 100)),
+        max_tokens_per_turn=max(256, min(settings.skills_agent_max_tokens, 64000)),
+        api_key=(settings.anthropic_api_key or "").strip() or None,
     )
-
-
-def _int_env(name: str, default: int, *, minimum: int, maximum: int) -> int:
-    raw = os.getenv(name)
-    if raw is None or not raw.strip():
-        return default
-    try:
-        value = int(raw)
-    except ValueError:
-        return default
-    return max(minimum, min(value, maximum))
 
 
 # ── Tool registry ──────────────────────────────────────────────────────────

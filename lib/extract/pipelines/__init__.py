@@ -1,6 +1,6 @@
 """Pipeline registry for PDF → FHIR extraction architectures.
 
-See ``docs/architecture/PDF-PROCESSOR.md`` for the architectural decision
+See ``docs/architecture/extraction/PDF-PROCESSOR.md`` for the architectural decision
 record and ``ehi_atlas/extract/pipelines/README.md`` for the contributor
 guide on how to implement a new pipeline.
 

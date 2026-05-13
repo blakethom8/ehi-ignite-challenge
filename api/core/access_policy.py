@@ -71,7 +71,7 @@ def _demo() -> Capabilities:
         can_run_workflows=True,
         can_use_aggregation_uploads=True,
         can_use_aggregation_profiles=False,
-        can_use_harmonize=False,
+        can_use_harmonize=True,
         can_use_guest_harmonization=True,
         can_use_assistant_tools_write=False,
         show_caspian_seed_files=True,

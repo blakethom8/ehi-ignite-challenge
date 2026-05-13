@@ -6,7 +6,7 @@ and returns a FHIR R4 Bundle (``type='collection'``) ready for ingest by
 ``lib.harmonize``.
 
 Worked examples for each emitted resource type live in
-``docs/architecture/LLM-CONTEXT-AUGMENTATION-PLAN.md`` §3.1.
+``docs/architecture/context/LLM-CONTEXT-AUGMENTATION-PLAN.md`` §3.1.
 
 Atlas extension URLs used by emitted resources:
 

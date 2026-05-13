@@ -54,7 +54,7 @@ HTTP archive captures are useful for reverse-engineering what other parsers do (
 The user reported seeing different results from our PDF parser vs Function Health for the same PDF. That's a measurable difference worth investigating empirically — not an architecture conversation. This folder is for the empirical work.
 
 Findings here may turn into:
-- New entries in `docs/architecture/PIPELINE-LOG.md` (when prompt-tuning experiments produce real bake-off result deltas)
+- New entries in `docs/architecture/extraction/PIPELINE-LOG.md` (when prompt-tuning experiments produce real bake-off result deltas)
 - New tasks in `.claude/pdf-lab-studio-queue.md` (when a finding implies missing studio capability)
 - Bug fixes to `lib/extract/` (after PROMOTE-EXTRACT) or `ehi-atlas/ehi_atlas/extract/` (today)
 

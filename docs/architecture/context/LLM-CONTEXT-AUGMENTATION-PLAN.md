@@ -755,7 +755,7 @@ Return JSON: {"summary": "...", "citations": ["turn-id", ...]}
   5. Publish snapshot → assert `data/narratives/<patient>/<episode-slug>/current.json` is freshly written.
   6. Call `POST /assistant/chat` with a stock question; assert the response contains a citation to the patient turn.
   7. Exit 0 on success; print a one-line diagnostic per beat on failure.
-- **Create** `docs/architecture/LLM-CONTEXT-AUGMENTATION-DEMO.md` — video script (§9 below), screenshot list, manual walkthrough checklist.
+- **Create** `docs/architecture/context/LLM-CONTEXT-AUGMENTATION-DEMO.md` — video script (§9 below), screenshot list, manual walkthrough checklist.
 
 **Acceptance:**
 - `scripts/demo_smoke.py` exits 0.

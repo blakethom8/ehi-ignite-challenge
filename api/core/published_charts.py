@@ -8,19 +8,17 @@ artifact rather than duplicating the full candidate record.
 from __future__ import annotations
 
 import json
-import os
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from api.core import harmonization_runs
+from api.settings import get_settings
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-PUBLISHED_ROOT = Path(
-    os.getenv("PUBLISHED_CHART_STORE_PATH", REPO_ROOT / "data" / "published-charts")
-)
+PUBLISHED_ROOT = get_settings().published_chart_store_path
 
 
 def _now() -> datetime:

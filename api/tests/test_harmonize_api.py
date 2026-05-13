@@ -30,6 +30,29 @@ from api.main import app
 _DEMO_AVAILABLE = (_BLAKE_DIR / "cedars-healthskillz-download" / "health-records.json").exists()
 
 
+class HarmonizeDemoAccessTests(unittest.TestCase):
+    def test_demo_session_can_open_patient_workspace_collection(self) -> None:
+        client = TestClient(app)
+        start = client.post("/api/auth/demo", json={"patient_id": "demo-aggregate-icu"})
+        self.assertEqual(start.status_code, 200)
+
+        workspace = client.get("/api/harmonize/workspaces/demo-aggregate-icu")
+        self.assertEqual(workspace.status_code, 200)
+        body = workspace.json()
+        self.assertEqual(body["id"], "workspace-demo-aggregate-icu")
+        self.assertGreaterEqual(body["source_count"], 1)
+
+    def test_demo_session_can_read_workspace_published_state(self) -> None:
+        client = TestClient(app)
+        start = client.post("/api/auth/demo", json={"patient_id": "demo-aggregate-icu"})
+        self.assertEqual(start.status_code, 200)
+
+        published = client.get("/api/harmonize/workspace-demo-aggregate-icu/published")
+        self.assertEqual(published.status_code, 200)
+        body = published.json()
+        self.assertEqual(body["collection_id"], "workspace-demo-aggregate-icu")
+
+
 @unittest.skipUnless(_DEMO_AVAILABLE, "blake-real source files not present in this checkout")
 class HarmonizeAPITests(unittest.TestCase):
     def setUp(self) -> None:

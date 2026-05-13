@@ -30,7 +30,7 @@
   - `lib/extract/pipelines/multipass_fhir.py` (pass-dispatch loop)
   - `lib/extract/pdf.py` (`VisionBackend` Protocol + `AnthropicBackend.extract`, `GoogleAIStudioBackend.extract`)
   - `lib/extract/cache.py` (existing cache shape — match it)
-  - `docs/architecture/PDF-PROCESSOR.md` Decision 6 (eval is load-bearing)
+  - `docs/architecture/extraction/PDF-PROCESSOR.md` Decision 6 (eval is load-bearing)
 - **What to build:** new module `lib/extract/run_logger.py`. Exposes `RunLogger(run_id: str, root: Path)` with method `log_pass(pass_name: str, prompt: str | list[dict], response: dict, usage: dict, latency_ms: float)`. Writes:
   - `runs/{run_id}/{pass_name}/prompt.txt`
   - `runs/{run_id}/{pass_name}/response.json`
@@ -89,7 +89,7 @@
 - **Context files:**
   - `lib/extract/bake_off.py` (`bake_off()` function + `BakeoffCell` dataclass)
   - `lib/extract/pipelines/__init__.py` (`list_pipelines()` registry)
-  - `docs/architecture/PDF-PROCESSOR.md` Decision 4 (per-pass model selection) + Decision 5 (Pluggable pipelines)
+  - `docs/architecture/extraction/PDF-PROCESSOR.md` Decision 4 (per-pass model selection) + Decision 5 (Pluggable pipelines)
   - `lib/extract/run_logger.py` (from T01)
 - **What to build:** in `07_PDF_Lab_Studio.py`, after a run is selected:
   - Pipeline checkbox grid sourced from `list_pipelines()`
@@ -116,7 +116,7 @@
 - **Why:** the eval harness already computes per-resource-type F1; we surface it next to the actual extractions so a reviewer can see *why* a number is what it is.
 - **Context files:**
   - `lib/extract/eval.py` (`evaluate_bundle` — match cells to ground truth)
-  - `docs/architecture/PDF-PROCESSOR.md` "Bake-off results" section (table format reference)
+  - `docs/architecture/extraction/PDF-PROCESSOR.md` "Bake-off results" section (table format reference)
   - `lib/extract/pipelines/multipass_fhir.py` (provenance shape — `meta.extension` with page/bbox)
 - **What to build:** in `07_PDF_Lab_Studio.py`, a "Compare cells" tab when ≥2 cells exist:
   - Top: per-resource-type F1 / precision / recall table, columns = cells, rows = (medication, condition, allergy, immunization, lab observation, procedure)
@@ -142,7 +142,7 @@
 - **Why:** today the eval treats every extra as a precision penalty. PDF-PROCESSOR.md's bake-off section explicitly notes that 4 of 4 condition extras and 41 of 41 lab extras on Cedars are valid clinical findings the structured EHR never coded. Without a reviewer, the wedge story is anecdotal.
 - **Context files:**
   - `lib/extract/eval.py` (current eval — note where extras are counted)
-  - `docs/architecture/PDF-PROCESSOR.md` "Bake-off results — 2026-05-03" section (this is the use case)
+  - `docs/architecture/extraction/PDF-PROCESSOR.md` "Bake-off results — 2026-05-03" section (this is the use case)
 - **What to build:** new tab "Vision-wins review":
   - Per cell, list all extras with FHIR JSON + provenance (page+bbox)
   - Three-button classifier per row: `valid_extra` / `hallucination` / `out_of_scope`
@@ -169,7 +169,7 @@
 - **Why:** "trust me, the bake-off says X" is a weaker pitch than "here's the chart of every bake-off we've run." Also the only way to catch model-drift regressions is to track the metric over time.
 - **Context files:**
   - `lib/extract/bake_off.py` (`BakeoffCell` shape — what numbers we have)
-  - `docs/architecture/PIPELINE-LOG.md` (style reference for journaling — but this is data, not prose)
+  - `docs/architecture/extraction/PIPELINE-LOG.md` (style reference for journaling — but this is data, not prose)
 - **What to build:**
   - On every cell completion in T03, append a JSON line to `data/pdf-lab/bake_off_runs.jsonl` with: `run_id`, `cell_id`, `pipeline`, `model_signature`, `pdf_sha`, `started_at`, `finished_at`, `latency_ms`, `cost_estimate_usd`, `weighted_f1` (if ground truth), `per_resource_f1` (dict)
   - New tab "History":

@@ -167,7 +167,7 @@
 
 - Run a fresh bake-off via PDF-LAB-STUDIO (or one-off) on the Function Health PDF + Cedars Health Summary
 - Compare F1 + qualitative output to Function Health's parser
-- Capture results in `docs/architecture/PIPELINE-LOG.md`
+- Capture results in `docs/architecture/extraction/PIPELINE-LOG.md`
 - Update `docs/daily/2026-05-07-ClaudeCode.md` Entry 6 with measured impact
 
 ---

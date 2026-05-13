@@ -4,7 +4,7 @@
 
 Companion files:
 - `.claude/backend-hardening-plan.md` — the phased plan + open questions
-- `docs/architecture/BACKEND-REPORT-2026-05-11.html` — original audit + 15 recommendations
+- `archive/docs/BACKEND-REPORT-2026-05-11.html` — original audit + 15 recommendations
 
 ---
 
@@ -348,7 +348,7 @@ $ uv run pytest api/tests/test_plugin_provenance.py -q
 **Shipped:** 2026-05-12
 **Commit:** `6e36428`
 **Files:**
-- `docs/architecture/PROD-SECRETS.md` (new) — operator runbook: TL;DR table of every required env var (purpose, failure point, generation command); Atlas signing key generation snippet that round-trips through `private_key_from_b64`; rotation procedures for each secret class; per-var failure mode reference; pre-deploy checklist; cross-references to known gaps tracked elsewhere.
+- `docs/architecture/deployment/PROD-SECRETS.md` (new) — operator runbook: TL;DR table of every required env var (purpose, failure point, generation command); Atlas signing key generation snippet that round-trips through `private_key_from_b64`; rotation procedures for each secret class; per-var failure mode reference; pre-deploy checklist; cross-references to known gaps tracked elsewhere.
 
 **What it does:** Closes the operational follow-on from H0.2. That ticket made env vars strict-required in production but left no runbook telling operators how to generate them or what fails on missing values — so the next deploy could fail at boot with no recovery doc.
 
@@ -393,7 +393,7 @@ $ uv run pytest api/tests/test_workspace_events.py -v
 **Files:**
 - `api/core/guest_harmonization.py` — `_is_production()` helper; `_guest_secret()` raises `RuntimeError` when `ENVIRONMENT=production` and `GUEST_HARMONIZATION_SECRET` is unset, instead of falling back to `data/atlas-guest-harmonization.key`.
 - `api/tests/test_trust_keys.py` — 3 new tests mirroring the H0.2 shape: production-fail, development-fallback, env-supplied.
-- `docs/architecture/PROD-SECRETS.md` — `GUEST_HARMONIZATION_SECRET` added to the required-env table and the failure-mode reference. Closed-out the "known gap" callout that pointed to this file.
+- `docs/architecture/deployment/PROD-SECRETS.md` — `GUEST_HARMONIZATION_SECRET` added to the required-env table and the failure-mode reference. Closed-out the "known gap" callout that pointed to this file.
 
 **What it does:** Closes the third plaintext-key fallback that H0.2 explicitly scoped out. Internal consistency on master — all three Atlas signing/session secrets now refuse the file fallback in production. Operators who don't set `GUEST_HARMONIZATION_SECRET` get a fast boot failure with an actionable message instead of a key silently materializing on disk in the data bind mount.
 

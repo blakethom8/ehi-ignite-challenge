@@ -808,7 +808,7 @@ export const api = {
   deleteAccount: (): Promise<AuthSessionResponse> =>
     http.delete<AuthSessionResponse>("/auth/me").then((r) => r.data),
   // T8c — LLM-augmented context panels on the merged-record page.
-  // See docs/architecture/LLM-CONTEXT-AUGMENTATION-PLAN.md §T8.
+  // See docs/architecture/context/LLM-CONTEXT-AUGMENTATION-PLAN.md §T8.
   getPatientContextAugmentation: (
     patientId: string,
   ): Promise<PatientContextAugmentationResponse> =>

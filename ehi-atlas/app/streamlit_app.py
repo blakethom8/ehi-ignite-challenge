@@ -57,9 +57,9 @@ PDFs (lab reports, H&Ps, discharge summaries, portal exports) into FHIR R4
 resources with measurable F1 against ground truth.
 
 The architectural cuts and decision history live in
-[`docs/architecture/PDF-PROCESSOR.md`](../../docs/architecture/PDF-PROCESSOR.md);
+[`docs/architecture/extraction/PDF-PROCESSOR.md`](../../docs/architecture/extraction/PDF-PROCESSOR.md);
 the running experiment journal lives in
-[`docs/architecture/PIPELINE-LOG.md`](../../docs/architecture/PIPELINE-LOG.md).
+[`docs/architecture/extraction/PIPELINE-LOG.md`](../../docs/architecture/extraction/PIPELINE-LOG.md).
 """
 )
 

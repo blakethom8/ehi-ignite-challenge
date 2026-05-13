@@ -94,7 +94,7 @@ shared harness structure.
 
 Implementation guidance that translates this vision into concrete page / canvas /
 workbench build rules now lives in
-[`docs/architecture/HARNESS-SURFACES.md`](../../docs/architecture/HARNESS-SURFACES.md).
+[`docs/architecture/harness/HARNESS-SURFACES.md`](../../docs/architecture/harness/HARNESS-SURFACES.md).
 
 ## Intended Outcome
 

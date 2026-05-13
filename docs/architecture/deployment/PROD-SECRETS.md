@@ -1,6 +1,6 @@
 # Production Secrets Runbook
 
-> Last updated 2026-05-12 (H0.12). This is the operational runbook for setting up and rotating the secrets the API requires when `ENVIRONMENT=production`. Pair with `docs/architecture/DEPLOYMENT.md` for the broader deploy procedure.
+> Last updated 2026-05-12 (H0.12). This is the operational runbook for setting up and rotating the secrets the API requires when `ENVIRONMENT=production`. Pair with `docs/architecture/deployment/DEPLOYMENT.md` for the broader deploy procedure.
 
 H0.2 made several env vars **strictly required in production**: missing values raise at boot rather than silently materializing keys on disk in the data bind mount. This doc explains what each one is, how to generate it, and what fails if it's wrong.
 

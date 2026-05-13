@@ -52,7 +52,7 @@ The goal is twofold:
 
 This proposal is consistent with the project's existing strategic posture:
 
-- **Provenance-first** ([ATLAS-DATA-MODEL.md](ATLAS-DATA-MODEL.md)) — every
+- **Provenance-first** ([ATLAS-DATA-MODEL.md](../data/ATLAS-DATA-MODEL.md)) — every
   fact carries lineage from bronze → silver → gold. Skill outputs must
   preserve that chain; an agent assertion without a citation back to a FHIR
   resource id (or an external source URL) is not allowed to ship in the
@@ -61,7 +61,7 @@ This proposal is consistent with the project's existing strategic posture:
   Explainer, Cardiometabolic) handle the 80% case fast and rules-based. The
   agent runtime handles the open-ended long tail: Med Access, Trial Match,
   Second Opinion, prior-auth packets. This doc is mostly about the cold path.
-- **Pre-digested context over raw FHIR** ([CONTEXT-ENGINEERING.md](CONTEXT-ENGINEERING.md))
+- **Pre-digested context over raw FHIR** ([CONTEXT-ENGINEERING.md](../context/CONTEXT-ENGINEERING.md))
   — agents reason from intelligence, not structure. Skills consume the
   canonical patient workspace and the existing context packages, not raw
   bundle JSON.
@@ -598,7 +598,7 @@ not just ours.
 ### 6.5 Citation graph
 
 Every assertion in `workspace.md` resolves through the existing Provenance
-graph from [ATLAS-DATA-MODEL.md](ATLAS-DATA-MODEL.md):
+graph from [ATLAS-DATA-MODEL.md](../data/ATLAS-DATA-MODEL.md):
 
 ```
 agent claim

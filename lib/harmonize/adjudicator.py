@@ -246,7 +246,7 @@ class SonnetConflictAdjudicator:
         if not self.enable_tracing:
             return
         try:
-            from api.core.tracing import SpanKind, start_span  # type: ignore
+            from lib.observability.tracing import SpanKind, start_span
         except Exception:
             return
         attrs = {

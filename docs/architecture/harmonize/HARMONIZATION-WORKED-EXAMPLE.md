@@ -2,7 +2,7 @@
 
 A single concrete walkthrough of Atlas's harmonization layer, using
 Blake's two real sources (Cedars-Sinai FHIR pull + Function Health PDF
-extractions). Read alongside [`ATLAS-DATA-MODEL.md`](ATLAS-DATA-MODEL.md)
+extractions). Read alongside [`ATLAS-DATA-MODEL.md`](../data/ATLAS-DATA-MODEL.md)
 for the strategic framing and `lib/harmonize/` for the implementation.
 
 > **Status:** Updated 2026-05-05. This example still uses HDL Cholesterol

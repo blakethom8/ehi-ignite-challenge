@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import json
-import os
 from datetime import datetime
 from typing import Any
 
 from api.core.cursor_sidecar_client import CursorSidecarClient, CursorSidecarHttpError
 from api.core.provider_assistant import AssistantCitationPayload, AssistantResult, get_relevant_provider_evidence
 from api.core.tracing import SpanKind, start_span
+from api.settings import get_settings
 
 
 class CursorSidecarConfigurationError(RuntimeError):
@@ -21,14 +21,14 @@ class CursorSidecarExecutionError(RuntimeError):
 
 
 def _parse_allowlist() -> set[str] | None:
-    raw = (os.getenv("CURSOR_SIDECAR_MODEL_ALLOWLIST") or "").strip()
+    raw = (get_settings().cursor_sidecar_model_allowlist or "").strip()
     if not raw:
         return None
     return {p.strip() for p in raw.split(",") if p.strip()}
 
 
 def _resolve_cursor_model(requested: str | None) -> str:
-    default = (os.getenv("CURSOR_SIDECAR_MODEL") or "composer-2").strip() or "composer-2"
+    default = (get_settings().cursor_sidecar_model or "composer-2").strip() or "composer-2"
     candidate = (requested or default).strip() or default
     allow = _parse_allowlist()
     if allow is not None and candidate not in allow:
@@ -89,7 +89,7 @@ def answer_with_cursor_sidecar(
     stance: str,
     cursor_model: str | None = None,
 ) -> AssistantResult:
-    base_url = (os.getenv("CURSOR_SIDECAR_URL") or "").strip()
+    base_url = (get_settings().cursor_sidecar_url or "").strip()
     if not base_url:
         raise CursorSidecarConfigurationError(
             "CURSOR_SIDECAR_URL is not set (e.g. http://127.0.0.1:3040 for local sidecar).",

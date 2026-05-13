@@ -112,7 +112,7 @@ http://127.0.0.1:11434
 ## Next implementation steps
 
 1. Run `multipass-fhir-ollama-tabular` alongside the existing pipelines on the same Cedars and Function Health PDFs.
-2. Capture F1 / latency / resource counts / harmonization impact in `docs/architecture/PIPELINE-LOG.md`.
+2. Capture F1 / latency / resource counts / harmonization impact in `docs/architecture/extraction/PIPELINE-LOG.md`.
 3. Add caching for the standalone `medgemma-ollama` lab pipeline if it remains useful after the multipass bake-off.
 4. If 4B is weak, test page cropping / OCR-assisted prompts before jumping to larger local models.
 5. Add OCR/text-first variants after measuring Docling / Marker / MinerU / Mistral-style raw text quality against our actual PDFs.

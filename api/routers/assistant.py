@@ -6,7 +6,7 @@ import asyncio
 import json
 from typing import Any, AsyncIterator
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 from api.core.auth import authorize_patient_access, require_access_session
@@ -23,8 +23,7 @@ from api.models import (
     ToolCallDetail,
     TraceDetail,
 )
-
-import os
+from api.settings import Settings, get_settings
 
 router = APIRouter(prefix="/assistant", tags=["assistant"])
 
@@ -32,29 +31,19 @@ router = APIRouter(prefix="/assistant", tags=["assistant"])
 _SSE_KEEPALIVE_INTERVAL_S = 15.0
 
 
-def _env_bool(name: str, default: bool) -> bool:
-    raw = os.getenv(name)
-    if raw is None:
-        return default
-    return raw.strip().lower() in {"1", "true", "yes", "on"}
+def _client_overrides_enabled(settings: Settings) -> bool:
+    override = settings.provider_assistant_allow_client_overrides
+    if override is not None:
+        return override
+    return not settings.is_production
 
 
-def _client_overrides_enabled() -> bool:
-    default = os.getenv("ENVIRONMENT", "development").strip().lower() not in {"prod", "production"}
-    return _env_bool("PROVIDER_ASSISTANT_ALLOW_CLIENT_OVERRIDES", default)
+def _max_response_tokens(settings: Settings) -> int:
+    return min(max(settings.provider_assistant_max_response_tokens, 128), 4000)
 
 
-def _max_response_tokens() -> int:
-    raw = os.getenv("PROVIDER_ASSISTANT_MAX_RESPONSE_TOKENS", "2000")
-    try:
-        value = int(raw)
-    except ValueError:
-        return 2000
-    return min(max(value, 128), 4000)
-
-
-def _cursor_sidecar_model_options() -> list[dict[str, str]]:
-    raw = (os.getenv("CURSOR_SIDECAR_MODEL_ALLOWLIST") or "").strip()
+def _cursor_sidecar_model_options(settings: Settings) -> list[dict[str, str]]:
+    raw = (settings.cursor_sidecar_model_allowlist or "").strip()
     if raw:
         return [
             {
@@ -65,7 +54,7 @@ def _cursor_sidecar_model_options() -> list[dict[str, str]]:
             for m in raw.split(",")
             if m.strip()
         ]
-    dm = (os.getenv("CURSOR_SIDECAR_MODEL") or "composer-2").strip() or "composer-2"
+    dm = (settings.cursor_sidecar_model or "composer-2").strip() or "composer-2"
     seeds = ["composer-2", "auto", dm]
     seen: set[str] = set()
     out: list[dict[str, str]] = []
@@ -77,16 +66,16 @@ def _cursor_sidecar_model_options() -> list[dict[str, str]]:
 
 
 @router.get("/settings")
-def get_assistant_settings() -> dict:
+def get_assistant_settings(settings: Settings = Depends(get_settings)) -> dict:
     """Return current assistant configuration and available options."""
     return {
         "current": {
-            "mode": os.getenv("PROVIDER_ASSISTANT_MODE", "deterministic"),
-            "model": os.getenv("PROVIDER_ASSISTANT_MODEL", "claude-sonnet-4-5"),
-            "max_tokens": _max_response_tokens(),
+            "mode": settings.provider_assistant_mode,
+            "model": settings.provider_assistant_model,
+            "max_tokens": _max_response_tokens(settings),
         },
-        "client_overrides_enabled": _client_overrides_enabled(),
-        "max_tokens_limit": _max_response_tokens(),
+        "client_overrides_enabled": _client_overrides_enabled(settings),
+        "max_tokens_limit": _max_response_tokens(settings),
         "available_modes": [
             {"id": "deterministic", "label": "Deterministic", "description": "Rule-based, instant (<100ms), no LLM cost"},
             {"id": "context", "label": "Context (Recommended)", "description": "Single Claude call with pre-built clinical context"},
@@ -100,9 +89,9 @@ def get_assistant_settings() -> dict:
             {"id": "claude-opus-4-5", "label": "Opus 4.5", "description": "Most capable, slowest", "speed": "slow"},
         ],
         "cursor_sidecar": {
-            "sidecar_url_configured": bool((os.getenv("CURSOR_SIDECAR_URL") or "").strip()),
-            "default_model": (os.getenv("CURSOR_SIDECAR_MODEL") or "composer-2").strip() or "composer-2",
-            "available_models": _cursor_sidecar_model_options(),
+            "sidecar_url_configured": bool((settings.cursor_sidecar_url or "").strip()),
+            "default_model": (settings.cursor_sidecar_model or "composer-2").strip() or "composer-2",
+            "available_models": _cursor_sidecar_model_options(settings),
         },
     }
 

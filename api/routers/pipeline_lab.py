@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 import json
+import logging
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
@@ -26,6 +27,8 @@ from lib.extract.lab.evaluations import (
 )
 from lib.extract.lab.recorder import REPO_ROOT
 from lib.extract.pipelines import list_pipelines
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/pipeline-lab", tags=["pipeline-lab"])
 
@@ -675,6 +678,9 @@ def _read_runs(
             try:
                 manifest = json.loads(manifest_path.read_text())
             except Exception:
+                logger.exception(
+                    "pipeline_lab: failed to load manifest %s", manifest_path
+                )
                 continue
             run_dir = manifest_path.parent
             pipeline_name = str(manifest.get("pipeline_name") or "unknown")
@@ -850,6 +856,7 @@ def _read_json(path: Path) -> Any:
     try:
         return json.loads(path.read_text())
     except Exception:
+        logger.exception("pipeline_lab: failed to read JSON at %s", path)
         return {}
 
 

@@ -2,7 +2,7 @@
 
 The architectural test. Replaces the bespoke ExtractionResult intermediate
 format with per-resource-type passes that emit FHIR-shaped output directly.
-Per ``docs/architecture/PDF-PROCESSOR.md`` decisions 1–4:
+Per ``docs/architecture/extraction/PDF-PROCESSOR.md`` decisions 1–4:
 
   1. **No intermediate format.** Each pass emits resources that go straight
      into a FHIR Bundle. Adding a new resource type = adding a new pass +
@@ -672,7 +672,7 @@ class ExtractionPass:
 
     - prompt_version: bump for prompt-only changes. Cheap re-extract for
       this pass alone; other passes' caches unaffected. Track deltas in
-      ``docs/architecture/PIPELINE-LOG.md``.
+      ``docs/architecture/extraction/PIPELINE-LOG.md``.
     - schema_version: bump when the BaseModel schema for this pass changes.
       Forces re-extract for this pass alone; other passes' caches unaffected.
       Both are per-pass — they do NOT invalidate other passes' caches.

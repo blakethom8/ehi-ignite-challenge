@@ -9,15 +9,16 @@ mediates writes via clinician-initiated save destinations.
 from __future__ import annotations
 
 import json
-import os
 import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from api.settings import get_settings
+
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-CASES_ROOT = Path(os.getenv("SKILLS_CASES_PATH", REPO_ROOT / "data" / "cases"))
+CASES_ROOT = get_settings().skills_cases_path
 
 
 def _now_iso() -> str:

@@ -11,5 +11,5 @@ Product spec docs that fed the original (pre-Atlas) product shape. Preserved as 
 Authoritative current sources:
 - `.claude/handoff/atlas/README.md` — Atlas product spec
 - `design/agentic-shell-spec/` — agentic shell vision
-- `docs/architecture/AGENTIC-HARNESS.md` — runtime contract for Caspian vs. Plugins
+- `docs/architecture/harness/AGENTIC-HARNESS.md` — runtime contract for Caspian vs. Plugins
 - `app/src/components/atlas/README.md` — current shared-component inventory

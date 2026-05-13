@@ -705,7 +705,7 @@ Same-day cross-source >10% spread flags `has_conflict`. Longitudinal change does
 
 The clinical signal: HDL Cholesterol **dropped 81 → 67 mg/dL over 16 months**, Triglycerides doubled 70 → 147 mg/dL, A1C drift 5.4 → 5.1 → 5.2%. None of these trajectories are visible in any single source.
 
-Worked example written up at `docs/architecture/HARMONIZATION-WORKED-EXAMPLE.md`.
+Worked example written up at `docs/architecture/harmonize/HARMONIZATION-WORKED-EXAMPLE.md`.
 
 **Conclusion:** Vertical slice strategy validated. Going deep on Observations first (rather than broad-but-shallow across all resource types) produced a demo-able artifact in one iteration. Conditions/Medications/Allergies follow the same shape and become mechanical.
 
@@ -1079,7 +1079,7 @@ Total wall-clock for all 12 cells: 178s.
 
 **Agent:** Claude Opus 4.7
 
-**What:** Built the [pipeline framework](../../lib/extract/pipelines/) (Protocol + registry + bake-off harness), shipped two pipelines (`single-pass-vision` baseline + `multipass-fhir`), ran first bake-off against Blake's Cedars Health Summary PDF (25 pages, 189 ground-truth facts in `cedars-sinai.json`).
+**What:** Built the [pipeline framework](../../../lib/extract/pipelines/) (Protocol + registry + bake-off harness), shipped two pipelines (`single-pass-vision` baseline + `multipass-fhir`), ran first bake-off against Blake's Cedars Health Summary PDF (25 pages, 189 ground-truth facts in `cedars-sinai.json`).
 
 **Why:** Validate decisions 1–4 of `PDF-PROCESSOR.md`. The eval harness from earlier in the session showed `single-pass-vision` losing **161 of 189 ground-truth facts** to schema gaps (medications, allergies, immunizations, labs all 0/N). Schema-direct multi-pass should close the gap.
 

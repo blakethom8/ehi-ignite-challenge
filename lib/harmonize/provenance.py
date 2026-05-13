@@ -41,7 +41,7 @@ HARMONIZE_ACTIVITY_URL = (
 # the entity for the patient-voice source, when the patient-voice
 # status assertion overrode at least one disagreeing EHR source. See
 # lib.harmonize.source_weights for the rule code vocabulary and
-# docs/architecture/LLM-CONTEXT-AUGMENTATION-PLAN.md §3.5.
+# docs/architecture/context/LLM-CONTEXT-AUGMENTATION-PLAN.md §3.5.
 RESOLUTION_RULE_URL = (
     "http://atlas.healthcaredataai.com/fhir/StructureDefinition/resolution-rule"
 )

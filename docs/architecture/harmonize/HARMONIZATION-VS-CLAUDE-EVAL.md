@@ -353,5 +353,5 @@ Use this on the day you actually run the eval. Tick boxes as you go.
 | Pipeline experiment journal | [PIPELINE-LOG.md](./PIPELINE-LOG.md) |
 | Harmonization layer worked example (HDL) | [HARMONIZATION-WORKED-EXAMPLE.md](./HARMONIZATION-WORKED-EXAMPLE.md) |
 | Harmonization layer implementation | `lib/harmonize/` |
-| `blake-real` workspace definition | [`api/core/harmonize_service.py`](../../api/core/harmonize_service.py) (`_COLLECTIONS["blake-real"]`) |
-| Caspian agent runtime | [`api/core/provider_assistant_agent_sdk.py`](../../api/core/provider_assistant_agent_sdk.py) |
+| `blake-real` workspace definition | [`api/core/harmonize_service.py`](../../../api/core/harmonize_service.py) (`_COLLECTIONS["blake-real"]`) |
+| Caspian agent runtime | [`api/core/provider_assistant_agent_sdk.py`](../../../api/core/provider_assistant_agent_sdk.py) |

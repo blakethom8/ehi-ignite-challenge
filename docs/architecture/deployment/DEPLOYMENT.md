@@ -41,18 +41,18 @@ the deployment.
 
 ## Deploy artifacts
 
-All Docker / nginx configs live in [`deploy/`](../../deploy/) and are the
+All Docker / nginx configs live in [`deploy/`](../../../deploy/) and are the
 source of truth. This doc deliberately links rather than inlining them so
 they can't drift.
 
 | File | Purpose |
 |---|---|
-| [`deploy/docker-compose.prod.yml`](../../deploy/docker-compose.prod.yml) | Production compose — four app-owned services: `api`, `app`, `cursor-sidecar`, `fhir-converter`. Joins the external `personal-website_default` network so the host-level nginx (run by the personal-website stack) can reach the containers. |
-| [`deploy/Dockerfile.api`](../../deploy/Dockerfile.api) | Python 3.13 + uv. Copies `lib/`, `api/`, `scripts/`, and the active `ehi-atlas/ehi_atlas/` namespace + reference vocab slices. |
-| [`deploy/Dockerfile.app`](../../deploy/Dockerfile.app) | Node build → nginx-alpine static serve. Uses [`deploy/nginx-app.conf`](../../deploy/nginx-app.conf) for SPA routing inside the app container. |
-| [`deploy/Dockerfile.cursor-sidecar`](../../deploy/Dockerfile.cursor-sidecar) | Cursor Agent sidecar — node service consumed by `api` via `CURSOR_SIDECAR_URL`. |
-| [`deploy/nginx-host.conf`](../../deploy/nginx-host.conf) | Hetzner 2 host nginx (the `personal-website_nginx_1` container that terminates TLS for `ehi.healthcaredataai.com` and proxies to `api` / `app`). Not loaded automatically — copied into place during initial server setup. |
-| [`deploy/deploy-prod.sh`](../../deploy/deploy-prod.sh) | The deploy entrypoint — handles compose v1/v2 detection, container recreation, health checks against `/api/health` and the FHIR converter, and reloads the host nginx so it re-resolves the recreated service names. |
+| [`deploy/docker-compose.prod.yml`](../../../deploy/docker-compose.prod.yml) | Production compose — four app-owned services: `api`, `app`, `cursor-sidecar`, `fhir-converter`. Joins the external `personal-website_default` network so the host-level nginx (run by the personal-website stack) can reach the containers. |
+| [`deploy/Dockerfile.api`](../../../deploy/Dockerfile.api) | Python 3.13 + uv. Copies `lib/`, `api/`, `scripts/`, and the active `ehi-atlas/ehi_atlas/` namespace + reference vocab slices. |
+| [`deploy/Dockerfile.app`](../../../deploy/Dockerfile.app) | Node build → nginx-alpine static serve. Uses [`deploy/nginx-app.conf`](../../../deploy/nginx-app.conf) for SPA routing inside the app container. |
+| [`deploy/Dockerfile.cursor-sidecar`](../../../deploy/Dockerfile.cursor-sidecar) | Cursor Agent sidecar — node service consumed by `api` via `CURSOR_SIDECAR_URL`. |
+| [`deploy/nginx-host.conf`](../../../deploy/nginx-host.conf) | Hetzner 2 host nginx (the `personal-website_nginx_1` container that terminates TLS for `ehi.healthcaredataai.com` and proxies to `api` / `app`). Not loaded automatically — copied into place during initial server setup. |
+| [`deploy/deploy-prod.sh`](../../../deploy/deploy-prod.sh) | The deploy entrypoint — handles compose v1/v2 detection, container recreation, health checks against `/api/health` and the FHIR converter, and reloads the host nginx so it re-resolves the recreated service names. |
 
 The FHIR converter is intentionally **not** proxied by nginx. It is exposed
 only on the Docker network and on Hetzner localhost port `18080` for

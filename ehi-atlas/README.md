@@ -5,7 +5,7 @@ designed to ingest and harmonize heterogeneous patient health data — FHIR R4
 bundles, Epic EHI Export SQLite, C-CDA documents, payer claims, lab PDFs,
 clinical-note PDFs — into one canonical FHIR R4 record with full Provenance
 lineage. The cross-source merge / Provenance graph is the platform's
-defensible wedge ([`../docs/architecture/ATLAS-DATA-MODEL.md`](../docs/architecture/ATLAS-DATA-MODEL.md)).
+defensible wedge ([`../docs/architecture/data/ATLAS-DATA-MODEL.md`](../docs/architecture/data/ATLAS-DATA-MODEL.md)).
 
 **Current development focus:** the **PDF → FHIR** ingestion path — the
 hardest single ingestion path and the one most directly relevant to the
@@ -46,9 +46,9 @@ make test
 
 ## Architecture & experiment journal
 
-- [`../docs/architecture/PDF-PROCESSOR.md`](../docs/architecture/PDF-PROCESSOR.md) — decision record for the PDF → FHIR pipeline (seven decisions, bake-off results, vision-wins evidence).
-- [`../docs/architecture/PIPELINE-LOG.md`](../docs/architecture/PIPELINE-LOG.md) — running journal of pipeline experiments (bake-off tables, prompt iterations, model swaps).
-- [`../docs/architecture/ATLAS-DATA-MODEL.md`](../docs/architecture/ATLAS-DATA-MODEL.md) — top-level data-layer decisions (FHIR R4 + USCDI canonical, Provenance graph as wedge).
+- [`../docs/architecture/extraction/PDF-PROCESSOR.md`](../docs/architecture/extraction/PDF-PROCESSOR.md) — decision record for the PDF → FHIR pipeline (seven decisions, bake-off results, vision-wins evidence).
+- [`../docs/architecture/extraction/PIPELINE-LOG.md`](../docs/architecture/extraction/PIPELINE-LOG.md) — running journal of pipeline experiments (bake-off tables, prompt iterations, model swaps).
+- [`../docs/architecture/data/ATLAS-DATA-MODEL.md`](../docs/architecture/data/ATLAS-DATA-MODEL.md) — top-level data-layer decisions (FHIR R4 + USCDI canonical, Provenance graph as wedge).
 
 ## Where the rest of the platform lives
 

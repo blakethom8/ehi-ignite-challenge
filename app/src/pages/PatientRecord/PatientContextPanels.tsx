@@ -4,7 +4,7 @@
  *   2. Care episodes     (EpisodeBriefs + drawer with Composition)
  *   3. Conflicts to review (HarmonizationCaveats)
  *
- * See docs/architecture/LLM-CONTEXT-AUGMENTATION-PLAN.md §T8 §3.
+ * See docs/architecture/context/LLM-CONTEXT-AUGMENTATION-PLAN.md §T8 §3.
  *
  * The panel reads everything from
  *   GET /api/patient-context/{patient_id}/augmentation

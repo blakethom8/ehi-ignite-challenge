@@ -6,10 +6,10 @@ Purpose: collect concrete proof points from the current EHI Atlas build so the P
 
 | Claim in report | Evidence we can cite/show | Current repo/source |
 |---|---|---|
-| We convert fragmented EHI into a structured clinical fact layer. | FHIR explorer and harmonization architecture over Synthea R4; PDF-to-FHIR pipeline emits FHIR Bundle output. | `docs/architecture/PDF-PROCESSOR.md`, `docs/architecture/EXTRACTION-DATA-MODEL.md` |
-| The LLM is a reasoning layer, not the source of truth. | Provider assistant builds query-filtered clinical context from facts, safety flags, medications, conditions, allergies, encounters. | `docs/architecture/FHIR-AGENT-CONTEXT-ENGINEERING-REPORT.md` |
-| The system can ingest non-FHIR documents. | PDF processor uses vision + multipass extraction; local MedGemma path installed/tested for lab/vital extraction. | `docs/architecture/PDF-PROCESSOR.md`, `docs/local-models/medgemma-ollama.md` |
-| We preserve provenance and auditability. | FHIR resources carry source locator metadata; harmonization layer tracks source contributions and provenance. | `docs/architecture/EXTRACTION-DATA-MODEL.md`, `docs/ideas/AGENTIC-PDF-HARMONIZATION.md` |
+| We convert fragmented EHI into a structured clinical fact layer. | FHIR explorer and harmonization architecture over Synthea R4; PDF-to-FHIR pipeline emits FHIR Bundle output. | `docs/architecture/extraction/PDF-PROCESSOR.md`, `docs/architecture/extraction/EXTRACTION-DATA-MODEL.md` |
+| The LLM is a reasoning layer, not the source of truth. | Provider assistant builds query-filtered clinical context from facts, safety flags, medications, conditions, allergies, encounters. | `docs/architecture/context/FHIR-AGENT-CONTEXT-ENGINEERING-REPORT.md` |
+| The system can ingest non-FHIR documents. | PDF processor uses vision + multipass extraction; local MedGemma path installed/tested for lab/vital extraction. | `docs/architecture/extraction/PDF-PROCESSOR.md`, `docs/local-models/medgemma-ollama.md` |
+| We preserve provenance and auditability. | FHIR resources carry source locator metadata; harmonization layer tracks source contributions and provenance. | `docs/architecture/extraction/EXTRACTION-DATA-MODEL.md`, `docs/ideas/AGENTIC-PDF-HARMONIZATION.md` |
 | The product is designed for interpretability. | Data Lab, FHIR Primer, Methodology, Coverage, Flight School, visible tool-call/evidence context. | `docs/JUDGE-WALKTHROUGH-DATALAB.md`, `docs/JUDGE-WALKTHROUGH.md` |
 | The system improves EHI readability/actionability. | “5 facts in 30 seconds,” pre-op safety panel, assistant returns direct verdicts, missing information, and action list. | `docs/JUDGE-WALKTHROUGH.md` |
 

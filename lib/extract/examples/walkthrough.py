@@ -1,6 +1,6 @@
 """Runnable walkthrough of the extraction pipeline data model.
 
-Mirrors the worked example in docs/architecture/EXTRACTION-DATA-MODEL.md.
+Mirrors the worked example in docs/architecture/extraction/EXTRACTION-DATA-MODEL.md.
 Constructs synthetic Pydantic outputs (as if the LLM had returned them),
 runs them through the FHIR builders + post-passes, and prints the data
 at each stage.

@@ -241,7 +241,7 @@ stats = compute_patient_stats(record)
 - **Production:** https://ehi.healthcaredataai.com (Hetzner 2 — 5.78.148.70)
 - Docker Compose + nginx + Let's Encrypt SSL
 - Manual deploy: `ssh hetzner2 'cd /opt/ehi-ignite && git pull origin master && docker compose -f deploy/docker-compose.prod.yml up -d --build'`
-- See `deploy/` for configs, `docs/architecture/DEPLOYMENT.md` for full setup
+- See `deploy/` for configs, `docs/architecture/deployment/DEPLOYMENT.md` for full setup
 
 ### Design System
 - Atlas Agentic Workspaces (see `design/DESIGN.md` + `.claude/handoff/atlas/`)
@@ -264,7 +264,7 @@ The frontend is organized around five top-level modules — see the module bar i
 | **Workspaces** | `/workspaces/*` | Installable plugin packages (Trial Finder, Med Access, Site Coordination) |
 | **Learn** | `/learn/*` | Internal section — runbooks, evals, methodology, skills |
 
-**Trust posture distinction (architectural promise):** Caspian is a trusted clinical co-pilot with full chart access. Plugins are attested, sandboxed, consented services that read a signed anchor package — never the raw chart. See `docs/architecture/AGENTIC-HARNESS.md` for the contract.
+**Trust posture distinction (architectural promise):** Caspian is a trusted clinical co-pilot with full chart access. Plugins are attested, sandboxed, consented services that read a signed anchor package — never the raw chart. See `docs/architecture/harness/AGENTIC-HARNESS.md` for the contract.
 
 ### Backend build order (still active)
 
@@ -281,16 +281,16 @@ The frontend is organized around five top-level modules — see the module bar i
 | Doc | What It Is |
 |---|---|
 | `.claude/handoff/atlas/README.md` | ⭐ **Read this first.** Atlas Agentic Workspaces handoff spec — IA, tokens, components, routing, voice & copy |
-| `docs/architecture/AGENTIC-HARNESS.md` | ⭐ Caspian vs. Plugins — what's shared (the harness) vs. what differs (trust posture, runtime, audit) |
+| `docs/architecture/harness/AGENTIC-HARNESS.md` | ⭐ Caspian vs. Plugins — what's shared (the harness) vs. what differs (trust posture, runtime, audit) |
 | `app/src/components/atlas/README.md` | Current shared-component inventory + conventions (read before touching workspace shell) |
 | `design/agentic-shell-spec/` | Agentic shell vision — north-star spec the redesign is built from |
-| `docs/architecture/ATLAS-DATA-MODEL.md` | Architectural decisions for Atlas's data layer — FHIR R4 + USCDI as silver, bronze preserves native shape, LLM-authored mapping specs, hot path UI + cold path agent, Provenance graph as the wedge |
-| `docs/architecture/PDF-PROCESSOR.md` | ⭐ PDF → FHIR pipeline decision record. Seven decisions, bake-off results, vision-wins evidence. Read before touching any extraction code. |
-| `docs/architecture/PIPELINE-LOG.md` | Running journal of pipeline experiments — bake-off result tables, prompt-tuning A/Bs, model-swap experiments. Append-only, newest at top. |
-| `docs/architecture/CONTEXT-ENGINEERING.md` | 5-layer LLM context pipeline design — read before building batch_enrichment or NL search |
-| `docs/architecture/DATA-DEFINITIONS.md` | Full data model reference — encounter types, medication records, observation fields |
+| `docs/architecture/data/ATLAS-DATA-MODEL.md` | Architectural decisions for Atlas's data layer — FHIR R4 + USCDI as silver, bronze preserves native shape, LLM-authored mapping specs, hot path UI + cold path agent, Provenance graph as the wedge |
+| `docs/architecture/extraction/PDF-PROCESSOR.md` | ⭐ PDF → FHIR pipeline decision record. Seven decisions, bake-off results, vision-wins evidence. Read before touching any extraction code. |
+| `docs/architecture/extraction/PIPELINE-LOG.md` | Running journal of pipeline experiments — bake-off result tables, prompt-tuning A/Bs, model-swap experiments. Append-only, newest at top. |
+| `docs/architecture/context/CONTEXT-ENGINEERING.md` | 5-layer LLM context pipeline design — read before building batch_enrichment or NL search |
+| `docs/architecture/data/DATA-DEFINITIONS.md` | Full data model reference — encounter types, medication records, observation fields |
 | `archive/ideas-pre-atlas/` | Pre-Atlas product spec docs (PatientJourneyApp, FormatAgnosticIngestion, DataAggregatorWireframes) — historical record only |
-| `docs/architecture/DEPLOYMENT.md` | Hetzner + Docker Compose deployment guide |
+| `docs/architecture/deployment/DEPLOYMENT.md` | Hetzner + Docker Compose deployment guide |
 | `docs/architecture/tracing.md` | LLM observability — traces, spans, token/cost tracking, Langfuse |
 | `research/SQL-ON-FHIR-REVIEW.md` | SOF prototype "was it worth it" review **+ `run_sql` tool-surface addendum** (Phase 0) |
 | `research/README.md` | Pitch snapshot layout + regen command for `research/ehi-ignite.db` |

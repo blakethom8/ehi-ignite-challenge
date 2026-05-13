@@ -223,12 +223,12 @@ Charts / Clinical Insights.
 | 5-layer pipeline spec | `~/Chief/20-projects/ehi-ignite-challenge/architecture/DATA-AGGREGATION-LAYER.md` |
 | Competitive landscape | `~/Chief/20-projects/ehi-ignite-challenge/research/harmonization-prior-art.md` |
 | Multi-format ingestion product spec | `docs/ideas/FORMAT-AGNOSTIC-INGESTION.md` |
-| Layer 5 — context engineering for the LLM | `docs/architecture/CONTEXT-PIPELINE.md` |
+| Layer 5 — context engineering for the LLM | `docs/architecture/context/CONTEXT-PIPELINE.md` |
 | SOF warehouse (current Layer 4 implementation) | `patient-journey/core/sql_on_fhir/views/README.md` |
 | Platform-level architecture | `CLAUDE.md` (repo guide) — pre-Atlas `ECOSYSTEM-OVERVIEW.md` is archived at `archive/docs/` |
 | Josh Mandel's stack (the bronze-only prior art) | `data-research/josh-stack-deep-dive/INDEX.md` |
 | Data shape catalog | `data-research/josh-stack-deep-dive/data-lane/session-D01-data-catalog.md` |
-| Agent SDK + tracing implementation | `docs/architecture/ANTHROPIC-AGENT-SDK.md`, `docs/architecture/tracing.md` |
+| Agent SDK + tracing implementation | `docs/architecture/harness/ANTHROPIC-AGENT-SDK.md`, `docs/architecture/tracing.md` |
 
 ---
 

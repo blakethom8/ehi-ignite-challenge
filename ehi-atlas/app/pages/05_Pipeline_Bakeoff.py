@@ -3,7 +3,7 @@
 Empirical comparison across PDF→FHIR extraction architectures. Pick
 pipelines, pick PDFs (with optional ground-truth pairs), run the matrix,
 see F1 / latency / fact-counts side-by-side. Per
-``docs/architecture/PDF-PROCESSOR.md`` Decision 6, this is where
+``docs/architecture/extraction/PDF-PROCESSOR.md`` Decision 6, this is where
 architecture decisions are *measured*, not argued.
 
 Run from repo root:
@@ -51,7 +51,7 @@ st.markdown(
 **Empirically compare PDF→FHIR pipeline architectures.** Each pipeline takes
 a PDF and emits a FHIR Bundle. The bake-off scores every Bundle against
 ClientFullEHR ground truth (where available) and surfaces F1, latency, and
-fact-count side-by-side. Per [`docs/architecture/PDF-PROCESSOR.md`](../../../docs/architecture/PDF-PROCESSOR.md)
+fact-count side-by-side. Per [`docs/architecture/extraction/PDF-PROCESSOR.md`](../../../docs/architecture/extraction/PDF-PROCESSOR.md)
 this is where architecture decisions are *measured*, not argued.
 """
 )
@@ -379,7 +379,7 @@ else:
 st.divider()
 st.caption(
     "Architecture decision record: "
-    "[`docs/architecture/PDF-PROCESSOR.md`](../../../docs/architecture/PDF-PROCESSOR.md) · "
+    "[`docs/architecture/extraction/PDF-PROCESSOR.md`](../../../docs/architecture/extraction/PDF-PROCESSOR.md) · "
     "Pipeline contributor guide: "
     "`lib/extract/pipelines/README.md` · "
     "Bake-off module: `lib/extract/bake_off.py`"

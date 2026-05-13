@@ -8,7 +8,7 @@ Audience:
 - backend engineers shaping workspace contracts
 
 Related docs:
-- `docs/architecture/AGENTIC-HARNESS.md`
+- `docs/architecture/harness/AGENTIC-HARNESS.md`
 - `design/agentic-shell-spec/01-shell-spec.md`
 - `design/agentic-shell-spec/02-workspace-model.md`
 - `app/src/components/atlas/README.md`

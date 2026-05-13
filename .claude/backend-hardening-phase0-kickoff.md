@@ -2,7 +2,7 @@ You're starting Phase 0 of the backend hardening sprint for the EHI Ignite Chall
 
   .claude/backend-hardening-plan.md             ← READ FIRST. Full plan.
   .claude/backend-hardening-build-log.md        ← append after each ticket
-  docs/architecture/BACKEND-REPORT-2026-05-11.html  ← the audit it derives from
+  archive/docs/BACKEND-REPORT-2026-05-11.html  ← the audit it derives from
   CLAUDE.md                                      ← project conventions
 
 Scope: H0.1 → H0.6 in the plan. Nothing in Phase 1, 2, or 3.

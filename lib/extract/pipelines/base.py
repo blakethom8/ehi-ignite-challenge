@@ -6,7 +6,7 @@ is opaque to the framework and to the eval harness. The contract is
 intentionally minimal so external contributors can implement against a
 stable interface.
 
-Read :doc:`docs/architecture/PDF-PROCESSOR.md` decisions 5 and 6 for the
+Read :doc:`docs/architecture/extraction/PDF-PROCESSOR.md` decisions 5 and 6 for the
 *why*. Read ``pipelines/README.md`` for *how to add one*.
 """
 

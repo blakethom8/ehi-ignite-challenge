@@ -12,7 +12,7 @@ Conversation thread: deeper review of the upfront data aggregation layer. Strate
 
 #### What's strong
 
-- **PDF → FHIR (multipass-fhir).** Vision-primary, no privileged-format backdoor. One focused pass per FHIR resource type, parallel dispatch via thread pool, per-pass model selection, deterministic SHA-keyed cache. Bake-off harness measures it: weighted F1 0.70 on Cedars Health Summary — medications 0.92, allergies 1.00, immunizations 0.88, labs 0.70. Decisions documented in `docs/architecture/PDF-PROCESSOR.md`.
+- **PDF → FHIR (multipass-fhir).** Vision-primary, no privileged-format backdoor. One focused pass per FHIR resource type, parallel dispatch via thread pool, per-pass model selection, deterministic SHA-keyed cache. Bake-off harness measures it: weighted F1 0.70 on Cedars Health Summary — medications 0.92, allergies 1.00, immunizations 0.88, labs 0.70. Decisions documented in `docs/architecture/extraction/PDF-PROCESSOR.md`.
 - **FHIR JSON pass-through.** Cedars JSON, Synthea bundles, SMART-pulled bundles flow to harmonization unchanged. Spec P0 — done.
 - **Per-source Bundle abstraction with provenance.** Every adapter outputs the same shape (FHIR Bundle with `meta.source` + `meta.extension` for source locator + bbox). The harmonizer is adapter-agnostic.
 - **Pluggable `ExtractionPipeline` Protocol + bake-off harness.** New architectures (OCR-first, agentic, future Gemma-tabular) slot in without framework changes; F1/cost/latency decides what wins.
@@ -208,7 +208,7 @@ Move forward with **Option B**: promote `lib/extract/` → `lib/extract/` to fix
 - `git mv lib/extract lib/extract`
 - Update import in `api/core/harmonize_service.py` (~line 1814): `from lib.extract.pipelines` → `from lib.extract.pipelines`
 - Update any Streamlit pages in `ehi-atlas/app/` that import from extract
-- Update path references in `docs/architecture/PDF-PROCESSOR.md` (multiple `../../lib/extract/...` links throughout)
+- Update path references in `docs/architecture/extraction/PDF-PROCESSOR.md` (multiple `../../lib/extract/...` links throughout)
 - Update `ehi-atlas/CLAUDE.md` so it no longer claims `extract/` lives in this zone
 - Update root `CLAUDE.md`:
   - line 152: replace `(adapters/extract/harmonize)` with the corrected description
@@ -252,7 +252,7 @@ Three subagents (CLAUDE.md vs tree, cross-zone imports, architecture-doc cross-r
 | 4 | Root `CLAUDE.md` line 152 | `ehi_atlas/ ← (adapters/extract/harmonize)` | Only `extract/` exists | covered by PROMOTE-EXTRACT |
 | 5 | Root `CLAUDE.md` line 68 | `context_builder.py ← TODO` | File exists, ~400 lines, has tests at `api/tests/test_context_builder.py` | CLAUDE-MD-RESYNC |
 | 6 | Root `CLAUDE.md` line ~131 + Reference Docs table | `CONTEXT-PIPELINE.md ← LLM context engineering (TODO)` | File exists, 271 lines | CLAUDE-MD-RESYNC |
-| 7 | `docs/architecture/CONTEXT-ENGINEERING.md` + `DATA-DEFINITIONS.md` | Cite `patient-journey/core/drug_classifier.py`, `fhir_explorer/parser/`, etc. | Pre-May-3-refactor paths. Code now lives at `lib/clinical/` and `lib/fhir_parser/`. | ARCH-DOC-RESYNC |
+| 7 | `docs/architecture/context/CONTEXT-ENGINEERING.md` + `DATA-DEFINITIONS.md` | Cite `patient-journey/core/drug_classifier.py`, `fhir_explorer/parser/`, etc. | Pre-May-3-refactor paths. Code now lives at `lib/clinical/` and `lib/fhir_parser/`. | ARCH-DOC-RESYNC |
 | 8 | `api/core/harmonize_service.py:1814` | (no claim — code) | Production imports from dev zone (`lib.extract.pipelines`) | covered by PROMOTE-EXTRACT |
 
 ### MEDIUM — explanation breaks but won't actively mislead
@@ -260,19 +260,19 @@ Three subagents (CLAUDE.md vs tree, cross-zone imports, architecture-doc cross-r
 | # | Location | Claim | Reality | Proposed task |
 |---|---|---|---|---|
 | 9 | Root `CLAUDE.md` line 95 | `lib/sql_on_fhir/views/` has "5 ViewDefinitions" | 6 JSON files: patient, condition, condition_active, medication_request, observation, encounter | CLAUDE-MD-RESYNC |
-| 10 | `docs/architecture/ATLAS-DATA-MODEL.md` | Cites `patient-journey/core/sql_on_fhir/views/README.md` | Wrong path; views live at `lib/sql_on_fhir/views/` | ARCH-DOC-RESYNC |
-| 11 | `docs/architecture/ATLAS-DATA-MODEL.md` | Cites `data-research/josh-stack-deep-dive/INDEX.md` | Directory absorbed into `ehi-atlas/notes/` | ARCH-DOC-RESYNC |
+| 10 | `docs/architecture/data/ATLAS-DATA-MODEL.md` | Cites `patient-journey/core/sql_on_fhir/views/README.md` | Wrong path; views live at `lib/sql_on_fhir/views/` | ARCH-DOC-RESYNC |
+| 11 | `docs/architecture/data/ATLAS-DATA-MODEL.md` | Cites `data-research/josh-stack-deep-dive/INDEX.md` | Directory absorbed into `ehi-atlas/notes/` | ARCH-DOC-RESYNC |
 
 ### LOW — cosmetic
 
 | # | Location | Claim | Reality | Proposed task |
 |---|---|---|---|---|
-| 12 | `docs/architecture/DEPLOYMENT.md` | References `deploy/nginx.conf` | Actual files: `deploy/nginx-app.conf`, `deploy/nginx-host.conf` | ARCH-DOC-RESYNC |
+| 12 | `docs/architecture/deployment/DEPLOYMENT.md` | References `deploy/nginx.conf` | Actual files: `deploy/nginx-app.conf`, `deploy/nginx-host.conf` | ARCH-DOC-RESYNC |
 | 13 | Root `CLAUDE.md` lines 66–69 | `temporal.py / batch_enrichment.py / rag_tools.py ← TODO` in directory tree | Files genuinely don't exist | Intentional roadmap placeholder — leave or move to a "Planned" section |
 
 ### Confirmed clean (good news)
 
-- `docs/architecture/PDF-PROCESSOR.md` cross-references all resolve. (PROMOTE-EXTRACT will introduce new drift here — task brief already covers it.)
+- `docs/architecture/extraction/PDF-PROCESSOR.md` cross-references all resolve. (PROMOTE-EXTRACT will introduce new drift here — task brief already covers it.)
 - `lib/` has no inverted dependencies on `api/` or `ehi-atlas/`. `lib/` is a clean leaf.
 - `ehi-atlas/` does not import from `api/`. Outbound dep convention is honored in that direction.
 - `scripts/` does not import from `ehi-atlas/`.
@@ -576,7 +576,7 @@ Verified impact (Function Health 2025-11-19 PDF):
 - Interpretation flag: 5% → **~64%** (computed from value vs reference range when extraction didn't print)
 - Clinical category extension: 0% → **100%** (where LOINC resolved)
 
-See `docs/architecture/PIPELINE-LOG.md` Move X for the detailed write-up.
+See `docs/architecture/extraction/PIPELINE-LOG.md` Move X for the detailed write-up.
 
 ---
 

@@ -98,7 +98,7 @@ Use layered context:
 4. drill-down on demand only
 
 Related deeper doc:
-- `docs/architecture/FHIR-AGENT-CONTEXT-ENGINEERING-REPORT.md`
+- `docs/architecture/context/FHIR-AGENT-CONTEXT-ENGINEERING-REPORT.md`
 
 ## 7) How To Leverage This Harness In Other Applications
 
@@ -231,5 +231,5 @@ If assistant shows "request failed":
 
 Use this playbook as the top-level guide.
 For implementation details, pair it with:
-- `docs/architecture/ANTHROPIC-SDK-OPERATING-REPORT.md`
-- `docs/architecture/FHIR-AGENT-CONTEXT-ENGINEERING-REPORT.md`
+- `docs/architecture/harness/ANTHROPIC-SDK-OPERATING-REPORT.md`
+- `docs/architecture/context/FHIR-AGENT-CONTEXT-ENGINEERING-REPORT.md`

@@ -160,7 +160,7 @@ For each of `trial-finder`, `med-access`, and `second-opinion`:
   renderer-registry inventory and the `usePluginRun` / `useManifest`
   hooks.
 
-- [x] **`docs/architecture/AGENTIC-HARNESS.md` §10 status table
+- [x] **`docs/architecture/harness/AGENTIC-HARNESS.md` §10 status table
   flipped** — every previously-unchecked row now reads ✅ shipped.
 
 - [x] **`docs/daily/2026-05-11-plugin-runtime.md`** — this file.
@@ -222,7 +222,7 @@ These were called out where they happened in the build log:
 
 ## HARNESS-SURFACES guidance — followups
 
-`docs/architecture/HARNESS-SURFACES.md` arrived mid-build. Concepts
+`docs/architecture/harness/HARNESS-SURFACES.md` arrived mid-build. Concepts
 adopted directly:
 
 - **Data tools vs render surfaces (§8).** All domain logic lives in

@@ -175,4 +175,4 @@ Ensure **`CURSOR_API_KEY`** is present in the environment passed to the sidecar 
 ## Related documentation
 
 - [Cursor TypeScript SDK](https://cursor.com/docs/api/sdk/typescript)
-- Claude / Anthropic harness docs in-repo: [`docs/architecture/ANTHROPIC-AGENT-SDK.md`](../docs/architecture/ANTHROPIC-AGENT-SDK.md), [`docs/architecture/CONTEXT-PIPELINE.md`](../docs/architecture/CONTEXT-PIPELINE.md) (mode selector table)
+- Claude / Anthropic harness docs in-repo: [`docs/architecture/harness/ANTHROPIC-AGENT-SDK.md`](../docs/architecture/harness/ANTHROPIC-AGENT-SDK.md), [`docs/architecture/context/CONTEXT-PIPELINE.md`](../docs/architecture/context/CONTEXT-PIPELINE.md) (mode selector table)

@@ -7,7 +7,7 @@
  * This file is the canonical TS mirror of the runtime contract. The
  * backend mirror lives in `api/trust/models.py`. The full design
  * intent is documented in `docs/product-specs/PLUGIN-RUNTIME.md` and
- * `docs/architecture/AGENTIC-HARNESS.md`.
+ * `docs/architecture/harness/AGENTIC-HARNESS.md`.
  */
 
 import type { WorkspaceId } from "./types";

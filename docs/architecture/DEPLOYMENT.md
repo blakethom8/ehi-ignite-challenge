@@ -39,143 +39,24 @@ the deployment.
 
 ---
 
-## docker-compose.prod.yml
+## Deploy artifacts
 
-The production compose runs four app-owned services: `api`, `app`,
-`cursor-sidecar`, and `fhir-converter`. The converter is intentionally not
-proxied by nginx. It is exposed only on the Docker network and on Hetzner
-localhost port `18080` for SSH-tunneled development.
+All Docker / nginx configs live in [`deploy/`](../../deploy/) and are the
+source of truth. This doc deliberately links rather than inlining them so
+they can't drift.
 
-```yaml
-services:
-  api:
-    build:
-      context: .
-      dockerfile: deploy/Dockerfile.api
-    environment:
-      - ENVIRONMENT=production
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - DATA_DIR=/data
-    volumes:
-      - ./data:/data:ro
-    restart: unless-stopped
+| File | Purpose |
+|---|---|
+| [`deploy/docker-compose.prod.yml`](../../deploy/docker-compose.prod.yml) | Production compose — four app-owned services: `api`, `app`, `cursor-sidecar`, `fhir-converter`. Joins the external `personal-website_default` network so the host-level nginx (run by the personal-website stack) can reach the containers. |
+| [`deploy/Dockerfile.api`](../../deploy/Dockerfile.api) | Python 3.13 + uv. Copies `lib/`, `api/`, `scripts/`, and the active `ehi-atlas/ehi_atlas/` namespace + reference vocab slices. |
+| [`deploy/Dockerfile.app`](../../deploy/Dockerfile.app) | Node build → nginx-alpine static serve. Uses [`deploy/nginx-app.conf`](../../deploy/nginx-app.conf) for SPA routing inside the app container. |
+| [`deploy/Dockerfile.cursor-sidecar`](../../deploy/Dockerfile.cursor-sidecar) | Cursor Agent sidecar — node service consumed by `api` via `CURSOR_SIDECAR_URL`. |
+| [`deploy/nginx-host.conf`](../../deploy/nginx-host.conf) | Hetzner 2 host nginx (the `personal-website_nginx_1` container that terminates TLS for `ehi.healthcaredataai.com` and proxies to `api` / `app`). Not loaded automatically — copied into place during initial server setup. |
+| [`deploy/deploy-prod.sh`](../../deploy/deploy-prod.sh) | The deploy entrypoint — handles compose v1/v2 detection, container recreation, health checks against `/api/health` and the FHIR converter, and reloads the host nginx so it re-resolves the recreated service names. |
 
-  app:
-    build:
-      context: .
-      dockerfile: deploy/Dockerfile.app
-    restart: unless-stopped
-
-  fhir-converter:
-    image: mcr.microsoft.com/healthcareapis/fhir-converter:1.0.0-preview@sha256:202c898d9807015a2b6269d3a6fe581cfaecc247ac163cd53d3e69e9cfc3659f
-    ports:
-      - "127.0.0.1:18080:8080"
-    expose:
-      - "8080"
-    restart: unless-stopped
-
-  nginx:
-    image: nginx:alpine
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./deploy/nginx.conf:/etc/nginx/nginx.conf
-      - ./certbot/conf:/etc/letsencrypt
-      - ./certbot/www:/var/www/certbot
-    depends_on:
-      - api
-      - app
-    restart: unless-stopped
-```
-
----
-
-## deploy/Dockerfile.api
-
-```dockerfile
-FROM python:3.13-slim
-
-WORKDIR /app
-
-COPY pyproject.toml uv.lock ./
-RUN pip install uv && uv sync --frozen
-
-COPY fhir_explorer/ ./fhir_explorer/
-COPY api/ ./api/
-COPY data/ ./data/
-
-CMD ["uv", "run", "uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
-```
-
----
-
-## deploy/Dockerfile.app
-
-```dockerfile
-FROM node:20-alpine AS builder
-
-WORKDIR /app
-COPY app/package*.json ./
-RUN npm ci
-
-COPY app/ ./
-RUN npm run build
-
-FROM nginx:alpine
-COPY --from=builder /app/dist /usr/share/nginx/html
-COPY deploy/nginx-app.conf /etc/nginx/conf.d/default.conf
-```
-
----
-
-## deploy/nginx.conf
-
-```nginx
-events {}
-
-http {
-    upstream api {
-        server api:8000;
-    }
-
-    upstream app {
-        server app:80;
-    }
-
-    server {
-        listen 80;
-        server_name _;
-
-        location /.well-known/acme-challenge/ {
-            root /var/www/certbot;
-        }
-
-        location / {
-            return 301 https://$host$request_uri;
-        }
-    }
-
-    server {
-        listen 443 ssl;
-        server_name your-domain.com;
-
-        ssl_certificate /etc/letsencrypt/live/your-domain.com/fullchain.pem;
-        ssl_certificate_key /etc/letsencrypt/live/your-domain.com/privkey.pem;
-
-        location /api/ {
-            proxy_pass http://api/;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-        }
-
-        location / {
-            proxy_pass http://app/;
-            proxy_set_header Host $host;
-        }
-    }
-}
-```
+The FHIR converter is intentionally **not** proxied by nginx. It is exposed
+only on the Docker network and on Hetzner localhost port `18080` for
+SSH-tunneled development (`ssh -L 18080:127.0.0.1:18080 hetzner2`).
 
 ---
 

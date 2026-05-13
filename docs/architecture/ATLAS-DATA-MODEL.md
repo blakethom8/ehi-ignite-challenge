@@ -225,7 +225,7 @@ Charts / Clinical Insights.
 | Multi-format ingestion product spec | `docs/ideas/FORMAT-AGNOSTIC-INGESTION.md` |
 | Layer 5 — context engineering for the LLM | `docs/architecture/CONTEXT-PIPELINE.md` |
 | SOF warehouse (current Layer 4 implementation) | `patient-journey/core/sql_on_fhir/views/README.md` |
-| Platform-level architecture | `docs/architecture/ECOSYSTEM-OVERVIEW.md` |
+| Platform-level architecture | `CLAUDE.md` (repo guide) — pre-Atlas `ECOSYSTEM-OVERVIEW.md` is archived at `archive/docs/` |
 | Josh Mandel's stack (the bronze-only prior art) | `data-research/josh-stack-deep-dive/INDEX.md` |
 | Data shape catalog | `data-research/josh-stack-deep-dive/data-lane/session-D01-data-catalog.md` |
 | Agent SDK + tracing implementation | `docs/architecture/ANTHROPIC-AGENT-SDK.md`, `docs/architecture/tracing.md` |

@@ -12,6 +12,8 @@ Production library code imported by `api/`, `ehi-atlas/`, `scripts/`, and protot
 | `lib.clinical` | Drug classifier, episode detector, interaction checker, patient loader | `api/core/`, `api/routers/` |
 | `lib.harmonize` | Cross-source Observation merge + FHIR Provenance minting (LOINC + name-bridge identity resolution, unit normalization). v1 covers Observations only. | `ehi-atlas/app/pages/06_Harmonize_Labs.py`; `api/` (planned) |
 | `lib.extract` | PDF → FHIR extraction framework — `pipelines/` (Protocol + registry), `bake_off.py`, `eval.py`, `pdf.py` (Anthropic + Google AI Studio backends). Production path: `multipass-fhir`. | `api/core/harmonize_service.py`, `ehi-atlas/app/pages/03_PDF_Lab.py` etc. |
+| `lib.narratives` | Per-episode FHIR `Composition` generator. Given a harmonized chart + patient-voice bundle + curated `EpisodeOfCare` list, produces one Composition per episode citing the merged resources it draws from. | `api/core/narrative_service.py` |
+| `lib.patient_voice` | Patient-voice adapter: turns guided Patient Context intake (Markdown + JSON) into FHIR-shaped resources that `lib.harmonize` can ingest. | `api/core/patient_context.py` |
 
 ## Conventions
 

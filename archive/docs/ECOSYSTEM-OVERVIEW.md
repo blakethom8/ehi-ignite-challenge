@@ -1,6 +1,14 @@
 # EHI Ignite — Ecosystem Architecture Overview
 
-*Last updated: April 5, 2026*
+> **ARCHIVED — pre-Atlas snapshot.** This doc describes the original
+> Explorer / Patient Journey IA (April 2026) and the `fhir_explorer/` +
+> `patient-journey/` directory layout that has since been refactored into
+> `lib/` and the Atlas Agentic Workspaces IA. Kept as historical context for
+> the platform-framing rationale. For the current shape, see
+> [`CLAUDE.md`](../../CLAUDE.md) and
+> [`docs/architecture/ATLAS-DATA-MODEL.md`](../../docs/architecture/ATLAS-DATA-MODEL.md).
+
+*Last updated: April 5, 2026 · archived: May 13, 2026*
 
 ---
 

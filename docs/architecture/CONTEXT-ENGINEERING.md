@@ -368,36 +368,40 @@ This is the key insight: **we don't need to fit everything in the context window
 
 ## Existing Work to Build On
 
-### Signal vs. Noise (fhir_explorer)
+### Signal vs. Noise (general-purpose filter)
 
-The `fhir_explorer/views/signal_filter.py` already implements:
+The original `fhir_explorer/views/signal_filter.py` (now archived under
+`archive/fhir-explorer-streamlit/views/signal_filter.py`) implemented the
+first cut of:
 - 5-tier resource classification (Always Include → Exclude Default)
 - Recency windowing with configurable cutoff
 - Token budget estimation per tier
 - Plain-text context generation with deduplication
 - Absence declarations
 
-This is the general-purpose engine. The patient-journey context builder specializes it for clinical personas.
+That logic was the general-purpose engine. The current
+`api/core/context_builder.py` specializes it for clinical review postures.
 
-### Patient Journey Core Modules
+### Clinical Core Modules
 
-Already built in `patient-journey/core/`:
+Already built in `lib/clinical/`:
 - `drug_classifier.py` — 12 surgical-risk drug classes with severity tiers
 - `episode_detector.py` — MedicationEpisode and ConditionEpisode grouping
 - `drug_classes.json` — keyword + RxNorm classification rules
+- `interaction_checker.py` — pairwise drug-interaction lookup
 
 ### What Needs to Be Built
 
 | Module | Purpose | Status |
 |--------|---------|--------|
-| `core/temporal.py` | Temporal metadata computation for episodes | Not started |
-| `core/batch_enrichment.py` | LLM batch classification, scoring, and narrative generation | Not started |
-| `core/context_builder.py` | Main pipeline: filter → compress → enrich → format → select | Not started |
-| `core/rag_tools.py` | Tool functions for on-demand record retrieval | Not started |
+| `api/core/context_builder.py` | Main pipeline: filter → compress → format → posture select | **Shipped** (~900 LOC; Layers 0/1/3/4) |
+| `api/core/temporal.py` | Temporal metadata computation for episodes | Not started |
+| `api/core/batch_enrichment.py` | LLM batch classification, scoring, and narrative generation (Layer 2) | Not started |
+| `api/core/rag_tools.py` | Tool functions for on-demand record retrieval | Not started |
 | `data/enrichment_prompts/` | Structured prompts for batch LLM classification tasks | Not started |
 | `data/enrichment_cache/` | Cached LLM enrichment results per patient | Not started |
-| Persona configs | JSON/dict configs for different clinical roles | Not started |
-| Integration with NL search view | Wire context builder into the chat interface | Not started |
+| Review-posture configs | JSON/dict configs for specialized chart-review packages | Partial (general chart-review default in `context_builder.py`) |
+| Integration with chat | Wire context builder into Caspian / Provider Assistant | **Shipped** (`api/core/provider_assistant_context.py`, `caspian_context_files.py`) |
 
 ---
 

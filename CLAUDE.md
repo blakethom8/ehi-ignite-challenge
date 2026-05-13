@@ -63,9 +63,9 @@ ehi-ignite-challenge/
 │   │   ├── sof_tools.py                   ← run_sql MCP tool: SELECT-only gate + read-only runner
 │   │   ├── sof_materialize.py             ← FastAPI startup hook — rebuilds data/sof.db on mtime gate
 │   │   ├── loader.py
+│   │   ├── context_builder.py             ← 5-layer pipeline: filter → compress → format → posture select (Layers 0/1/3/4; Layer 2 LLM enrichment deferred)
 │   │   ├── temporal.py                    ← TODO
 │   │   ├── batch_enrichment.py            ← TODO (LLM pipeline)
-│   │   ├── context_builder.py             ← TODO (5-layer pipeline)
 │   │   └── rag_tools.py                   ← TODO
 │   └── tests/                             ← FastAPI tests
 │
@@ -104,6 +104,7 @@ ehi-ignite-challenge/
 │   │   ├── episode_detector.py
 │   │   ├── interaction_checker.py
 │   │   └── loader.py
+│   ├── harmonize/                         ← Cross-source Observation merge + FHIR Provenance minting (v1 = Observations)
 │   ├── extract/                           ← PDF → FHIR extraction framework ⭐
 │   │   ├── pipelines/                     ← Protocol + registry (multipass-fhir is production default)
 │   │   ├── pdf.py                         ← VisionBackend Protocol (Anthropic + Google AI Studio)
@@ -111,6 +112,8 @@ ehi-ignite-challenge/
 │   │   ├── eval.py                        ← ground-truth scoring (findable-only filter + GT dedup)
 │   │   ├── cache.py                       ← deterministic SHA-keyed extraction cache
 │   │   └── ...
+│   ├── narratives/                        ← Per-episode FHIR Composition generator (cites merged resources)
+│   ├── patient_voice/                     ← Patient-intake Markdown/JSON → FHIR adapter (feeds harmonize)
 │   └── tests/                             ← library tests
 │
 ├── data/                                  ← Production runtime data only
@@ -136,7 +139,6 @@ ehi-ignite-challenge/
 │   ├── PIPELINE-LOG.md                    ← running journal of pipeline experiments + measurements ⭐
 │   ├── CONTEXT-ENGINEERING.md             ← LLM context pipeline design ⭐
 │   ├── DATA-DEFINITIONS.md                ← data model reference ⭐
-│   ├── ECOSYSTEM-OVERVIEW.md              ← platform framing, full directory layout, build sequence
 │   ├── DEPLOYMENT.md                      ← Hetzner + Docker Compose deployment guide
 │   ├── tracing.md                         ← LLM observability — traces, spans, costs, Langfuse
 │   ├── FHIR-EXPLORER-DATA-REVIEW.md       ← original FHIR explorer purpose statement
@@ -287,7 +289,6 @@ The frontend is organized around five top-level modules — see the module bar i
 | `docs/architecture/PIPELINE-LOG.md` | Running journal of pipeline experiments — bake-off result tables, prompt-tuning A/Bs, model-swap experiments. Append-only, newest at top. |
 | `docs/architecture/CONTEXT-ENGINEERING.md` | 5-layer LLM context pipeline design — read before building batch_enrichment or NL search |
 | `docs/architecture/DATA-DEFINITIONS.md` | Full data model reference — encounter types, medication records, observation fields |
-| `docs/architecture/ECOSYSTEM-OVERVIEW.md` | Platform framing and directory layout |
 | `archive/ideas-pre-atlas/` | Pre-Atlas product spec docs (PatientJourneyApp, FormatAgnosticIngestion, DataAggregatorWireframes) — historical record only |
 | `docs/architecture/DEPLOYMENT.md` | Hetzner + Docker Compose deployment guide |
 | `docs/architecture/tracing.md` | LLM observability — traces, spans, token/cost tracking, Langfuse |
@@ -345,4 +346,4 @@ The frontend is organized around five top-level modules — see the module bar i
 
 ---
 
-*Last updated: May 3, 2026 — major refactor: lib/ extracted, fhir_explorer/ + patient-journey/ archived, data-research/ absorbed into ehi-atlas/*
+*Last updated: May 13, 2026 — doc sweep: un-TODO'd `context_builder.py`, added `lib.harmonize` / `lib.narratives` / `lib.patient_voice` to the lib tree, removed stale `ECOSYSTEM-OVERVIEW.md` reference (moved to `archive/docs/`). Previous update May 3, 2026 — major refactor: lib/ extracted, fhir_explorer/ + patient-journey/ archived, data-research/ absorbed into ehi-atlas/.*

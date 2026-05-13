@@ -228,21 +228,30 @@ class TestMaterializeFromEnv(unittest.TestCase):
                 os.environ.pop(k, None)
             else:
                 os.environ[k] = v
+        from api.settings import get_settings
+
+        get_settings.cache_clear()
 
     def test_auto_materialize_disabled_returns_none(self) -> None:
+        from api.settings import get_settings
+
         os.environ["SOF_AUTO_MATERIALIZE"] = "0"
         os.environ["SOF_DB_PATH"] = str(self.db_path)
         os.environ["SOF_FHIR_DIR"] = str(self.fhir_dir)
+        get_settings.cache_clear()
         self.assertIsNone(materialize_from_env())
         self.assertFalse(self.db_path.exists())
 
     def test_env_driven_build(self) -> None:
+        from api.settings import get_settings
+
         if self.db_path.exists():
             self.db_path.unlink()
         os.environ["SOF_AUTO_MATERIALIZE"] = "1"
         os.environ["SOF_DB_PATH"] = str(self.db_path)
         os.environ["SOF_FHIR_DIR"] = str(self.fhir_dir)
         os.environ["SOF_PATIENT_LIMIT"] = "5"
+        get_settings.cache_clear()
         report = materialize_from_env()
         self.assertIsInstance(report, MaterializeReport)
         assert report is not None  # for type-checker
@@ -251,6 +260,8 @@ class TestMaterializeFromEnv(unittest.TestCase):
         self.assertEqual(report.patient_limit, 5)
 
     def test_env_swallows_errors(self) -> None:
+        from api.settings import get_settings
+
         # Force a stale check by pointing at a brand-new DB path.
         broken_db = self.tmpdir / "broken.db"
         if broken_db.exists():
@@ -258,6 +269,7 @@ class TestMaterializeFromEnv(unittest.TestCase):
         os.environ["SOF_AUTO_MATERIALIZE"] = "1"
         os.environ["SOF_DB_PATH"] = str(broken_db)
         os.environ["SOF_FHIR_DIR"] = str(self.tmpdir / "does-not-exist")
+        get_settings.cache_clear()
         self.assertIsNone(materialize_from_env())
         self.assertFalse(broken_db.exists())
 

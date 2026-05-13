@@ -144,7 +144,9 @@ def test_payload_redaction_strips_patient_name_from_freetext(monkeypatch, db):
     # Reload events to pick up the env var.
     import importlib
     import api.workspace.events as events_mod
+    from api.settings import get_settings
 
+    get_settings.cache_clear()
     importlib.reload(events_mod)
 
     events_mod.record_event(
@@ -175,7 +177,9 @@ def test_payload_redaction_strips_direct_identifier_keys(monkeypatch, db):
     monkeypatch.setenv("EVENTS_REDACTION_PRESET", "events-strict")
     import importlib
     import api.workspace.events as events_mod
+    from api.settings import get_settings
 
+    get_settings.cache_clear()
     importlib.reload(events_mod)
 
     events_mod.record_event(
@@ -204,7 +208,9 @@ def test_minimal_preset_disables_redaction_for_dev(monkeypatch, db):
     monkeypatch.setenv("EVENTS_REDACTION_PRESET", "minimal")
     import importlib
     import api.workspace.events as events_mod
+    from api.settings import get_settings
 
+    get_settings.cache_clear()
     importlib.reload(events_mod)
 
     events_mod.record_event(

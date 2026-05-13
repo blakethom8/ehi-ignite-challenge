@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import time
 from pathlib import Path
 
@@ -38,6 +37,7 @@ from api.core.provider_assistant import (
 from api.core.tracing import SpanKind, start_span
 from api.core import caspian_tools, caspian_workspace
 from api.core.auth import SessionPrincipal
+from api.settings import get_settings
 
 LOGGER = logging.getLogger(__name__)
 
@@ -46,7 +46,7 @@ _REPO_ENV_PATH = Path(__file__).resolve().parent.parent.parent / ".env"
 
 def _resolve_api_key() -> str:
     """Resolve Anthropic API key from env or .env file."""
-    env_key = (os.getenv("ANTHROPIC_API_KEY") or "").strip()
+    env_key = (get_settings().anthropic_api_key or "").strip()
     if env_key and "YOUR_KEY_HERE" not in env_key:
         return env_key
     if _REPO_ENV_PATH.exists():
@@ -200,7 +200,7 @@ def answer_with_context(
     messages.append({"role": "user", "content": question})
 
     # Step 3: bounded tool loop
-    model = model_override or os.getenv("PROVIDER_ASSISTANT_MODEL", "claude-sonnet-4-5")
+    model = model_override or get_settings().provider_assistant_model
     max_tokens = max_tokens_override or 1500
     tools_enabled = session is not None  # tools require a workspace key
 

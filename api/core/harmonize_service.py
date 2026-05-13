@@ -34,7 +34,6 @@ from __future__ import annotations
 import base64
 import binascii
 import json
-import os
 import re
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -50,6 +49,7 @@ from api.core.ccda import (
     is_ccda_xml,
     is_converter_required,
 )
+from api.settings import get_settings
 from lib.harmonize import (
     SourceBundle,
     merge_allergies,
@@ -69,13 +69,10 @@ from lib.harmonize.models import (
 from lib.patient_voice import patient_voice_source_bundles
 
 
+_settings = get_settings()
 REPO_ROOT = Path(__file__).resolve().parents[2]
-UPLOADS_ROOT = Path(
-    os.getenv("AGGREGATION_UPLOAD_STORE_PATH", REPO_ROOT / "data" / "aggregation-uploads")
-)
-PROFILE_ROOT = Path(
-    os.getenv("AGGREGATION_PROFILE_STORE_PATH", REPO_ROOT / "data" / "aggregation-profiles")
-)
+UPLOADS_ROOT = _settings.aggregation_upload_store_path
+PROFILE_ROOT = _settings.aggregation_profile_store_path
 PROFILE_REGISTRY_PATH = PROFILE_ROOT / "profiles.json"
 
 # ---------------------------------------------------------------------------

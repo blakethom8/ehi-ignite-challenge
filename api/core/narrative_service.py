@@ -15,11 +15,11 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 from pathlib import Path
 from typing import Any
 
 from api.core.loader import load_patient, path_from_patient_id
+from api.settings import get_settings
 from lib.narratives import (
     SonnetNarrativeGenerator,
     generate_episode_narrative,
@@ -29,9 +29,7 @@ from lib.narratives.storage import NARRATIVE_STORE_ROOT
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-PATIENT_CONTEXT_STORE_ROOT = Path(
-    os.getenv("PATIENT_CONTEXT_STORE_PATH", REPO_ROOT / "data" / "patient-context")
-)
+PATIENT_CONTEXT_STORE_ROOT = get_settings().patient_context_store_path
 
 
 _logger = logging.getLogger(__name__)

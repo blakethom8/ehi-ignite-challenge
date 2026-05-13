@@ -9,19 +9,17 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from api.core import harmonize_service
+from api.settings import get_settings
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-RUNS_ROOT = Path(
-    os.getenv("HARMONIZATION_RUN_STORE_PATH", REPO_ROOT / "data" / "harmonization-runs")
-)
+RUNS_ROOT = get_settings().harmonization_run_store_path
 RUN_VERSION = "scripted-harmonize-v1"
 
 

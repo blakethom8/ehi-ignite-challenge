@@ -6,7 +6,6 @@ import base64
 import hashlib
 import hmac
 import json
-import os
 import secrets
 import sqlite3
 import uuid
@@ -29,17 +28,17 @@ from api.auth_models import (
 )
 from api.core.aggregation import list_upload_workspaces
 from api.core.loader import path_from_patient_id
+from api.settings import get_settings
 from api.trust.models import UserIdentity
 
+_settings = get_settings()
 REPO_ROOT = Path(__file__).resolve().parents[2]
-AUTH_DB_PATH = Path(os.getenv("EHI_AUTH_DB_PATH", REPO_ROOT / "data" / "auth.db"))
-SESSION_SECRET_PATH = Path(
-    os.getenv("EHI_SESSION_SECRET_PATH", REPO_ROOT / "data" / "atlas-session.key")
-)
+AUTH_DB_PATH = _settings.ehi_auth_db_path
+SESSION_SECRET_PATH = _settings.ehi_session_secret_path
 SESSION_COOKIE_NAME = "atlas_session"
-SESSION_IDLE_HOURS = max(1, int(os.getenv("EHI_AUTH_SESSION_IDLE_HOURS", "12")))
-SESSION_MAX_DAYS = max(1, int(os.getenv("EHI_AUTH_SESSION_MAX_DAYS", "7")))
-SESSION_SECURE = os.getenv("ENVIRONMENT", "development").strip().lower() in {"prod", "production"}
+SESSION_IDLE_HOURS = _settings.ehi_auth_session_idle_hours
+SESSION_MAX_DAYS = _settings.ehi_auth_session_max_days
+SESSION_SECURE = _settings.is_production
 
 
 @dataclass(frozen=True)
@@ -221,11 +220,11 @@ def _ensure_parent(path: Path) -> None:
 
 
 def _is_production() -> bool:
-    return os.getenv("ENVIRONMENT", "development").strip().lower() in {"prod", "production"}
+    return get_settings().is_production
 
 
 def _session_secret() -> bytes:
-    override = (os.getenv("EHI_SESSION_SECRET") or "").strip()
+    override = (get_settings().ehi_session_secret or "").strip()
     if override:
         return override.encode("utf-8")
     if _is_production():
@@ -358,14 +357,14 @@ _VALID_ROLES: frozenset[str] = frozenset(
 
 
 def _seed_bootstrap_user() -> None:
-    env = os.getenv("ENVIRONMENT", "development").strip().lower()
-    email = (os.getenv("EHI_AUTH_BOOTSTRAP_EMAIL") or "clinician@atlas.local").strip().lower()
-    password = (os.getenv("EHI_AUTH_BOOTSTRAP_PASSWORD") or "").strip()
-    display_name = (os.getenv("EHI_AUTH_BOOTSTRAP_NAME") or "Atlas Clinician").strip() or "Atlas Clinician"
-    role_raw = (os.getenv("EHI_AUTH_BOOTSTRAP_ROLE") or "clinician").strip().lower()
+    settings = get_settings()
+    email = (settings.ehi_auth_bootstrap_email or "clinician@atlas.local").strip().lower()
+    password = (settings.ehi_auth_bootstrap_password or "").strip()
+    display_name = (settings.ehi_auth_bootstrap_name or "Atlas Clinician").strip() or "Atlas Clinician"
+    role_raw = (settings.ehi_auth_bootstrap_role or "clinician").strip().lower()
     role = role_raw if role_raw in _VALID_ROLES else "clinician"
     if not password:
-        if env in {"prod", "production"}:
+        if settings.is_production:
             return
         password = "atlas-demo-password"
 

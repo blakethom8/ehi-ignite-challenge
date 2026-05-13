@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 from dataclasses import dataclass
 from typing import Any
 
 import httpx
+
+from api.settings import get_settings
 
 LOGGER = logging.getLogger(__name__)
 
@@ -41,9 +42,10 @@ class CursorSidecarClient:
         base_url: str | None = None,
         timeout_s: float | None = None,
     ) -> None:
-        raw = (base_url or os.getenv("CURSOR_SIDECAR_URL") or "http://127.0.0.1:3040").rstrip("/")
+        settings = get_settings()
+        raw = (base_url or settings.cursor_sidecar_url or "http://127.0.0.1:3040").rstrip("/")
         self._base = raw
-        self._timeout = timeout_s if timeout_s is not None else float(os.getenv("CURSOR_SIDECAR_TIMEOUT_S", "120"))
+        self._timeout = timeout_s if timeout_s is not None else settings.cursor_sidecar_timeout_s
 
     def health(self) -> bool:
         try:

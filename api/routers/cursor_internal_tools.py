@@ -7,7 +7,6 @@ These wrap the same Python surfaces as the Anthropic Agent SDK MCP tools.
 
 from __future__ import annotations
 
-import os
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException
@@ -16,6 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from api.core.provider_assistant import get_relevant_provider_evidence
 from api.core.sof_tools import run_sql as sof_run_sql
 from api.core.sof_tools import tool_result_payload as sof_tool_result_payload
+from api.settings import get_settings
 
 router = APIRouter(prefix="/internal/cursor-tools", tags=["cursor-internal-tools"])
 
@@ -23,7 +23,7 @@ router = APIRouter(prefix="/internal/cursor-tools", tags=["cursor-internal-tools
 def require_cursor_tool_secret(
     x_ehi_cursor_tool_secret: Annotated[str | None, Header(alias="X-EHI-Cursor-Tool-Secret")] = None,
 ) -> None:
-    expected = (os.getenv("CURSOR_INTERNAL_TOOL_SECRET") or "").strip()
+    expected = (get_settings().cursor_internal_tool_secret or "").strip()
     if not expected:
         raise HTTPException(status_code=503, detail="CURSOR_INTERNAL_TOOL_SECRET is not configured")
     if not x_ehi_cursor_tool_secret or x_ehi_cursor_tool_secret.strip() != expected:

@@ -62,6 +62,7 @@ from api.core.sof_tools import (
     tool_result_payload as _sof_tool_result_payload,
 )
 from api.core.tracing import SpanKind, start_span
+from api.settings import get_settings
 
 
 _AGENT_PROFILE_DIR = Path(__file__).parent.parent / "agents" / "provider-assistant"
@@ -85,13 +86,6 @@ class AgentSDKConfig:
     enable_web_fetch: bool
 
 
-def _env_bool(name: str, default: bool) -> bool:
-    raw = os.getenv(name)
-    if raw is None:
-        return default
-    return raw.strip().lower() in {"1", "true", "yes", "on"}
-
-
 def _resolve_anthropic_api_key() -> str:
     """
     Resolve Anthropic key with safe fallback to repo .env.
@@ -99,7 +93,7 @@ def _resolve_anthropic_api_key() -> str:
     This prevents stale shell placeholders (e.g. sk-ant-YOUR_KEY_HERE) from
     masking a valid key in .env when dotenv loading uses override=False.
     """
-    env_key = (os.getenv("ANTHROPIC_API_KEY") or "").strip()
+    env_key = (get_settings().anthropic_api_key or "").strip()
     if env_key and "YOUR_KEY_HERE" not in env_key:
         return env_key
 
@@ -112,20 +106,13 @@ def _resolve_anthropic_api_key() -> str:
 
 
 def _load_config() -> AgentSDKConfig:
-    max_budget_raw = os.getenv("PROVIDER_ASSISTANT_MAX_BUDGET_USD")
-    max_budget = None
-    if max_budget_raw:
-        try:
-            max_budget = float(max_budget_raw)
-        except ValueError:
-            max_budget = None
-
+    settings = get_settings()
     return AgentSDKConfig(
-        model=os.getenv("PROVIDER_ASSISTANT_MODEL", "claude-sonnet-4-5"),
-        max_turns=max(2, int(os.getenv("PROVIDER_ASSISTANT_MAX_TURNS", "6"))),
-        max_budget_usd=max_budget,
-        enable_web_search=_env_bool("PROVIDER_ASSISTANT_ENABLE_WEB_SEARCH", False),
-        enable_web_fetch=_env_bool("PROVIDER_ASSISTANT_ENABLE_WEB_FETCH", False),
+        model=settings.provider_assistant_model,
+        max_turns=settings.provider_assistant_max_turns,
+        max_budget_usd=settings.provider_assistant_max_budget_usd,
+        enable_web_search=settings.provider_assistant_enable_web_search,
+        enable_web_fetch=settings.provider_assistant_enable_web_fetch,
     )
 
 

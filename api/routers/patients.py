@@ -5,7 +5,6 @@
 from __future__ import annotations
 
 import json
-import os
 import re
 from collections import defaultdict
 from datetime import date, datetime
@@ -20,6 +19,7 @@ from api.core.auth import (
     demo_patient_label,
     require_access_session,
 )
+from api.settings import get_settings
 from api.core.loader import (
     list_patient_files,
     patient_display_name,
@@ -100,7 +100,7 @@ router = APIRouter(prefix="/patients", tags=["patients"])
 
 BILLING_TYPES = {"Claim", "ExplanationOfBenefit"}
 ADMIN_TYPES = {"Organization", "Practitioner", "PractitionerRole", "Location"}
-DEMO_PATIENT_LIMIT = max(1, int(os.getenv("EHI_DEMO_PATIENT_LIMIT", "20")))
+DEMO_PATIENT_LIMIT = get_settings().ehi_demo_patient_limit
 DEMO_PATIENT_IDS = (
     # Current working demo patient and early aggregation fixture.
     "763b6101-133a-44bb-ac60-3c097d6c0ba1",

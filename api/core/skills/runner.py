@@ -201,11 +201,11 @@ class SkillRunner:
         working, but there is no deterministic fallback. If the real agent
         runtime is not configured, the run fails with a clear setup error.
         """
-        import os
+        from api.settings import get_settings
 
         raw = (
             self.brief.get("_run_mode")
-            or os.getenv("SKILLS_RUN_MODE", "")
+            or get_settings().skills_run_mode
             or "agent"
         )
         mode = str(raw).strip().lower() or "agent"

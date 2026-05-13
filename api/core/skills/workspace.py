@@ -13,7 +13,6 @@ the patient memory layer, and saving as a reusable patient context package.
 from __future__ import annotations
 
 import json
-import os
 import re
 import uuid
 from dataclasses import dataclass, field
@@ -24,10 +23,11 @@ from typing import Any, Iterator, Literal
 from api.core.skills.event_hub import EventHub
 from api.core.skills.loader import Skill
 from api.core.skills.patient_memory import PatientMemory
+from api.settings import get_settings
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-CASES_ROOT = Path(os.getenv("SKILLS_CASES_PATH", REPO_ROOT / "data" / "cases"))
+CASES_ROOT = get_settings().skills_cases_path
 
 _CITATION_ID_PATTERN = re.compile(r"^c_\d{4}$")
 _APPROVAL_ID_PATTERN = re.compile(r"^a_\d{4}$")

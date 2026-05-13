@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import sqlite3
 import threading
 import time
@@ -24,23 +23,23 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Generator
 
+from api.settings import get_settings
+
 LOGGER = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
 
-TRACING_ENABLED = os.getenv("TRACING_ENABLED", "false").lower() in ("true", "1", "yes")
-DB_PATH = Path(os.getenv("TRACES_DB_PATH", "data/traces.db"))
+_settings = get_settings()
+
+TRACING_ENABLED = _settings.tracing_enabled
+DB_PATH = _settings.traces_db_path
 
 # Sampling — fraction of requests that get traced when TRACING_ENABLED=true.
 # 1.0 = always (default), 0.2 = 20%. Keep at 1.0 in early production until
 # trace volume justifies stepping down.
-try:
-    TRACING_SAMPLE_RATE = float(os.getenv("TRACING_SAMPLE_RATE", "1.0"))
-except ValueError:
-    TRACING_SAMPLE_RATE = 1.0
-TRACING_SAMPLE_RATE = max(0.0, min(1.0, TRACING_SAMPLE_RATE))
+TRACING_SAMPLE_RATE = _settings.tracing_sample_rate
 
 # Workspace kinds — every traced surface tags its origin so per-user audit
 # queries can group by surface (caspian chat vs skill run vs plugin tool).
@@ -49,9 +48,9 @@ WORKSPACE_SKILL = "skill"
 WORKSPACE_PLUGIN = "plugin"
 
 # Langfuse (optional)
-LANGFUSE_PUBLIC_KEY = os.getenv("LANGFUSE_PUBLIC_KEY", "")
-LANGFUSE_SECRET_KEY = os.getenv("LANGFUSE_SECRET_KEY", "")
-LANGFUSE_HOST = os.getenv("LANGFUSE_HOST", "https://cloud.langfuse.com")
+LANGFUSE_PUBLIC_KEY = _settings.langfuse_public_key
+LANGFUSE_SECRET_KEY = _settings.langfuse_secret_key
+LANGFUSE_HOST = _settings.langfuse_host
 LANGFUSE_ENABLED = bool(LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY)
 
 # ---------------------------------------------------------------------------
@@ -484,7 +483,7 @@ def _export_to_langfuse(trace: Trace) -> None:
                     name=span.name,
                     input=span.input_data,
                     output=span.output_data,
-                    model=os.getenv("PROVIDER_ASSISTANT_MODEL", "claude-sonnet-4-5"),
+                    model=get_settings().provider_assistant_model,
                     usage={
                         "input": span.input_tokens,
                         "output": span.output_tokens,

@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import re
 import json
-import os
 import subprocess
 import tempfile
 import urllib.error
@@ -20,6 +19,8 @@ import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+from api.settings import get_settings
 
 
 HL7_V3_NS = "urn:hl7-org:v3"
@@ -67,21 +68,23 @@ def convert_ccda_to_fhir_bundle(path_str: str, source_id: str, *, mode: str = "a
 
 
 def _try_microsoft_converter(path: Path, root_template: str) -> dict[str, Any] | None:
-    if os.getenv("FHIR_CONVERTER_URL"):
+    settings = get_settings()
+    if settings.fhir_converter_url:
         return _convert_with_microsoft_api(path, root_template)
-    if os.getenv("FHIR_CONVERTER_BIN") and os.getenv("FHIR_CONVERTER_TEMPLATE_DIR"):
+    if settings.fhir_converter_bin and settings.fhir_converter_template_dir:
         return _convert_with_microsoft_cli(path, root_template)
     return None
 
 
 def is_converter_required() -> bool:
-    return (os.getenv("FHIR_CONVERTER_REQUIRED") or "").lower() in {"1", "true", "yes"}
+    return get_settings().fhir_converter_required
 
 
 def _convert_with_microsoft_api(path: Path, root_template: str) -> dict[str, Any] | None:
-    base_url = (os.getenv("FHIR_CONVERTER_URL") or "").rstrip("/")
-    api_version = os.getenv("FHIR_CONVERTER_API_VERSION", "2024-05-01-preview")
-    timeout = float(os.getenv("FHIR_CONVERTER_TIMEOUT_SECONDS", "30"))
+    settings = get_settings()
+    base_url = (settings.fhir_converter_url or "").rstrip("/")
+    api_version = settings.fhir_converter_api_version
+    timeout = settings.fhir_converter_timeout_seconds
     url = f"{base_url}/convertToFhir?api-version={api_version}"
     payload = {
         "InputDataFormat": "Ccda",
@@ -94,7 +97,7 @@ def _convert_with_microsoft_api(path: Path, root_template: str) -> dict[str, Any
         headers={"Content-Type": "application/json"},
         method="POST",
     )
-    token = os.getenv("FHIR_CONVERTER_BEARER_TOKEN")
+    token = settings.fhir_converter_bearer_token
     if token:
         request.add_header("Authorization", f"Bearer {token}")
     try:
@@ -109,11 +112,12 @@ def _convert_with_microsoft_api(path: Path, root_template: str) -> dict[str, Any
 
 
 def _convert_with_microsoft_cli(path: Path, root_template: str) -> dict[str, Any] | None:
-    converter_bin = os.getenv("FHIR_CONVERTER_BIN")
-    template_dir = os.getenv("FHIR_CONVERTER_TEMPLATE_DIR")
+    settings = get_settings()
+    converter_bin = settings.fhir_converter_bin
+    template_dir = settings.fhir_converter_template_dir
     if not converter_bin or not template_dir:
         return None
-    timeout = float(os.getenv("FHIR_CONVERTER_TIMEOUT_SECONDS", "30"))
+    timeout = settings.fhir_converter_timeout_seconds
     with tempfile.TemporaryDirectory(prefix="ccda-convert-") as tmp:
         out = Path(tmp) / "bundle.json"
         cmd = [
@@ -213,7 +217,7 @@ def _is_fhir_bundle(value: Any) -> bool:
 
 
 def _root_template_for_ccda(path: Path) -> str:
-    override = os.getenv("FHIR_CONVERTER_ROOT_TEMPLATE")
+    override = get_settings().fhir_converter_root_template
     if override:
         return override
     try:

@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Landing } from "./Landing";
+import type { Capabilities } from "../types";
 
 const {
   useAccessContextMock,
@@ -21,11 +22,29 @@ function renderLanding() {
   );
 }
 
+function capabilitiesForMode(mode: Capabilities["mode"]): Capabilities {
+  return {
+    mode,
+    can_use_caspian: mode !== "anonymous" && mode !== "guest",
+    can_edit_caspian_user_files: false,
+    can_write_caspian_notes: false,
+    can_run_workflows: false,
+    can_use_aggregation_uploads: mode === "authenticated",
+    can_use_aggregation_profiles: mode === "authenticated",
+    can_use_harmonize: mode === "authenticated",
+    can_use_guest_harmonization: mode === "guest",
+    can_use_assistant_tools_write: false,
+    show_caspian_seed_files: false,
+    persistence_scope: mode === "authenticated" ? "browser-persistent" : mode === "demo" ? "browser-ephemeral" : "none",
+  };
+}
+
 describe("Landing", () => {
   beforeEach(() => {
     useAccessContextMock.mockReset();
     useAccessContextMock.mockReturnValue({
       mode: "anonymous",
+      capabilities: capabilitiesForMode("anonymous"),
       activePatientId: null,
       activePatientName: null,
       isDemo: false,
@@ -78,6 +97,7 @@ describe("Landing", () => {
   it("shows signed-in workspace actions for authenticated users", () => {
     useAccessContextMock.mockReturnValue({
       mode: "authenticated",
+      capabilities: capabilitiesForMode("authenticated"),
       activePatientId: null,
       activePatientName: null,
       isDemo: false,

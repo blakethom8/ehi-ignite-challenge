@@ -1,10 +1,11 @@
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { ArrowRight, Boxes, Database, FileSearch, Upload, ShieldCheck } from "lucide-react";
 import { HeroPipelineDiagram } from "../components/marketing/HeroPipelineDiagram";
 import { MarketingHeader } from "../components/marketing/MarketingHeader";
 import { useAccessContext } from "../context/AccessContext";
-import { buildDemoSelectionPath, withPatientContext } from "../routing";
-import { resolveAccountPath, resolveSessionHomePath } from "../sessionRouting";
+import { useCanManageOwnAccount, useCanUsePatientWorkspace, useCapabilities } from "../hooks/useCapabilities";
+import { buildAccountAccessPath, buildDemoSelectionPath, withPatientContext } from "../routing";
+import { resolveSessionHomePath } from "../sessionRouting";
 
 const surfaceCards = [
   {
@@ -58,14 +59,20 @@ const surfaceCards = [
 ];
 
 export function Landing() {
-  const { activePatientId, isUnlocked, mode, user } = useAccessContext();
+  const location = useLocation();
+  const { activePatientId, mode, user } = useAccessContext();
+  const capabilities = useCapabilities();
+  const canManageAccount = useCanManageOwnAccount();
+  const canUsePatientWorkspace = useCanUsePatientWorkspace();
   const surfaceCardsForState = surfaceCards.map((card) => ({
     ...card,
-    to: withPatientContext(card.to, activePatientId),
+    to: withPatientContext(card.to, activePatientId, { mode: capabilities.mode }),
   }));
-  const accountHref = resolveAccountPath(mode, Boolean(user));
+  const accountHref = canManageAccount && user
+    ? "/account/settings"
+    : buildAccountAccessPath(`${location.pathname}${location.search}`);
   const sessionHomeHref = resolveSessionHomePath(mode, activePatientId);
-  const isAuthenticated = mode === "authenticated" && Boolean(user);
+  const isAuthenticated = capabilities.mode === "authenticated" && Boolean(user);
   const primaryWorkspaceLabel = activePatientId ? "Resume workspace" : "Upload files";
 
   return (
@@ -185,15 +192,15 @@ export function Landing() {
                           {card.detail}
                         </p>
                         <span className="inline-flex items-center gap-2 text-sm font-semibold text-[#3558ff] transition-all group-hover:gap-3">
-                          {isUnlocked ? "Open surface" : "Available after opening a workspace"}
-                          {isUnlocked ? <ArrowRight size={15} /> : null}
+                          {canUsePatientWorkspace ? "Open surface" : "Available after opening a workspace"}
+                          {canUsePatientWorkspace ? <ArrowRight size={15} /> : null}
                         </span>
                       </div>
                     </div>
                   </>
                 );
 
-                if (isUnlocked) {
+                if (canUsePatientWorkspace) {
                   return (
                     <Link
                       key={card.title}

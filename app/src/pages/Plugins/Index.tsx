@@ -5,6 +5,8 @@ import { DemoPatientPicker } from "../../components/atlas/DemoPatientPicker";
 import { useInstalledManifests } from "../../components/atlas/manifests";
 import { StartStateCard } from "../../components/atlas/StartStateCard";
 import { useAccessContext } from "../../context/AccessContext";
+import { useCanUsePatientWorkspace } from "../../hooks/useCapabilities";
+import { withPatientContext } from "../../routing";
 
 const PLUGIN_ICONS: Record<string, typeof Telescope> = {
   Telescope,
@@ -16,10 +18,11 @@ const PLUGIN_ICONS: Record<string, typeof Telescope> = {
 };
 
 export function PluginsIndex() {
-  const { activePatientId, isUnlocked } = useAccessContext();
+  const { activePatientId } = useAccessContext();
+  const canUsePatientWorkspace = useCanUsePatientWorkspace();
   const { data: manifests, error, isError, isLoading, refetch } = useInstalledManifests();
 
-  if (!isUnlocked) {
+  if (!canUsePatientWorkspace) {
     return (
       <StartStateCard
         icon={Boxes}
@@ -33,7 +36,7 @@ export function PluginsIndex() {
         ]}
         aside={
           <DemoPatientPicker
-            destination={(patientId) => `/workspaces?patient=${encodeURIComponent(patientId)}`}
+            destination={(patientId) => withPatientContext("/workspaces", patientId)}
             title="Open plugins with a sample chart"
           />
         }
@@ -103,7 +106,7 @@ export function PluginsIndex() {
           return (
             <Link
               key={m.id}
-              to={activePatientId ? `/workspaces/${m.id}?patient=${encodeURIComponent(activePatientId)}` : `/workspaces/${m.id}`}
+              to={withPatientContext(`/workspaces/${m.id}`, activePatientId)}
               className="group flex flex-col gap-2 rounded-md border p-4 transition-colors hover:border-[var(--action-line)]"
               style={{ background: "var(--surface-1)", borderColor: "var(--line-1)" }}
             >

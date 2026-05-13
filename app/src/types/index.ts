@@ -115,6 +115,18 @@ export interface AdminActionResponse {
   ok: boolean;
 }
 
+export interface AccountSessionSummary {
+  id: string;
+  mode: "authenticated";
+  is_current: boolean;
+  active_patient_id: string | null;
+  active_patient_name: string | null;
+  created_at: string;
+  last_seen_at: string;
+  expires_at: string;
+  user_agent: string | null;
+}
+
 export interface PatientListItem {
   id: string;
   name: string;

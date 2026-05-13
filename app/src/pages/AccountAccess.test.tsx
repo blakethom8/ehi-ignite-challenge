@@ -10,8 +10,8 @@ const {
   useAccessContextMock,
 } = vi.hoisted(() => ({
   navigateMock: vi.fn(),
-  signInMock: vi.fn<(email: string, password: string) => Promise<void>>(),
-  signUpMock: vi.fn<(email: string, password: string, displayName: string) => Promise<void>>(),
+  signInMock: vi.fn(),
+  signUpMock: vi.fn(),
   useAccessContextMock: vi.fn(),
 }));
 
@@ -27,9 +27,24 @@ vi.mock("react-router-dom", async () => {
   };
 });
 
-function renderAccountAccess() {
+const authSession = {
+  mode: "authenticated" as const,
+  user: {
+    id: "user-1",
+    email: "test@example.com",
+    display_name: "Dr. Test",
+    role: "consumer" as const,
+  },
+  active_patient_id: null,
+  active_patient_name: null,
+  active_demo_patient: null,
+  expires_at: null,
+  available_demo_patients: [],
+};
+
+function renderAccountAccess(initialEntry = "/account") {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[initialEntry]}>
       <AccountAccessPage />
     </MemoryRouter>,
   );
@@ -53,7 +68,7 @@ describe("AccountAccessPage", () => {
   });
 
   it("logs in existing accounts without exposing seeded credentials", async () => {
-    signInMock.mockResolvedValue();
+    signInMock.mockResolvedValue(authSession);
     renderAccountAccess();
 
     fireEvent.change(screen.getByLabelText("Email"), {
@@ -68,12 +83,12 @@ describe("AccountAccessPage", () => {
     await waitFor(() => {
       expect(signInMock).toHaveBeenCalledWith("person@example.com", "private-password");
     });
-    expect(navigateMock).toHaveBeenCalledWith("/patient-record/sources");
+    expect(navigateMock).toHaveBeenCalledWith("/patient-record/sources", { replace: true });
     expect(screen.queryByText(/clinician@atlas\.local|atlas-demo-password/i)).not.toBeInTheDocument();
   });
 
   it("creates a new account from the signup tab", async () => {
-    signUpMock.mockResolvedValue();
+    signUpMock.mockResolvedValue(authSession);
     renderAccountAccess();
 
     fireEvent.click(screen.getByRole("button", { name: /create account/i }));
@@ -98,11 +113,14 @@ describe("AccountAccessPage", () => {
         "Dr. Test",
       );
     });
-    expect(navigateMock).toHaveBeenCalledWith("/patient-record/sources");
+    expect(navigateMock).toHaveBeenCalledWith("/patient-record/sources", { replace: true });
   });
 
   it("keeps an active patient context when a signed-in account logs in again", async () => {
-    signInMock.mockResolvedValue();
+    signInMock.mockResolvedValue({
+      ...authSession,
+      active_patient_id: "patient-123",
+    });
     useAccessContextMock.mockReturnValue({
       activePatientId: "patient-123",
       isLoading: false,
@@ -126,11 +144,11 @@ describe("AccountAccessPage", () => {
     await waitFor(() => {
       expect(signInMock).toHaveBeenCalledWith("person@example.com", "private-password");
     });
-    expect(navigateMock).toHaveBeenCalledWith("/patient-record?patient=patient-123");
+    expect(navigateMock).toHaveBeenCalledWith("/patient-record?patient=patient-123", { replace: true });
   });
 
   it("does not carry demo patient context into an authenticated login", async () => {
-    signInMock.mockResolvedValue();
+    signInMock.mockResolvedValue(authSession);
     useAccessContextMock.mockReturnValue({
       activePatientId: "demo-high-risk",
       isLoading: false,
@@ -154,7 +172,25 @@ describe("AccountAccessPage", () => {
     await waitFor(() => {
       expect(signInMock).toHaveBeenCalledWith("person@example.com", "private-password");
     });
-    expect(navigateMock).toHaveBeenCalledWith("/patient-record/sources");
+    expect(navigateMock).toHaveBeenCalledWith("/patient-record/sources", { replace: true });
+  });
+
+  it("resumes the requested destination after login when next is present", async () => {
+    signInMock.mockResolvedValue(authSession);
+    renderAccountAccess("/account?next=%2Fcaspian%3Fpatient%3Dpatient-123");
+
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "person@example.com" },
+    });
+    fireEvent.change(screen.getByLabelText("Password"), {
+      target: { value: "private-password" },
+    });
+    fireEvent.click(screen.getAllByRole("button", { name: "Log in" }).at(-1)!);
+
+    await waitFor(() => {
+      expect(signInMock).toHaveBeenCalledWith("person@example.com", "private-password");
+    });
+    expect(navigateMock).toHaveBeenCalledWith("/caspian?patient=patient-123", { replace: true });
   });
 
   it("disables the signup submit button while required fields are incomplete", () => {

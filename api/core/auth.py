@@ -20,6 +20,7 @@ from typing import Callable
 from fastapi import Depends, HTTPException, Request, Response, status
 
 from api.auth_models import (
+    AccountSessionSummary,
     AuthRole,
     AuthSessionResponse,
     AuthUserResponse,
@@ -1221,6 +1222,101 @@ def change_own_password(
         event_type="account.password_changed",
         payload={"user_id": user_id},
     )
+
+
+def list_own_sessions(user_id: str, *, current_session_id: str) -> list[AccountSessionSummary]:
+    init_auth_store()
+    now = _now().isoformat()
+    with _connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, mode, active_patient_id, active_patient_name, created_at,
+                   last_seen_at, expires_at, user_agent
+            FROM sessions
+            WHERE user_id = ? AND revoked_at IS NULL AND expires_at > ?
+            ORDER BY last_seen_at DESC
+            """,
+            (user_id, now),
+        ).fetchall()
+    return [
+        AccountSessionSummary(
+            id=row["id"],
+            mode="authenticated",
+            is_current=row["id"] == current_session_id,
+            active_patient_id=row["active_patient_id"],
+            active_patient_name=row["active_patient_name"],
+            created_at=datetime.fromisoformat(row["created_at"]),
+            last_seen_at=datetime.fromisoformat(row["last_seen_at"]),
+            expires_at=datetime.fromisoformat(row["expires_at"]),
+            user_agent=row["user_agent"],
+        )
+        for row in rows
+    ]
+
+
+def revoke_own_session(
+    user_id: str,
+    session_id: str,
+    *,
+    current_session_id: str,
+) -> None:
+    init_auth_store()
+    if session_id == current_session_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Use sign out to end the current session.",
+        )
+    with _connect() as conn:
+        row = conn.execute(
+            """
+            SELECT id, active_patient_id
+            FROM sessions
+            WHERE id = ? AND user_id = ? AND revoked_at IS NULL
+            """,
+            (session_id, user_id),
+        ).fetchone()
+        if row is None:
+            raise HTTPException(status_code=404, detail="Session not found.")
+        conn.execute(
+            "UPDATE sessions SET revoked_at = ? WHERE id = ?",
+            (_now().isoformat(), session_id),
+        )
+        conn.commit()
+    audit_event(
+        event_type="account.session_revoked",
+        payload={
+            "user_id": user_id,
+            "target_session_id": session_id,
+            "patient_id": row["active_patient_id"],
+        },
+    )
+
+
+def revoke_other_sessions(user_id: str, *, keep_session_id: str) -> int:
+    init_auth_store()
+    with _connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT id
+            FROM sessions
+            WHERE user_id = ? AND revoked_at IS NULL AND id != ?
+            """,
+            (user_id, keep_session_id),
+        ).fetchall()
+        conn.execute(
+            """
+            UPDATE sessions SET revoked_at = ?
+            WHERE user_id = ? AND revoked_at IS NULL AND id != ?
+            """,
+            (_now().isoformat(), user_id, keep_session_id),
+        )
+        conn.commit()
+    revoked_count = len(rows)
+    audit_event(
+        event_type="account.other_sessions_revoked",
+        payload={"user_id": user_id, "revoked_count": revoked_count},
+    )
+    return revoked_count
 
 
 def delete_own_account(principal: SessionPrincipal) -> int:

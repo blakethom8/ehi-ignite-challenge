@@ -40,6 +40,13 @@ export function purgeNamespacesByPrefix(prefix: string): void {
   }
 }
 
+export function purgeScopedState(
+  mode: AccessMode,
+  userOrAlias: string | null,
+): void {
+  purgeNamespacesByPrefix(storageNamespace(mode, userOrAlias, ""));
+}
+
 /**
  * Wipe cross-mode workspace state from localStorage.
  *

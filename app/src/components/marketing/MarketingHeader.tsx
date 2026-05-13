@@ -1,19 +1,25 @@
 import { ArrowLeft, ArrowRight, Clock3 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { useAccessContext } from "../../context/AccessContext";
-import { buildDemoSelectionPath } from "../../routing";
-import { resolveAccountPath, resolveSessionHomePath } from "../../sessionRouting";
+import { useCanManageOwnAccount, useCapabilities } from "../../hooks/useCapabilities";
+import { buildAccountAccessPath, buildDemoSelectionPath } from "../../routing";
+import { resolveSessionHomePath } from "../../sessionRouting";
 
 type MarketingHeaderProps = {
   activeNav?: "about" | null;
 };
 
 export function MarketingHeader({ activeNav = null }: MarketingHeaderProps) {
+  const location = useLocation();
   const { activePatientId, activePatientName, isDemo, mode, user } = useAccessContext();
+  const capabilities = useCapabilities();
+  const canManageAccount = useCanManageOwnAccount();
   const isInAppAbout = activeNav === "about" && Boolean(activePatientId);
   const resumeHref = resolveSessionHomePath(mode, activePatientId);
-  const accountHref = resolveAccountPath(mode, Boolean(user));
-  const isAuthenticated = mode === "authenticated" && Boolean(user);
+  const accountHref = canManageAccount && user
+    ? "/account/settings"
+    : buildAccountAccessPath(`${location.pathname}${location.search}`);
+  const isAuthenticated = capabilities.mode === "authenticated" && Boolean(user);
 
   return (
     <header className="border-b border-[#dde5ef] bg-[rgba(255,255,255,0.88)] backdrop-blur">

@@ -30,8 +30,24 @@ export function useCapabilities(): Capabilities {
   return capabilities ?? ANONYMOUS_CAPABILITIES;
 }
 
+export function canUsePatientWorkspace(capabilities: Capabilities): boolean {
+  return capabilities.mode === "authenticated" || capabilities.mode === "demo";
+}
+
+export function canManageOwnAccount(capabilities: Capabilities): boolean {
+  return capabilities.mode === "authenticated";
+}
+
 // Convenience selectors — optional but handy for call sites that only need
 // one flag and want a more readable boolean expression.
+export function useCanUsePatientWorkspace(): boolean {
+  return canUsePatientWorkspace(useCapabilities());
+}
+
+export function useCanManageOwnAccount(): boolean {
+  return canManageOwnAccount(useCapabilities());
+}
+
 export function useCanEditCaspianFiles(): boolean {
   return useCapabilities().can_edit_caspian_user_files;
 }

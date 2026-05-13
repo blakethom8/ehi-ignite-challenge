@@ -6,6 +6,7 @@ from fastapi import APIRouter, Request, Response
 
 from api.auth_models import (
     AccountPasswordChangeRequest,
+    AccountSessionSummary,
     AccountUpdateRequest,
     AdminActionResponse,
     AuthDemoRequest,
@@ -15,6 +16,7 @@ from api.auth_models import (
     AuthSignupRequest,
 )
 from api.core.access_policy import Capabilities, capabilities_for
+from api.core import guest_harmonization
 from api.core.auth import (
     begin_demo_session,
     change_own_password,
@@ -26,7 +28,10 @@ from api.core.auth import (
     optional_session_response,
     require_access_session,
     require_authenticated_session,
+    list_own_sessions,
     revoke_session,
+    revoke_other_sessions,
+    revoke_own_session,
     select_patient,
     set_session_cookie,
     signup_user,
@@ -34,6 +39,10 @@ from api.core.auth import (
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+def _clear_guest_cookie(response: Response) -> None:
+    response.delete_cookie(key=guest_harmonization.GUEST_COOKIE_NAME, path="/")
 
 
 @router.get("/capabilities", response_model=Capabilities)
@@ -62,6 +71,7 @@ def login(payload: AuthLoginRequest, request: Request, response: Response) -> Au
     if existing is not None:
         revoke_session(existing)
     session = login_user(payload.email, payload.password, request)
+    _clear_guest_cookie(response)
     set_session_cookie(response, session.session_id)
     return session.to_response()
 
@@ -72,6 +82,7 @@ def signup(payload: AuthSignupRequest, request: Request, response: Response) -> 
     if existing is not None:
         revoke_session(existing)
     session = signup_user(payload.email, payload.password, payload.display_name, request)
+    _clear_guest_cookie(response)
     set_session_cookie(response, session.session_id)
     return session.to_response()
 
@@ -79,6 +90,7 @@ def signup(payload: AuthSignupRequest, request: Request, response: Response) -> 
 @router.post("/logout", response_model=AuthSessionResponse)
 def logout(request: Request, response: Response) -> AuthSessionResponse:
     revoke_session(current_session(request))
+    _clear_guest_cookie(response)
     clear_session_cookie(response)
     return optional_session_response(request)
 
@@ -89,6 +101,7 @@ def start_demo(payload: AuthDemoRequest, request: Request, response: Response) -
     if existing is not None:
         revoke_session(existing)
     session = begin_demo_session(payload.patient_id, request)
+    _clear_guest_cookie(response)
     set_session_cookie(response, session.session_id)
     return session.to_response()
 
@@ -96,6 +109,7 @@ def start_demo(payload: AuthDemoRequest, request: Request, response: Response) -
 @router.post("/demo/exit", response_model=AuthSessionResponse)
 def exit_demo(request: Request, response: Response) -> AuthSessionResponse:
     revoke_session(current_session(request))
+    _clear_guest_cookie(response)
     clear_session_cookie(response)
     return optional_session_response(request)
 
@@ -136,9 +150,33 @@ def change_password(payload: AccountPasswordChangeRequest, request: Request) -> 
     return AdminActionResponse(ok=True)
 
 
+@router.get("/sessions", response_model=list[AccountSessionSummary])
+def get_own_sessions(request: Request) -> list[AccountSessionSummary]:
+    principal = require_authenticated_session(request)
+    assert principal.user_id is not None
+    return list_own_sessions(principal.user_id, current_session_id=principal.session_id)
+
+
+@router.delete("/sessions/{session_id}", response_model=AdminActionResponse)
+def delete_own_session(session_id: str, request: Request) -> AdminActionResponse:
+    principal = require_authenticated_session(request)
+    assert principal.user_id is not None
+    revoke_own_session(principal.user_id, session_id, current_session_id=principal.session_id)
+    return AdminActionResponse(ok=True)
+
+
+@router.post("/sessions/revoke-others", response_model=AdminActionResponse)
+def delete_other_sessions(request: Request) -> AdminActionResponse:
+    principal = require_authenticated_session(request)
+    assert principal.user_id is not None
+    revoke_other_sessions(principal.user_id, keep_session_id=principal.session_id)
+    return AdminActionResponse(ok=True)
+
+
 @router.delete("/me", response_model=AuthSessionResponse)
 def delete_my_account(request: Request, response: Response) -> AuthSessionResponse:
     principal = require_authenticated_session(request)
     delete_own_account(principal)
+    _clear_guest_cookie(response)
     clear_session_cookie(response)
     return optional_session_response(request)

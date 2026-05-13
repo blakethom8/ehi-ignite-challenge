@@ -1,13 +1,16 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PlatformDrawer } from "./PlatformDrawer";
+import type { Capabilities } from "../../types";
 
 const {
   clearAccessMock,
+  exitDemoMock,
   navigateMock,
   useAccessContextMock,
 } = vi.hoisted(() => ({
   clearAccessMock: vi.fn(),
+  exitDemoMock: vi.fn(),
   navigateMock: vi.fn(),
   useAccessContextMock: vi.fn(),
 }));
@@ -34,15 +37,34 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
+function capabilitiesForMode(mode: Capabilities["mode"]): Capabilities {
+  return {
+    mode,
+    can_use_caspian: mode !== "anonymous" && mode !== "guest",
+    can_edit_caspian_user_files: false,
+    can_write_caspian_notes: false,
+    can_run_workflows: false,
+    can_use_aggregation_uploads: mode === "authenticated",
+    can_use_aggregation_profiles: mode === "authenticated",
+    can_use_harmonize: mode === "authenticated",
+    can_use_guest_harmonization: mode === "guest",
+    can_use_assistant_tools_write: false,
+    show_caspian_seed_files: false,
+    persistence_scope: mode === "authenticated" ? "browser-persistent" : mode === "demo" ? "browser-ephemeral" : "none",
+  };
+}
+
 describe("PlatformDrawer", () => {
   beforeEach(() => {
     clearAccessMock.mockReset();
+    exitDemoMock.mockReset();
     navigateMock.mockReset();
     useAccessContextMock.mockReset();
     useAccessContextMock.mockReturnValue({
       activePatientId: null,
+      capabilities: capabilitiesForMode("authenticated"),
       clearAccess: clearAccessMock,
-      isUnlocked: true,
+      exitDemo: exitDemoMock,
       mode: "authenticated",
       user: {
         id: "user-1",
@@ -94,8 +116,9 @@ describe("PlatformDrawer", () => {
   it("uses demo-specific exit copy for demo sessions", () => {
     useAccessContextMock.mockReturnValue({
       activePatientId: "demo-high-risk",
+      capabilities: capabilitiesForMode("demo"),
       clearAccess: clearAccessMock,
-      isUnlocked: true,
+      exitDemo: exitDemoMock,
       mode: "demo",
       user: null,
     });

@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MarketingHeader } from "./MarketingHeader";
+import type { Capabilities } from "../../types";
 
 const {
   useAccessContextMock,
@@ -14,10 +15,28 @@ vi.mock("../../context/AccessContext", () => ({
 }));
 
 describe("MarketingHeader", () => {
+  function capabilitiesForMode(mode: Capabilities["mode"]): Capabilities {
+    return {
+      mode,
+      can_use_caspian: mode !== "anonymous" && mode !== "guest",
+      can_edit_caspian_user_files: false,
+      can_write_caspian_notes: false,
+      can_run_workflows: false,
+      can_use_aggregation_uploads: mode === "authenticated",
+      can_use_aggregation_profiles: mode === "authenticated",
+      can_use_harmonize: mode === "authenticated",
+      can_use_guest_harmonization: mode === "guest",
+      can_use_assistant_tools_write: false,
+      show_caspian_seed_files: false,
+      persistence_scope: mode === "authenticated" ? "browser-persistent" : mode === "demo" ? "browser-ephemeral" : "none",
+    };
+  }
+
   beforeEach(() => {
     useAccessContextMock.mockReset();
     useAccessContextMock.mockReturnValue({
       mode: "anonymous",
+      capabilities: capabilitiesForMode("anonymous"),
       activePatientId: null,
       activePatientName: null,
       isDemo: false,
@@ -40,6 +59,7 @@ describe("MarketingHeader", () => {
   it("shows the resume workspace link when a patient is active", () => {
     useAccessContextMock.mockReturnValue({
       mode: "demo",
+      capabilities: capabilitiesForMode("demo"),
       activePatientId: "demo-trial-match",
       activePatientName: "Demo Patient - Trial Match",
       isDemo: true,
@@ -65,6 +85,7 @@ describe("MarketingHeader", () => {
   it("switches to an in-app about header when opened from an active workspace", () => {
     useAccessContextMock.mockReturnValue({
       mode: "demo",
+      capabilities: capabilitiesForMode("demo"),
       activePatientId: "demo-trial-match",
       activePatientName: "Demo Patient - Trial Match",
       isDemo: true,
@@ -92,6 +113,7 @@ describe("MarketingHeader", () => {
   it("shows signed-in state for authenticated users instead of anonymous CTas", () => {
     useAccessContextMock.mockReturnValue({
       mode: "authenticated",
+      capabilities: capabilitiesForMode("authenticated"),
       activePatientId: null,
       activePatientName: null,
       isDemo: false,

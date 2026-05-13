@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  resolveAccountPath,
   resolveInvalidPatientRedirect,
   resolveModulePath,
   resolveSessionHomePath,
@@ -11,13 +10,11 @@ describe("sessionRouting", () => {
   it("routes anonymous users to the public home", () => {
     expect(resolveSessionHomePath("anonymous", null)).toBe("/");
     expect(resolveSessionWorkspaceHubPath("anonymous", null)).toBe("/");
-    expect(resolveAccountPath("anonymous", false)).toBe("/account");
   });
 
   it("routes authenticated users without an active patient to file intake", () => {
     expect(resolveSessionHomePath("authenticated", null)).toBe("/patient-record/sources");
     expect(resolveSessionWorkspaceHubPath("authenticated", null)).toBe("/patient-record/sources");
-    expect(resolveAccountPath("authenticated", true)).toBe("/account/settings");
     expect(resolveModulePath("patient-record", "authenticated", null)).toBe("/patient-record/sources");
     expect(resolveModulePath("fhir-charts", "authenticated", null)).toBe("/patient-record/sources");
     expect(resolveModulePath("caspian", "authenticated", null)).toBe("/patient-record/sources");
@@ -37,6 +34,7 @@ describe("sessionRouting", () => {
   it("routes invalid patient state back to the right recovery screen", () => {
     expect(resolveInvalidPatientRedirect("authenticated")).toBe("/patient-record/sources");
     expect(resolveInvalidPatientRedirect("demo")).toBe("/demo");
+    expect(resolveInvalidPatientRedirect("guest")).toBe("/guest-harmonization");
     expect(resolveInvalidPatientRedirect("anonymous")).toBe("/");
   });
 });

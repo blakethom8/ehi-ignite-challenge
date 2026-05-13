@@ -69,6 +69,7 @@ import type {
   AdminSessionSummary,
   AdminUserDetail,
   AdminUserSummary,
+  AccountSessionSummary,
   CanonicalPatientSummary,
   GuestHarmonizationContextRequest,
   GuestHarmonizationDeleteResponse,
@@ -792,6 +793,17 @@ export const api = {
         new_password: newPassword,
       })
       .then((r) => r.data),
+
+  listOwnSessions: (): Promise<AccountSessionSummary[]> =>
+    http.get<AccountSessionSummary[]>("/auth/sessions").then((r) => r.data),
+
+  revokeOwnSession: (sessionId: string): Promise<AdminActionResponse> =>
+    http
+      .delete<AdminActionResponse>(`/auth/sessions/${encodeURIComponent(sessionId)}`)
+      .then((r) => r.data),
+
+  revokeOtherSessions: (): Promise<AdminActionResponse> =>
+    http.post<AdminActionResponse>("/auth/sessions/revoke-others").then((r) => r.data),
 
   deleteAccount: (): Promise<AuthSessionResponse> =>
     http.delete<AuthSessionResponse>("/auth/me").then((r) => r.data),

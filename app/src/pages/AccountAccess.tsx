@@ -1,8 +1,9 @@
 import axios from "axios";
 import { useState, type FormEvent } from "react";
-import { Link, Navigate, useNavigate } from "react-router-dom";
+import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, ArrowRight, CheckCircle2, LockKeyhole, UserPlus } from "lucide-react";
 import { useAccessContext } from "../context/AccessContext";
+import { resolveAccountDestination } from "../routing";
 import { resolveSessionHomePath } from "../sessionRouting";
 
 type AccountTab = "login" | "signup";
@@ -47,8 +48,10 @@ function signUpErrorMessage(error: unknown): string {
 
 export function AccountAccessPage() {
   const navigate = useNavigate();
-  const { activePatientId, isLoading, isUnlocked, mode, signIn, signUp, user } = useAccessContext();
+  const [searchParams] = useSearchParams();
+  const { isLoading, isUnlocked, signIn, signUp, user } = useAccessContext();
   const [activeTab, setActiveTab] = useState<AccountTab>("login");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [signInError, setSignInError] = useState<string | null>(null);
@@ -56,32 +59,41 @@ export function AccountAccessPage() {
   const [signUpPassword, setSignUpPassword] = useState("");
   const [signUpDisplayName, setSignUpDisplayName] = useState("");
   const [signUpError, setSignUpError] = useState<string | null>(null);
-  const resumePatientId = mode === "authenticated" ? activePatientId : null;
-  const defaultAuthenticatedDestination = resolveSessionHomePath("authenticated", resumePatientId);
+  const nextDestination = resolveAccountDestination(searchParams.get("next"));
 
-  if (!isLoading && isUnlocked && user) {
-    return <Navigate to="/account/settings" replace />;
+  if (!isLoading && isUnlocked && user && !isSubmitting) {
+    return <Navigate to={nextDestination ?? "/account/settings"} replace />;
   }
 
   const handleSignIn = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSignInError(null);
+    setIsSubmitting(true);
     try {
-      await signIn(email, password);
-      navigate(defaultAuthenticatedDestination);
+      const session = await signIn(email, password);
+      navigate(
+        nextDestination ?? resolveSessionHomePath(session.mode, session.active_patient_id),
+        { replace: true },
+      );
     } catch (error) {
       setSignInError(signInErrorMessage(error));
+      setIsSubmitting(false);
     }
   };
 
   const handleSignUp = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSignUpError(null);
+    setIsSubmitting(true);
     try {
-      await signUp(signUpEmail, signUpPassword, signUpDisplayName);
-      navigate("/patient-record/sources");
+      const session = await signUp(signUpEmail, signUpPassword, signUpDisplayName);
+      navigate(
+        nextDestination ?? resolveSessionHomePath(session.mode, session.active_patient_id),
+        { replace: true },
+      );
     } catch (error) {
       setSignUpError(signUpErrorMessage(error));
+      setIsSubmitting(false);
     }
   };
 
@@ -196,7 +208,7 @@ export function AccountAccessPage() {
                 )}
                 <button
                   type="submit"
-                  disabled={isLoading || !email.trim() || !password}
+                  disabled={isLoading || isSubmitting || !email.trim() || !password}
                   className="mt-5 inline-flex items-center gap-2 rounded-2xl bg-[#4d68ff] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#3c57ef] disabled:cursor-not-allowed disabled:opacity-70"
                 >
                   {isLoading ? "Checking account..." : "Log in"}
@@ -251,6 +263,7 @@ export function AccountAccessPage() {
                   type="submit"
                   disabled={
                     isLoading ||
+                    isSubmitting ||
                     !signUpEmail.trim() ||
                     !signUpDisplayName.trim() ||
                     signUpPassword.length < 8

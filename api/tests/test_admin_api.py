@@ -266,6 +266,56 @@ class SelfServiceAccountTests(unittest.TestCase):
         )
         self.assertEqual(relogin.status_code, 401)
 
+    def test_list_own_sessions_marks_current(self) -> None:
+        client_a = TestClient(app)
+        email = f"self-sessions-{uuid.uuid4().hex}@example.com"
+        _signup(client_a, email)
+
+        client_b = TestClient(app)
+        _login(client_b, email)
+
+        response = client_a.get("/api/auth/sessions")
+        self.assertEqual(response.status_code, 200, response.text)
+        sessions = response.json()
+        self.assertEqual(len(sessions), 2)
+        self.assertEqual(sum(1 for session in sessions if session["is_current"]), 1)
+
+    def test_revoke_other_sessions_keeps_current(self) -> None:
+        client_a = TestClient(app)
+        email = f"revoke-others-{uuid.uuid4().hex}@example.com"
+        _signup(client_a, email)
+
+        client_b = TestClient(app)
+        _login(client_b, email)
+
+        revoke = client_a.post("/api/auth/sessions/revoke-others")
+        self.assertEqual(revoke.status_code, 200, revoke.text)
+
+        still_a = client_a.get("/api/auth/session")
+        self.assertEqual(still_a.status_code, 200)
+        self.assertEqual(still_a.json()["mode"], "authenticated")
+
+        after_b = client_b.get("/api/auth/session")
+        self.assertEqual(after_b.status_code, 200)
+        self.assertEqual(after_b.json()["mode"], "anonymous")
+
+    def test_revoke_specific_own_session(self) -> None:
+        client_a = TestClient(app)
+        email = f"revoke-one-{uuid.uuid4().hex}@example.com"
+        _signup(client_a, email)
+
+        client_b = TestClient(app)
+        _login(client_b, email)
+        sessions = client_a.get("/api/auth/sessions").json()
+        target = next(session for session in sessions if not session["is_current"])
+
+        revoke = client_a.delete(f"/api/auth/sessions/{target['id']}")
+        self.assertEqual(revoke.status_code, 200, revoke.text)
+
+        after_b = client_b.get("/api/auth/session")
+        self.assertEqual(after_b.status_code, 200)
+        self.assertEqual(after_b.json()["mode"], "anonymous")
+
 
 if __name__ == "__main__":
     unittest.main()

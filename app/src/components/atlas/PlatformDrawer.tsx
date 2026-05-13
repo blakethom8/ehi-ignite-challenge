@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import {
   FileText,
   HelpCircle,
@@ -12,6 +12,8 @@ import {
 import { useNavigate } from "react-router-dom";
 import type { User } from "./types";
 import { useAccessContext } from "../../context/AccessContext";
+import { useCanManageOwnAccount, useCapabilities } from "../../hooks/useCapabilities";
+import { useSessionActions } from "../../hooks/useSessionActions";
 import { resolveSessionHomePath, resolveSessionWorkspaceHubPath } from "../../sessionRouting";
 
 type PlatformDrawerProps = {
@@ -22,17 +24,24 @@ type PlatformDrawerProps = {
 
 export function PlatformDrawer({ open, onClose, user }: PlatformDrawerProps) {
   const navigate = useNavigate();
+  const capabilities = useCapabilities();
+  const canManageOwnAccount = useCanManageOwnAccount();
   const {
     activePatientId,
-    clearAccess,
-    isUnlocked,
     mode,
     user: authUser,
   } = useAccessContext();
-  const showAccountSettings = isUnlocked && authUser !== null;
-  const showAdmin = isUnlocked && authUser?.role === "admin";
-  const [sessionActionError, setSessionActionError] = useState<string | null>(null);
-  const [isSessionActionPending, setIsSessionActionPending] = useState(false);
+  const {
+    clearSessionActionError,
+    isSessionActionPending,
+    leaveSessionToHome,
+    navigateToAccountSettings,
+    sessionActionError,
+    sessionActionLabel,
+    sessionActionPendingLabel,
+  } = useSessionActions();
+  const showAccountSettings = canManageOwnAccount && authUser !== null;
+  const showAdmin = canManageOwnAccount && authUser?.role === "admin";
   const homeHref = resolveSessionHomePath(mode, activePatientId);
   const workspaceHubHref = resolveSessionWorkspaceHubPath(mode, activePatientId);
 
@@ -47,10 +56,9 @@ export function PlatformDrawer({ open, onClose, user }: PlatformDrawerProps) {
 
   useEffect(() => {
     if (!open) {
-      setSessionActionError(null);
-      setIsSessionActionPending(false);
+      clearSessionActionError();
     }
-  }, [open]);
+  }, [clearSessionActionError, open]);
 
   if (!open) return null;
 
@@ -143,8 +151,7 @@ export function PlatformDrawer({ open, onClose, user }: PlatformDrawerProps) {
             <DrawerItem
               icon={<Settings className="h-3.5 w-3.5" strokeWidth={1.5} />}
               onClick={() => {
-                onClose();
-                navigate("/account/settings");
+                navigateToAccountSettings({ onBeforeNavigate: onClose });
               }}
             >
               Account settings
@@ -196,7 +203,7 @@ export function PlatformDrawer({ open, onClose, user }: PlatformDrawerProps) {
           </DrawerItem>
         </DrawerSection>
         <div className="flex-1" />
-        {mode !== "anonymous" ? (
+        {capabilities.mode !== "anonymous" ? (
           <div
             className="border-t px-1.5 pb-3 pt-1.5"
             style={{ borderColor: "var(--line-1)" }}
@@ -211,22 +218,10 @@ export function PlatformDrawer({ open, onClose, user }: PlatformDrawerProps) {
               muted={false}
               disabled={isSessionActionPending}
               onClick={async () => {
-                setSessionActionError(null);
-                setIsSessionActionPending(true);
-                try {
-                  await clearAccess();
-                  onClose();
-                  navigate("/", { replace: true });
-                } catch (error) {
-                  setSessionActionError(error instanceof Error && error.message ? error.message : "Session action failed.");
-                } finally {
-                  setIsSessionActionPending(false);
-                }
+                await leaveSessionToHome({ onBeforeNavigate: onClose });
               }}
             >
-              {mode === "authenticated"
-                ? isSessionActionPending ? "Signing out..." : "Sign out"
-                : isSessionActionPending ? "Leaving demo..." : "Exit demo"}
+              {isSessionActionPending ? sessionActionPendingLabel : sessionActionLabel}
             </DrawerItem>
           </div>
         ) : null}

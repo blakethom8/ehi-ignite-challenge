@@ -203,6 +203,29 @@ class AuthApiTests(unittest.TestCase):
         self.assertEqual(selected.status_code, 200)
         self.assertEqual(selected.json()["active_patient_id"], workspace_id)
 
+    def test_logout_clears_guest_fallback_capabilities(self) -> None:
+        client = TestClient(app)
+        guest_run = client.post("/api/guest-harmonization/runs")
+        self.assertEqual(guest_run.status_code, 201)
+
+        signup = client.post(
+            "/api/auth/signup",
+            json={
+                "email": f"guest-fallback-{uuid.uuid4().hex}@example.com",
+                "password": "correct-horse-battery",
+                "display_name": "Guest Fallback",
+            },
+        )
+        self.assertEqual(signup.status_code, 200)
+
+        logout = client.post("/api/auth/logout")
+        self.assertEqual(logout.status_code, 200)
+        self.assertEqual(logout.json()["mode"], "anonymous")
+
+        capabilities = client.get("/api/auth/capabilities")
+        self.assertEqual(capabilities.status_code, 200)
+        self.assertEqual(capabilities.json()["mode"], "anonymous")
+
 
 if __name__ == "__main__":
     unittest.main()

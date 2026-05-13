@@ -10,7 +10,8 @@ import type {
   User,
   WorkspaceId,
 } from "./types";
-import { useAccessContext, type AccessMode } from "../../context/AccessContext";
+import { useAccessContext } from "../../context/AccessContext";
+import { withPatientContext } from "../../routing";
 import { resolveSessionHomePath } from "../../sessionRouting";
 
 const DEFAULT_USER: User = {
@@ -99,7 +100,9 @@ export function AppShell({
   const handleSelectModule = (m: ModuleId) => {
     const target = hrefForModule(m);
     if (target) {
-      navigate(withPatientContext(target, searchParams.get("patient") ?? activePatientId, mode));
+      navigate(
+        withPatientContext(target, searchParams.get("patient") ?? activePatientId, { mode }),
+      );
     }
   };
 
@@ -109,10 +112,10 @@ export function AppShell({
     setWorkspaceId(w);
     const patientId = searchParams.get("patient") ?? activePatientId;
     if (w === "caspian") {
-      navigate(withPatientContext("/caspian", patientId, mode));
+      navigate(withPatientContext("/caspian", patientId, { mode }));
       return;
     }
-    navigate(withPatientContext(`/workspaces/${w}`, patientId, mode));
+    navigate(withPatientContext(`/workspaces/${w}`, patientId, { mode }));
   };
   const shellUser = useMemo<User>(() => {
     if (!user) {
@@ -162,13 +165,6 @@ export function AppShell({
       />
     </div>
   );
-}
-
-function withPatientContext(path: string, patientId: string | null, mode: AccessMode) {
-  if (!patientId || path === "/" || mode === "anonymous" || mode === "guest") return path;
-  const url = new URL(path, "http://atlas.local");
-  url.searchParams.set("patient", patientId);
-  return `${url.pathname}${url.search}`;
 }
 
 function humanize(slug: string): string {

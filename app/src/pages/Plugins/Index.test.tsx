@@ -4,6 +4,7 @@ import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AxiosError } from "axios";
 import { PluginsIndex } from "./Index";
+import type { Capabilities } from "../../types";
 
 const {
   useAccessContextMock,
@@ -35,6 +36,23 @@ function renderPluginsIndex() {
   );
 }
 
+function capabilitiesForMode(mode: Capabilities["mode"]): Capabilities {
+  return {
+    mode,
+    can_use_caspian: mode !== "anonymous" && mode !== "guest",
+    can_edit_caspian_user_files: false,
+    can_write_caspian_notes: false,
+    can_run_workflows: false,
+    can_use_aggregation_uploads: mode === "authenticated",
+    can_use_aggregation_profiles: mode === "authenticated",
+    can_use_harmonize: mode === "authenticated",
+    can_use_guest_harmonization: mode === "guest",
+    can_use_assistant_tools_write: false,
+    show_caspian_seed_files: false,
+    persistence_scope: mode === "authenticated" ? "browser-persistent" : mode === "demo" ? "browser-ephemeral" : "none",
+  };
+}
+
 describe("PluginsIndex", () => {
   beforeEach(() => {
     useAccessContextMock.mockReset();
@@ -42,7 +60,7 @@ describe("PluginsIndex", () => {
   });
 
   it("shows a sample-first start state before loading plugins when the session is locked", () => {
-    useAccessContextMock.mockReturnValue({ isUnlocked: false });
+    useAccessContextMock.mockReturnValue({ activePatientId: null, capabilities: capabilitiesForMode("anonymous") });
     useInstalledManifestsMock.mockReturnValue({
       data: undefined,
       error: null,
@@ -60,7 +78,7 @@ describe("PluginsIndex", () => {
   });
 
   it("renders a truthful unauthorized state instead of an empty marketplace", () => {
-    useAccessContextMock.mockReturnValue({ isUnlocked: true });
+    useAccessContextMock.mockReturnValue({ activePatientId: null, capabilities: capabilitiesForMode("authenticated") });
     useInstalledManifestsMock.mockReturnValue({
       data: undefined,
       error: {
@@ -89,7 +107,7 @@ describe("PluginsIndex", () => {
   });
 
   it("uses a neutral empty state when the backend returns no installed plugins", () => {
-    useAccessContextMock.mockReturnValue({ isUnlocked: true });
+    useAccessContextMock.mockReturnValue({ activePatientId: null, capabilities: capabilitiesForMode("authenticated") });
     useInstalledManifestsMock.mockReturnValue({
       data: [],
       error: null,

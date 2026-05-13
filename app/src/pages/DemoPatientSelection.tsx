@@ -2,17 +2,19 @@ import { ArrowLeft, ArrowRight } from "lucide-react";
 import { Link, Navigate, useSearchParams } from "react-router-dom";
 import { DemoPatientPicker } from "../components/atlas/DemoPatientPicker";
 import { useAccessContext } from "../context/AccessContext";
+import { canManageOwnAccount, useCapabilities } from "../hooks/useCapabilities";
 import { resolveDemoDestination, withPatientContext } from "../routing";
 
 export function DemoPatientSelection() {
   const [searchParams] = useSearchParams();
   const { activePatientId, activePatientName, isDemo, mode } = useAccessContext();
+  const capabilities = useCapabilities();
   const prioritizedPatientId = searchParams.get("patient");
   const destination = resolveDemoDestination(searchParams.get("next"));
 
-  if (mode === "authenticated") {
+  if (canManageOwnAccount(capabilities)) {
     const authenticatedDestination = activePatientId
-      ? withPatientContext("/patient-record", activePatientId)
+      ? withPatientContext("/patient-record", activePatientId, { mode })
       : "/patient-record/sources";
     return <Navigate replace to={authenticatedDestination} />;
   }
@@ -62,7 +64,7 @@ export function DemoPatientSelection() {
               </p>
               <div className="mt-4">
                 <Link
-                  to={withPatientContext(destination, activePatientId)}
+                  to={withPatientContext(destination, activePatientId, { mode: "demo" })}
                   className="inline-flex items-center gap-2 rounded-2xl bg-[#eef2ff] px-4 py-2.5 text-sm font-semibold text-[#3657ff]"
                 >
                   Continue current sample
@@ -74,7 +76,7 @@ export function DemoPatientSelection() {
 
           <div className="mt-8">
             <DemoPatientPicker
-              destination={(patientId) => withPatientContext(destination, patientId)}
+              destination={(patientId) => withPatientContext(destination, patientId, { mode: "demo" })}
               prioritizedPatientId={prioritizedPatientId}
               title="Select a synthetic patient"
               body="Choose one of the curated demo patients below."

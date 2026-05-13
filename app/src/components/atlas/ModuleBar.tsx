@@ -10,6 +10,8 @@ import type {
   WorkspaceId,
 } from "./types";
 import { useAccessContext } from "../../context/AccessContext";
+import { useSessionActions } from "../../hooks/useSessionActions";
+import { withPatientContext } from "../../routing";
 import { resolveModulePath, resolveSessionWorkspaceHubPath } from "../../sessionRouting";
 
 const RECENT: RecentWorkspace[] = [
@@ -87,15 +89,18 @@ export function ModuleBar({
     activePatientId,
     activePatientName,
     availableDemoPatients,
-    clearAccess,
     enterDemoPatient,
-    exitDemo,
     isDemo,
     isUnlocked,
     mode,
   } = useAccessContext();
-  const [isSigningOut, setIsSigningOut] = useState(false);
-  const [signOutError, setSignOutError] = useState<string | null>(null);
+  const {
+    clearSessionActionError,
+    isSessionActionPending,
+    leaveSessionToHome,
+    sessionActionError,
+    sessionActionPendingLabel,
+  } = useSessionActions();
 
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
@@ -130,18 +135,6 @@ export function ModuleBar({
   const reloadModuleNav =
     activeModule === "caspian" || activeModule === "workspaces";
   const isDenseWorkspaceChrome = showPaneToggles || Boolean(onRunWorkflow);
-  const handleSignOut = async () => {
-    setSignOutError(null);
-    setIsSigningOut(true);
-    try {
-      await clearAccess();
-      navigate("/", { replace: true });
-    } catch {
-      setSignOutError("Sign out failed. Try again.");
-    } finally {
-      setIsSigningOut(false);
-    }
-  };
 
   return (
     <div
@@ -344,9 +337,9 @@ export function ModuleBar({
         </div>
       </div>
       <div className="flex min-w-0 items-center justify-end gap-2 overflow-hidden pl-2">
-        {signOutError ? (
+        {sessionActionError ? (
           <span className="hidden text-[11px] font-medium text-[#ffb4b4] xl:inline">
-            {signOutError}
+            {sessionActionError}
           </span>
         ) : null}
         {activeBundle ? (
@@ -415,12 +408,13 @@ export function ModuleBar({
                       <button
                         key={patient.id}
                         type="button"
-                        disabled={pendingDemoPatientId !== null}
+                        disabled={pendingDemoPatientId !== null || isSessionActionPending}
                         onClick={async () => {
                           if (isActive) {
                             setDemoOpen(false);
                             return;
                           }
+                          clearSessionActionError();
                           setPendingDemoPatientId(patient.id);
                           try {
                             await enterDemoPatient(patient.id);
@@ -459,19 +453,12 @@ export function ModuleBar({
                 <button
                   type="button"
                   onClick={async () => {
-                    setPendingDemoPatientId("exit-demo");
-                    setSignOutError(null);
-                    try {
-                      await exitDemo();
+                    const didLeave = await leaveSessionToHome();
+                    if (didLeave) {
                       setDemoOpen(false);
-                      navigate("/", { replace: true });
-                    } catch {
-                      setSignOutError("Exit demo failed. Try again.");
-                    } finally {
-                      setPendingDemoPatientId(null);
                     }
                   }}
-                  disabled={pendingDemoPatientId !== null}
+                  disabled={pendingDemoPatientId !== null || isSessionActionPending}
                   className="flex w-full items-center justify-between rounded-[7px] px-2.5 py-2 text-left transition-colors hover:bg-[var(--surface-2)]"
                   role="menuitem"
                 >
@@ -484,7 +471,7 @@ export function ModuleBar({
                     </div>
                   </div>
                   <span className="text-[11px] font-medium text-[var(--action)]">
-                    {pendingDemoPatientId === "exit-demo" ? "Leaving..." : "Leave"}
+                    {isSessionActionPending ? "Leaving..." : "Leave"}
                   </span>
                 </button>
               </div>
@@ -495,9 +482,9 @@ export function ModuleBar({
           <button
             type="button"
             onClick={() => {
-              void handleSignOut();
+              void leaveSessionToHome();
             }}
-            disabled={isSigningOut}
+            disabled={isSessionActionPending}
             className="hidden h-[30px] shrink-0 items-center gap-1.5 rounded-md border px-2.5 text-[12px] font-medium text-white/85 transition-colors hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-70 lg:inline-flex"
             style={{
               borderColor: "rgba(255,255,255,0.15)",
@@ -506,7 +493,7 @@ export function ModuleBar({
             title="Sign out"
           >
             <LogOut className="h-3 w-3" strokeWidth={1.5} />
-            {isSigningOut ? "Signing out..." : "Sign out"}
+            {isSessionActionPending ? sessionActionPendingLabel : "Sign out"}
           </button>
         ) : null}
         {onRunWorkflow && (
@@ -592,11 +579,4 @@ export function ModuleBar({
       {workspaceId /* keep param referenced */ && null}
     </div>
   );
-}
-
-function withPatientContext(path: string, patientId: string | null) {
-  if (!patientId || path === "/") return path;
-  const url = new URL(path, "http://atlas.local");
-  url.searchParams.set("patient", patientId);
-  return `${url.pathname}${url.search}`;
 }

@@ -101,6 +101,18 @@ class AccountPasswordChangeRequest(BaseModel):
     new_password: str = Field(min_length=8, max_length=256)
 
 
+class AccountSessionSummary(BaseModel):
+    id: str
+    mode: Literal["authenticated"]
+    is_current: bool = False
+    active_patient_id: str | None = None
+    active_patient_name: str | None = None
+    created_at: datetime
+    last_seen_at: datetime
+    expires_at: datetime
+    user_agent: str | None = None
+
+
 # ---------------------------------------------------------------------------
 # Admin response models
 # ---------------------------------------------------------------------------

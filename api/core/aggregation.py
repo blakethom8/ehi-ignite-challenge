@@ -8,7 +8,6 @@ private proof-of-life data, uploaded local files, and Patient Context outputs.
 from __future__ import annotations
 
 import json
-import os
 import re
 import shutil
 import uuid
@@ -21,6 +20,7 @@ from fastapi import HTTPException
 
 from api.core.loader import load_patient, patient_display_name, path_from_patient_id
 from api.core.patient_context import private_cedars_available
+from api.settings import get_settings
 from api.models import (
     AggregationCleaningIssue,
     AggregationCreateProfileRequest,
@@ -41,11 +41,12 @@ from api.models import (
 )
 
 
+_settings = get_settings()
 REPO_ROOT = Path(__file__).resolve().parents[2]
-STORE_ROOT = Path(os.getenv("AGGREGATION_UPLOAD_STORE_PATH", REPO_ROOT / "data" / "aggregation-uploads"))
-PROFILE_ROOT = Path(os.getenv("AGGREGATION_PROFILE_STORE_PATH", REPO_ROOT / "data" / "aggregation-profiles"))
+STORE_ROOT = _settings.aggregation_upload_store_path
+PROFILE_ROOT = _settings.aggregation_profile_store_path
 PROFILE_REGISTRY_PATH = PROFILE_ROOT / "profiles.json"
-MAX_UPLOAD_BYTES = int(os.getenv("AGGREGATION_MAX_UPLOAD_BYTES", str(25 * 1024 * 1024)))
+MAX_UPLOAD_BYTES = _settings.aggregation_max_upload_bytes
 
 
 def _now() -> datetime:

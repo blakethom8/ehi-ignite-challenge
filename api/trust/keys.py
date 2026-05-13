@@ -10,7 +10,6 @@ v2 (out of scope): per-org keys, key rotation, vendor key federation.
 from __future__ import annotations
 
 import json
-import os
 import threading
 from dataclasses import dataclass
 from pathlib import Path
@@ -20,6 +19,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import (
     Ed25519PublicKey,
 )
 
+from api.settings import get_settings
 from .signatures import (
     fingerprint,
     generate_keypair,
@@ -53,11 +53,11 @@ class VendorRecord:
 
 
 def _is_production() -> bool:
-    return os.getenv("ENVIRONMENT", "development").strip().lower() in {"prod", "production"}
+    return get_settings().is_production
 
 
 def _load_or_create_atlas_key(path: Path) -> tuple[Ed25519PrivateKey, Ed25519PublicKey]:
-    env = os.environ.get("ATLAS_SIGNING_KEY")
+    env = get_settings().atlas_signing_key
     if env:
         sk = private_key_from_b64(env)
         return sk, sk.public_key()

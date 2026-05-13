@@ -11,7 +11,6 @@ import base64
 import hashlib
 import hmac
 import json
-import os
 import re
 import secrets
 import shutil
@@ -22,38 +21,27 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, BinaryIO
 
+from api.settings import get_settings
 
+
+_settings = get_settings()
 REPO_ROOT = Path(__file__).resolve().parents[2]
-GUEST_ROOT = Path(
-    os.getenv("GUEST_HARMONIZATION_ROOT", REPO_ROOT / "data" / "guest-harmonization")
-)
-GUEST_SECRET_PATH = Path(
-    os.getenv("GUEST_HARMONIZATION_SECRET_PATH", REPO_ROOT / "data" / "atlas-guest-harmonization.key")
-)
+GUEST_ROOT = _settings.guest_harmonization_root
+GUEST_SECRET_PATH = _settings.guest_harmonization_secret_path
 GUEST_COOKIE_NAME = "atlas_guest_harmonization"
-GUEST_COOKIE_SECURE = os.getenv("ENVIRONMENT", "development").strip().lower() in {"prod", "production"}
-GUEST_TTL_HOURS = max(1, int(os.getenv("GUEST_HARMONIZATION_TTL_HOURS", "24")))
-GUEST_MAX_FILE_BYTES = max(
-    1024,
-    int(os.getenv("GUEST_HARMONIZATION_MAX_FILE_BYTES", str(10 * 1024 * 1024))),
-)
+GUEST_COOKIE_SECURE = _settings.is_production
+GUEST_TTL_HOURS = _settings.guest_harmonization_ttl_hours
+GUEST_MAX_FILE_BYTES = _settings.guest_harmonization_max_file_bytes
 ALLOWED_EXTENSIONS = {".json", ".pdf", ".xml", ".txt"}
-GUEST_MAX_PDF_PAGES = max(
-    1, int(os.getenv("GUEST_HARMONIZATION_MAX_PDF_PAGES", "60"))
-)
-GUEST_MAX_PAGES_PER_PDF = max(
-    1, int(os.getenv("GUEST_HARMONIZATION_MAX_PAGES_PER_PDF", "40"))
-)
-GUEST_GLOBAL_DAILY_PAGE_BUDGET = max(
-    0, int(os.getenv("GUEST_HARMONIZATION_GLOBAL_DAILY_PAGE_BUDGET", "5000"))
-)
+GUEST_MAX_PDF_PAGES = _settings.guest_harmonization_max_pdf_pages
+GUEST_MAX_PAGES_PER_PDF = _settings.guest_harmonization_max_pages_per_pdf
+GUEST_GLOBAL_DAILY_PAGE_BUDGET = _settings.guest_harmonization_global_daily_page_budget
 GUEST_PDF_PIPELINE_NAME = (
-    os.getenv("GUEST_HARMONIZATION_PDF_PIPELINE", "multipass-fhir").strip()
-    or "multipass-fhir"
+    _settings.guest_harmonization_pdf_pipeline.strip() or "multipass-fhir"
 )
 GUEST_PDF_FALLBACK_PIPELINE_NAME = "pdfplumber-lab-text"
 GUEST_CCDA_PIPELINE_NAME = "ccda-fallback-v1"
-GUEST_PROGRESS_EVENT_CAP = max(20, int(os.getenv("GUEST_HARMONIZATION_EVENT_CAP", "200")))
+GUEST_PROGRESS_EVENT_CAP = _settings.guest_harmonization_event_cap
 
 # Background-thread plumbing. Guest processing runs as a daemon so the
 # frontend can poll for granular page-by-page progress instead of blocking
@@ -110,11 +98,11 @@ def _ensure_parent(path: Path) -> None:
 
 
 def _is_production() -> bool:
-    return os.getenv("ENVIRONMENT", "development").strip().lower() in {"prod", "production"}
+    return get_settings().is_production
 
 
 def _guest_secret() -> bytes:
-    override = (os.getenv("GUEST_HARMONIZATION_SECRET") or "").strip()
+    override = (get_settings().guest_harmonization_secret or "").strip()
     if override:
         return override.encode("utf-8")
     if _is_production():
@@ -1053,7 +1041,7 @@ def _extract_pdf_facts(
         )
         pipeline_name = GUEST_PDF_FALLBACK_PIPELINE_NAME
 
-    if pipeline_name == "multipass-fhir" and not (os.getenv("ANTHROPIC_API_KEY") or "").strip():
+    if pipeline_name == "multipass-fhir" and not (get_settings().anthropic_api_key or "").strip():
         quality_issues.append(
             {
                 "severity": "high",

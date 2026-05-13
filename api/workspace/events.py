@@ -22,7 +22,6 @@ Schema:
 from __future__ import annotations
 
 import json
-import os
 import sqlite3
 import threading
 import uuid
@@ -30,26 +29,23 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+from api.settings import get_settings
+
+_settings = get_settings()
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
-DEFAULT_DB_PATH = Path(
-    os.getenv("EVENTS_DB_PATH", str(REPO_ROOT / "data" / "events.db"))
-)
+DEFAULT_DB_PATH = _settings.events_db_path
 
 # PII-by-default: every payload runs through this redaction preset before
 # the row is written. ``events-strict`` strips direct identifiers and
 # scrubs free-text fields (question_preview, message, brief...) where
 # clinician-typed PHI tends to land. Set to ``minimal`` in dev when you
 # need to see what got logged.
-EVENTS_REDACTION_PRESET = os.getenv("EVENTS_REDACTION_PRESET", "events-strict").strip()
+EVENTS_REDACTION_PRESET = _settings.events_redaction_preset.strip()
 
 # Retention window in days. Events older than this get purged at startup
 # so events.db doesn't grow unbounded under production traffic (3-5 events
 # per user action × N users × N days). 0 disables purging (tests + dev).
-try:
-    EVENTS_RETENTION_DAYS = int(os.getenv("EVENTS_RETENTION_DAYS", "90"))
-except ValueError:
-    EVENTS_RETENTION_DAYS = 90
-EVENTS_RETENTION_DAYS = max(0, EVENTS_RETENTION_DAYS)
+EVENTS_RETENTION_DAYS = _settings.events_retention_days
 
 # Workspace-kind tags, mirrored from api.core.tracing so callers can import
 # from a single place.

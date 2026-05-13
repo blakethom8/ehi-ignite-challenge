@@ -11,7 +11,6 @@ execution shell changes.
 from __future__ import annotations
 
 import asyncio
-import os
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -20,9 +19,10 @@ from api.core.skills.loader import Skill, load_skill, SKILLS_ROOT
 from api.core.skills.patient_memory import PatientMemory
 from api.core.skills.runner import RunResult, SkillRunner
 from api.core.skills.workspace import Workspace, allocate_run_dir, load_workspace
+from api.settings import get_settings
 
 
-_DEFAULT_CONCURRENCY = int(os.getenv("SKILLS_WORKER_CONCURRENCY", "2"))
+_DEFAULT_CONCURRENCY = get_settings().skills_worker_concurrency
 
 
 @dataclass

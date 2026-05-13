@@ -4,12 +4,11 @@ EHI Ignite Challenge — FastAPI backend.
 Run: uv run uvicorn api.main:app --reload --port 8000
 """
 
-import os
 from pathlib import Path
 
 from dotenv import load_dotenv
 
-# Load local .env from project root before anything else reads os.getenv().
+# Load local .env from project root before anything else reads env vars.
 # Keep override=False so real environment variables (e.g., production secrets)
 # always win over values from .env.
 load_dotenv(Path(__file__).resolve().parent.parent / ".env", override=False)
@@ -45,9 +44,10 @@ from api.routers import ccda_lab
 from api.routers import skills as skills_router
 from api.plugins.routers import plugins as plugins_router
 from api.plugins import runtime as plugin_runtime
+from api.settings import get_settings
 
-_ENVIRONMENT = os.getenv("ENVIRONMENT", "development").strip().lower()
-_IS_PRODUCTION = _ENVIRONMENT in {"prod", "production"}
+_settings = get_settings()
+_IS_PRODUCTION = _settings.is_production
 
 app = FastAPI(
     title="EHI Ignite API",
@@ -57,13 +57,6 @@ app = FastAPI(
     redoc_url=None if _IS_PRODUCTION else "/redoc",
     openapi_url=None if _IS_PRODUCTION else "/openapi.json",
 )
-
-
-def _csv_env(name: str, default: list[str]) -> list[str]:
-    raw = os.getenv(name)
-    if not raw:
-        return default
-    return [item.strip() for item in raw.split(",") if item.strip()]
 
 
 @app.on_event("startup")
@@ -116,27 +109,12 @@ def _materialize_sof_db() -> None:
 
 app.add_middleware(
     TrustedHostMiddleware,
-    allowed_hosts=_csv_env(
-        "ALLOWED_HOSTS",
-        [
-            "ehi.healthcaredataai.com",
-            "localhost",
-            "127.0.0.1",
-            "testserver",
-        ],
-    ),
+    allowed_hosts=_settings.allowed_hosts,
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_csv_env(
-        "CORS_ALLOWED_ORIGINS",
-        [
-            "http://localhost:5173",
-            "http://localhost:3000",
-            "https://ehi.healthcaredataai.com",
-        ],
-    ),
+    allow_origins=_settings.cors_allowed_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Accept", "Authorization", "Content-Type"],

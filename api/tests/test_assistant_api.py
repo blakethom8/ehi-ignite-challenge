@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 
 from api.main import app
 from api.core.provider_assistant import AssistantResult
+from api.settings import get_settings
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -26,6 +27,7 @@ def patched_env(updates: dict[str, str | None]):
                 os.environ.pop(key, None)
             else:
                 os.environ[key] = value
+        get_settings.cache_clear()
         yield
     finally:
         for key, value in original.items():
@@ -33,6 +35,7 @@ def patched_env(updates: dict[str, str | None]):
                 os.environ.pop(key, None)
             else:
                 os.environ[key] = value
+        get_settings.cache_clear()
 
 
 class ProviderAssistantApiTests(unittest.TestCase):

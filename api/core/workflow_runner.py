@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import re
 import time
 import uuid
@@ -38,6 +37,7 @@ from api.core.provider_assistant import _collect_citations, _rank_relevant_facts
 from api.core.tracing import SpanKind, start_span
 from api.core import caspian_workspace
 from api.core.auth import SessionPrincipal
+from api.settings import get_settings
 from api.models import (
     ProviderAssistantCitation,
     WorkflowArtifact,
@@ -63,7 +63,7 @@ class WorkflowRunError(RuntimeError):
 
 
 def _resolve_api_key() -> str:
-    env_key = (os.getenv("ANTHROPIC_API_KEY") or "").strip()
+    env_key = (get_settings().anthropic_api_key or "").strip()
     if env_key and "YOUR_KEY_HERE" not in env_key:
         return env_key
     if _ENV_PATH.exists():
@@ -413,7 +413,7 @@ def run_workflow(
         f"Return only the JSON artifact."
     )
 
-    model = model_override or os.getenv("PROVIDER_ASSISTANT_MODEL", "claude-sonnet-4-5")
+    model = model_override or get_settings().provider_assistant_model
     max_tokens = 3000
 
     generated_at = datetime.now(timezone.utc)

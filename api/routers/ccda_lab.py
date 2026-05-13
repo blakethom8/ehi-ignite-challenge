@@ -5,7 +5,6 @@ from __future__ import annotations
 from collections import Counter
 from dataclasses import asdict
 from pathlib import Path
-import os
 import tempfile
 import time
 import urllib.error
@@ -18,13 +17,14 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 
 from api.core.ccda import convert_ccda_to_fhir_bundle, is_ccda_xml
+from api.settings import get_settings
 from lib.extract.lab.bundle_shape import score_bundle_shape
 from lib.extract.pipelines import get as get_pdf_pipeline
 from lib.extract.pipelines import list_pipelines
 
 router = APIRouter(prefix="/internal/ccda-lab", tags=["internal-ccda-lab"])
 
-MAX_UPLOAD_BYTES = int(os.getenv("CCDA_LAB_MAX_UPLOAD_BYTES", str(25 * 1024 * 1024)))
+MAX_UPLOAD_BYTES = get_settings().ccda_lab_max_upload_bytes
 
 
 class ConverterOption(BaseModel):
@@ -116,7 +116,8 @@ CLINICAL_RESOURCE_TYPES = {
 
 
 def _microsoft_status() -> MicrosoftConverterStatus:
-    base_url = (os.getenv("FHIR_CONVERTER_URL") or "").rstrip("/")
+    settings = get_settings()
+    base_url = (settings.fhir_converter_url or "").rstrip("/")
     if base_url:
         parsed = urllib.parse.urlparse(base_url)
         endpoint = parsed.netloc or parsed.path or base_url
@@ -138,8 +139,8 @@ def _microsoft_status() -> MicrosoftConverterStatus:
                 endpoint=endpoint,
                 detail=f"Configured but health check failed: {type(exc).__name__}.",
             )
-    converter_bin = os.getenv("FHIR_CONVERTER_BIN")
-    template_dir = os.getenv("FHIR_CONVERTER_TEMPLATE_DIR")
+    converter_bin = settings.fhir_converter_bin
+    template_dir = settings.fhir_converter_template_dir
     if converter_bin and template_dir:
         return MicrosoftConverterStatus(
             configured=True,

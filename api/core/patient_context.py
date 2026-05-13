@@ -8,7 +8,6 @@ separate patient-reported facts and exported as portable Markdown.
 from __future__ import annotations
 
 import json
-import os
 import re
 import uuid
 from datetime import datetime, timezone
@@ -18,6 +17,7 @@ from typing import Any
 from dotenv import dotenv_values
 
 from api.core.loader import load_patient, patient_display_name, path_from_patient_id
+from api.settings import get_settings
 from api.models import (
     PatientContextExportResponse,
     PatientContextExportStatus,
@@ -30,7 +30,7 @@ from api.models import (
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-STORE_ROOT = Path(os.getenv("PATIENT_CONTEXT_STORE_PATH", REPO_ROOT / "data" / "patient-context"))
+STORE_ROOT = get_settings().patient_context_store_path
 AGENT_PROFILE_DIR = Path(__file__).parent.parent / "agents" / "patient-context"
 REPO_ENV_PATH = REPO_ROOT / ".env"
 PRIVATE_CEDARS_DEFAULT = (
@@ -87,7 +87,7 @@ def _read_json(path: Path) -> dict[str, Any]:
 
 
 def _resolve_api_key() -> str:
-    env_key = (os.getenv("ANTHROPIC_API_KEY") or "").strip()
+    env_key = (get_settings().anthropic_api_key or "").strip()
     if env_key and "YOUR_KEY_HERE" not in env_key:
         return env_key
     if REPO_ENV_PATH.exists():
@@ -98,7 +98,7 @@ def _resolve_api_key() -> str:
 
 
 def _private_cedars_path() -> Path | None:
-    configured = os.getenv("PATIENT_CONTEXT_BLAKE_CEDARS_PATH")
+    configured = get_settings().patient_context_blake_cedars_path
     candidates = [Path(configured).expanduser()] if configured else []
     candidates.extend([PRIVATE_CEDARS_DEFAULT, PRIVATE_CEDARS_CHIEF])
     for path in candidates:
@@ -359,7 +359,8 @@ def _call_patient_context_llm(session: PatientContextSessionResponse, message: s
 
     import anthropic
 
-    model = os.getenv("PATIENT_CONTEXT_MODEL", os.getenv("PROVIDER_ASSISTANT_MODEL", "claude-sonnet-4-5"))
+    settings = get_settings()
+    model = settings.patient_context_model or settings.provider_assistant_model
     client = anthropic.Anthropic(api_key=api_key)
     response = client.messages.create(
         model=model,

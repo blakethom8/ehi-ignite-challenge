@@ -131,3 +131,89 @@ def test_active_published_context_skips_global_sof(monkeypatch) -> None:
 
     assert "Published creatinine" in prompt or "Creatinine" in prompt
     assert "Published encounter" in prompt
+
+
+def test_context_builder_reuses_single_sof_connection_and_single_published_lookup(monkeypatch) -> None:
+    record = SimpleNamespace(
+        summary=SimpleNamespace(
+            name="Test Patient",
+            birth_date=None,
+            gender="female",
+            city="Los Angeles",
+            state="CA",
+        ),
+        medications=[],
+        conditions=[],
+        observations=[],
+        diagnostic_reports=[],
+        procedures=[],
+        allergies=[],
+        encounters=[],
+    )
+    stats = SimpleNamespace(name="Test Patient")
+
+    published_calls = 0
+    bundle_calls = 0
+    connect_calls = 0
+
+    class FakeCursor:
+        def __init__(self, rows):
+            self._rows = rows
+
+        def fetchall(self):
+            return self._rows
+
+    class FakeConn:
+        def __init__(self):
+            self.row_factory = None
+            self.closed = False
+
+        def execute(self, sql, _params):
+            if "FROM medication_episode" in sql:
+                return FakeCursor([])
+            if "FROM condition" in sql:
+                return FakeCursor([])
+            if "FROM observation_latest" in sql:
+                return FakeCursor([])
+            if "FROM encounter e" in sql:
+                return FakeCursor([])
+            raise AssertionError(f"Unexpected SQL: {sql}")
+
+        def close(self):
+            self.closed = True
+
+    def fake_load_active(_patient_id: str):
+        nonlocal published_calls
+        published_calls += 1
+        return None
+
+    def fake_load_bundle(_path):
+        nonlocal bundle_calls
+        bundle_calls += 1
+        return {
+            "entry": [
+                {
+                    "fullUrl": "urn:uuid:test-patient-uuid",
+                    "resource": {"resourceType": "Patient"},
+                }
+            ]
+        }
+
+    def fake_connect(*_args, **_kwargs):
+        nonlocal connect_calls
+        connect_calls += 1
+        return FakeConn()
+
+    monkeypatch.setattr(context_builder, "load_patient", lambda _patient_id: (record, stats))
+    monkeypatch.setattr(context_builder, "load_active_published_run", fake_load_active)
+    monkeypatch.setattr(context_builder, "path_from_patient_id", lambda _patient_id: SimpleNamespace())
+    monkeypatch.setattr(context_builder, "_load_bundle_json", fake_load_bundle)
+    monkeypatch.setattr(context_builder, "DEFAULT_SOF_DB", SimpleNamespace(exists=lambda: True))
+    monkeypatch.setattr(context_builder.sqlite3, "connect", fake_connect)
+
+    context = context_builder.build_clinical_context("synthea-id")
+
+    assert context.patient_summary.startswith("Test Patient")
+    assert published_calls == 1
+    assert bundle_calls == 1
+    assert connect_calls == 1

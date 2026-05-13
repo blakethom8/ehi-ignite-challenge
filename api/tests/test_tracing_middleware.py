@@ -45,6 +45,10 @@ def traced_app(monkeypatch, tmp_path):
     async def chat():
         return {"engine": "context"}
 
+    @app.post("/api/assistant/chat/stream")
+    async def chat_stream():
+        return {"engine": "context"}
+
     @app.post("/api/skills/{name}/runs")
     async def skill_run(name: str):
         return {"runId": "r_skill_1"}
@@ -117,6 +121,21 @@ def test_non_audited_path_is_not_traced(traced_app):
     assert r.status_code == 200
     rows = _read_traces(db_path)
     assert rows == []
+
+
+def test_streaming_chat_path_is_also_traced(traced_app):
+    app, db_path = traced_app
+    client = TestClient(app)
+
+    r = client.post(
+        "/api/assistant/chat/stream",
+        json={"patient_id": "p1", "question": "what changed?", "stance": "opinionated"},
+    )
+    assert r.status_code == 200
+
+    rows = _read_traces(db_path)
+    assert len(rows) == 1
+    assert rows[0]["workspace_kind"] == "caspian"
 
 
 def test_sample_rate_zero_drops_all_traces(monkeypatch, tmp_path):

@@ -36,6 +36,8 @@ type CaspianChatPaneProps = {
   onUpdateAgentSettings?: (next: AgentSettings) => void;
   /** Live tool-call events for the in-flight agent turn (empty between turns). */
   liveToolCalls?: LiveToolCall[];
+  /** Human-readable in-flight status emitted before tool events arrive. */
+  pendingStatus?: string | null;
 };
 
 const TOOL_LABELS: Record<string, string> = {
@@ -233,6 +235,7 @@ export function CaspianChatPane({
   agentSettings,
   onUpdateAgentSettings,
   liveToolCalls = [],
+  pendingStatus = null,
 }: CaspianChatPaneProps) {
   const [text, setText] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -366,11 +369,13 @@ export function CaspianChatPane({
                   />
                 </span>
                 {liveToolCalls.length === 0
-                  ? "Thinking across the chart…"
+                  ? pendingStatus || "Thinking across the chart…"
                   : "Working across the chart…"}
               </div>
               <div className="mt-1 text-[11.5px] leading-[1.5] text-[var(--ink-4)]">
-                Pulling evidence, weighing risk, and assembling citations for the next answer.
+                {liveToolCalls.length === 0
+                  ? "The harness has started. Evidence and tool activity will appear here as soon as they land."
+                  : "Pulling evidence, weighing risk, and assembling citations for the next answer."}
               </div>
               {liveToolCalls.length > 0 ? (
                 <ul className="mt-3 space-y-1.5">

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import unittest
 from contextlib import contextmanager
@@ -9,6 +10,7 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 from api.main import app
+from api.core.provider_assistant import AssistantResult
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -99,6 +101,49 @@ class ProviderAssistantApiTests(unittest.TestCase):
         response = self.client.post("/api/assistant/chat", json=payload)
 
         self.assertEqual(response.status_code, 422)
+
+    def test_assistant_chat_stream_emits_immediate_status_and_live_events(self) -> None:
+        def fake_answer_provider_question(**kwargs):
+            progress_hook = kwargs.get("progress_hook")
+            if progress_hook is not None:
+                progress_hook(
+                    {
+                        "type": "tool_start",
+                        "id": "tool_1",
+                        "tool": "baseline_evidence",
+                        "input_summary": "Building baseline for: Any active blood thinner risk?",
+                    }
+                )
+            return AssistantResult(
+                answer="Active anticoagulant risk is present.",
+                confidence="high",
+                citations=[],
+                follow_ups=[],
+                engine="anthropic-agent-sdk",
+            )
+
+        with patch("api.routers.assistant.answer_provider_question", side_effect=fake_answer_provider_question):
+            with self.client.stream(
+                "POST",
+                "/api/assistant/chat/stream",
+                json=self._payload(),
+            ) as response:
+                self.assertEqual(response.status_code, 200)
+                payload = "".join(response.iter_text())
+
+        events: list[dict[str, object]] = []
+        for frame in payload.split("\n\n"):
+            lines = [line for line in frame.splitlines() if line.startswith("data:")]
+            if not lines:
+                continue
+            body = "\n".join(line[5:].strip() for line in lines)
+            events.append(json.loads(body))
+
+        self.assertGreaterEqual(len(events), 4)
+        self.assertEqual(events[0]["type"], "status")
+        self.assertEqual(events[1]["type"], "tool_start")
+        self.assertEqual(events[-2]["type"], "done")
+        self.assertEqual(events[-1]["type"], "stream_closed")
 
     def test_assistant_chat_anthropic_missing_key_falls_back(self) -> None:
         with patched_env(

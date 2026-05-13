@@ -2,6 +2,7 @@
 
 Audited surfaces (each emits one trace per request):
 - POST /api/assistant/chat            → workspace_kind = "caspian"
+- POST /api/assistant/chat/stream     → workspace_kind = "caspian"
 - POST /api/skills/{name}/runs[/...]  → workspace_kind = "skill"
 - POST /api/plugins/runs/{run_id}/tool/{tool_id}  → workspace_kind = "plugin"
 
@@ -31,6 +32,7 @@ from api.core.tracing import (
 LOGGER = logging.getLogger(__name__)
 
 _CASPIAN_PATH = "/api/assistant/chat"
+_CASPIAN_STREAM_PATH = "/api/assistant/chat/stream"
 _CASPIAN_WORKFLOW_PATH = "/api/caspian/workflows/run"
 _SKILL_PATH_PREFIX = "/api/skills/"
 _PLUGIN_TOOL_RE = re.compile(r"^/api/plugins/runs/[^/]+/tool/[^/]+/?$")
@@ -40,7 +42,7 @@ def _classify(method: str, path: str) -> str | None:
     """Return the workspace_kind for an audited path, or None to skip."""
     if method != "POST":
         return None
-    if path == _CASPIAN_PATH or path == _CASPIAN_WORKFLOW_PATH:
+    if path in {_CASPIAN_PATH, _CASPIAN_STREAM_PATH, _CASPIAN_WORKFLOW_PATH}:
         return WORKSPACE_CASPIAN
     if path.startswith(_SKILL_PATH_PREFIX):
         return WORKSPACE_SKILL

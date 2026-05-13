@@ -742,11 +742,17 @@ export interface ProviderAssistantRequest {
 
 /**
  * Live streaming events emitted by POST /assistant/chat/stream as the agent runs.
- * `tool_start`/`tool_end` arrive in real time per tool call; `done` carries the
- * full ProviderAssistantResponse; `error` is terminal. `stream_closed` is the
+ * `status` arrives immediately once the harness is accepted; `tool_start` /
+ * `tool_end` arrive in real time per tool call; `done` carries the full
+ * ProviderAssistantResponse; `error` is terminal. `stream_closed` is the
  * end-of-stream sentinel.
  */
 export type AssistantStreamEvent =
+  | {
+      type: "status";
+      phase: "starting";
+      message: string;
+    }
   | {
       type: "tool_start";
       id: string;

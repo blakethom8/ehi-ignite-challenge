@@ -114,6 +114,11 @@ describe("useCaspianAssistantSession", () => {
         callbacks: { onEvent: (event: Record<string, unknown>) => void },
       ) => {
         callbacks.onEvent({
+          type: "status",
+          phase: "starting",
+          message: "Initializing Caspian harness and preparing chart evidence.",
+        });
+        callbacks.onEvent({
           type: "tool_start",
           id: "t1",
           tool: "query_chart_evidence",
@@ -171,5 +176,56 @@ describe("useCaspianAssistantSession", () => {
     );
     expect(stored).toContain("Any pre-op medication risks?");
     expect(stored).toContain("Apixaban 5 mg BID");
+  });
+
+  it("surfaces an immediate pending status before tool activity arrives", async () => {
+    let resolveStream: (() => void) | null = null;
+    chatProviderAssistantStream.mockImplementation(
+      async (
+        _payload: unknown,
+        callbacks: { onEvent: (event: Record<string, unknown>) => void },
+      ) =>
+        new Promise<void>((resolve) => {
+          resolveStream = () => {
+            callbacks.onEvent({
+              type: "done",
+              response: {
+                patient_id: "patient-123",
+                answer: "No immediate blocker found.",
+                confidence: "medium",
+                stance: "opinionated",
+                engine: "anthropic-agent-sdk",
+                citations: [],
+                follow_ups: [],
+                trace: null,
+              },
+            });
+            resolve();
+          };
+        }),
+    );
+
+    const { result } = renderHook(
+      () => useCaspianAssistantSession("patient-123", "s_pending"),
+      { wrapper },
+    );
+
+    act(() => {
+      result.current.submitQuestion("Give me the top issue.");
+    });
+
+    await waitFor(() => {
+      expect(result.current.isPending).toBe(true);
+      expect(result.current.pendingStatus).toBe("Starting Caspian harness…");
+    });
+
+    await act(async () => {
+      resolveStream?.();
+    });
+
+    await waitFor(() => {
+      expect(result.current.isPending).toBe(false);
+      expect(result.current.pendingStatus).toBeNull();
+    });
   });
 });

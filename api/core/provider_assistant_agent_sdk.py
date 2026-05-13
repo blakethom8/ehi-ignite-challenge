@@ -52,7 +52,7 @@ from dotenv import dotenv_values
 from api.core.provider_assistant import (
     AssistantCitationPayload,
     AssistantResult,
-    get_relevant_provider_evidence,
+    build_provider_evidence_session,
 )
 from api.core.loader import load_active_published_run
 from api.core.sof_tools import (
@@ -229,6 +229,7 @@ async def _run_agent(
     config: AgentSDKConfig,
     progress_hook: ProgressHook = None,
 ) -> AssistantResult:
+    evidence_session = None
     baseline_id = uuid.uuid4().hex[:12]
     _emit(progress_hook, {
         "type": "tool_start",
@@ -238,15 +239,23 @@ async def _run_agent(
     })
     baseline_started = time.monotonic()
     with start_span(SpanKind.RETRIEVAL, "baseline_evidence", input_data={"patient_id": patient_id, "question": question}) as _baseline_span:
-        baseline = get_relevant_provider_evidence(
-            patient_id=patient_id,
+        evidence_session = build_provider_evidence_session(patient_id)
+        baseline_lookup = evidence_session.get_relevant_evidence(
             query=question,
             history=history,
             max_facts=8,
             max_citations=6,
         )
+        baseline = baseline_lookup.payload
         if _baseline_span:
-            _baseline_span.output_data = json.dumps({"intent": baseline.get("intent"), "fact_count": len(baseline.get("evidence_lines", []))}, default=str)
+            _baseline_span.output_data = json.dumps(
+                {
+                    "intent": baseline.get("intent"),
+                    "fact_count": len(baseline.get("evidence_lines", [])),
+                    "cache_hit": baseline_lookup.cache_hit,
+                },
+                default=str,
+            )
     _emit(progress_hook, {
         "type": "tool_end",
         "id": baseline_id,
@@ -266,6 +275,8 @@ async def _run_agent(
             retrieved_citations[(citation.source_type, citation.resource_id)] = citation
 
     remember_citations(baseline.get("citations", []))
+    if evidence_session is None:  # pragma: no cover - defensive
+        raise AgentExecutionError("Baseline evidence session was not initialized.")
 
     @tool(
         "get_patient_snapshot",
@@ -282,13 +293,13 @@ async def _run_agent(
         })
         started = time.monotonic()
         with start_span(SpanKind.TOOL, "get_patient_snapshot") as _snap_span:
-            snapshot = get_relevant_provider_evidence(
-                patient_id=patient_id,
+            snapshot_lookup = evidence_session.get_relevant_evidence(
                 query="Summarize the current peri-operative risk picture and major active safety signals.",
                 history=history,
                 max_facts=10,
                 max_citations=8,
             )
+            snapshot = snapshot_lookup.payload
             remember_citations(snapshot.get("citations", []))
             result = {
                 "content": [
@@ -299,7 +310,14 @@ async def _run_agent(
                 ]
             }
             if _snap_span:
-                _snap_span.output_data = json.dumps({"fact_count": len(snapshot.get("evidence_lines", [])), "citation_count": len(snapshot.get("citations", []))}, default=str)
+                _snap_span.output_data = json.dumps(
+                    {
+                        "fact_count": len(snapshot.get("evidence_lines", [])),
+                        "citation_count": len(snapshot.get("citations", [])),
+                        "cache_hit": snapshot_lookup.cache_hit,
+                    },
+                    default=str,
+                )
         _emit(progress_hook, {
             "type": "tool_end",
             "id": snap_id,
@@ -342,16 +360,23 @@ async def _run_agent(
         })
         started = time.monotonic()
         with start_span(SpanKind.TOOL, "query_chart_evidence", input_data={"query": query_text, "max_facts": max_facts_int}) as _ev_span:
-            evidence = get_relevant_provider_evidence(
-                patient_id=patient_id,
+            evidence_lookup = evidence_session.get_relevant_evidence(
                 query=query_text,
                 history=history,
                 max_facts=max_facts_int,
                 max_citations=8,
             )
+            evidence = evidence_lookup.payload
             remember_citations(evidence.get("citations", []))
             if _ev_span:
-                _ev_span.output_data = json.dumps({"fact_count": len(evidence.get("evidence_lines", [])), "citation_count": len(evidence.get("citations", []))}, default=str)
+                _ev_span.output_data = json.dumps(
+                    {
+                        "fact_count": len(evidence.get("evidence_lines", [])),
+                        "citation_count": len(evidence.get("citations", [])),
+                        "cache_hit": evidence_lookup.cache_hit,
+                    },
+                    default=str,
+                )
         _emit(progress_hook, {
             "type": "tool_end",
             "id": ev_id,

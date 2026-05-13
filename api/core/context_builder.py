@@ -33,6 +33,12 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
 from api.core.loader import load_active_published_run, load_patient, path_from_patient_id
 from api.core.sof_tools import DEFAULT_SOF_DB
+from lib.clinical.drug_classifier import DrugClassifier
+
+_DRUG_CLASSIFIER = DrugClassifier(
+    mapping_path=_REPO_ROOT / "lib" / "clinical" / "drug_classes.json"
+)
+_MISSING = object()
 
 # ---------------------------------------------------------------------------
 # Data structures
@@ -230,6 +236,12 @@ def _patient_uuid_from_id(patient_id: str) -> str | None:
         return None
     with open(path) as f:
         bundle = json.load(f)
+    return _patient_uuid_from_bundle(bundle)
+
+
+def _patient_uuid_from_bundle(bundle: dict[str, Any] | None) -> str | None:
+    if not isinstance(bundle, dict):
+        return None
     for entry in bundle.get("entry", []):
         resource = entry.get("resource", {})
         if resource.get("resourceType") == "Patient":
@@ -237,6 +249,52 @@ def _patient_uuid_from_id(patient_id: str) -> str | None:
             if full_url.startswith("urn:uuid:"):
                 return full_url.removeprefix("urn:uuid:")
     return None
+
+
+def _load_bundle_json(path: Path | None) -> dict[str, Any] | None:
+    import json
+
+    if path is None:
+        return None
+    try:
+        with open(path) as f:
+            bundle = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return None
+    return bundle if isinstance(bundle, dict) else None
+
+
+def _medication_reason_index_from_bundle(bundle: dict[str, Any] | None) -> dict[str, str]:
+    if not isinstance(bundle, dict):
+        return {}
+
+    ref_index = {
+        entry.get("fullUrl", ""): entry["resource"]
+        for entry in bundle.get("entry", [])
+        if isinstance(entry, dict) and isinstance(entry.get("resource"), dict)
+    }
+    reasons: dict[str, str] = {}
+    for entry in bundle.get("entry", []):
+        if not isinstance(entry, dict):
+            continue
+        resource = entry.get("resource", {})
+        if not isinstance(resource, dict) or resource.get("resourceType") != "MedicationRequest":
+            continue
+        drug_text = str(resource.get("medicationCodeableConcept", {}).get("text", "")).strip().lower()
+        if not drug_text:
+            continue
+        for ref in resource.get("reasonReference", []):
+            if not isinstance(ref, dict):
+                continue
+            display = str(ref.get("display", "")).strip()
+            if not display:
+                target = ref_index.get(str(ref.get("reference", "")), {})
+                if isinstance(target, dict):
+                    display = str(target.get("code", {}).get("text", "")).strip()
+            if display:
+                reasons[drug_text] = display
+                break
+    return reasons
 
 
 # ---------------------------------------------------------------------------
@@ -392,7 +450,12 @@ def _build_record_lab_context(record) -> list[str]:
     return lines
 
 
-def _build_published_clinical_note_context(patient_id: str, limit: int = 8) -> list[str]:
+def _build_published_clinical_note_context(
+    patient_id: str,
+    limit: int = 8,
+    *,
+    published_run: dict[str, Any] | None | object = _MISSING,
+) -> list[str]:
     """Surface note/document artifacts from the active published workspace.
 
     The shared PatientRecord facade intentionally focuses on normalized FHIR
@@ -400,7 +463,7 @@ def _build_published_clinical_note_context(patient_id: str, limit: int = 8) -> l
     important for chart-grounded Q&A, so the assistant context reads them from
     the durable run artifact when a workspace has been published.
     """
-    run = load_active_published_run(patient_id)
+    run = load_active_published_run(patient_id) if published_run is _MISSING else published_run
     if not run:
         return []
     candidate = run.get("candidate_record")
@@ -484,8 +547,6 @@ def build_clinical_context(patient_id: str) -> ClinicalContext:
     Pulls from both the FHIR bundle (via load_patient) and the SOF warehouse
     (for deduplicated medication episodes and latest labs).
     """
-    import json
-
     # Load patient record
     result = load_patient(patient_id)
     if result is None:
@@ -497,12 +558,18 @@ def build_clinical_context(patient_id: str) -> ClinicalContext:
     # Get patient demographics. Uploaded/published workspace records do not have
     # a backing Synthea file path, so prefer the parsed record summary.
     path = path_from_patient_id(patient_id)
+    source_bundle = _load_bundle_json(path)
+    medication_reasons = _medication_reason_index_from_bundle(source_bundle)
     name = stats.name or record.summary.name or patient_id
 
     # Resolve FHIR UUID for SOF queries. When an active published snapshot
     # exists, the selected chart scope is the published facade, not global SOF.
-    fhir_uuid = None if active_published_run is not None else _patient_uuid_from_id(patient_id)
+    fhir_uuid = None if active_published_run is not None else _patient_uuid_from_bundle(source_bundle)
     patient_ref = f"urn:uuid:{fhir_uuid}" if fhir_uuid else None
+    sof_conn: sqlite3.Connection | None = None
+    if patient_ref and DEFAULT_SOF_DB.exists():
+        sof_conn = sqlite3.connect(f"file:{DEFAULT_SOF_DB}?mode=ro", uri=True)
+        sof_conn.row_factory = sqlite3.Row
 
     # --- Patient summary line ---
     demographics: list[str] = [name]
@@ -515,11 +582,7 @@ def build_clinical_context(patient_id: str) -> ClinicalContext:
     patient_summary = " · ".join(demographics)
 
     # --- Safety flags from drug classifier ---
-    from lib.clinical.drug_classifier import DrugClassifier
-    classifier = DrugClassifier(
-        mapping_path=_REPO_ROOT / "lib" / "clinical" / "drug_classes.json"
-    )
-    raw_flags = classifier.generate_safety_flags(record.medications)
+    raw_flags = _DRUG_CLASSIFIER.generate_safety_flags(record.medications)
 
     safety_flags: list[str] = []
     interactions_list: list[str] = []
@@ -554,11 +617,9 @@ def build_clinical_context(patient_id: str) -> ClinicalContext:
     active_meds: list[str] = []
     historical_meds: list[str] = []
 
-    if patient_ref and DEFAULT_SOF_DB.exists():
-        conn = sqlite3.connect(f"file:{DEFAULT_SOF_DB}?mode=ro", uri=True)
-        conn.row_factory = sqlite3.Row
-        try:
-            med_rows = conn.execute(
+    try:
+        if sof_conn is not None:
+            med_rows = sof_conn.execute(
                 """SELECT display, drug_class, latest_status, is_active,
                           start_date, end_date, duration_days, request_count
                    FROM medication_episode
@@ -567,29 +628,9 @@ def build_clinical_context(patient_id: str) -> ClinicalContext:
                 (patient_ref,),
             ).fetchall()
 
-            # Resolve reasons from the source bundle when one exists. Uploaded
-            # workspaces can be backed only by server-local persisted artifacts.
-            med_reasons: dict[str, str] = {}
-            if path:
-                with open(path) as f:
-                    bundle = json.load(f)
-                ref_index = {e.get("fullUrl", ""): e["resource"] for e in bundle.get("entry", [])}
-                for entry in bundle.get("entry", []):
-                    resource = entry.get("resource", {})
-                    if resource.get("resourceType") == "MedicationRequest":
-                        drug_text = resource.get("medicationCodeableConcept", {}).get("text", "")
-                        for ref in resource.get("reasonReference", []):
-                            display = ref.get("display", "")
-                            if not display:
-                                target = ref_index.get(ref.get("reference", ""), {})
-                                display = target.get("code", {}).get("text", "")
-                            if drug_text and display:
-                                med_reasons[drug_text.strip().lower()] = display
-                                break
-
             for row in med_rows:
                 dur = _duration_str(row["start_date"], row["end_date"])
-                reason = med_reasons.get(row["display"].strip().lower(), "")
+                reason = medication_reasons.get(row["display"].strip().lower(), "")
                 reason_str = f" — for {reason}" if reason else ""
                 drug_class = f" [{row['drug_class']}]" if row["drug_class"] else ""
 
@@ -602,21 +643,15 @@ def build_clinical_context(patient_id: str) -> ClinicalContext:
                         f"- {row['display']}{drug_class}{reason_str} | {_fmt_date(row['start_date'])} → {_fmt_date(row['end_date'])} ({dur})"
                     )
 
-        finally:
-            conn.close()
+        if not active_meds and not historical_meds:
+            active_meds, historical_meds = _build_record_medication_context(record, _DRUG_CLASSIFIER)
 
-    if not active_meds and not historical_meds:
-        active_meds, historical_meds = _build_record_medication_context(record, classifier)
+        # --- Active conditions (from SOF) ---
+        active_conditions: list[str] = []
+        resolved_conditions: list[str] = []
 
-    # --- Active conditions (from SOF) ---
-    active_conditions: list[str] = []
-    resolved_conditions: list[str] = []
-
-    if patient_ref and DEFAULT_SOF_DB.exists():
-        conn = sqlite3.connect(f"file:{DEFAULT_SOF_DB}?mode=ro", uri=True)
-        conn.row_factory = sqlite3.Row
-        try:
-            cond_rows = conn.execute(
+        if sof_conn is not None:
+            cond_rows = sof_conn.execute(
                 """SELECT display, clinical_status, onset_date
                    FROM condition
                    WHERE patient_ref = ?
@@ -634,21 +669,15 @@ def build_clinical_context(patient_id: str) -> ClinicalContext:
                     resolved_conditions.append(
                         f"- {row['display']} ({row['clinical_status']}) | Onset {_fmt_date(row['onset_date'])}"
                     )
-        finally:
-            conn.close()
+        if not active_conditions and not resolved_conditions:
+            active_conditions, resolved_conditions = _build_record_condition_context(record)
 
-    if not active_conditions and not resolved_conditions:
-        active_conditions, resolved_conditions = _build_record_condition_context(record)
+        # --- Key labs (from SOF observation_latest) ---
+        key_labs: list[str] = []
 
-    # --- Key labs (from SOF observation_latest) ---
-    key_labs: list[str] = []
-
-    if patient_ref and DEFAULT_SOF_DB.exists():
-        conn = sqlite3.connect(f"file:{DEFAULT_SOF_DB}?mode=ro", uri=True)
-        conn.row_factory = sqlite3.Row
-        try:
+        if sof_conn is not None:
             loinc_list = ",".join(f"'{k}'" for k in KEY_LAB_LOINCS.keys())
-            lab_rows = conn.execute(
+            lab_rows = sof_conn.execute(
                 f"""SELECT loinc_code, display, value_quantity, value_unit, effective_date
                    FROM observation_latest
                    WHERE patient_ref = ? AND loinc_code IN ({loinc_list})
@@ -669,25 +698,22 @@ def build_clinical_context(patient_id: str) -> ClinicalContext:
                         val_str = str(value)
                     key_labs.append(f"- **{lab_name}**: {val_str} {unit} ({date})")
 
-        finally:
-            conn.close()
+        if not key_labs:
+            key_labs = _build_record_lab_context(record)
 
-    if not key_labs:
-        key_labs = _build_record_lab_context(record)
+        # --- Clinical notes and narrative document context ---
+        clinical_notes = _build_published_clinical_note_context(
+            patient_id,
+            published_run=active_published_run,
+        )
+        if not clinical_notes:
+            clinical_notes = _build_record_clinical_note_context(record)
 
-    # --- Clinical notes and narrative document context ---
-    clinical_notes = _build_published_clinical_note_context(patient_id)
-    if not clinical_notes:
-        clinical_notes = _build_record_clinical_note_context(record)
+        # --- Recent encounters (from SOF, last 10 with diagnoses) ---
+        recent_encounters: list[str] = []
 
-    # --- Recent encounters (from SOF, last 10 with diagnoses) ---
-    recent_encounters: list[str] = []
-
-    if patient_ref and DEFAULT_SOF_DB.exists():
-        conn = sqlite3.connect(f"file:{DEFAULT_SOF_DB}?mode=ro", uri=True)
-        conn.row_factory = sqlite3.Row
-        try:
-            enc_rows = conn.execute(
+        if sof_conn is not None:
+            enc_rows = sof_conn.execute(
                 """SELECT e.class_code, e.type_text, e.period_start,
                           GROUP_CONCAT(c.display, '; ') as diagnoses
                    FROM encounter e
@@ -706,65 +732,65 @@ def build_clinical_context(patient_id: str) -> ClinicalContext:
                 type_text = row["type_text"] or ""
                 recent_encounters.append(f"- {date} | {cls} | {type_text}{dx}")
 
-        finally:
-            conn.close()
+        if not recent_encounters:
+            recent_encounters = _build_record_encounter_context(record)
 
-    if not recent_encounters:
-        recent_encounters = _build_record_encounter_context(record)
+        # --- Procedures summary (from FHIR, grouped) ---
+        procedures_summary: list[str] = []
+        from collections import Counter
+        proc_counts: Counter[str] = Counter()
+        for p in record.procedures:
+            proc_counts[p.code.label()] += 1
+        for proc_name, count in proc_counts.most_common(10):
+            if count > 1:
+                procedures_summary.append(f"- {proc_name} (×{count})")
+            else:
+                procedures_summary.append(f"- {proc_name}")
 
-    # --- Procedures summary (from FHIR, grouped) ---
-    procedures_summary: list[str] = []
-    from collections import Counter
-    proc_counts: Counter[str] = Counter()
-    for p in record.procedures:
-        proc_counts[p.code.label()] += 1
-    for proc_name, count in proc_counts.most_common(10):
-        if count > 1:
-            procedures_summary.append(f"- {proc_name} (×{count})")
+        # --- Notable absences ---
+        absences: list[str] = []
+        all_class_keys = {f.class_key for f in raw_flags}
+        critical_classes = {"anticoagulants", "antiplatelets", "opioids", "immunosuppressants"}
+        for cls in critical_classes - all_class_keys:
+            label = cls.replace("_", " ").title()
+            absences.append(f"- No {label} (current or historical)")
+        for flag in raw_flags:
+            if flag.status == "NONE" and flag.severity == "critical":
+                absences.append(f"- No {flag.label} found")
+
+        # Check for allergies
+        if not record.allergies:
+            absences.append("- No allergies recorded")
         else:
-            procedures_summary.append(f"- {proc_name}")
+            for allergy in record.allergies[:5]:
+                safety_flags.append(f"- ⚠️ **Allergy**: {allergy.code.label()} (criticality: {allergy.criticality or 'unknown'})")
 
-    # --- Notable absences ---
-    absences: list[str] = []
-    all_class_keys = {f.class_key for f in raw_flags}
-    critical_classes = {"anticoagulants", "antiplatelets", "opioids", "immunosuppressants"}
-    for cls in critical_classes - all_class_keys:
-        label = cls.replace("_", " ").title()
-        absences.append(f"- No {label} (current or historical)")
-    for flag in raw_flags:
-        if flag.status == "NONE" and flag.severity == "critical":
-            absences.append(f"- No {flag.label} found")
+        # T8b: read LLM-augmented context from disk. Generation happens at
+        # publish/intake time (D8); the request path is purely a disk read.
+        patient_voice_ctx = _load_patient_voice_context(patient_id)
+        episode_briefs = _load_episode_briefs(patient_id)
+        caveats = _load_caveats(patient_id)
 
-    # Check for allergies
-    if not record.allergies:
-        absences.append("- No allergies recorded")
-    else:
-        for allergy in record.allergies[:5]:
-            safety_flags.append(f"- ⚠️ **Allergy**: {allergy.code.label()} (criticality: {allergy.criticality or 'unknown'})")
-
-    # T8b: read LLM-augmented context from disk. Generation happens at
-    # publish/intake time (D8); the request path is purely a disk read.
-    patient_voice_ctx = _load_patient_voice_context(patient_id)
-    episode_briefs = _load_episode_briefs(patient_id)
-    caveats = _load_caveats(patient_id)
-
-    return ClinicalContext(
-        patient_summary=patient_summary,
-        safety_flags=safety_flags,
-        interactions=interactions_list,
-        active_medications=active_meds,
-        active_conditions=active_conditions,
-        key_labs=key_labs,
-        clinical_notes=clinical_notes,
-        recent_encounters=recent_encounters,
-        procedures_summary=procedures_summary,
-        historical_meds=historical_meds,
-        resolved_conditions=resolved_conditions,
-        absences=absences,
-        patient_voice=patient_voice_ctx,
-        episode_briefs=episode_briefs,
-        caveats=caveats,
-    )
+        return ClinicalContext(
+            patient_summary=patient_summary,
+            safety_flags=safety_flags,
+            interactions=interactions_list,
+            active_medications=active_meds,
+            active_conditions=active_conditions,
+            key_labs=key_labs,
+            clinical_notes=clinical_notes,
+            recent_encounters=recent_encounters,
+            procedures_summary=procedures_summary,
+            historical_meds=historical_meds,
+            resolved_conditions=resolved_conditions,
+            absences=absences,
+            patient_voice=patient_voice_ctx,
+            episode_briefs=episode_briefs,
+            caveats=caveats,
+        )
+    finally:
+        if sof_conn is not None:
+            sof_conn.close()
 
 
 # ---------------------------------------------------------------------------

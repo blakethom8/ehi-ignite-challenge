@@ -407,15 +407,25 @@ async def provider_chat_stream(payload: ProviderAssistantRequest, request: Reque
         finally:
             await hub.close()
 
-    worker = asyncio.create_task(run_agent())
-
     async def event_stream() -> AsyncIterator[bytes]:
+        sub_iter = hub.subscribe().__aiter__()
+        sub_task: asyncio.Task[Any] = asyncio.create_task(sub_iter.__anext__())
+        keep_task: asyncio.Task[Any] = asyncio.create_task(
+            asyncio.sleep(_SSE_KEEPALIVE_INTERVAL_S)
+        )
+        # Let the subscription task register with the hub before any initial
+        # status/tool events are published; otherwise the first events can race
+        # and be dropped.
+        await asyncio.sleep(0)
+        hub.publish_nowait(
+            {
+                "type": "status",
+                "phase": "starting",
+                "message": "Initializing Caspian harness and preparing chart evidence.",
+            }
+        )
+        worker = asyncio.create_task(run_agent())
         try:
-            sub_iter = hub.subscribe().__aiter__()
-            sub_task: asyncio.Task[Any] = asyncio.create_task(sub_iter.__anext__())
-            keep_task: asyncio.Task[Any] = asyncio.create_task(
-                asyncio.sleep(_SSE_KEEPALIVE_INTERVAL_S)
-            )
             try:
                 while True:
                     done, _pending = await asyncio.wait(

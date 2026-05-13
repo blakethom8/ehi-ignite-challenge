@@ -11,7 +11,7 @@ Design goals:
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -91,6 +91,72 @@ class AssistantResult:
     history_turns_sent: int | None = None     # how many prior turns included
     # Workspace files the agent wrote during this turn (slice 3+4).
     files_created: list[str] | None = None
+
+
+@dataclass(frozen=True)
+class ProviderEvidenceLookup:
+    payload: dict[str, Any]
+    cache_hit: bool
+
+
+@dataclass
+class ProviderEvidenceSession:
+    patient_id: str
+    facts: list[_Fact]
+    summary: dict[str, Any]
+    _cache: dict[tuple[str, tuple[tuple[str, str], ...], int, int], dict[str, Any]] = field(
+        default_factory=dict,
+        repr=False,
+    )
+
+    def get_relevant_evidence(
+        self,
+        query: str,
+        history: list[dict[str, str]] | None = None,
+        max_facts: int = 8,
+        max_citations: int = 6,
+    ) -> ProviderEvidenceLookup:
+        normalized_history = tuple(
+            (
+                str(turn.get("role", "")).strip().lower(),
+                str(turn.get("content", "")).strip(),
+            )
+            for turn in (history or [])
+            if str(turn.get("content", "")).strip()
+        )
+        cache_key = (query.strip(), normalized_history, max_facts, max_citations)
+        cached = self._cache.get(cache_key)
+        if cached is not None:
+            return ProviderEvidenceLookup(payload=cached, cache_hit=True)
+
+        query_with_history = f"{query} {_history_context(history)}".strip()
+        tokens = _expand_tokens(_tokenize(query_with_history))
+        intent = _detect_intent(tokens)
+
+        scored = sorted(
+            ((fact, _score_fact(fact, tokens, intent)) for fact in self.facts),
+            key=lambda item: item[1],
+            reverse=True,
+        )
+
+        top_facts = [fact for fact, score in scored if score >= 10][:max_facts]
+        if not top_facts:
+            top_facts = [fact for fact, _score in scored[:max_facts]]
+
+        citations = _collect_citations(top_facts, max_items=max_citations)
+        payload = {
+            "intent": intent,
+            "patient_name": self.summary["patient_name"],
+            "parse_warning_count": self.summary["parse_warning_count"],
+            "active_flag_count": len(self.summary["active_flags"]),
+            "interaction_count": len(self.summary["interactions"]),
+            "high_risk_active_condition_count": self.summary["active_high_risk_condition_count"],
+            "evidence_lines": [fact.text for fact in top_facts],
+            "citations": [_serialize_citation(citation) for citation in citations],
+            "follow_ups": _follow_ups(intent),
+        }
+        self._cache[cache_key] = payload
+        return ProviderEvidenceLookup(payload=payload, cache_hit=False)
 
 
 def _tokenize(text: str) -> set[str]:
@@ -450,6 +516,11 @@ def _serialize_citation(citation: AssistantCitationPayload) -> dict[str, Any]:
     }
 
 
+def build_provider_evidence_session(patient_id: str) -> ProviderEvidenceSession:
+    facts, summary = _build_facts(patient_id)
+    return ProviderEvidenceSession(patient_id=patient_id, facts=facts, summary=summary)
+
+
 def get_relevant_provider_evidence(
     patient_id: str,
     query: str,
@@ -463,25 +534,13 @@ def get_relevant_provider_evidence(
     This helper is used by the Anthropic Agent SDK tool layer so both assistant
     modes use the same retrieval/ranking logic.
     """
-    intent, top_facts, summary = _rank_relevant_facts(
-        patient_id=patient_id,
-        question=query,
+    session = build_provider_evidence_session(patient_id)
+    return session.get_relevant_evidence(
+        query=query,
         history=history,
-        max_items=max_facts,
-    )
-
-    citations = _collect_citations(top_facts, max_items=max_citations)
-    return {
-        "intent": intent,
-        "patient_name": summary["patient_name"],
-        "parse_warning_count": summary["parse_warning_count"],
-        "active_flag_count": len(summary["active_flags"]),
-        "interaction_count": len(summary["interactions"]),
-        "high_risk_active_condition_count": summary["active_high_risk_condition_count"],
-        "evidence_lines": [fact.text for fact in top_facts],
-        "citations": [_serialize_citation(citation) for citation in citations],
-        "follow_ups": _follow_ups(intent),
-    }
+        max_facts=max_facts,
+        max_citations=max_citations,
+    ).payload
 
 
 def _direct_answer(intent: str, summary: dict, question: str) -> tuple[str, str, str | None]:

@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 from collections import defaultdict
 from datetime import date, datetime
@@ -95,6 +96,8 @@ from lib.clinical.drug_classifier import DrugClassifier, SafetyFlag as _SafetyFl
 _REPO_ROOT = Path(__file__).parent.parent.parent
 _DRUG_MAPPING = _REPO_ROOT / "lib" / "clinical" / "drug_classes.json"
 _classifier = DrugClassifier(mapping_path=_DRUG_MAPPING)
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/patients", tags=["patients"])
 
@@ -582,6 +585,7 @@ def _cached_patient_list() -> list[PatientListItem]:
         ]
     except Exception:
         # Fallback to filename-only list if corpus cache fails
+        logger.exception("patients: corpus catalog load failed; using filename fallback")
         files = list_patient_files()
         return [
             PatientListItem(

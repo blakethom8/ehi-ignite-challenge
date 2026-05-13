@@ -15,6 +15,7 @@ Auth model mirrors /api/traces: bearer token, required in production.
 
 from __future__ import annotations
 
+import logging
 import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -26,6 +27,8 @@ from api.core.tracing import query_traces
 from api.plugins import provenance as prov_log
 from api.settings import get_settings
 from api.workspace.events import query_events
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/audit", tags=["audit"])
 
@@ -144,6 +147,9 @@ def _provenance_for_user(
             approver_id=user_id, since=since_str, until=until_str
         )
     except Exception:
+        logger.exception(
+            "audit: prov_log.list_records failed for user_id=%s", user_id
+        )
         return out
     for r in records:
         out.append(_provenance_to_timeline_entry(r))
@@ -183,6 +189,7 @@ def get_user_timeline(
         try:
             traces = query_traces(limit=limit)
         except Exception:
+            logger.exception("audit: query_traces failed")
             traces = []
         for t in traces:
             if t.get("user_id") != user_id:

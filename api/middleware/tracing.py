@@ -65,6 +65,7 @@ def _session_identity(request: Request) -> tuple[str, str]:
 
         principal = current_session(request)
     except Exception:
+        LOGGER.exception("tracing: session identity lookup failed")
         return "", ""
     if principal is None:
         return "", ""
@@ -107,7 +108,7 @@ class TracingMiddleware(BaseHTTPMiddleware):
                     question = body.get("question", "") or question
                 stance = body.get("stance", "opinionated")
             except Exception:
-                LOGGER.debug("Could not parse chat request body for tracing")
+                LOGGER.exception("tracing: could not parse chat request body")
 
         with start_trace(
             patient_id=patient_id,

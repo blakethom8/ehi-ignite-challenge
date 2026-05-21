@@ -75,3 +75,83 @@ Note: All screenshots use synthetic Synthea data. No PHI from any personal porta
 **Content:** Patient summary for Shelly431 Corwin846, female, 91 years old, Lynn Massachusetts. Demographics (DOB, ethnicity, QALY 47.978). Complexity: "Highly Complex Complexity — 90/100." Data span 1953–2019. Encounter class breakdown (184 AMB, 27 EMER, 6 IMP). Care activity histogram 1953–2019. Recent encounters visible at bottom.  
 **Caption suggestion:** "A complexity-scored patient summary — demographics, data span, encounter mix, and recent activity at a glance."  
 **Rubric mapping:** Interpretability & Ease of Use — structured clinical overview with complexity signal.
+
+---
+
+## 08-atlas-data-flow.png
+
+**Surface:** Landing / main Atlas Data Flow visual  
+**Patient:** N/A (platform overview)  
+**Content:** Four source types at the top (`FHIR bundle`, `C-CDA`, `PDF`, `Portal export`) feeding `Harmonize + prepare`, then four downstream environments at the bottom (`FHIR Charts`, `Caspian`, `Plugins`, `Export package`). Includes the line “One patient record. Multiple downstream environments.”  
+**Caption suggestion:** "Atlas harmonizes multiple source types into one prepared patient record, then supports multiple downstream environments from that shared layer."  
+**Rubric mapping:** Description of Solution and Problem Addressed, Innovation, Technical Feasibility — quickly shows the two-pronged architecture and portability claim.
+
+---
+
+## 09-source-intake-refresh.png
+
+**Surface:** Patient workflow → Source Intake  
+**Patient:** Blake Thomson demo workspace  
+**Content:** Upload surface for portal exports, PDFs, screenshots, CSVs, and device data. Shows three sources staged, prepared counts, needs-context counts, and a selected PDF with extracted FHIR candidate bundle details.  
+**Caption suggestion:** "Source Intake: portal exports, PDFs, and FHIR files enter one patient workflow; parsed documents can already emit candidate FHIR resources before harmonization."  
+**Rubric mapping:** Wireframes / Mockups, Technical Feasibility — demonstrates multi-source intake and PDF-to-FHIR candidate generation.
+
+---
+
+## 10-harmonized-record-refresh.png
+
+**Surface:** Patient workflow → Harmonized Record  
+**Patient:** Blake Thomson demo workspace  
+**Content:** Canonical labs table with cross-source merge counts, selected fact detail, source list, and raw FHIR Provenance JSON. Shows the harmonization layer explicitly rather than just the output view.  
+**Caption suggestion:** "Harmonized Record: cross-source merges, canonical facts, and provenance lineage show how Atlas turns document inputs into a reusable FHIR-based record."  
+**Rubric mapping:** Wireframes / Mockups, Innovation, Technical Feasibility — shows the provenance-backed FHIR output model directly.
+
+---
+
+## 11-chart-history-refresh.png
+
+**Surface:** FHIR Charts → History  
+**Patient:** Blake Thomson demo workspace  
+**Content:** Encounter timeline with imported lab-report source events, office visits, immunization source events, filters, and resource links. Emphasizes chart-review chronology built from the prepared record.  
+**Caption suggestion:** "FHIR Charts: encounters, imported lab events, and office visits are organized into a chart-review timeline instead of scattered documents."  
+**Rubric mapping:** Wireframes / Mockups, Interpretability and Ease of Use — demonstrates chart-ready chronology built from the harmonized record.
+
+---
+
+## 12-caspian-review-refresh.png
+
+**Surface:** Caspian → Clinical review  
+**Patient:** Blake Thomson demo workspace  
+**Content:** Pre-op clearance review workflow with evidence-backed disposition, generated markdown summary, inspector evidence panel, and file workspace.  
+**Caption suggestion:** "Caspian: a pre-op workflow turns the record into a review disposition, evidence-backed summary, and shareable clinical note."  
+**Rubric mapping:** Wireframes / Mockups, Innovation, Potential Impact — shows pre-guided clinical workflow over the prepared record.
+
+---
+
+## 13-caspian-chat-refresh.png
+
+**Surface:** Caspian → Clinical review chat surface  
+**Patient:** Blake Thomson demo workspace  
+**Content:** Conversation view showing tool calls, evidence references, files created, and the clinician’s request for a shareable summary PDF.  
+**Caption suggestion:** "Caspian can show the conversational workflow and the file outputs created from the same evidence boundary."  
+**Rubric mapping:** Wireframes / Mockups, Innovation — shows the assistant/chat side of the clinical workspace.
+
+---
+
+## 14-plugin-marketplace-refresh.png
+
+**Surface:** Plugin marketplace  
+**Patient:** N/A (platform-level)  
+**Content:** Three plug-ins — Medication Access, Second Opinion, and Trial Finder — each showing a workflow description, an external boundary, and an approval-aware workspace entry point.  
+**Caption suggestion:** "Plugin marketplace: Medication Access, Second Opinion, and Trial Finder each define a workflow boundary, an external system boundary, and an approval model."  
+**Rubric mapping:** Wireframes / Mockups, Innovation, Potential Impact — demonstrates scoped downstream workflows beyond the core app.
+
+---
+
+## 15-trial-finder-refresh.png
+
+**Surface:** Trial Finder plug-in workspace  
+**Patient:** Hollister demo workspace  
+**Content:** Candidate-board workflow with a consented external registry boundary, ranked trials, approval request, and workbench artifacts such as shortlist and manifest files.  
+**Caption suggestion:** "Trial Finder: Atlas can pass a consented patient anchor into a workflow that ranks candidate trials and pauses outbound actions pending approval."  
+**Rubric mapping:** Wireframes / Mockups, Innovation, Potential Impact — shows plug-ins engaging the external world while preserving approval and consent controls.

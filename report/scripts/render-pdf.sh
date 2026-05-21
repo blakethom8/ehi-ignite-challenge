@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # render-pdf.sh — Regenerate the EHI Atlas Phase 1 submission PDF from HTML source.
 #
-# Usage: ./report/scripts/render-pdf.sh
+# Usage: ./report/scripts/render-pdf.sh [html-source] [pdf-output]
 #
 # Strategy: WeasyPrint first (pure Python, no browser header/footer injection).
 # If WeasyPrint is unavailable or produces layout problems, fall back to Chrome
@@ -14,8 +14,8 @@ set -euo pipefail
 
 cd "$(dirname "$0")/../.."   # repo root
 
-SRC="report/drafts/ehi-atlas-phase1-submission.html"
-OUT="report/ehi-atlas-phase1-submission-draft-v3.pdf"
+SRC="${1:-report/drafts/ehi-atlas-phase1-submission.html}"
+OUT="${2:-report/ehi-atlas-phase1-submission-draft-v5.pdf}"
 
 echo "Rendering: $SRC -> $OUT"
 

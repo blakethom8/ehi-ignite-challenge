@@ -26,6 +26,7 @@ import {
   PdfPageProgressMap,
 } from "../../../components/atlas/extraction";
 import type { ExtractionProgress } from "../../../components/atlas/extraction";
+import { PrototypeNotice } from "../../../components/marketing/PrototypeNotice";
 import { SnapshotList } from "../../../components/atlas/snapshots/SnapshotList";
 import type {
   AggregationEnvironmentResponse,
@@ -878,8 +879,7 @@ function UploadDetailModal({
               This source will be staged directly inside {patientLabel}'s Source Intake workspace.
             </p>
             <p className="mt-2 rounded-lg border border-[#f0d7bf] bg-[#fff8f1] px-3 py-2 text-xs leading-5 text-[#8a5a24]">
-              Demo storage: uploaded files are stored on this application server for the prototype. Use synthetic or
-              test records unless you intentionally want to test this hosted demo environment.
+              Prototype storage notice: this file will be saved to server-local workspace storage for demo and proof-of-concept use. This hosted environment is not presented as a production-hardened or HIPAA-reviewed upload surface.
             </p>
           </div>
           <button
@@ -1264,6 +1264,15 @@ function SourceInventoryPage({
           </div>
         </div>
         <div className="border-t border-[#eef0f5] px-4 py-3">
+          <PrototypeNotice
+            badge="Prototype security notice"
+            title="Upload only if you are comfortable using a hosted prototype workspace."
+            summary="Source Intake currently stages files in server-local storage so the Atlas preparation pipeline can inspect, extract, and review them. This is a work in progress built for demos, challenge evaluation, and proof-of-concept workflows."
+            storageDetail="Signed-in workspaces store uploaded files on the application server as local workspace artifacts rather than end-user encrypted vault storage."
+            retentionDetail="These workspaces can persist across restarts when the server's data directories stay mounted, so uploads should be treated as durable prototype data."
+            cautionDetail="Use synthetic, demo, or explicitly consented test records unless you intentionally accept this prototype posture and the current limits of the hosted environment."
+            className="mb-3"
+          />
           <div className="flex flex-col gap-3 rounded-lg border border-dashed border-[#cfd7e6] bg-[#fafbff] px-4 py-3 md:flex-row md:items-center md:justify-between">
             <div className="min-w-0">
               <p className="text-sm font-semibold text-[#1c1c1e]">

@@ -168,7 +168,8 @@ const APPLICATION_SURFACES: SurfaceCardProps[] = [
 
 export function GettingStarted() {
   const sectionPageIcons: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
-    "/using-atlas": BookOpen,
+    "/using-atlas": ShieldCheck,
+    "/using-atlas/get-started": BookOpen,
     "/using-atlas/pipeline": GitBranch,
     "/using-atlas/pdf-extraction": FileText,
     "/using-atlas/harmonization": GitMerge,

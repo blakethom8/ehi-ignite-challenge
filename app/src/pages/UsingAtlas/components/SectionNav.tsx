@@ -12,6 +12,13 @@ interface SectionPage {
 const SECTION_PAGES: SectionPage[] = [
   {
     path: "/using-atlas",
+    label: "EHI Ignite Challenge",
+    description: "Submission framing, prototype status, and challenge materials.",
+    icon: ShieldCheck,
+    available: true,
+  },
+  {
+    path: "/using-atlas/get-started",
     label: "Get started",
     description: "What Atlas does, what's inside, and where to look first.",
     icon: BookOpen,

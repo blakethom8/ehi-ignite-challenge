@@ -6,6 +6,21 @@ Built for the [HHS EHI Ignite Challenge](https://ehignitechallenge.org/) — a $
 
 **Live demo:** [ehi.healthcaredataai.com](https://ehi.healthcaredataai.com)
 
+## Prototype Status
+
+Atlas is currently a **prototype and proof-of-concept submission** for the EHI Ignite Challenge.
+
+- The hosted app is designed for demos, evaluator review, and workflow exploration.
+- Upload flows currently stage files in **server-local storage** so the extraction and harmonization pipeline can run.
+- Guest uploads are temporary; authenticated workspaces can persist on mounted server storage across restarts.
+- This repository does **not** present the current hosted environment as a production-hardened or HIPAA-reviewed deployment surface.
+- Prefer synthetic, demo, or explicitly consented test data unless you intentionally accept the prototype posture of the current site.
+
+## Challenge Materials
+
+- [Phase 1 submission review PDF](report/ehi-atlas-phase1-submission-review.pdf)
+- [Report artifacts and submission materials](report/)
+
 ---
 
 ## The Problem
@@ -25,6 +40,10 @@ The app ships as **Atlas Agentic Workspaces** — five top-level modules sitting
 - **Learn** — Internal section: runbooks, evals, methodology, skills
 
 Underneath, a **SQL-on-FHIR warehouse** materializes the 1,180 Synthea bundles into a queryable SQLite layer (patient, condition, medication, observation, encounter views plus drug-class enrichment and a derived medication-episode table). Caspian and the deterministic clinical-intelligence modules (drug classifier, episode detector, interaction checker, cross-source harmonizer) read from that layer.
+
+## About Blake
+
+Blake Thomson is building Atlas as an EHI Ignite Challenge submission with a healthcare data strategy and business-development background focused on making fragmented health information more usable for real clinical and operational workflows.
 
 ## Tech Stack
 

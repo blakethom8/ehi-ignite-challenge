@@ -19,6 +19,7 @@ import {
   PdfPageProgressMap,
 } from "../components/atlas/extraction";
 import type { ExtractionProgress } from "../components/atlas/extraction";
+import { PrototypeNotice } from "../components/marketing/PrototypeNotice";
 import { useAccessContext } from "../context/AccessContext";
 import type {
   GuestHarmonizationAudience,
@@ -492,6 +493,16 @@ export function GuestHarmonization() {
             workspace, and hands you a portable bundle a clinician or coding agent can use.
           </p>
         </div>
+
+        <PrototypeNotice
+          badge="Prototype security notice"
+          title="This hosted upload flow is for demos, proof-of-concept use, and EHI Ignite Challenge review."
+          summary="Atlas needs to stage uploaded files on the server so the extraction and harmonization pipeline can run. Treat this as a prototype environment rather than a production-grade medical-record system."
+          storageDetail="Guest files are written to a temporary server workspace for processing before a portable output bundle is generated."
+          retentionDetail="Guest runs are cookie-scoped and currently auto-delete after 24 hours, but your files do live on the server during that window."
+          cautionDetail="Avoid highly sensitive or irreplaceable records here. Prefer synthetic, demo, or test data unless you intentionally accept this prototype storage posture."
+          className="mb-6"
+        />
 
         {error && (
           <div className="mb-6 rounded-lg border border-[#f1c7c2] bg-[#fff7f6] p-3 text-sm text-[#b42318]">

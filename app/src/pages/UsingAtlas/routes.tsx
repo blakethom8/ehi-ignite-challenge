@@ -1,5 +1,6 @@
 import { Route, Routes } from "react-router-dom";
 import { UsingAtlasLayout } from "./Layout";
+import { EhiIgniteChallenge } from "./EhiIgniteChallenge";
 import { GettingStarted } from "./GettingStarted";
 import { ThePipeline } from "./ThePipeline";
 import { PdfExtraction } from "./PdfExtraction";
@@ -11,7 +12,8 @@ export function UsingAtlasRoutes() {
   return (
     <Routes>
       <Route element={<UsingAtlasLayout />}>
-        <Route index element={<GettingStarted />} />
+        <Route index element={<EhiIgniteChallenge />} />
+        <Route path="get-started" element={<GettingStarted />} />
         <Route path="pipeline" element={<ThePipeline />} />
         <Route path="pdf-extraction" element={<PdfExtraction />} />
         <Route path="harmonization" element={<Harmonization />} />

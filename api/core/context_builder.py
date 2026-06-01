@@ -343,6 +343,15 @@ def _fmt_dt(dt: datetime | None) -> str:
     return dt.strftime("%b %d, %Y")
 
 
+def _sort_ts(dt: datetime | None) -> float:
+    """Return a comparable timestamp for naive or timezone-aware datetimes."""
+    if dt is None:
+        return float("-inf")
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+    return dt.timestamp()
+
+
 def _value_text(value: float | None, unit: str = "") -> str:
     if value is None:
         return "value not recorded"
@@ -373,7 +382,7 @@ def _build_record_medication_context(record, classifier: Any) -> tuple[list[str]
         classified.medication.med_id: classified.matched_classes
         for classified in classifier.classify_all(record.medications)
     }
-    meds_sorted = sorted(record.medications, key=lambda med: med.authored_on or datetime.min, reverse=True)
+    meds_sorted = sorted(record.medications, key=lambda med: _sort_ts(med.authored_on), reverse=True)
 
     for med in meds_sorted[:80]:
         status = med.status or "unknown"
@@ -394,7 +403,7 @@ def _build_record_condition_context(record) -> tuple[list[str], list[str]]:
     resolved_conditions: list[str] = []
     conditions_sorted = sorted(
         record.conditions,
-        key=lambda condition: condition.onset_dt or condition.recorded_dt or datetime.min,
+        key=lambda condition: _sort_ts(condition.onset_dt or condition.recorded_dt),
         reverse=True,
     )
 
@@ -420,7 +429,7 @@ def _build_record_lab_context(record) -> list[str]:
     for obs in quantity_observations:
         key = obs.loinc_code or obs.display
         current = latest_by_key.get(key)
-        if current is None or (obs.effective_dt or datetime.min) > (current.effective_dt or datetime.min):
+        if current is None or _sort_ts(obs.effective_dt) > _sort_ts(current.effective_dt):
             latest_by_key[key] = obs
 
     key_labs = [
@@ -430,7 +439,7 @@ def _build_record_lab_context(record) -> list[str]:
     ]
     recent_labs = sorted(
         latest_by_key.values(),
-        key=lambda obs: obs.effective_dt or datetime.min,
+        key=lambda obs: _sort_ts(obs.effective_dt),
         reverse=True,
     )
     selected_keys = {obs.loinc_code or obs.display for obs in key_labs}
@@ -498,7 +507,7 @@ def _build_published_clinical_note_context(
 
 def _build_record_clinical_note_context(record, limit: int = 6) -> list[str]:
     lines: list[str] = []
-    for report in sorted(record.diagnostic_reports, key=lambda r: r.effective_dt or datetime.min, reverse=True):
+    for report in sorted(record.diagnostic_reports, key=lambda r: _sort_ts(r.effective_dt), reverse=True):
         text = _compact_text(report.presented_form_text)
         if not text:
             continue
@@ -523,7 +532,7 @@ def _linked_resource_summary(encounter) -> str:
 
 
 def _build_record_encounter_context(record) -> list[str]:
-    encounters = sorted(record.encounters, key=lambda enc: enc.period.start or datetime.min, reverse=True)
+    encounters = sorted(record.encounters, key=lambda enc: _sort_ts(enc.period.start), reverse=True)
     lines: list[str] = []
     for encounter in encounters[:12]:
         class_text = encounter.class_code or "UNK"
@@ -534,6 +543,119 @@ def _build_record_encounter_context(record) -> list[str]:
         linked_text = f" | linked: {linked}" if linked else ""
         lines.append(f"- {_fmt_dt(encounter.period.start)} | {class_text} | {type_text}{reason} | {provider}{linked_text}")
     return lines
+
+
+def build_clinical_context_from_bundle_path(path: Path | str) -> ClinicalContext:
+    """Build Caspian-style context for an ad hoc FHIR Bundle file.
+
+    This is intentionally disk/temp-file friendly so public transparency
+    tooling can preview the same context-shaping logic without registering the
+    upload as a patient workspace or materializing it into SQL-on-FHIR.
+    """
+    from collections import Counter
+
+    from lib.fhir_parser.bundle_parser import parse_bundle
+    from lib.patient_catalog.single_patient import compute_patient_stats
+
+    bundle_path = Path(path)
+    record = parse_bundle(bundle_path)
+    stats = compute_patient_stats(record)
+    source_bundle = _load_bundle_json(bundle_path)
+    medication_reasons = _medication_reason_index_from_bundle(source_bundle)
+
+    name = stats.name or record.summary.name or record.summary.patient_id or bundle_path.stem
+    demographics: list[str] = [name]
+    if record.summary.birth_date:
+        demographics.append(f"DOB {record.summary.birth_date.isoformat()}")
+    if record.summary.gender:
+        demographics.append(record.summary.gender)
+    if record.summary.city or record.summary.state:
+        demographics.append(", ".join(part for part in [record.summary.city, record.summary.state] if part))
+    patient_summary = " · ".join(demographics)
+
+    raw_flags = _DRUG_CLASSIFIER.generate_safety_flags(record.medications)
+    safety_flags: list[str] = []
+    interactions_list: list[str] = []
+
+    for flag in raw_flags:
+        if flag.status == "NONE":
+            continue
+        med_names = [cm.medication.display for cm in flag.medications[:3]]
+        meds_str = ", ".join(med_names) if med_names else "none listed"
+        severity_icon = {"critical": "🔴", "warning": "⚠️", "info": "ℹ️"}.get(flag.severity, "•")
+        status_label = "ACTIVE" if flag.status == "ACTIVE" else "HISTORICAL"
+        safety_flags.append(
+            f"- {severity_icon} **{flag.label}** ({flag.severity}, {status_label}): {meds_str}"
+        )
+        if flag.surgical_note:
+            safety_flags.append(f"  Action: {flag.surgical_note}")
+
+    from api.core.interaction_checker import check_interactions
+
+    active_class_keys = [f.class_key for f in raw_flags if f.status == "ACTIVE"]
+    interactions_raw = check_interactions(active_class_keys)
+    for item in interactions_raw:
+        drug_a_label = item.drug_a.replace("_", " ").title()
+        drug_b_label = item.drug_b.replace("_", " ").title()
+        interactions_list.append(
+            f"- **{item.severity.upper()}**: {drug_a_label} + {drug_b_label} — {item.clinical_effect}"
+        )
+        if item.management:
+            interactions_list.append(f"  Management: {item.management}")
+
+    active_meds, historical_meds = _build_record_medication_context(record, _DRUG_CLASSIFIER)
+    if medication_reasons:
+        reasoned: list[str] = []
+        for line in active_meds:
+            line_key = line.lower()
+            reason = next((r for med, r in medication_reasons.items() if med and med in line_key), "")
+            reasoned.append(line.replace(" | ", f" — for {reason} | ", 1) if reason and " — for " not in line else line)
+        active_meds = reasoned
+
+    active_conditions, resolved_conditions = _build_record_condition_context(record)
+    key_labs = _build_record_lab_context(record)
+    clinical_notes = _build_record_clinical_note_context(record)
+    recent_encounters = _build_record_encounter_context(record)
+
+    procedures_summary: list[str] = []
+    proc_counts: Counter[str] = Counter()
+    for procedure in record.procedures:
+        proc_counts[procedure.code.label()] += 1
+    for proc_name, count in proc_counts.most_common(10):
+        if count > 1:
+            procedures_summary.append(f"- {proc_name} (×{count})")
+        else:
+            procedures_summary.append(f"- {proc_name}")
+
+    absences: list[str] = []
+    all_class_keys = {f.class_key for f in raw_flags}
+    critical_classes = {"anticoagulants", "antiplatelets", "opioids", "immunosuppressants"}
+    for cls in critical_classes - all_class_keys:
+        label = cls.replace("_", " ").title()
+        absences.append(f"- No {label} (current or historical)")
+    for flag in raw_flags:
+        if flag.status == "NONE" and flag.severity == "critical":
+            absences.append(f"- No {flag.label} found")
+    if not record.allergies:
+        absences.append("- No allergies recorded")
+    else:
+        for allergy in record.allergies[:5]:
+            safety_flags.append(f"- ⚠️ **Allergy**: {allergy.code.label()} (criticality: {allergy.criticality or 'unknown'})")
+
+    return ClinicalContext(
+        patient_summary=patient_summary,
+        safety_flags=safety_flags,
+        interactions=interactions_list,
+        active_medications=active_meds,
+        active_conditions=active_conditions,
+        key_labs=key_labs,
+        clinical_notes=clinical_notes,
+        recent_encounters=recent_encounters,
+        procedures_summary=procedures_summary,
+        historical_meds=historical_meds,
+        resolved_conditions=resolved_conditions,
+        absences=absences,
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { BookOpen, GitBranch, FileText, GitMerge, ShieldCheck, Globe } from "lucide-react";
+import { BookOpen, GitBranch, FileText, GitMerge, ShieldCheck, Globe, Microscope } from "lucide-react";
 
 interface SectionPage {
   path: string;
@@ -43,6 +43,13 @@ const SECTION_PAGES: SectionPage[] = [
     label: "Harmonization",
     description: "Deduplication, conflict detection, and cross-source provenance.",
     icon: GitMerge,
+    available: true,
+  },
+  {
+    path: "/using-atlas/fhir-context-lab",
+    label: "FHIR Context Lab",
+    description: "Upload a FHIR package and inspect the prompt-ready context.",
+    icon: Microscope,
     available: true,
   },
   {

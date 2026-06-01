@@ -43,6 +43,7 @@ from api.routers import cursor_internal_tools
 from api.routers import ground_truth_review
 from api.routers import pipeline_lab
 from api.routers import ccda_lab
+from api.routers import context_lab
 from api.routers import skills as skills_router
 from api.plugins.routers import plugins as plugins_router
 from api.plugins import runtime as plugin_runtime
@@ -179,6 +180,7 @@ app.include_router(cursor_internal_tools.router, prefix="/api")
 app.include_router(ground_truth_review.router, prefix="/api")
 app.include_router(pipeline_lab.router, prefix="/api")
 app.include_router(ccda_lab.router, prefix="/api")
+app.include_router(context_lab.router, prefix="/api")
 app.include_router(skills_router.router, prefix="/api")
 app.include_router(plugins_router.router, prefix="/api")
 

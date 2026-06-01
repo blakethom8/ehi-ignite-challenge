@@ -1,0 +1,771 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Caspian FHIR Context Pipeline Report</title>
+<style>
+  :root {
+    --ink: #172033;
+    --ink-soft: #46536b;
+    --muted: #718096;
+    --line: #dde4ee;
+    --line-strong: #bdc9d8;
+    --paper: #ffffff;
+    --bg: #f6f8fb;
+    --blue: #2457d6;
+    --blue-soft: #eef4ff;
+    --green: #137a52;
+    --green-soft: #eaf8f1;
+    --amber: #9a6500;
+    --amber-soft: #fff7e5;
+    --red: #a4343a;
+    --red-soft: #fff0f1;
+    --code: #f3f5f8;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 1.58;
+  }
+
+  main {
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: 44px 28px 80px;
+    background: var(--paper);
+    min-height: 100vh;
+    border-left: 1px solid var(--line);
+    border-right: 1px solid var(--line);
+  }
+
+  header {
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 26px;
+    margin-bottom: 34px;
+  }
+
+  .eyebrow {
+    color: var(--blue);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  h1 {
+    margin: 0 0 12px;
+    font-size: 34px;
+    line-height: 1.16;
+    letter-spacing: 0;
+  }
+
+  .lede {
+    max-width: 860px;
+    margin: 0;
+    color: var(--ink-soft);
+    font-size: 18px;
+  }
+
+  .meta {
+    margin-top: 18px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 4px 10px;
+    color: var(--ink-soft);
+    background: #fbfcfe;
+    font-size: 13px;
+  }
+
+  h2 {
+    margin: 42px 0 12px;
+    font-size: 24px;
+    line-height: 1.24;
+    letter-spacing: 0;
+  }
+
+  h3 {
+    margin: 26px 0 8px;
+    font-size: 17px;
+    line-height: 1.3;
+  }
+
+  p { margin: 0 0 14px; }
+
+  a { color: var(--blue); text-decoration-thickness: 1px; }
+
+  code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.88em;
+    background: var(--code);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 1px 5px;
+  }
+
+  pre {
+    margin: 14px 0 22px;
+    padding: 16px;
+    overflow-x: auto;
+    background: #101828;
+    color: #f8fafc;
+    border-radius: 8px;
+    font-size: 13px;
+    line-height: 1.52;
+  }
+
+  pre code {
+    background: transparent;
+    border: 0;
+    padding: 0;
+    color: inherit;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0 24px;
+    font-size: 14px;
+  }
+
+  th, td {
+    text-align: left;
+    vertical-align: top;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  th {
+    background: #f8fafc;
+    color: var(--muted);
+    border-bottom: 1px solid var(--line-strong);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .callout {
+    margin: 18px 0 24px;
+    padding: 14px 16px;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    background: #fbfcfe;
+  }
+
+  .callout strong { color: var(--ink); }
+  .callout.blue { border-color: #c7d8ff; background: var(--blue-soft); }
+  .callout.green { border-color: #bde8d3; background: var(--green-soft); }
+  .callout.amber { border-color: #f3d692; background: var(--amber-soft); }
+  .callout.red { border-color: #f1bbc0; background: var(--red-soft); }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+    margin: 18px 0 24px;
+  }
+
+  .panel {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 16px;
+    background: #fbfcfe;
+  }
+
+  .panel h3 {
+    margin-top: 0;
+    color: var(--blue);
+  }
+
+  .metric {
+    font-size: 28px;
+    line-height: 1.2;
+    font-weight: 760;
+    color: var(--ink);
+  }
+
+  .metric-label {
+    color: var(--muted);
+    font-size: 13px;
+    margin-top: 4px;
+  }
+
+  .pipeline {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(130px, 1fr));
+    gap: 10px;
+    margin: 20px 0 26px;
+  }
+
+  .step {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 13px;
+    background: #fbfcfe;
+    min-height: 122px;
+  }
+
+  .step .num {
+    color: var(--blue);
+    font-weight: 800;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .step .title {
+    margin-top: 6px;
+    font-weight: 720;
+    line-height: 1.25;
+  }
+
+  .step .body {
+    margin-top: 8px;
+    color: var(--ink-soft);
+    font-size: 13px;
+    line-height: 1.42;
+  }
+
+  .section-note {
+    color: var(--muted);
+    font-size: 14px;
+  }
+
+  .good { color: var(--green); font-weight: 700; }
+  .warn { color: var(--amber); font-weight: 700; }
+  .risk { color: var(--red); font-weight: 700; }
+
+  footer {
+    margin-top: 54px;
+    padding-top: 20px;
+    border-top: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  @media (max-width: 900px) {
+    main { padding: 28px 18px 64px; border: 0; }
+    h1 { font-size: 28px; }
+    .grid { grid-template-columns: 1fr; }
+    .pipeline { grid-template-columns: 1fr 1fr; }
+  }
+
+  @media (max-width: 620px) {
+    .pipeline { grid-template-columns: 1fr; }
+    table { font-size: 13px; }
+    th, td { padding: 8px; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="eyebrow">Caspian context engineering</div>
+    <h1>How Atlas Turns Raw FHIR Into Usable Agent Context</h1>
+    <p class="lede">
+      This report documents how Caspian handles FHIR context size. The core
+      design is simple: FHIR remains the source of truth, but the model sees a
+      compact, deterministic, safety-first clinical briefing instead of the raw
+      bundle.
+    </p>
+    <div class="meta">
+      <span class="chip">Prepared for clinical AI collaborators</span>
+      <span class="chip">Generated from local repo measurements</span>
+      <span class="chip">Date: 2026-06-01</span>
+    </div>
+  </header>
+
+  <section>
+    <h2>Executive Answer</h2>
+    <div class="callout blue">
+      <p>
+        <strong>Does Caspian pass the longitudinal patient journey?</strong>
+        Yes, but as a compressed journey, not as the full raw longitudinal
+        record. Caspian sends active safety facts, active medications, active
+        conditions, key labs, clinical notes, recent encounters, procedures,
+        historical medication episodes, resolved conditions, explicit absences,
+        and cached care episode briefs when those narrative artifacts exist.
+      </p>
+    </div>
+    <p>
+      The model is not asked to parse every FHIR resource. Instead,
+      <code>build_clinical_context()</code> prepares a chart briefing that is
+      short enough for normal chat, clinically ordered, and traceable back to
+      the underlying FHIR and SQL-on-FHIR data.
+    </p>
+    <p>
+      In practical terms, this means Caspian behaves more like a clinician
+      briefing system than a raw FHIR browser. The patient journey is represented
+      by clinical summaries and temporal markers. The raw chart stays available
+      behind the application for citations, drill-down, and deterministic tools.
+    </p>
+  </section>
+
+  <section>
+    <h2>Key Measurements</h2>
+    <div class="grid">
+      <div class="panel">
+        <h3>Largest measured raw bundle</h3>
+        <div class="metric">~11.7M</div>
+        <div class="metric-label">estimated raw FHIR tokens for the MIMIC ICU demo</div>
+      </div>
+      <div class="panel">
+        <h3>Typical Caspian context</h3>
+        <div class="metric">~1.5K-3.2K</div>
+        <div class="metric-label">estimated chart-context tokens sent to the model</div>
+      </div>
+      <div class="panel">
+        <h3>Observed compression</h3>
+        <div class="metric">173x-7,992x</div>
+        <div class="metric-label">raw bundle estimate divided by chart-context estimate</div>
+      </div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Patient package</th>
+          <th>Raw FHIR entries</th>
+          <th>Raw FHIR token estimate</th>
+          <th>Caspian chart context</th>
+          <th>Approx first-turn input</th>
+          <th>Compression</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Surgical-review Synthea demo</td>
+          <td>604</td>
+          <td>~387K</td>
+          <td>~1.7K</td>
+          <td>~2.6K</td>
+          <td>234x</td>
+        </tr>
+        <tr>
+          <td>Polypharmacy aggregate demo</td>
+          <td>7,632</td>
+          <td>~4.1M</td>
+          <td>~1.7K</td>
+          <td>~2.6K</td>
+          <td>2,493x</td>
+        </tr>
+        <tr>
+          <td>MIMIC ICU aggregate demo</td>
+          <td>27,365</td>
+          <td>~11.7M</td>
+          <td>~1.5K</td>
+          <td>~2.4K</td>
+          <td>7,992x</td>
+        </tr>
+        <tr>
+          <td>Cardiac coherent aggregate demo</td>
+          <td>15,244</td>
+          <td>~8.9M</td>
+          <td>~3.2K</td>
+          <td>~4.1K</td>
+          <td>2,819x</td>
+        </tr>
+        <tr>
+          <td>Small Synthea example</td>
+          <td>303</td>
+          <td>~163K</td>
+          <td>~943</td>
+          <td>~1.9K</td>
+          <td>173x</td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="section-note">
+      Token estimates use the repository's current estimator,
+      <code>len(text) // 4</code>. The first-turn estimate includes the base
+      system prompt, chart context, user question, and Caspian file-tool schemas.
+      Exact Anthropic tokenizer counts require a live valid API key.
+    </p>
+  </section>
+
+  <section>
+    <h2>The Data Transformation Pipeline</h2>
+    <p>
+      Caspian's current context path is a layered transformation. Each layer
+      reduces noise while preserving the evidence needed for clinical reasoning.
+    </p>
+    <div class="pipeline">
+      <div class="step">
+        <div class="num">Layer 0</div>
+        <div class="title">Raw FHIR bundle</div>
+        <div class="body">Patient, MedicationRequest, Condition, Observation, Encounter, Procedure, DiagnosticReport, and related resources.</div>
+      </div>
+      <div class="step">
+        <div class="num">Layer 1</div>
+        <div class="title">Shared parser</div>
+        <div class="body">FHIR is parsed into typed patient models rather than passed to the LLM as JSON.</div>
+      </div>
+      <div class="step">
+        <div class="num">Layer 2</div>
+        <div class="title">SQL-on-FHIR warehouse</div>
+        <div class="body">Selected views and derived tables support deduped meds, latest labs, and queryable chart facts.</div>
+      </div>
+      <div class="step">
+        <div class="num">Layer 3</div>
+        <div class="title">Clinical compression</div>
+        <div class="body">Medication episodes, safety flags, key labs, recent encounters, procedures, absences, and notes.</div>
+      </div>
+      <div class="step">
+        <div class="num">Layer 4</div>
+        <div class="title">Prompt rendering</div>
+        <div class="body">The chart is rendered as compact markdown, ordered by clinical risk and temporal relevance.</div>
+      </div>
+      <div class="step">
+        <div class="num">Layer 5</div>
+        <div class="title">Claude call</div>
+        <div class="body">The model receives the briefing, short recent chat history, and optional workflow instructions.</div>
+      </div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Pipeline component</th>
+          <th>What it does</th>
+          <th>Primary implementation</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>FHIR parser</td>
+          <td>Loads the bundle into typed patient structures shared across API and app surfaces.</td>
+          <td><code>lib/fhir_parser/</code></td>
+        </tr>
+        <tr>
+          <td>Patient loader</td>
+          <td>Resolves patient IDs, demo aliases, and published snapshots; caches parsed records.</td>
+          <td><code>api/core/loader.py</code></td>
+        </tr>
+        <tr>
+          <td>SQL-on-FHIR</td>
+          <td>Materializes normalized views and derived medication episodes for deterministic retrieval.</td>
+          <td><code>lib/sql_on_fhir/</code>, <code>data/sof.db</code></td>
+        </tr>
+        <tr>
+          <td>Drug classifier</td>
+          <td>Classifies medications into safety-critical classes and produces surgical risk flags.</td>
+          <td><code>lib/clinical/drug_classifier.py</code></td>
+        </tr>
+        <tr>
+          <td>Context builder</td>
+          <td>Builds the compact markdown context Caspian sends in the system prompt.</td>
+          <td><code>api/core/context_builder.py</code></td>
+        </tr>
+        <tr>
+          <td>Caspian chat runtime</td>
+          <td>Sends the context, recent history, workflow packets, and optional file tools to Claude.</td>
+          <td><code>api/core/provider_assistant_context.py</code></td>
+        </tr>
+        <tr>
+          <td>Virtual system files</td>
+          <td>Expose the exact live system prompt and chart context to the Files pane for transparency.</td>
+          <td><code>api/core/caspian_context_files.py</code></td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>What the Longitudinal Journey Looks Like in Context</h2>
+    <p>
+      Caspian does not currently dump a full event-by-event patient journey into
+      every chat turn. It sends a compressed longitudinal briefing with multiple
+      temporal slices:
+    </p>
+    <table>
+      <thead>
+        <tr>
+          <th>Journey slice</th>
+          <th>Included by default?</th>
+          <th>How it is represented</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Patient voice</td>
+          <td><span class="good">When cached</span></td>
+          <td>First-person summary from patient-reported context.</td>
+        </tr>
+        <tr>
+          <td>Care episodes</td>
+          <td><span class="good">When generated</span></td>
+          <td>EpisodeOfCare briefs loaded from <code>data/narratives/&lt;patient&gt;/</code>.</td>
+        </tr>
+        <tr>
+          <td>Active medication story</td>
+          <td><span class="good">Yes</span></td>
+          <td>Current meds with status, date, class, duration where available, and indication where resolvable.</td>
+        </tr>
+        <tr>
+          <td>Medication history</td>
+          <td><span class="good">Yes, capped</span></td>
+          <td>Stopped medications compressed into one-line historical entries.</td>
+        </tr>
+        <tr>
+          <td>Active conditions</td>
+          <td><span class="good">Yes</span></td>
+          <td>Current problem list with onset or recorded dates.</td>
+        </tr>
+        <tr>
+          <td>Resolved conditions</td>
+          <td><span class="good">Yes, capped</span></td>
+          <td>Resolved conditions shown after active problems, not interleaved with urgent context.</td>
+        </tr>
+        <tr>
+          <td>Recent encounters</td>
+          <td><span class="good">Yes, capped</span></td>
+          <td>Recent visits with encounter class, type, reason, provider, and linked-resource counts.</td>
+        </tr>
+        <tr>
+          <td>Lab history</td>
+          <td><span class="warn">Latest/key only</span></td>
+          <td>Key LOINC-driven labs and recent quantitative observations; trend drill-down is a future/on-demand layer.</td>
+        </tr>
+        <tr>
+          <td>Raw timeline</td>
+          <td><span class="risk">No</span></td>
+          <td>Not sent by default because it is too large and low-signal for routine chat context.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout amber">
+      <p>
+        <strong>Interpretation:</strong> Caspian passes enough longitudinal
+        structure for the model to answer "what matters now, what changed
+        recently, and what historical facts still matter." It does not pass the
+        whole FHIR chronology unless a future drill-down tool or workflow asks
+        for deeper detail.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Before and After Example</h2>
+    <p>
+      A raw medication resource repeats FHIR coding, references, dates, status,
+      dosage, requester, encounter links, and other metadata. Caspian compresses
+      that into a clinically useful line.
+    </p>
+
+    <h3>Raw FHIR shape</h3>
+    <pre><code>{
+  "resourceType": "MedicationRequest",
+  "status": "active",
+  "intent": "order",
+  "medicationCodeableConcept": {
+    "coding": [
+      {
+        "system": "http://www.nlm.nih.gov/research/umls/rxnorm",
+        "code": "...",
+        "display": "Warfarin Sodium 5 MG Oral Tablet"
+      }
+    ],
+    "text": "Warfarin Sodium 5 MG Oral Tablet"
+  },
+  "subject": { "reference": "urn:uuid:..." },
+  "authoredOn": "2001-12-02",
+  "reasonReference": [{ "display": "Atrial Fibrillation" }]
+}</code></pre>
+
+    <h3>Caspian prompt shape</h3>
+    <pre><code>## SAFETY FLAGS (Action Required)
+- Anticoagulants / Blood Thinners (critical, ACTIVE): Warfarin Sodium 5 MG Oral Tablet
+  Action: Bleeding risk - must hold before surgery. Check INR/PT if on warfarin.
+
+## ACTIVE MEDICATIONS
+- Warfarin Sodium 5 MG Oral Tablet [anticoagulants] - for Atrial Fibrillation | active | Dec 02, 2001</code></pre>
+
+    <p>
+      The prompt shape is not just shorter. It is ordered around the clinical
+      task: risk first, then current therapy, then temporal context and evidence.
+    </p>
+  </section>
+
+  <section>
+    <h2>What Caspian Sends to the Model</h2>
+    <p>
+      In context mode, the request is assembled in
+      <code>answer_with_context()</code>. The model receives:
+    </p>
+    <table>
+      <thead>
+        <tr>
+          <th>Request part</th>
+          <th>Purpose</th>
+          <th>Boundaries</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Base system prompt</td>
+          <td>Clinical behavior, safety posture, formatting, and file-tool rules.</td>
+          <td>Static template in <code>provider_assistant_context.py</code>.</td>
+        </tr>
+        <tr>
+          <td>Patient chart context</td>
+          <td>Compact clinical briefing from the selected patient chart.</td>
+          <td>Generated by <code>build_clinical_context(patient_id)</code>.</td>
+        </tr>
+        <tr>
+          <td>Context packages</td>
+          <td>Workflow instructions, such as pre-op review or medication safety review.</td>
+          <td>Up to 8 attached packages.</td>
+        </tr>
+        <tr>
+          <td>User overrides</td>
+          <td>Workspace-specific standing instructions.</td>
+          <td>Loaded from <code>user-instructions.md</code> when present.</td>
+        </tr>
+        <tr>
+          <td>Chat history</td>
+          <td>Short conversational continuity.</td>
+          <td>Last 6 turns only.</td>
+        </tr>
+        <tr>
+          <td>File tools</td>
+          <td>Allow the agent to list, read, and write workspace files when authorized.</td>
+          <td>Demo mode is read-only; authenticated sessions can write notes.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>
+      The live context is also exposed to users inside Caspian as the virtual
+      read-only file <code>system-context/patient-chart-context.md</code>. This
+      makes the hidden prompt context inspectable.
+    </p>
+  </section>
+
+  <section>
+    <h2>Why This Helps With Context Size</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Raw FHIR challenge</th>
+          <th>Caspian response</th>
+          <th>Effect</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>FHIR is verbose and deeply nested.</td>
+          <td>Use typed parsing and selected markdown rendering.</td>
+          <td>Model reads clinical facts, not schema ceremony.</td>
+        </tr>
+        <tr>
+          <td>Longitudinal records repeat the same medication many times.</td>
+          <td>Use medication episodes or capped medication summaries.</td>
+          <td>Dozens of MedicationRequests become one clinical line.</td>
+        </tr>
+        <tr>
+          <td>Lab and observation volume can dominate the bundle.</td>
+          <td>Use key latest labs by LOINC and cap the default list.</td>
+          <td>Important values are visible; full trend history stays out of default context.</td>
+        </tr>
+        <tr>
+          <td>Clinical risk is not ordered in raw JSON.</td>
+          <td>Put safety flags and drug interactions first.</td>
+          <td>The model leads with what can hurt the patient.</td>
+        </tr>
+        <tr>
+          <td>Raw context makes citations hard to audit.</td>
+          <td>Keep deterministic retrieval and citation payloads alongside the answer.</td>
+          <td>Users can trace responses back to chart facts.</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Current Limits and Next Improvements</h2>
+    <div class="callout red">
+      <p>
+        <strong>Important limit:</strong> Caspian's default context is compact
+        by design. If a clinician asks for a full lab trend, a detailed
+        medication chronology, or every encounter in a time window, that should
+        be retrieved by a drill-down tool rather than preloaded into every chat
+        request.
+      </p>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Opportunity</th>
+          <th>Recommended next step</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Richer longitudinal journey in Caspian</td>
+          <td>Promote cached EpisodeOfCare narratives into the default context for demo patients that have generated narratives.</td>
+        </tr>
+        <tr>
+          <td>Lab trend drill-down</td>
+          <td>Add a dedicated observation drill-down tool by LOINC, date window, abnormality, and source.</td>
+        </tr>
+        <tr>
+          <td>Exact token accounting</td>
+          <td>Use Anthropic <code>messages.count_tokens</code> in a valid-key environment to replace rough estimates.</td>
+        </tr>
+        <tr>
+          <td>Formal packet contract</td>
+          <td>Convert the markdown context into a typed TUNE-style packet before rendering, with explicit token budgets and evidence-unit counts.</td>
+        </tr>
+        <tr>
+          <td>Published demo QA</td>
+          <td>Normalize mixed timezone datetimes in all demo profile bundles before context sorting.</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Reproducibility Notes</h2>
+    <p>
+      The measurements in this report were computed from local FHIR bundle
+      sizes and the current Caspian context renderer. The relevant logic is:
+    </p>
+    <pre><code>from api.core.context_builder import build_clinical_context
+
+ctx = build_clinical_context(patient_id)
+markdown = ctx.to_prompt()
+context_tokens = ctx.total_tokens_estimate
+fact_count = ctx.fact_count</code></pre>
+    <p>
+      The raw token estimate used here is <code>len(raw_fhir_json) // 4</code>.
+      The same rough estimator is used by the current context object for
+      display and trace transparency.
+    </p>
+  </section>
+
+  <footer>
+    Source files: <code>api/core/context_builder.py</code>,
+    <code>api/core/provider_assistant_context.py</code>,
+    <code>api/core/caspian_context_files.py</code>, and
+    <code>docs/architecture/context/FHIR-AGENT-CONTEXT-ENGINEERING-REPORT.md</code>.
+  </footer>
+</main>
+</body>
+</html>

@@ -88,6 +88,7 @@ import type {
   PipelineLabLeaderboardResponse,
   PatientContextAugmentationResponse,
   FhirComposition,
+  FhirContextLabPreviewResponse,
 } from "../types";
 import {
   getMockAggregationCleaningQueue,
@@ -258,6 +259,17 @@ export const api = {
   /** Provider-facing chart Q&A */
   chatProviderAssistant: (payload: ProviderAssistantRequest): Promise<ProviderAssistantResponse> =>
     http.post<ProviderAssistantResponse>("/assistant/chat", payload).then((r) => r.data),
+
+  /** Public FHIR Bundle -> Caspian context preview lab */
+  previewFhirContext: (file: File): Promise<FhirContextLabPreviewResponse> => {
+    const form = new FormData();
+    form.append("file", file);
+    return http
+      .post<FhirContextLabPreviewResponse>("/context-lab/preview", form, {
+        headers: { "Content-Type": "multipart/form-data" },
+      })
+      .then((r) => r.data);
+  },
 
   /**
    * Streaming variant of /assistant/chat. Emits tool_start / tool_end events as

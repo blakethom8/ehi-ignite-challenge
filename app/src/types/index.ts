@@ -222,6 +222,36 @@ export interface ResourceTypeCount {
   category: "Clinical" | "Billing" | "Administrative";
 }
 
+export interface FhirContextLabSection {
+  label: string;
+  count: number;
+  token_estimate: number;
+  included: boolean;
+}
+
+export interface FhirContextLabTraceStep {
+  label: string;
+  detail: string;
+  status: string;
+}
+
+export interface FhirContextLabPreviewResponse {
+  source_filename: string;
+  bundle_type: string;
+  entry_count: number;
+  resource_type_counts: Record<string, number>;
+  raw_bytes: number;
+  raw_token_estimate: number;
+  context_token_estimate: number;
+  compression_ratio: number | null;
+  fact_count: number;
+  patient_summary: string;
+  sections: FhirContextLabSection[];
+  trace_steps: FhirContextLabTraceStep[];
+  markdown: string;
+  warnings: string[];
+}
+
 export interface EncounterTypeSummary {
   encounter_type: string;
   count: number;
